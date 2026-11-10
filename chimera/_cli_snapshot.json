@@ -15,7 +15,7 @@
             "--url"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "a2a-card"
@@ -36,7 +36,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model for this session.",
@@ -46,7 +46,7 @@
             "--model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "30",
@@ -57,7 +57,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "acp"
@@ -76,7 +76,7 @@
             "task"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Print one final JSON object.",
@@ -86,7 +86,7 @@
             "--json"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Print JSON events as lines.",
@@ -96,7 +96,7 @@
             "--jsonl"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Override the model slug.",
@@ -107,7 +107,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "8",
@@ -118,7 +118,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "'.'",
@@ -130,7 +130,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Route deep-reasoning turns through fusion.",
@@ -140,7 +140,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Gate tool calls through the governance kernel.",
@@ -150,7 +150,7 @@
             "--guard"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Per-session allowlist: only these tools (comma-separated).",
@@ -160,7 +160,7 @@
             "--allow-tools"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Per-session denylist: drop these tools (comma-separated).",
@@ -170,7 +170,7 @@
             "--deny-tools"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "agent"
@@ -199,7 +199,7 @@
                 "agent_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "agents rm"
@@ -218,7 +218,7 @@
                 "agent_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "''",
@@ -229,7 +229,7 @@
                 "--name"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "''",
@@ -240,7 +240,7 @@
                 "--instructions"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "''",
@@ -251,7 +251,7 @@
                 "--model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "''",
@@ -262,7 +262,7 @@
                 "--tools"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "agents set"
@@ -289,7 +289,7 @@
             "method"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "API path, e.g. /api/health.",
@@ -299,7 +299,7 @@
             "path"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "JSON request body.",
@@ -310,7 +310,7 @@
             "-d"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Request header as 'Key: Value'. Repeatable.",
@@ -321,7 +321,7 @@
             "-H"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Server base URL.",
@@ -331,7 +331,7 @@
             "--url"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Confirm a state-changing request.",
@@ -342,7 +342,7 @@
             "-y"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "api"
@@ -362,7 +362,7 @@
             "--host"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "8765",
@@ -373,7 +373,7 @@
             "--port"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Override the model slug.",
@@ -384,7 +384,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "6",
@@ -395,7 +395,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Workspace root for tools. Falls back to $CHIMERA_WORKSPACE, then the current directory \u2014 which is the wrong root for a packaged app, whose current directory is wherever its shortcut points.",
@@ -406,7 +406,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Route turns through fusion (no token streaming).",
@@ -416,7 +416,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Don't recall long-term memory.",
@@ -426,7 +426,7 @@
             "--no-memory"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Fire scheduled jobs while the app is open (proactivity). Default: the CHIMERA_APP_CRON setting (on). --no-cron makes the app purely reactive.",
@@ -439,7 +439,7 @@
           "secondary_opts": [
             "--no-cron"
           ],
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "True",
@@ -453,7 +453,7 @@
           "secondary_opts": [
             "--no-open"
           ],
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Write the final http://host:port URL to this file once bound (for a parent/sidecar).",
@@ -463,7 +463,7 @@
             "--emit-port-file"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "A private server: publish no discovery file and no desktop bridge.",
@@ -473,7 +473,7 @@
             "--standalone"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "app"
@@ -492,7 +492,7 @@
             "request_id"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Approve it.",
@@ -503,7 +503,7 @@
             "-y"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Refuse it.",
@@ -514,7 +514,7 @@
             "-n"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Print the whole question \u2014 the full action \u2014 and answer nothing.",
@@ -524,7 +524,7 @@
             "--show"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "''",
@@ -535,7 +535,7 @@
             "--code"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "approve"
@@ -555,7 +555,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "6",
@@ -566,7 +566,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "'.'",
@@ -578,7 +578,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Don't recall long-term memory.",
@@ -588,7 +588,7 @@
             "--no-memory"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "True",
@@ -602,7 +602,7 @@
           "secondary_opts": [
             "--no-compact"
           ],
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Disable tiered routing (single default model instead).",
@@ -612,7 +612,7 @@
             "--no-cascade"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Stop once this conversation has spent this much (the whole run, not one turn).",
@@ -622,7 +622,7 @@
             "--max-usd"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
@@ -632,7 +632,7 @@
             "--write-region"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "assist"
@@ -653,7 +653,7 @@
                 "--wire"
               ],
               "required": false,
-              "type": "None"
+              "type": "path"
             },
             {
               "help": "Run trace JSONL path (default: CHIMERA_HOME/traces.jsonl).",
@@ -663,7 +663,7 @@
                 "--steplog"
               ],
               "required": false,
-              "type": "None"
+              "type": "path"
             },
             {
               "help": "Reconcile only this run id (the wire log is shared by every gateway user).",
@@ -673,7 +673,7 @@
                 "--run"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "audit reconcile"
@@ -703,7 +703,7 @@
                 "--tasks"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "bench cascade"
@@ -722,7 +722,7 @@
                 "baseline"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "JSON file of the treatment arm's per-task pass/fail.",
@@ -732,7 +732,7 @@
                 "treatment"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'baseline'",
@@ -743,7 +743,7 @@
                 "--baseline-name"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'chimera'",
@@ -754,7 +754,7 @@
                 "--treatment-name"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Paired (McNemar) test: item i in both files is the SAME task replayed from an identical forked state \u2014 a tighter CI.",
@@ -764,7 +764,7 @@
                 "--paired"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "bench compare"
@@ -783,7 +783,7 @@
                 "--traces"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Path to runs.jsonl (default: CHIMERA_HOME).",
@@ -793,7 +793,7 @@
                 "--runs"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Print the raw result instead of a table.",
@@ -803,7 +803,7 @@
                 "--json"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "bench context-curve"
@@ -823,7 +823,7 @@
                 "--length"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Override the model slug.",
@@ -834,7 +834,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "2",
@@ -845,7 +845,7 @@
                 "--retries"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "bench evoclaw"
@@ -865,7 +865,7 @@
                 "--tasks"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "bench fusion"
@@ -885,7 +885,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Top model for synthesis. Defaults to --model (same family keeps the isolation).",
@@ -895,7 +895,7 @@
                 "--top-model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "''",
@@ -906,7 +906,7 @@
                 "--tasks"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "4",
@@ -917,7 +917,7 @@
                 "--max-workers"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Write the JSON summary to this path.",
@@ -927,7 +927,7 @@
                 "--out"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Run the MULTI-STEP suite instead (single growing context vs per-step scoped workers, over large docs) \u2014 the regime where the hierarchy actually saves tokens. Also reports a caching-aware dollar reduction.",
@@ -937,7 +937,7 @@
                 "--multistep"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "bench hierarchy"
@@ -957,7 +957,7 @@
                 "--sizes"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Use embedding recall (needs an embeddings key) to measure the lift.",
@@ -967,7 +967,7 @@
                 "--semantic"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "bench memory"
@@ -994,7 +994,7 @@
                 "data"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Read observations from a ProbeLog JSONL (e.g. <home>/probe.jsonl written by `solve --probe-log`).",
@@ -1004,7 +1004,7 @@
                 "--from-log"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "0.1",
@@ -1015,7 +1015,7 @@
                 "--delta"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "default": "2",
@@ -1026,7 +1026,7 @@
                 "--min-reward"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "bench probe-select"
@@ -1045,7 +1045,7 @@
                 "--rubric"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "The task the answer is for.",
@@ -1055,7 +1055,7 @@
                 "--task"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "The answer text (or use --answer-file).",
@@ -1065,7 +1065,7 @@
                 "--answer"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Read the answer from this file.",
@@ -1075,7 +1075,7 @@
                 "--answer-file"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Model slug for the grader.",
@@ -1085,7 +1085,7 @@
                 "--model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "bench rubric-grade"
@@ -1106,7 +1106,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the model slug.",
@@ -1117,7 +1117,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "8",
@@ -1128,7 +1128,7 @@
                 "--max-steps"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "bench sandbox"
@@ -1147,7 +1147,7 @@
                 "--openapi"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Include a couple of synthetic verbose tools to show the effect.",
@@ -1157,7 +1157,7 @@
                 "--demo"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Tokenizer model (default: your default).",
@@ -1168,7 +1168,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "bench schema"
@@ -1188,7 +1188,7 @@
                 "--tasks"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "1",
@@ -1199,7 +1199,7 @@
                 "--k"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "2",
@@ -1210,7 +1210,7 @@
                 "--min-overlap"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "3",
@@ -1221,7 +1221,7 @@
                 "--max-lines"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Bench your own learned cards (skills.json) instead of the demo set.",
@@ -1231,7 +1231,7 @@
                 "--use-store"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "bench skillcard"
@@ -1250,7 +1250,7 @@
                 "baseline"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "SWE-bench evaluation report JSON for the model+Chimera arm.",
@@ -1260,7 +1260,7 @@
                 "treatment"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "JSONL of the instances both arms ran (fixes the id set).",
@@ -1270,7 +1270,7 @@
                 "--instances"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "bench swe-compare"
@@ -1289,7 +1289,7 @@
                 "tuned_baseline"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "JSON pass/fail of the candidate on the TUNED slice (aligned, same order).",
@@ -1299,7 +1299,7 @@
                 "tuned_treatment"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "JSON pass/fail of the baseline on a DISJOINT same-capability holdout.",
@@ -1309,7 +1309,7 @@
                 "--holdout-baseline"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "JSON pass/fail of the candidate on the holdout (aligned).",
@@ -1319,7 +1319,7 @@
                 "--holdout-treatment"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Require the tuned gain's paired CI to exclude 0, not just \u0394>0.",
@@ -1329,7 +1329,7 @@
                 "--require-significant"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "default": "0.0",
@@ -1340,7 +1340,7 @@
                 "--tol"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "bench transfer-gate"
@@ -1360,7 +1360,7 @@
             "--limit"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Override the model slug.",
@@ -1371,7 +1371,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Use the fusion engine as the solver.",
@@ -1381,7 +1381,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Run the stateful chained benchmark (error propagation).",
@@ -1391,7 +1391,7 @@
             "--chain"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Use the hard suite (traps / propagating chain).",
@@ -1401,7 +1401,7 @@
             "--hard"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "1",
@@ -1412,7 +1412,7 @@
             "--rounds"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "bench"
@@ -1431,7 +1431,7 @@
             "baseline"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "JSON file of the treatment arm's per-task pass/fail.",
@@ -1441,7 +1441,7 @@
             "treatment"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'baseline'",
@@ -1452,7 +1452,7 @@
             "--baseline-name"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'chimera'",
@@ -1463,7 +1463,7 @@
             "--treatment-name"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Paired (McNemar) test: item i in both files is the SAME task replayed from an identical forked state \u2014 a tighter CI.",
@@ -1473,7 +1473,7 @@
             "--paired"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "bench-compare"
@@ -1493,7 +1493,7 @@
             "--recipe"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Write the digest to this file (default: print only).",
@@ -1503,7 +1503,7 @@
             "--out"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "4",
@@ -1514,7 +1514,7 @@
             "--max-workers"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "brief"
@@ -1534,7 +1534,7 @@
             "--tasks"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "cascade-bench"
@@ -1555,7 +1555,7 @@
                 "--check"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "catalog pins"
@@ -1583,7 +1583,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "6",
@@ -1594,7 +1594,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "'.'",
@@ -1606,7 +1606,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Route deep-reasoning turns through fusion.",
@@ -1616,7 +1616,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default).",
@@ -1626,7 +1626,7 @@
             "--cascade"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Don't recall long-term memory.",
@@ -1636,7 +1636,7 @@
             "--no-memory"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Resume a specific session id (see 'chimera sessions').",
@@ -1647,7 +1647,7 @@
             "-s"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Start a fresh session instead of resuming.",
@@ -1657,7 +1657,7 @@
             "--new"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Stop once this conversation has spent this much (the whole thread, not one turn).",
@@ -1667,7 +1667,7 @@
             "--max-usd"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
@@ -1677,7 +1677,7 @@
             "--write-region"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "True",
@@ -1691,7 +1691,7 @@
           "secondary_opts": [
             "--no-compact"
           ],
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "chat"
@@ -1714,7 +1714,7 @@
                 "-n"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "code list"
@@ -1733,7 +1733,7 @@
                 "message"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "The project folder. Omitted: the app's default folder, with no project.",
@@ -1744,7 +1744,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "code new"
@@ -1763,7 +1763,7 @@
                 "session_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Send this one message and exit. Omit to keep talking.",
@@ -1774,7 +1774,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "code resume"
@@ -1801,7 +1801,7 @@
             "--traces"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Path to runs.jsonl (default: CHIMERA_HOME).",
@@ -1811,7 +1811,7 @@
             "--runs"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Print the raw result instead of a table.",
@@ -1821,7 +1821,7 @@
             "--json"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "context-curve"
@@ -1840,7 +1840,7 @@
             "task"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'sequential'",
@@ -1851,7 +1851,7 @@
             "--mode"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -1862,7 +1862,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Use the fusion engine as the backend.",
@@ -1872,7 +1872,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "crew"
@@ -1891,7 +1891,7 @@
             "task"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "A worker as 'name:instruction'; repeatable. Each edits in its own worktree.",
@@ -1902,7 +1902,7 @@
             "-W"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -1914,7 +1914,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -1925,7 +1925,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Per-worker gate: shell command run in each worktree (exit 0 to merge).",
@@ -1935,7 +1935,7 @@
             "--verify"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "6",
@@ -1946,7 +1946,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "4",
@@ -1957,7 +1957,7 @@
             "--max-workers"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "A supervisor folds the merged results into one unified report.",
@@ -1967,7 +1967,7 @@
             "--synthesize"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Workers do DISJOINT parts: land every approved worker's files instead of one worker's whole tree (files two of them changed land from neither).",
@@ -1977,7 +1977,7 @@
             "--merge-all"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Route worker turns through fusion.",
@@ -1987,7 +1987,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless \u2014 it's always on for fan-out.",
@@ -1997,7 +1997,7 @@
             "--taint"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "crew-isolated"
@@ -2018,7 +2018,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Cron expression, or an event/webhook name.",
@@ -2028,7 +2028,7 @@
                 "schedule"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "What to do (task description / skill).",
@@ -2038,7 +2038,7 @@
                 "action"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Treat SCHEDULE as an event name.",
@@ -2048,7 +2048,7 @@
                 "--event"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Fire on POST /webhook/<SCHEDULE> (needs 'chimera serve').",
@@ -2058,7 +2058,7 @@
                 "--webhook"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "default": "''",
@@ -2069,7 +2069,7 @@
                 "--verify"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "1",
@@ -2080,7 +2080,7 @@
                 "--max-attempts"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "'always'",
@@ -2091,7 +2091,7 @@
                 "--notify"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Comma-separated tools this job may use; the rest are removed from its registry. Omit for every tool (the previous behaviour). Refused with --webhook: a webhook job runs through the chat gateway, which does not apply the list.",
@@ -2101,7 +2101,7 @@
                 "--tools"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Chat webhook URL (Discord or Slack) the job's answers are posted to, per --notify; a run that could not run or finish is announced there too. The URL is a credential and is never printed in full. Refused with --webhook: that job answers through the chat gateway.",
@@ -2111,7 +2111,7 @@
                 "--deliver-to"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "cron add"
@@ -2130,7 +2130,7 @@
                 "job_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "cron disable"
@@ -2150,7 +2150,7 @@
                 "--grace"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Exit 1 when a job is late or failing, so a watcher outside Chimera alerts only then.",
@@ -2160,7 +2160,7 @@
                 "--check"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "cron doctor"
@@ -2179,7 +2179,7 @@
                 "job_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "cron enable"
@@ -2198,7 +2198,7 @@
                 "event"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Model for the dispatched jobs.",
@@ -2209,7 +2209,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "6",
@@ -2220,7 +2220,7 @@
                 "--max-steps"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "'.'",
@@ -2232,7 +2232,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "cron fire"
@@ -2251,7 +2251,7 @@
                 "job_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "cron kill"
@@ -2271,7 +2271,7 @@
                 "--min"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Override the suggested cron schedule.",
@@ -2281,7 +2281,7 @@
                 "--schedule"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Create every proposal without prompting.",
@@ -2292,7 +2292,7 @@
                 "-y"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "cron learn"
@@ -2319,7 +2319,7 @@
                 "job_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "cron remove"
@@ -2347,7 +2347,7 @@
             "-q"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "''",
@@ -2359,7 +2359,7 @@
             "-s"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Ask about every line of this JSONL file instead.",
@@ -2369,7 +2369,7 @@
             "--jsonl"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'state'",
@@ -2380,7 +2380,7 @@
             "--field"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "With --jsonl: write results here (default: stdout).",
@@ -2391,7 +2391,7 @@
             "-o"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "''",
@@ -2402,7 +2402,7 @@
             "--decision"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Do not write the answers to the decision log.",
@@ -2412,7 +2412,7 @@
             "--no-log"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "decide"
@@ -2433,7 +2433,7 @@
                 "entry_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "The question's event happened (governance: it WAS dangerous).",
@@ -2444,7 +2444,7 @@
                 "-y"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "It did not (governance: it was NOT dangerous).",
@@ -2455,7 +2455,7 @@
                 "-n"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "default": "''",
@@ -2466,7 +2466,7 @@
                 "--note"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "decisions label"
@@ -2487,7 +2487,7 @@
                 "-n"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Only answers without a label.",
@@ -2497,7 +2497,7 @@
                 "--unlabelled"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "decisions log"
@@ -2524,7 +2524,7 @@
                 "--write"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "decisions refit"
@@ -2551,7 +2551,7 @@
                 "backend"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "''",
@@ -2562,7 +2562,7 @@
                 "model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "decisions use"
@@ -2589,7 +2589,7 @@
             "--path"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "delegations"
@@ -2608,7 +2608,7 @@
             "request"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Write the deliverable to this file.",
@@ -2619,7 +2619,7 @@
             "-o"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'md'",
@@ -2631,7 +2631,7 @@
             "-f"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -2642,7 +2642,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Use the fusion engine for higher quality.",
@@ -2652,7 +2652,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "deliver"
@@ -2671,7 +2671,7 @@
             "--fix"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Actually call the provider once, instead of trusting the key's name.",
@@ -2681,7 +2681,7 @@
             "--probe"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "doctor"
@@ -2700,7 +2700,7 @@
             "spec"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -2712,7 +2712,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Check only this requirement id (project cards).",
@@ -2722,7 +2722,7 @@
             "--only"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "drift"
@@ -2742,7 +2742,7 @@
             "--length"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Override the model slug.",
@@ -2753,7 +2753,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "2",
@@ -2764,7 +2764,7 @@
             "--retries"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "evoclaw"
@@ -2785,7 +2785,7 @@
                 "--out"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'sft'",
@@ -2796,7 +2796,7 @@
                 "--format"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Trajectory JSONL (default: <home>/trajectories.jsonl).",
@@ -2806,7 +2806,7 @@
                 "--traj"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "0.0",
@@ -2817,7 +2817,7 @@
                 "--min-reward"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Keep duplicate examples.",
@@ -2827,7 +2827,7 @@
                 "--no-dedup"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "default": "0.0",
@@ -2838,7 +2838,7 @@
                 "--min-margin"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "default": "0",
@@ -2849,7 +2849,7 @@
                 "--min-steps"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Recipe: at most one SFT example per task.",
@@ -2859,7 +2859,7 @@
                 "--diverse"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Keep only traces whose step-following score >= this (SkillCoach).",
@@ -2869,7 +2869,7 @@
                 "--min-process"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "evolve export"
@@ -2889,7 +2889,7 @@
                 "--limit"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Override the model slug.",
@@ -2900,7 +2900,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Also roll back if second-half mean cost exceeds first by more than this.",
@@ -2910,7 +2910,7 @@
                 "--cost-drift-tol"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Retire the most recent skill IF a SIGNIFICANT regression is measured.",
@@ -2920,7 +2920,7 @@
                 "--apply"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "evolve guard"
@@ -2939,7 +2939,7 @@
                 "--out"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'sft'",
@@ -2950,7 +2950,7 @@
                 "--format"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'meta-llama/Llama-3.1-8B-Instruct'",
@@ -2960,7 +2960,7 @@
                 "--base-model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'dataset.jsonl'",
@@ -2971,7 +2971,7 @@
                 "--dataset"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "evolve recipe"
@@ -2990,7 +2990,7 @@
                 "skill_name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Trajectory JSONL (default: <home>/trajectories.jsonl).",
@@ -3000,7 +3000,7 @@
                 "--traj"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the model.",
@@ -3011,7 +3011,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "20",
@@ -3022,7 +3022,7 @@
                 "--budget"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "1.0",
@@ -3033,7 +3033,7 @@
                 "--min-reward"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Persist the refined skill IF it passes the transfer gate.",
@@ -3043,7 +3043,7 @@
                 "--apply"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "evolve refine"
@@ -3062,7 +3062,7 @@
                 "--baseline"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "JSON list of candidate bench pass/fail.",
@@ -3072,7 +3072,7 @@
                 "--candidate"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Trajectory JSONL (default: <home>/trajectories.jsonl).",
@@ -3082,7 +3082,7 @@
                 "--traj"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "0.5",
@@ -3093,7 +3093,7 @@
                 "--min-reward"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "default": "30",
@@ -3104,7 +3104,7 @@
                 "--min-examples"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "0",
@@ -3115,7 +3115,7 @@
                 "--top-k"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "If promoted, write dataset + recipe here.",
@@ -3125,7 +3125,7 @@
                 "--out"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Export even if the round is not promoted.",
@@ -3135,7 +3135,7 @@
                 "--force"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "evolve rft"
@@ -3154,7 +3154,7 @@
                 "--traj"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "0.0",
@@ -3165,7 +3165,7 @@
                 "--min-reward"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "default": "30",
@@ -3176,7 +3176,7 @@
                 "--min-examples"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "evolve status"
@@ -3196,7 +3196,7 @@
                 "--rounds"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Base model for the spec.",
@@ -3206,7 +3206,7 @@
                 "--model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "8",
@@ -3217,7 +3217,7 @@
                 "--max-steps"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "3",
@@ -3228,7 +3228,7 @@
                 "--k"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "evolve tune"
@@ -3255,7 +3255,7 @@
             "query"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -3267,7 +3267,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Model for the explorer (a cheap one is fine).",
@@ -3278,7 +3278,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "8",
@@ -3289,7 +3289,7 @@
             "--max-turns"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "'medium'",
@@ -3300,7 +3300,7 @@
             "--thoroughness"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "explore"
@@ -3327,7 +3327,7 @@
             "query"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -3338,7 +3338,7 @@
             "--path"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "8",
@@ -3349,7 +3349,7 @@
             "--k"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Rebuild the index before searching.",
@@ -3359,7 +3359,7 @@
             "--reindex"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Fuse keyword with embeddings. Costs money to index.",
@@ -3369,7 +3369,7 @@
             "--semantic"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "find"
@@ -3388,7 +3388,7 @@
             "prompt"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Show panel answers + judge analysis.",
@@ -3398,7 +3398,7 @@
             "--show-panel"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Override selective fusion (default: from settings).",
@@ -3411,7 +3411,7 @@
           "secondary_opts": [
             "--full"
           ],
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "1",
@@ -3422,7 +3422,7 @@
             "--best-of"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "With --best-of: pick the best sample by a verifier score instead of majority vote (Weaver-lite).",
@@ -3432,7 +3432,7 @@
             "--verify-select"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Model for --best-of self-consistency.",
@@ -3443,7 +3443,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Print the itemized receipt: per-advisor cost at each model's rate.",
@@ -3453,7 +3453,7 @@
             "--show-cost"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Append the run's cost receipt to this JSONL (for cost\u00d7quality analysis).",
@@ -3463,7 +3463,7 @@
             "--receipt"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "fuse"
@@ -3483,7 +3483,7 @@
             "--tasks"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "fusion-bench"
@@ -3502,7 +3502,7 @@
             "path"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "fusion-receipts"
@@ -3521,7 +3521,7 @@
             "action"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "guard"
@@ -3541,7 +3541,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Top model for synthesis. Defaults to --model (same family keeps the isolation).",
@@ -3551,7 +3551,7 @@
             "--top-model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "''",
@@ -3562,7 +3562,7 @@
             "--tasks"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "4",
@@ -3573,7 +3573,7 @@
             "--max-workers"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Write the JSON summary to this path.",
@@ -3583,7 +3583,7 @@
             "--out"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Run the MULTI-STEP suite instead (single growing context vs per-step scoped workers, over large docs) \u2014 the regime where the hierarchy actually saves tokens. Also reports a caching-aware dollar reduction.",
@@ -3593,7 +3593,7 @@
             "--multistep"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "hierarchy-bench"
@@ -3613,7 +3613,7 @@
             "--provider"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "API key for --provider.",
@@ -3623,7 +3623,7 @@
             "--key"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Your OpenRouter API key (same as --provider openrouter --key).",
@@ -3633,7 +3633,7 @@
             "--openrouter-key"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Default model slug to set (optional).",
@@ -3643,7 +3643,7 @@
             "--model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Non-interactive: never prompt.",
@@ -3654,7 +3654,7 @@
             "-y"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Project dir for the .env (default: cwd).",
@@ -3664,7 +3664,7 @@
             "--home"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "init"
@@ -3685,7 +3685,7 @@
                 "title"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Task text to run (defaults to title).",
@@ -3696,7 +3696,7 @@
                 "-a"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'solve'",
@@ -3708,7 +3708,7 @@
                 "-l"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Verify command for the solve lane (exit 0).",
@@ -3718,7 +3718,7 @@
                 "--verify"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "kanban add"
@@ -3746,7 +3746,7 @@
                 "--min"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "'solve'",
@@ -3758,7 +3758,7 @@
                 "-l"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Add every card without prompting.",
@@ -3769,7 +3769,7 @@
                 "-y"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "kanban learn"
@@ -3788,7 +3788,7 @@
                 "card_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "backlog | doing | review | done.",
@@ -3798,7 +3798,7 @@
                 "column"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "kanban move"
@@ -3817,7 +3817,7 @@
                 "card_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "kanban rm"
@@ -3837,7 +3837,7 @@
                 "-n"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "'.'",
@@ -3849,7 +3849,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the model slug.",
@@ -3860,7 +3860,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "1",
@@ -3872,7 +3872,7 @@
                 "-j"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "kanban run"
@@ -3901,7 +3901,7 @@
                 "--tainted"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "lessons show"
@@ -3920,7 +3920,7 @@
                 "seq"
               ],
               "required": true,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "lessons vouch"
@@ -3947,7 +3947,7 @@
             "task"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Test command for the test stage (exit 0).",
@@ -3957,7 +3957,7 @@
             "--verify"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -3969,7 +3969,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -3980,7 +3980,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "2",
@@ -3991,7 +3991,7 @@
             "--max-attempts"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "lifecycle"
@@ -4010,7 +4010,7 @@
             "--follow"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Only records containing this run id.",
@@ -4020,7 +4020,7 @@
             "--run"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Minimum log level.",
@@ -4030,7 +4030,7 @@
             "--level"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "100",
@@ -4041,7 +4041,7 @@
             "--lines"
           ],
           "required": false,
-          "type": "None"
+          "type": "int range"
         }
       ],
       "path": "logs"
@@ -4061,7 +4061,7 @@
             "--tests"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "maturity"
@@ -4082,7 +4082,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "The launch command (e.g. npx, uvx, python).",
@@ -4093,7 +4093,7 @@
                 "-c"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "A streamable-HTTP MCP endpoint.",
@@ -4103,7 +4103,7 @@
                 "--url"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Per-call timeout in seconds for this server (default 120).",
@@ -4113,7 +4113,7 @@
                 "--call-timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Connect timeout in seconds for this server (default 30).",
@@ -4123,7 +4123,7 @@
                 "--connect-timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Timeout in seconds for listing tools (default 30).",
@@ -4133,7 +4133,7 @@
                 "--catalog-timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Working directory for a local stdio server.",
@@ -4143,7 +4143,7 @@
                 "--cwd"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Maximum response characters per tool call for this server.",
@@ -4153,7 +4153,7 @@
                 "--max-output-chars"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Environment variable containing a bearer token.",
@@ -4163,7 +4163,7 @@
                 "--token-env"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "OAuth authorization endpoint.",
@@ -4173,7 +4173,7 @@
                 "--oauth-authorization-url"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "OAuth token endpoint.",
@@ -4183,7 +4183,7 @@
                 "--oauth-token-url"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "OAuth public client ID.",
@@ -4193,7 +4193,7 @@
                 "--oauth-client-id"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "OAuth loopback redirect URI.",
@@ -4203,7 +4203,7 @@
                 "--oauth-redirect-uri"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "OAuth scope string.",
@@ -4213,7 +4213,7 @@
                 "--oauth-scope"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "A command argument (repeatable).",
@@ -4224,7 +4224,7 @@
                 "-a"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "An env var as K=V (repeatable).",
@@ -4235,7 +4235,7 @@
                 "-e"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "mcp add"
@@ -4254,7 +4254,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Approve without asking (the diff still prints).",
@@ -4265,7 +4265,7 @@
                 "-y"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "mcp approve"
@@ -4292,7 +4292,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "mcp disable"
@@ -4311,7 +4311,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "mcp enable"
@@ -4338,7 +4338,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "180.0",
@@ -4349,7 +4349,7 @@
                 "--timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "mcp login"
@@ -4368,7 +4368,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "mcp logout"
@@ -4387,7 +4387,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "mcp remove"
@@ -4406,7 +4406,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "12.0",
@@ -4417,7 +4417,7 @@
                 "--timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "mcp test"
@@ -4446,7 +4446,7 @@
                 "root"
               ],
               "required": true,
-              "type": "None"
+              "type": "path"
             },
             {
               "default": "10",
@@ -4457,7 +4457,7 @@
                 "--k"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "200",
@@ -4468,7 +4468,7 @@
                 "--max-probes"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Measure the vector and hybrid arms too. Costs money.",
@@ -4478,7 +4478,7 @@
                 "--semantic"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "measure rag"
@@ -4497,7 +4497,7 @@
                 "corpus"
               ],
               "required": true,
-              "type": "None"
+              "type": "path"
             },
             {
               "default": "5",
@@ -4508,7 +4508,7 @@
                 "--k"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "measure reranker"
@@ -4537,7 +4537,7 @@
                 "content"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Optional dedup key.",
@@ -4547,7 +4547,7 @@
                 "--key"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Store as a persona fact (part of the cross-session profile).",
@@ -4557,7 +4557,7 @@
                 "--persona"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "memory add"
@@ -4577,7 +4577,7 @@
                 "--threshold"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Only list the clusters that would be merged (no model call, no write).",
@@ -4587,7 +4587,7 @@
                 "--dry-run"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "memory consolidate"
@@ -4607,7 +4607,7 @@
                 "--format"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Write to this file (default: print to stdout).",
@@ -4617,7 +4617,7 @@
                 "--out"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "memory export"
@@ -4637,7 +4637,7 @@
                 "-e"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "memory graph"
@@ -4673,7 +4673,7 @@
                 "--max"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Actually delete. Default is a dry-run preview (no data lost).",
@@ -4683,7 +4683,7 @@
                 "--apply"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "memory prune"
@@ -4702,7 +4702,7 @@
                 "query"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "5",
@@ -4713,7 +4713,7 @@
                 "--k"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             }
           ],
           "path": "memory search"
@@ -4741,7 +4741,7 @@
             "--sizes"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Use embedding recall (needs an embeddings key) to measure the lift.",
@@ -4751,7 +4751,7 @@
             "--semantic"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "memory-bench"
@@ -4778,7 +4778,7 @@
             "task"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -4789,7 +4789,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "meta"
@@ -4808,7 +4808,7 @@
             "source"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Path to the source agent's home directory (for claude: ~/.claude or a project).",
@@ -4818,7 +4818,7 @@
             "path"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Write artifacts (default: dry-run preview).",
@@ -4828,7 +4828,7 @@
             "--apply"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Target Chimera home (default: from config).",
@@ -4838,7 +4838,7 @@
             "--home"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "migrate"
@@ -4859,7 +4859,7 @@
                 "--tier"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Filter by vendor substring.",
@@ -4869,7 +4869,7 @@
                 "--vendor"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "models catalog"
@@ -4888,7 +4888,7 @@
                 "role"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "A model slug (any vendor), 'auto' to unpin, or a cost mode for 'mode'.",
@@ -4898,7 +4898,7 @@
                 "value"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "models set"
@@ -4925,7 +4925,7 @@
             "task"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "4",
@@ -4936,7 +4936,7 @@
             "--max-workers"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Token budget per delegation (default: settings).",
@@ -4946,7 +4946,7 @@
             "--budget"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Show classification + decomposition + estimate; zero worker spend.",
@@ -4956,7 +4956,7 @@
             "--dry-run"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Model slug for the spot-check auditor (a DISTINCT/cross-provider model that grades a worker's summary against its raw output). Default: the weak tier.",
@@ -4966,7 +4966,7 @@
             "--verify-model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "orchestrate"
@@ -4985,7 +4985,7 @@
             "--lan"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Print the code and URLs as JSON.",
@@ -4995,7 +4995,7 @@
             "--json"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "pair"
@@ -5025,7 +5025,7 @@
                 "--name"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'chimera'",
@@ -5036,7 +5036,7 @@
                 "--species"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "pet new"
@@ -5089,7 +5089,7 @@
                 "content"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'strategy'",
@@ -5100,7 +5100,7 @@
                 "--section"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "playbook add"
@@ -5119,7 +5119,7 @@
                 "--task"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "What happened (success/failure + details).",
@@ -5129,7 +5129,7 @@
                 "--outcome"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Model slug for the reflect+curate call.",
@@ -5139,7 +5139,7 @@
                 "--model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "playbook curate"
@@ -5166,7 +5166,7 @@
                 "--ids"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "playbook show"
@@ -5185,7 +5185,7 @@
                 "item_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "playbook vouch"
@@ -5213,7 +5213,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "plugin disable"
@@ -5231,7 +5231,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Also add this MCP server of the plugin (repeatable). None is added otherwise.",
@@ -5241,7 +5241,7 @@
                 "--add-mcp"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "plugin enable"
@@ -5260,7 +5260,7 @@
                 "source"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "plugin install"
@@ -5289,7 +5289,7 @@
                     "source"
                   ],
                   "required": true,
-                  "type": "None"
+                  "type": "str"
                 }
               ],
               "path": "plugin marketplace add"
@@ -5323,7 +5323,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "plugin remove"
@@ -5341,7 +5341,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "A new pinned source; default: re-read the recorded one.",
@@ -5351,7 +5351,7 @@
                 "--source"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "plugin update"
@@ -5370,7 +5370,7 @@
                 "path"
               ],
               "required": true,
-              "type": "None"
+              "type": "path"
             }
           ],
           "path": "plugin validate"
@@ -5415,7 +5415,7 @@
             "data"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Read observations from a ProbeLog JSONL (e.g. <home>/probe.jsonl written by `solve --probe-log`).",
@@ -5425,7 +5425,7 @@
             "--from-log"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "0.1",
@@ -5436,7 +5436,7 @@
             "--delta"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "default": "2",
@@ -5447,7 +5447,7 @@
             "--min-reward"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "probe-select"
@@ -5468,7 +5468,7 @@
                 "value"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "profile forget"
@@ -5487,7 +5487,7 @@
                 "kind"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "The fact to store.",
@@ -5497,7 +5497,7 @@
                 "value"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "profile set"
@@ -5534,7 +5534,7 @@
                 "project_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Approve a specific high-risk card instead of the plan.",
@@ -5544,7 +5544,7 @@
                 "--card"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the solve model.",
@@ -5555,7 +5555,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "project approve"
@@ -5574,7 +5574,7 @@
                 "project_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "The high-risk card to reject.",
@@ -5584,7 +5584,7 @@
                 "--card"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "project deny"
@@ -5603,7 +5603,7 @@
                 "project_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the solve model.",
@@ -5614,7 +5614,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "project run"
@@ -5633,7 +5633,7 @@
                 "spec"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "'.'",
@@ -5645,7 +5645,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the solve model.",
@@ -5656,7 +5656,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "20",
@@ -5667,7 +5667,7 @@
                 "--max-iterations"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Skip the initial plan-approval pause (auto-approve).",
@@ -5678,7 +5678,7 @@
                 "-y"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "project start"
@@ -5697,7 +5697,7 @@
                 "project_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "project status"
@@ -5716,7 +5716,7 @@
                 "project_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the solve model.",
@@ -5727,7 +5727,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "project step"
@@ -5766,7 +5766,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Look now and print the summary instead of proposing the job. Reads only; remembers nothing.",
@@ -5776,7 +5776,7 @@
                 "--print"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Look now and print what was found as JSON. Reads only; remembers nothing.",
@@ -5786,7 +5786,7 @@
                 "--json"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Chat webhook URL (Discord or Slack) the job posts to. Stored on the proposal; never printed in full.",
@@ -5796,7 +5796,7 @@
                 "--deliver-to"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "pt or en. Default: the owner's identity language (Portuguese unless it names another).",
@@ -5806,7 +5806,7 @@
                 "--lang"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "report pr-watch"
@@ -5825,7 +5825,7 @@
                 "--print"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Chat webhook URL (Discord or Slack) the weekly job posts to. Stored on the proposal; never printed in full.",
@@ -5835,7 +5835,7 @@
                 "--deliver-to"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "pt or en. Default: the owner's identity language (Portuguese unless it names another).",
@@ -5845,7 +5845,7 @@
                 "--lang"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "report weekly"
@@ -5872,7 +5872,7 @@
             "revision_range"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Review the working tree against its merge base with this ref (default: main).",
@@ -5882,7 +5882,7 @@
             "--base"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -5893,7 +5893,7 @@
             "--repo"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Print only the report, as JSON (schema chimera.review/1).",
@@ -5903,7 +5903,7 @@
             "--json"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "''",
@@ -5914,7 +5914,7 @@
             "--reviewer-model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "''",
@@ -5925,7 +5925,7 @@
             "--author-model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "low: finder only. medium: also hide findings under confidence 0.8, then verify. high (default): finder and verifier, no cut. See bench/review_confidence_cut.",
@@ -5935,7 +5935,7 @@
             "--effort"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Show every located finding, without the second-stage check (same as --effort low).",
@@ -5945,7 +5945,7 @@
             "--no-verify"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Also list the findings the checks dropped, with the reason.",
@@ -5955,7 +5955,7 @@
             "--show-dropped"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "10",
@@ -5966,7 +5966,7 @@
             "--context"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "review"
@@ -5985,7 +5985,7 @@
             "--rubric"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "The task the answer is for.",
@@ -5995,7 +5995,7 @@
             "--task"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "The answer text (or use --answer-file).",
@@ -6005,7 +6005,7 @@
             "--answer"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Read the answer from this file.",
@@ -6015,7 +6015,7 @@
             "--answer-file"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Model slug for the grader.",
@@ -6025,7 +6025,7 @@
             "--model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "rubric-grade"
@@ -6044,7 +6044,7 @@
             "prompt"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Print one final JSON object.",
@@ -6054,7 +6054,7 @@
             "--json"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Print JSON events as lines.",
@@ -6064,7 +6064,7 @@
             "--jsonl"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Override the model slug.",
@@ -6075,7 +6075,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Optional system prompt.",
@@ -6086,7 +6086,7 @@
             "-s"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Attach an image (path or URL); repeatable. Needs a vision model.",
@@ -6096,7 +6096,7 @@
             "--image"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "run"
@@ -6117,7 +6117,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -6128,7 +6128,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "8",
@@ -6139,7 +6139,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         }
       ],
       "path": "sandbox-bench"
@@ -6159,7 +6159,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "3",
@@ -6170,7 +6170,7 @@
             "--k"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "6",
@@ -6181,7 +6181,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "3.0",
@@ -6192,7 +6192,7 @@
             "--max-usd"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "default": "1",
@@ -6203,7 +6203,7 @@
             "--seed"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Where to append the JSONL row (default <home>/scenarios.jsonl).",
@@ -6213,7 +6213,7 @@
             "--series"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "scenarios"
@@ -6232,7 +6232,7 @@
             "--openapi"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Include a couple of synthetic verbose tools to show the effect.",
@@ -6242,7 +6242,7 @@
             "--demo"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Tokenizer model (default: your default).",
@@ -6253,7 +6253,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "schema-bench"
@@ -6282,7 +6282,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "secrets rm"
@@ -6301,7 +6301,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Omit to be prompted without echo.",
@@ -6311,7 +6311,7 @@
                 "--value"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "secrets set"
@@ -6339,7 +6339,7 @@
             "--host"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "8765",
@@ -6350,7 +6350,7 @@
             "--port"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Serve on a reachable address with no token. Only behind a network you already trust.",
@@ -6360,7 +6360,7 @@
             "--allow-insecure-bind"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Override the model slug.",
@@ -6371,7 +6371,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "6",
@@ -6382,7 +6382,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "'.'",
@@ -6394,7 +6394,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Route deep-reasoning turns through fusion.",
@@ -6404,7 +6404,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Don't recall long-term memory.",
@@ -6414,7 +6414,7 @@
             "--no-memory"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Serve on Discord (needs CHIMERA_DISCORD_BOT_TOKEN + the 'messaging' extra).",
@@ -6424,7 +6424,7 @@
             "--discord"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Serve on Telegram (needs CHIMERA_TELEGRAM_BOT_TOKEN).",
@@ -6434,7 +6434,7 @@
             "--telegram"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Serve on Slack (needs CHIMERA_SLACK_BOT_TOKEN + CHIMERA_SLACK_APP_TOKEN + the 'messaging' extra).",
@@ -6444,7 +6444,7 @@
             "--slack"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Serve on Signal via a signal-cli-rest-api bridge (CHIMERA_SIGNAL_API_URL + CHIMERA_SIGNAL_NUMBER).",
@@ -6454,7 +6454,7 @@
             "--signal"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Also run the cron daemon: fire scheduled jobs on the real clock (proactivity).",
@@ -6464,7 +6464,7 @@
             "--cron"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "30",
@@ -6475,7 +6475,7 @@
             "--cron-tick"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Serve Chimera AS an MCP server over stdio (solve/fuse/memory as tools).",
@@ -6485,7 +6485,7 @@
             "--mcp"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Also expose an A2A endpoint on HTTP (agent card + task lifecycle).",
@@ -6495,7 +6495,7 @@
             "--a2a"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "serve"
@@ -6516,7 +6516,7 @@
                 "--lan"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Print the code and URLs as JSON.",
@@ -6526,7 +6526,7 @@
                 "--json"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "service pair"
@@ -6545,7 +6545,7 @@
                 "--port"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Workspace root for the tools.",
@@ -6556,7 +6556,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "120.0",
@@ -6567,7 +6567,7 @@
                 "--timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "service restart"
@@ -6587,7 +6587,7 @@
                 "--host"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Port to serve on (default: the channel's own).",
@@ -6597,7 +6597,7 @@
                 "--port"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Workspace root for the tools.",
@@ -6608,7 +6608,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Override the model slug.",
@@ -6619,7 +6619,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "6",
@@ -6630,7 +6630,7 @@
                 "--max-steps"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Don't recall long-term memory.",
@@ -6640,7 +6640,7 @@
                 "--no-memory"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "help": "Default: the CHIMERA_APP_CRON setting.",
@@ -6653,7 +6653,7 @@
               "secondary_opts": [
                 "--no-cron"
               ],
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "service run"
@@ -6672,7 +6672,7 @@
                 "--port"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Workspace root for the tools.",
@@ -6683,7 +6683,7 @@
                 "-w"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "120.0",
@@ -6694,7 +6694,7 @@
                 "--timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "help": "Print the outcome as JSON (no token).",
@@ -6704,7 +6704,7 @@
                 "--json"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "service start"
@@ -6723,7 +6723,7 @@
                 "--json"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "service status"
@@ -6742,7 +6742,7 @@
                 "--now"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "default": "60.0",
@@ -6753,7 +6753,7 @@
                 "--timeout"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "service stop"
@@ -6782,7 +6782,7 @@
                 "turn_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Guidance to send first (repeatable). Then follow the turn.",
@@ -6793,7 +6793,7 @@
                 "-m"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Send each line typed while following as guidance. Default: on when this is a terminal.",
@@ -6806,7 +6806,7 @@
               "secondary_opts": [
                 "--no-steer"
               ],
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "sessions attach"
@@ -6833,7 +6833,7 @@
                 "turn_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "sessions logs"
@@ -6852,7 +6852,7 @@
                 "turn_id"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "sessions stop"
@@ -6871,7 +6871,7 @@
             "--delete"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "sessions"
@@ -6891,7 +6891,7 @@
             "--tasks"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "1",
@@ -6902,7 +6902,7 @@
             "--k"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "2",
@@ -6913,7 +6913,7 @@
             "--min-overlap"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "3",
@@ -6924,7 +6924,7 @@
             "--max-lines"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Bench your own learned cards (skills.json) instead of the demo set.",
@@ -6934,7 +6934,7 @@
             "--use-store"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "skillcard-bench"
@@ -6955,7 +6955,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills approve"
@@ -6974,7 +6974,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills bundle-disable"
@@ -6993,7 +6993,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills bundle-enable"
@@ -7020,7 +7020,7 @@
                 "query"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Only this topic.",
@@ -7030,7 +7030,7 @@
                 "--topic"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills catalog"
@@ -7049,7 +7049,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "JSON file: a list of {\"input\": {...}, \"expect\": \"substring\"}.",
@@ -7059,7 +7059,7 @@
                 "--instances"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "default": "20",
@@ -7070,7 +7070,7 @@
                 "--budget"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "help": "Model slug for the executor + reflector.",
@@ -7080,7 +7080,7 @@
                 "--model"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Save the improved skill (default: dry-run).",
@@ -7090,7 +7090,7 @@
                 "--apply"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "skills evolve"
@@ -7109,7 +7109,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Write to this path (default: <name>/SKILL.md).",
@@ -7120,7 +7120,7 @@
                 "-o"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills export"
@@ -7139,7 +7139,7 @@
                 "path"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills import"
@@ -7158,7 +7158,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Replace it if it is already installed.",
@@ -7168,7 +7168,7 @@
                 "--force"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             }
           ],
           "path": "skills install"
@@ -7187,7 +7187,7 @@
                 "name"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills library"
@@ -7206,7 +7206,7 @@
                 "--apply"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "default": "5",
@@ -7217,7 +7217,7 @@
                 "--promote-min-uses"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "0.7",
@@ -7228,7 +7228,7 @@
                 "--promote-min-rate"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             },
             {
               "default": "5",
@@ -7239,7 +7239,7 @@
                 "--demote-min-uses"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "0.3333333333333333",
@@ -7250,7 +7250,7 @@
                 "--demote-max-rate"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "skills lifecycle"
@@ -7277,7 +7277,7 @@
                 "name"
               ],
               "required": false,
-              "type": "None"
+              "type": "str"
             },
             {
               "help": "Actually retire (default: dry-run preview).",
@@ -7287,7 +7287,7 @@
                 "--apply"
               ],
               "required": false,
-              "type": "None"
+              "type": "boolean"
             },
             {
               "default": "5",
@@ -7298,7 +7298,7 @@
                 "--min-uses"
               ],
               "required": false,
-              "type": "None"
+              "type": "int"
             },
             {
               "default": "0.3333333333333333",
@@ -7309,7 +7309,7 @@
                 "--max-rate"
               ],
               "required": false,
-              "type": "None"
+              "type": "float"
             }
           ],
           "path": "skills retire"
@@ -7336,7 +7336,7 @@
                 "name"
               ],
               "required": true,
-              "type": "None"
+              "type": "str"
             }
           ],
           "path": "skills uninstall"
@@ -7363,7 +7363,7 @@
             "name"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-approve"
@@ -7382,7 +7382,7 @@
             "name"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-bundle-disable"
@@ -7401,7 +7401,7 @@
             "name"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-bundle-enable"
@@ -7428,7 +7428,7 @@
             "query"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Only this topic.",
@@ -7438,7 +7438,7 @@
             "--topic"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-catalog"
@@ -7457,7 +7457,7 @@
             "name"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "JSON file: a list of {\"input\": {...}, \"expect\": \"substring\"}.",
@@ -7467,7 +7467,7 @@
             "--instances"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "20",
@@ -7478,7 +7478,7 @@
             "--budget"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Model slug for the executor + reflector.",
@@ -7488,7 +7488,7 @@
             "--model"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Save the improved skill (default: dry-run).",
@@ -7498,7 +7498,7 @@
             "--apply"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "skills-evolve"
@@ -7517,7 +7517,7 @@
             "name"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Write to this path (default: <name>/SKILL.md).",
@@ -7528,7 +7528,7 @@
             "-o"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-export"
@@ -7547,7 +7547,7 @@
             "path"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-import"
@@ -7566,7 +7566,7 @@
             "name"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Replace it if it is already installed.",
@@ -7576,7 +7576,7 @@
             "--force"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "skills-install"
@@ -7595,7 +7595,7 @@
             "name"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-library"
@@ -7614,7 +7614,7 @@
             "--apply"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "5",
@@ -7625,7 +7625,7 @@
             "--promote-min-uses"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "0.7",
@@ -7636,7 +7636,7 @@
             "--promote-min-rate"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "default": "5",
@@ -7647,7 +7647,7 @@
             "--demote-min-uses"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "0.3333333333333333",
@@ -7658,7 +7658,7 @@
             "--demote-max-rate"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         }
       ],
       "path": "skills-lifecycle"
@@ -7685,7 +7685,7 @@
             "name"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Actually retire (default: dry-run preview).",
@@ -7695,7 +7695,7 @@
             "--apply"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "5",
@@ -7706,7 +7706,7 @@
             "--min-uses"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "0.3333333333333333",
@@ -7717,7 +7717,7 @@
             "--max-rate"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         }
       ],
       "path": "skills-retire"
@@ -7744,7 +7744,7 @@
             "name"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "skills-uninstall"
@@ -7763,7 +7763,7 @@
             "task"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Verification command (exit 0 == success).",
@@ -7773,7 +7773,7 @@
             "--verify"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -7785,7 +7785,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -7796,7 +7796,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "3",
@@ -7807,7 +7807,7 @@
             "--max-attempts"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "8",
@@ -7818,7 +7818,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Stop the whole run once this much has been spent (all attempts together).",
@@ -7828,7 +7828,7 @@
             "--max-usd"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "help": "Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6).",
@@ -7838,7 +7838,7 @@
             "--context-budget"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "help": "Skip the planning step.",
@@ -7848,7 +7848,7 @@
             "--no-plan"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Skip Manager review.",
@@ -7858,7 +7858,7 @@
             "--no-manager"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Manager reviews via the cascade rubric.",
@@ -7868,7 +7868,7 @@
             "--rubric"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Route deep-reasoning turns through fusion.",
@@ -7878,7 +7878,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Ask reasoning models to answer without a thinking phase.",
@@ -7888,7 +7888,7 @@
             "--no-thinking"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default).",
@@ -7898,7 +7898,7 @@
             "--cascade"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Gate tool calls through the governance kernel.",
@@ -7908,7 +7908,7 @@
             "--guard"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Per-session allowlist: only these tools (comma-separated).",
@@ -7918,7 +7918,7 @@
             "--allow-tools"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Per-session denylist: drop these tools (comma-separated).",
@@ -7928,7 +7928,7 @@
             "--deny-tools"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Track a capability ledger + review execution of tainted input.",
@@ -7938,7 +7938,7 @@
             "--taint"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "True",
@@ -7952,7 +7952,7 @@
           "secondary_opts": [
             "--no-collect"
           ],
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Don't auto-write a long-term memory fact on success.",
@@ -7962,7 +7962,7 @@
             "--no-remember"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Don't auto-propose a learned skill when a task recurs.",
@@ -7972,7 +7972,7 @@
             "--no-evolve-skills"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Run in an isolated git worktree; changes copied back only on success.",
@@ -7982,7 +7982,7 @@
             "--isolate"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Give the agent an isolated Context Explorer for repo search (FastContext-style).",
@@ -7992,7 +7992,7 @@
             "--explorer"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Give the agent spawn_subagent to delegate subtasks to isolated subagents.",
@@ -8002,7 +8002,7 @@
             "--subagents"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Prepend a structural map of the workspace (files + top-level symbols) to the agent's context.",
@@ -8012,7 +8012,7 @@
             "--repo-map"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "EXPERIMENT (study 20 B4): a cheap MODEL names the tool before each step and the executor is given only that tool. Reads a shallow context on purpose. Narrows only \u2014 an undecided router leaves the full list, and the run's receipt counts how often that happened.",
@@ -8022,7 +8022,7 @@
             "--tool-router"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'narrow'",
@@ -8033,7 +8033,7 @@
             "--tool-router-mode"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "EXPERIMENT (study 24 M6): when the tool-loop breaker trips, hand the rest of the run to this stronger MODEL instead of stopping. A second trip stops as before. Off by default.",
@@ -8043,7 +8043,7 @@
             "--escalate-on-tool-loop"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "EXPERIMENT (study 24 M6 fork): with --escalate-on-tool-loop, copy the workspace to this DIR at the trip, before escalating \u2014 what stopping would have left. Off by default.",
@@ -8053,7 +8053,7 @@
             "--snapshot-at-tool-loop"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "After a failed attempt, run a structured self-check that steers the retry (helps weak models).",
@@ -8063,7 +8063,7 @@
             "--progress-ledger"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints).",
@@ -8073,7 +8073,7 @@
             "--checklist"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps). Measured on 78 labelled patches (bench/test_gate_two_sided): fails every wrong patch, and reverts 4 of 64 correct ones (6%) on a test of its own that is wrong \u2014 opt-in for that reason.",
@@ -8083,7 +8083,7 @@
             "--gen-tests"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Model-role profile: economy | balanced | max. Puts a different model on each role (explore/plan/edit/review) drawn from the tier ladder. Routing is NOT yet shown to improve outcomes \u2014 see bench/role_routing/PREREGISTRATION.md.",
@@ -8093,7 +8093,7 @@
             "--profile"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Per-role model overrides: 'edit=vendor/slug,plan=vendor/other'. Roles: explore, plan, edit, review. Merges over --profile; a role left unset keeps --model. `verify` is not a role here \u2014 it runs a command and has no model to choose.",
@@ -8103,7 +8103,7 @@
             "--role-models"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
@@ -8113,7 +8113,7 @@
             "--write-region"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Log (arm, proxy=manager-judgment, reward=verified) per attempt to <home>/probe.jsonl for PROBE best-arm selection (see `chimera probe-select --from-log`). Needs --verify + a manager.",
@@ -8123,7 +8123,7 @@
             "--probe-log"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Reshape a long, rambling bug-report task into a salient-facts-first form (location/repro/expected-vs-actual/fix-hint) before planning. No-op on non-bug or short tasks.",
@@ -8133,7 +8133,7 @@
             "--normalize-task"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Inject the stored ACE strategy playbook into context, then curate it from this run's outcome (closed loop).",
@@ -8143,7 +8143,7 @@
             "--playbook"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Read learned skill cards back into context (the learn->use loop). Default follows settings.skill_cards; this overrides it per run.",
@@ -8156,7 +8156,7 @@
           "secondary_opts": [
             "--no-skill-cards"
           ],
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "1",
@@ -8167,7 +8167,7 @@
             "--agreement"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Model slug of a stronger, independent judge that grades hard-turn (retried) results before accepting them.",
@@ -8177,7 +8177,7 @@
             "--strong-verify"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "On a stall, rebuild the plan from accumulated failure causes (dual-ledger) instead of just nudging.",
@@ -8187,7 +8187,7 @@
             "--replan"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Show a failed attempt its own reverted diff, as a path not to retake.",
@@ -8197,7 +8197,7 @@
             "--diff-feedback"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "On failure, leave the last attempt's edits on disk for an external grader (don't revert).",
@@ -8207,7 +8207,7 @@
             "--keep-workspace"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Fail an attempt that changed no file \u2014 for code tasks, an explanation is not a fix.",
@@ -8217,7 +8217,7 @@
             "--require-diff"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "'generic'",
@@ -8228,7 +8228,7 @@
             "--recovery"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Match repeated-failure signatures approximately, not byte-identically.",
@@ -8238,7 +8238,7 @@
             "--stagnation-fuzzy"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX.",
@@ -8248,7 +8248,7 @@
             "--contract"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Print live progress events (attempt/result/status) as the run proceeds.",
@@ -8258,7 +8258,7 @@
             "--stream"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Print one final JSON object.",
@@ -8268,7 +8268,7 @@
             "--json"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Print JSON events as lines.",
@@ -8278,7 +8278,7 @@
             "--jsonl"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Checkpoint this run under a thread id; re-run with the same id to resume after a crash.",
@@ -8288,7 +8288,7 @@
             "--thread"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Pause for human approval before finalizing a run that consumed untrusted content (needs --thread).",
@@ -8298,7 +8298,7 @@
             "--pause-on-taint"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "HITL accept: finalize a paused run as-is, by thread id (no task needed).",
@@ -8308,7 +8308,7 @@
             "--approve"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "HITL ignore: discard a paused run by thread id (no task needed).",
@@ -8318,7 +8318,7 @@
             "--deny"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "HITL respond: resume a paused run by thread id with --feedback guidance.",
@@ -8328,7 +8328,7 @@
             "--respond"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Guidance for --respond (fed back so the run tries again).",
@@ -8338,7 +8338,7 @@
             "--feedback"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "HITL edit: finalize a paused run with the corrected --answer, by thread id.",
@@ -8348,7 +8348,7 @@
             "--edit"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "The human-corrected answer for --edit.",
@@ -8358,7 +8358,7 @@
             "--answer"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "solve"
@@ -8377,7 +8377,7 @@
             "tasks"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -8389,7 +8389,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -8400,7 +8400,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "6",
@@ -8411,7 +8411,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6).",
@@ -8421,7 +8421,7 @@
             "--context-budget"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "default": "2",
@@ -8432,7 +8432,7 @@
             "--max-attempts"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "4",
@@ -8443,7 +8443,7 @@
             "--max-workers"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "help": "Route deep-reasoning turns through fusion.",
@@ -8453,7 +8453,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless \u2014 it's always on for fan-out.",
@@ -8463,7 +8463,7 @@
             "--taint"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "solve-batch"
@@ -8482,7 +8482,7 @@
             "baseline"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "SWE-bench evaluation report JSON for the model+Chimera arm.",
@@ -8492,7 +8492,7 @@
             "treatment"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "JSONL of the instances both arms ran (fixes the id set).",
@@ -8502,7 +8502,7 @@
             "--instances"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "swe-bench-compare"
@@ -8522,7 +8522,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Report what CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save on this install.",
@@ -8532,7 +8532,7 @@
             "--defer-saving"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         }
       ],
       "path": "tools"
@@ -8551,7 +8551,7 @@
             "tuned_baseline"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "JSON pass/fail of the candidate on the TUNED slice (aligned, same order).",
@@ -8561,7 +8561,7 @@
             "tuned_treatment"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "JSON pass/fail of the baseline on a DISJOINT same-capability holdout.",
@@ -8571,7 +8571,7 @@
             "--holdout-baseline"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "JSON pass/fail of the candidate on the holdout (aligned).",
@@ -8581,7 +8581,7 @@
             "--holdout-treatment"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Require the tuned gain's paired CI to exclude 0, not just \u0394>0.",
@@ -8591,7 +8591,7 @@
             "--require-significant"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "0.0",
@@ -8602,7 +8602,7 @@
             "--tol"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         }
       ],
       "path": "transfer-gate"
@@ -8622,7 +8622,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "6",
@@ -8633,7 +8633,7 @@
             "--max-steps"
           ],
           "required": false,
-          "type": "None"
+          "type": "int"
         },
         {
           "default": "'.'",
@@ -8645,7 +8645,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Route deep-reasoning turns through fusion.",
@@ -8655,7 +8655,7 @@
             "--fuse"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Don't recall long-term memory.",
@@ -8665,7 +8665,7 @@
             "--no-memory"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Resume a specific session id (see 'chimera sessions').",
@@ -8676,7 +8676,7 @@
             "-s"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Start a fresh session instead of resuming.",
@@ -8686,7 +8686,7 @@
             "--new"
           ],
           "required": false,
-          "type": "None"
+          "type": "boolean"
         },
         {
           "default": "True",
@@ -8700,7 +8700,7 @@
           "secondary_opts": [
             "--no-stream"
           ],
-          "type": "None"
+          "type": "boolean"
         },
         {
           "help": "Stop once this session has spent this much (the whole session, not one turn). The activity panel shows what is left.",
@@ -8710,7 +8710,7 @@
             "--max-usd"
           ],
           "required": false,
-          "type": "None"
+          "type": "float"
         },
         {
           "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
@@ -8720,7 +8720,7 @@
             "--write-region"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "tui"
@@ -8747,7 +8747,7 @@
             "file"
           ],
           "required": true,
-          "type": "None"
+          "type": "str"
         },
         {
           "default": "'.'",
@@ -8759,7 +8759,7 @@
             "-w"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         },
         {
           "help": "Override the model slug.",
@@ -8770,7 +8770,7 @@
             "-m"
           ],
           "required": false,
-          "type": "None"
+          "type": "str"
         }
       ],
       "path": "workflow"
