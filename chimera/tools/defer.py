@@ -30,9 +30,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from chimera.governance.allowlist import restrict_registry
 from chimera.telemetry import get_logger
-from chimera.tools.base import Tool, unknown_arguments_error
+from chimera.tools.base import Tool
 from chimera.tools.registry import ToolRegistry
 
 _log = get_logger("tools.defer")
@@ -62,7 +61,50 @@ CORE = frozenset(
 #: trip, which `code_api.assemble_registry` names as the thing its ordering exists to avoid. Kept
 #: as a rule here rather than an ordering there, because an ordering is one more caller away from
 #: being wrong again.
-_NEVER_DEFERRED = CORE | frozenset({"mcp_list", "mcp_describe", "mcp_call"})
+#: Built-ins a surface cannot reach through a proxy. Each one is handed a sink or a callback by the
+#: surface that owns it (the chart and design canvases stream their frame, the browser its screenshot,
+#: `ask_user` the question card, the Code screen its interpreter). Deferring one would route the turn's
+#: own output through `tool_call` into a sink the proxy does not carry, so these stay declared.
+TURN_BOUND = frozenset({"render_chart", "design", "browser", "ask_user", "execute_code", "code_interpreter"})
+
+_NEVER_DEFERRED = CORE | frozenset({"mcp_list", "mcp_describe", "mcp_call"}) | TURN_BOUND
+
+
+#: Every tool name `chimera.tools` defines (the unconditional ones and the conditional ones), without the
+#: proxies, which are never moved, and without the test-only `echo`. `tests/test_the_product_defers_the_builtins_by_default.py`
+#: re-derives this list from the source, so a built-in added without a line here fails the suite.
+SHIPPED_BUILTINS: frozenset[str] = frozenset({
+    "apply_patch", "arxiv_search", "ask_user", "browser", "calendar_events", "code_interpreter", "crawl",
+    "create_document", "decide", "design", "download_media", "edit_batch", "edit_file", "execute_code",
+    "extract", "generate_audio", "generate_image", "generate_video", "glob", "grep", "http_get", "job_cancel",
+    "job_status", "list_dir", "map", "open_pull_request", "read_document", "read_email", "read_file",
+    "recall_history", "render_chart", "report_defect", "run_shell", "schedule_once", "scrape", "send_email",
+    "text_to_speech", "todo_write", "transcribe_audio", "view_image", "web_search", "write_file",
+    "youtube_transcript",
+})
+
+
+def _unwrapped(tool: Tool) -> Tool:
+    """The tool under the governance and ledger wrappers (`.inner`), so the module that defines it decides."""
+    seen = 0
+    current = tool
+    while seen < 16 and isinstance(getattr(current, "inner", None), Tool):
+        current = current.inner  # type: ignore[attr-defined]
+        seen += 1
+    return current
+
+
+def _is_builtin(tool: Tool) -> bool:
+    """A built-in the product ships: a name `chimera.tools` defines, from a tool that is not a connector.
+
+    MCP and OpenAPI connector tools (`chimera.integrations`) carry their own switch (`CHIMERA_MCP_DEFER`),
+    so a connector is never moved here even if its name collides with a built-in one. A name the product
+    does not define (a plugin's, a caller's) stays declared too.
+    """
+    if tool.name not in SHIPPED_BUILTINS:
+        return False
+    return not type(_unwrapped(tool)).__module__.startswith("chimera.integrations")
+
 
 #: How many lines `tool_list` will print before it says it stopped.
 _MAX_LISTED = 60
@@ -91,6 +133,18 @@ class _Deferred:
         self.denied = denied
         self.allowed = allowed
         self.by_name = {t.name: t for t in tools if self.permitted(t.name)}
+        # The door the proxy runs through: the same `ToolRegistry.run` every other tool goes through, so
+        # the owner's policy is re-read at CALL time (not only here, at build), and the span and the
+        # `tool.ok` reading are the ones a declared tool gets. A second execution path is one more place
+        # for a policy edited mid-conversation to be missed.
+        self.runner = ToolRegistry()
+        for tool in self.by_name.values():
+            self.runner.register(tool)
+
+    def reachable(self, name: str) -> Tool | None:
+        """The deferred tool ``name`` if it is still permitted NOW, else ``None``."""
+        tool = self.by_name.get(name)
+        return tool if tool is not None and self.permitted(name) else None
 
     def permitted(self, name: str) -> bool:
         # The policy in its own terms (ordered globs, a later allow undoing an earlier deny of
@@ -139,6 +193,7 @@ class ToolListTool(Tool):
         rows = [
             f"{name}: {_one_line(tool.description)}"
             for name, tool in sorted(self.catalogue.by_name.items())
+            if self.catalogue.permitted(name)
             if not query or query in name.lower() or query in (tool.description or "").lower()
         ]
         if not rows:
@@ -167,7 +222,7 @@ class ToolDescribeTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         name = str(kwargs.get("tool") or "").strip()
-        tool = self.catalogue.by_name.get(name)
+        tool = self.catalogue.reachable(name)
         if tool is None:
             return _unknown(name, self.catalogue)
         return json.dumps(
@@ -204,14 +259,22 @@ class ToolCallTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         name = str(kwargs.get("tool") or "").strip()
-        tool = self.catalogue.by_name.get(name)
-        if tool is None:
+        if name not in self.catalogue.by_name:
             return _unknown(name, self.catalogue)
         argumentos = kwargs.get("arguments") or {}
         if not isinstance(argumentos, dict):
             return "arguments must be an object"
-        # The registry checks a call's names; this proxy runs the tool itself, so it checks here.
-        return unknown_arguments_error(tool, argumentos) or tool.run(**argumentos)
+        if name in self.catalogue.denied or (
+            self.catalogue.allowed is not None and name not in self.catalogue.allowed
+        ):
+            return _unknown(name, self.catalogue)
+        # Through `ToolRegistry.run`: it applies the owner's deployment policy at call time (a policy
+        # edited after deferral still denies), rejects undeclared arguments, and records the span.
+        return self.catalogue.runner.run(name, **argumentos)
+
+    def target_tool(self, name: str) -> Tool | None:
+        """The deferred tool a call to ``name`` would run, for the layers that judge by the target."""
+        return self.catalogue.by_name.get(name)
 
 
 def defer_builtins(
@@ -229,14 +292,25 @@ def defer_builtins(
     core, which is a different thing from deferral not running, and an intervention that cannot tell
     those apart reads as "on and useless" when it was "on and there was nothing to do".
     """
-    deferidas = [t for t in registry.tools() if t.name not in _NEVER_DEFERRED]
+    deferidas = [t for t in registry.tools() if t.name not in _NEVER_DEFERRED and _is_builtin(t)]
     if not deferidas:
         return registry, 0
 
     catalogo = _Deferred(deferidas, denied, allowed)
-    enxuto = restrict_registry(
-        registry, allow=[n for n in registry.names() if n in _NEVER_DEFERRED]
-    )
+    # Everything NOT moved stays declared: the core, the proxies, the turn-bound built-ins, and every tool
+    # that is not a built-in (connectors, plugins, a caller's own). Keeping only `_NEVER_DEFERRED` here
+    # would silently drop those, which is the bug this line used to have.
+    moved = {tool.name for tool in deferidas}
+    # Built directly, not through `restrict_registry`: that call names an allowlist, and an allowlist that
+    # keeps a code-running tool is what the governance warning is FOR. Deferral is not an allowlist, so it
+    # must not raise that alarm on the owner's behalf.
+    enxuto = ToolRegistry.like(registry)
+    for tool in registry.tools():
+        if tool.name not in moved:
+            enxuto.register(tool)
+    # Only what the catalogue kept: a deferred tool the deployment fence denies is not grantable either,
+    # or `declared_names()` would offer it to a subagent that the proxy itself refuses.
+    enxuto.deferred.update(catalogo.by_name)
     for proxy in (ToolListTool(catalogo), ToolDescribeTool(catalogo), ToolCallTool(catalogo)):
         if proxy.name in enxuto:
             _log.warning("deferred tool %r collides with an existing tool — skipping", proxy.name)

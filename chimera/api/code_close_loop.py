@@ -4,7 +4,8 @@
 conversation. It owns three things the core must not know about:
 
 * **When it runs.** Only for a foreground turn the owner's setting (or the owner's own screen override)
-  allows. A turn that is a fix turn of an earlier loop (``close_loop_follow``) does not open a second
+  allows. Merging a green pull request is a second, separate switch (``CHIMERA_CLOSE_LOOP_MERGE``, off),
+  read again at the moment of the merge. A turn that is a fix turn of an earlier loop (``close_loop_follow``) does not open a second
   pull request: it adds its commit to the open one and the watch follows that.
 * **Where its result goes.** Every change of state is written into the stored receipt of the turn (the
   receipt is the only record that outlives the request), under the conversation's lock.
@@ -40,6 +41,11 @@ _STORE_RETRIES = 5
 _STORE_RETRY_SECONDS = 5.0
 
 
+def _merge_off() -> bool:
+    """The default: a green pull request is left open for the owner, never merged."""
+    return False
+
+
 class CloseLoopWiring:
     """One instance per server. Dependencies are injected so the tests can drive it without a server."""
 
@@ -47,6 +53,7 @@ class CloseLoopWiring:
         self,
         *,
         enabled: Callable[[], bool],
+        merge_enabled: Callable[[], bool] = _merge_off,
         amend: Callable[[str, str, dict[str, Any]], int],
         enqueue: Callable[[str, str, dict[str, Any]], bool],
         locked: Callable[[str], AbstractContextManager[object]],
@@ -55,6 +62,7 @@ class CloseLoopWiring:
         gh: Sequence[str] | None = None,
     ) -> None:
         self._enabled = enabled
+        self._merge_enabled = merge_enabled
         self._amend = amend
         self._enqueue = enqueue
         self._locked = locked
@@ -121,7 +129,7 @@ class CloseLoopWiring:
 
     def _hooks(self) -> Hooks:
         gh = list(self._gh) if self._gh is not None else gh_command()
-        return Hooks(gh=gh, sleep=self._sleep, clock=self._clock)
+        return Hooks(gh=gh, sleep=self._sleep, clock=self._clock, merge_allowed=self._merge_enabled)
 
     def _start_watch(self, state: CloseLoop, ws: Path, session_id: str) -> None:
         # The watch owns a copy: the done frame reads `state` on this thread while the watch mutates its own.
@@ -137,6 +145,7 @@ class CloseLoopWiring:
             clock=self._clock,
             ask_fix=lambda log, attempt: self._ask_fix(session_id, ws, watched, log, attempt),
             report=lambda current: self._record(session_id, current),
+            merge_allowed=self._merge_enabled,
         )
         head = watched.commit
         thread = threading.Thread(

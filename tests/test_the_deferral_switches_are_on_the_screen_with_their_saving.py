@@ -38,6 +38,9 @@ from chimera.tools.registry import ToolRegistry
 SWITCHES = {"CHIMERA_DEFER_TOOLS": "tools", "CHIMERA_MCP_DEFER": "mcp"}
 
 
+pytestmark = pytest.mark.product_default  # these are about deferral, which is on by default
+
+
 class _ServerTool(Tool):
     """A server-published tool with a schema long enough that deferring it is a real saving."""
 
@@ -109,8 +112,12 @@ def test_the_screen_may_write_each_switch(env: str) -> None:
     assert is_editable(env)
 
 
-def test_both_are_off_when_nobody_chose_them(tmp_path: Path) -> None:
-    assert read_config(_settings(tmp_path))["defer"] == {"tools": False, "mcp": False}
+def test_the_built_in_half_is_on_by_default_and_the_mcp_half_off_when_nobody_chose(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The built-in half is on by the owner's decision (2026-11-10); the MCP half was never decided.
+    # The subject is the default, so the conftest pin (the old value) is removed for this test.
+    assert read_config(_settings(tmp_path))["defer"] == {"tools": True, "mcp": False}
     # A server that predates the block reads as both off, not as a validation error.
     assert "defer" in ConfigOut.model_fields
     assert DeferCfgOut().model_dump() == {"tools": False, "mcp": False}
@@ -118,7 +125,10 @@ def test_both_are_off_when_nobody_chose_them(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(("env", "field"), sorted(SWITCHES.items()))
 def test_the_screen_reads_each_one_back_alone(env: str, field: str, tmp_path: Path) -> None:
-    reported = read_config(_settings(tmp_path, **{env: "true"}))["defer"]
+    # The built-in half is on by default now, so the other switch is pinned off here: "alone" means
+    # the only one on is the one this case turns on.
+    pinned = {"CHIMERA_DEFER_TOOLS": "false", env: "true"}
+    reported = read_config(_settings(tmp_path, **pinned))["defer"]
     assert [k for k, v in reported.items() if v] == [field]
 
 
@@ -319,9 +329,14 @@ def _unwrapped(text: str) -> str:
     return " ".join(text.split())
 
 
-def test_the_command_reports_the_saving_for_a_machine_with_no_screen(tmp_path: Path) -> None:
+def test_the_command_reports_the_saving_for_a_machine_with_no_screen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from chimera.cli.main import app
 
+    # Pinned off: the built-in switch is on by default since 2026-11-10, and this case is about the
+    # report for a machine whose switch is off, so the report's "off" wording stays under test.
+    monkeypatch.setenv("CHIMERA_DEFER_TOOLS", "0")
     result = CliRunner().invoke(app, ["tools", "--defer-saving", "--workspace", str(tmp_path)])
 
     assert result.exit_code == 0, result.output

@@ -63,6 +63,7 @@ function config() {
     approval_webhook_set: false,
     pull_requests: false,
     close_loop: false,
+    close_loop_merge: false,
     hooks: false,
     hooks_host_exec: false,
   },

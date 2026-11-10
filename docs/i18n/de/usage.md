@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -544,22 +544,16 @@ Agent wiederverwendet, was funktioniert hat, und bekannte Fehlermodi
 vermeidet. Das schließt den Kreis — vorher wurden gelernte Skills gespeichert
 und nie zurückgelesen.
 
-Standardmäßig aus: Das Injizieren von Cards fügt Prompt-Token hinzu, und die
-*Token*-Einsparungen von TRS kommen aus dem Verkürzen langer Reasoning-Spuren,
-sodass bei kurzen Antwortaufgaben der Vorteil in der Genauigkeit liegt, nicht
-in den Kosten. Das ist nicht hypothetisch — auf der `hard`-Kurzantwort-Suite
-(bezahltes deepseek-v3.1) maß `skillcard-bench` Cards mit **+290 % Token** und
-**−8 Prozentpunkten Genauigkeit** gegenüber keinen Cards: bei einem nahezu an
-der Obergrenze liegenden Modell und ohne lange Spur zum Kürzen sind generische
-Cards purer Overhead, der ablenken kann. Cards für **Long-Reasoning**-
-Workloads aktivieren (Mathe/Coding mit langen Spuren), wo die Token-Rechnung
-kippt, und immer zuerst den eigenen Trade-off mit einer Ground-Truth-Prüfung
-messen:
+Standardmäßig aus, per Entscheidung des Eigentümers vom 10.11.2026 nach der überarbeiteten Messung:
+Die ausgelieferte Konfiguration kostet +37–48 % Tokens (zwei Läufe), und die Genauigkeit schwankte
+zwischen identischen Läufen mit 12 Aufgaben um +16,7 pp und dann −8,3 pp, daher ist kein Gewinn
+belegt. Karten fügen Prompt-Tokens hinzu; lohnt sich dieser Kompromiss für dich, miss ihn selbst mit
+einer Ground-Truth-Prüfung und schalte das Lesen mit `CHIMERA_SKILL_CARDS=on` ein:
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # Lesen einschalten, sobald der Kompromiss sich lohnt
 ```
 
 Der Bench meldet die Genauigkeit mit vs. ohne Cards, das Token-Delta, die

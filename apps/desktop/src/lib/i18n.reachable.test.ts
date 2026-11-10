@@ -109,10 +109,23 @@ const CODE = sources(SRC)
   .map((file) => readFileSync(file, "utf8"))
   .join("\n");
 
+/**
+ * Keys retired in place. A key's meaning never changes under its name, so a key whose text had to say
+ * something new got a new key (`...closeLoopNoSecret`, `...voiceListenDownload`, `...skillCardsRevised`)
+ * and the old one is kept, unrendered, for anything that still reads it. Listed here on purpose: a
+ * retired key is allowed by name, and any other unrendered key still fails the test.
+ */
+const RETIRED_KEYS = new Set([
+  "settings.hint.closeLoop",
+  "settings.hint.skillCards",
+  "settings.hint.voiceListen",
+]);
+
 describe("the dictionary", () => {
   it("has no key that nothing can render", () => {
     const dead = Object.keys(DICTS.en).filter(
       (key) =>
+        !RETIRED_KEYS.has(key) &&
         !DYNAMIC.some((prefix) => key.startsWith(prefix)) &&
         !CODE.includes(`"${key}"`) &&
         !CODE.includes(`'${key}'`) &&

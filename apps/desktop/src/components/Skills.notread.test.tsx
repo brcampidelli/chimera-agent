@@ -3,7 +3,7 @@
  * Measured on a real install: fourteen learned cards, every one marked ACTIVE, every one reading
  * `0 uses · 0 wins`. The available reading is that the agent tried them and they were useless. What
  * actually happened is that nothing consulted them — retrieval is off by default because it was
- * measured (+16.7pp, a confidence interval including zero, +300% tokens) and left off.
+ * measured (+16.7pp then -8.3pp between identical runs, a confidence interval including zero) and left off.
  *
  * The person who draws the wrong conclusion goes looking for a bug in the cards.
  */

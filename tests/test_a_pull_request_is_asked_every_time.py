@@ -500,15 +500,20 @@ def pr_verdict() -> Any:
 # ------------------------------------------------------------------ the surfaces
 
 
-def test_the_tool_exists_only_when_the_owner_switched_it_on(
+def test_the_tool_is_on_by_default_and_the_owner_can_take_it_away(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from chimera.tools import default_registry
 
+    # On by default since the owner's decision of 2026-11-10: the tool is in every registry unless the
+    # owner switches it off. Every call still asks the owner (`approval.always_ask`), whatever this says.
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
     monkeypatch.delenv("CHIMERA_PULL_REQUESTS", raising=False)
     get_settings.cache_clear()
     try:
+        assert isinstance(default_registry(tmp_path).get("open_pull_request"), OpenPullRequestTool)
+        monkeypatch.setenv("CHIMERA_PULL_REQUESTS", "false")
+        get_settings.cache_clear()
         assert "open_pull_request" not in default_registry(tmp_path).names()
         monkeypatch.setenv("CHIMERA_PULL_REQUESTS", "true")
         get_settings.cache_clear()
@@ -526,6 +531,10 @@ def _code_registry(
 
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("CHIMERA_PULL_REQUESTS", "true")
+    # Pinned off: built-in tools are on demand by default (since 2026-11-10), which would hide the tool
+    # behind `tool_call`. Those proxies are governed the same way (`test_a_deferred_tool_is_still_governed`);
+    # this helper is about the pull request's own card, so it asks for the tool directly.
+    monkeypatch.setenv("CHIMERA_DEFER_TOOLS", "0")
     monkeypatch.setattr(pr, "gh_command", lambda: list(repo["gh"]))
     get_settings.cache_clear()
     settings = Settings(
@@ -594,15 +603,17 @@ def test_a_yes_on_the_card_is_not_remembered_for_the_next_pull_request(
 # ------------------------------------------------------------------ the switch, the button, the bridge
 
 
-def test_the_switch_is_off_by_default_readable_and_refuses_junk(
+def test_the_switch_is_on_by_default_readable_and_refuses_junk(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from chimera.api.config_api import APPLIES_WHEN, is_editable, patch_config, read_config
     from chimera.api.schemas import AutonomyCfgOut
 
+    # The default is on (owner's decision, 2026-11-10). The schema field's own default stays off: a
+    # server that does not report the field must not be read as having the tool.
     monkeypatch.delenv("CHIMERA_PULL_REQUESTS", raising=False)
-    assert Settings(CHIMERA_HOME=str(tmp_path)).pull_requests is False  # type: ignore[arg-type]
-    assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["autonomy"]["pull_requests"] is False  # type: ignore[arg-type]
+    assert Settings(CHIMERA_HOME=str(tmp_path)).pull_requests is True  # type: ignore[arg-type]
+    assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["autonomy"]["pull_requests"] is True  # type: ignore[arg-type]
     assert AutonomyCfgOut().pull_requests is False, "a server without the field reads as off"
     assert is_editable("CHIMERA_PULL_REQUESTS")
     assert APPLIES_WHEN["CHIMERA_PULL_REQUESTS"] == "next_conversation"

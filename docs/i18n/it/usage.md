@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera — Guida all'uso
@@ -495,20 +495,16 @@ rilevanti (BM25 su nome + descrizione + trigger) e le inietta nel contesto di ra
 del worker, così l'agente riusa ciò che ha funzionato ed evita modalità di fallimento
 note. Questo chiude il ciclo — prima, le skill apprese venivano memorizzate e mai rilette.
 
-Disattivato per default: iniettare carte aggiunge token di prompt, e i risparmi di *token*
-del TRS derivano dall'accorciare tracce di ragionamento lunghe, quindi su task a risposta
-breve il guadagno è in accuratezza, non in costo. Questo non è ipotetico — sulla suite a
-risposta breve `hard` (deepseek-v3.1 a pagamento), `skillcard-bench` ha misurato carte che
-costano **+290% di token** e **−8pp di accuratezza** rispetto a nessuna carta: con un
-modello vicino al soffitto e senza una traccia lunga da accorciare, le carte generiche sono
-puro overhead che può distrarre. Abilita le carte per carichi di lavoro a
-**ragionamento lungo** (matematica/codice con tracce estese) dove la matematica dei token
-si inverte, e misura sempre prima il tuo trade-off con un controllo di ground-truth:
+Disattivato di default, per decisione del proprietario del 10/11/2026 dopo la misura rivista: la
+configurazione distribuita costa +37–48% di token (due esecuzioni), e l'accuratezza è variata di
++16,7 pp e poi −8,3 pp tra esecuzioni identiche di 12 compiti, quindi non si mostra alcun guadagno.
+Le schede aggiungono token al prompt; se quel compromesso ti conviene, misuralo con un controllo di
+verità di riferimento e attiva la lettura con `CHIMERA_SKILL_CARDS=on`:
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # attiva la lettura, quando il compromesso ti conviene
 ```
 
 Il bench riporta l'accuratezza con vs senza carte, il delta di token, il tasso di hit

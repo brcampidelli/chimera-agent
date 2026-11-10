@@ -132,15 +132,19 @@ _EDITABLE_SETTINGS = {
     # creation, so no APPLIES_WHEN entry. Checked before it is written: a value git would refuse
     # would otherwise be read as the default with a warning nobody on this screen sees.
     "CHIMERA_BRANCH_PREFIX",
-    # Whether the agent has `open_pull_request` at all (study 29, P8.1). Off by default; each call
+    # Whether the agent has `open_pull_request` at all (study 29, P8.1). On by default; each call
     # asks the owner whatever this says. Owner-only (`bridge_routes.OWNER_ONLY_SETTINGS`): turning
     # it on widens where the owner's code can go, so no client but the owner's own screen writes it.
     "CHIMERA_PULL_REQUESTS",
-    # Whether a finished Code turn commits, opens its pull request, follows CI and merges a green one
-    # (`chimera/core/close_loop.py`). Off by default; read per turn, so no APPLIES_WHEN entry. Owner-only
-    # (`bridge_routes.REACH_SETTINGS`): it pushes the owner's code to a remote and merges it. Written
-    # only from the owner's screen (`SCREEN_WRITE_SETTINGS`), like the two switches above.
+    # Whether a finished Code turn commits, opens its pull request and follows CI
+    # (`chimera/core/close_loop.py`). On by default; read per turn, so no APPLIES_WHEN entry. Owner-only
+    # (`bridge_routes.REACH_SETTINGS`): it pushes the owner's code to a remote. Written only from the
+    # owner's screen (`SCREEN_WRITE_SETTINGS`), like the two switches above.
     "CHIMERA_CODE_CLOSE_LOOP",
+    # Whether that loop may MERGE a green pull request. A separate switch, off by default, because a
+    # merge puts the change on the default branch. Read at the moment of the merge, so no APPLIES_WHEN
+    # entry. Owner-only (`bridge_routes.REACH_SETTINGS`) and screen-only (`SCREEN_WRITE_SETTINGS`).
+    "CHIMERA_CLOSE_LOOP_MERGE",
     # Whether a conversation may be shared at all, and how long a new link opens it. Both only
     # narrow, and both are read per request, so neither needs an APPLIES_WHEN entry. The bridge may
     # write neither (`bridge_routes.OWNER_ONLY_SETTINGS`): their other direction widens.
@@ -319,6 +323,7 @@ SCREEN_WRITE_SETTINGS = frozenset({
     "CHIMERA_BROWSER_TRUSTED_SITES",
     "CHIMERA_PULL_REQUESTS",
     "CHIMERA_CODE_CLOSE_LOOP",
+    "CHIMERA_CLOSE_LOOP_MERGE",
     # A base URL decides where prompts are sent, and the key env name decides which credential goes
     # with them. Adding or removing one is the owner's screen's act, not the server token's (#1133).
     "CHIMERA_ENDPOINTS",
@@ -811,8 +816,10 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "approval_webhook_set": bool(settings.approval_webhook.strip()),
             # Whether the agent may propose a pull request at all. Every proposal asks the owner.
             "pull_requests": settings.pull_requests,
-            # Whether a finished Code turn closes its own loop (`chimera/core/close_loop.py`). Off by default.
+            # Whether a finished Code turn closes its own loop (`chimera/core/close_loop.py`). On by default.
             "close_loop": settings.code_close_loop,
+            # Whether that loop may merge a green pull request. Off by default; owner-only.
+            "close_loop_merge": settings.close_loop_merge,
             # The owner's lifecycle hooks and whether a shell hook may run on the host
             # (`docs/hooks-threat-model.md`). Both off by default; both owner-only.
             "hooks": settings.hooks,
@@ -1239,6 +1246,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_HOOKS_HOST_EXEC": _check_boolean("CHIMERA_HOOKS_HOST_EXEC"),
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
     "CHIMERA_CODE_CLOSE_LOOP": _check_boolean("CHIMERA_CODE_CLOSE_LOOP"),
+    "CHIMERA_CLOSE_LOOP_MERGE": _check_boolean("CHIMERA_CLOSE_LOOP_MERGE"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }
 

@@ -63,6 +63,10 @@ def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     for var in ("CHIMERA_MCP_AUTOLOAD", "CHIMERA_MCP_DEFER", "CHIMERA_TOOL_DENYLIST"):
         monkeypatch.delenv(var, raising=False)
+    # Pinned off: these tests call tools by name on the registry, and built-in tools are on demand by
+    # default since 2026-11-10. A deferred tool is not in the registry under its own name; its governance
+    # through `tool_call` is tested in test_a_deferred_tool_is_still_governed.
+    monkeypatch.setenv("CHIMERA_DEFER_TOOLS", "0")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

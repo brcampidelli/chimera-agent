@@ -190,7 +190,7 @@ def default_registry(
     # Arm B of `bench/edit_tools`, and OFF by default on purpose: registering it unconditionally
     # would delete the control arm, since arm A is defined as today's tool surface. It also costs a
     # tool schema in every prompt for the whole run, which this project has measured biting before
-    # (bench/skillcard: +300% tokens for a non-significant gain). It goes on when the measurement
+    # (bench/skillcard: +37-48% tokens for a non-significant gain). It goes on when the measurement
     # says it earns its place — not before.
     if settings.edit_batch:
         registry.register(EditBatchTool(workspace, write_region=write_region))

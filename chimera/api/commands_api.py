@@ -142,7 +142,7 @@ def available_tools(workspace: Path, settings: Settings) -> set[str]:
     from chimera.tools.builtin import default_registry
 
     denied, allowed = deployment_fence(settings)
-    names = set(default_registry(workspace).names()) - denied
+    names = set(default_registry(workspace).declared_names()) - denied
     return names & allowed if allowed is not None else names
 
 

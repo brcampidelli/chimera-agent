@@ -38,8 +38,14 @@ def load_env(path: Path) -> int:
 
 
 if __name__ == "__main__":
+    # The shared launcher: whatever it runs gets the five 2026-11-10 defaults pinned to the value the
+    # bench measured with, unless the environment or the run's own arm already sets them.
     count = load_env(REPO / ".env")
     print(f"loaded {count} variable(s) from .env", file=sys.stderr)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _legacy_defaults import pin_legacy_defaults
+
+    pin_legacy_defaults()  # after .env: a value the owner wrote there is kept, the rest is pinned
     target = sys.argv[1]
     sys.argv = sys.argv[1:]
     runpy.run_path(target, run_name="__main__")

@@ -313,6 +313,7 @@ faulthandler_timeout = 900
 # provider and are opt-in via `-m integration`.
 addopts = "-m 'not integration'"
 markers = [
+    "product_default: the test asserts the product default, so the suite-wide deferral pin is skipped",
     "integration: live test that calls a real provider API (needs OPENROUTER_API_KEY)",
 ]
 

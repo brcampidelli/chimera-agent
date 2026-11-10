@@ -158,9 +158,11 @@ def test_a_curated_name_on_altered_content_is_a_strangers_file(tmp_path: Path, h
 
 
 def test_the_library_help_says_the_cards_are_read_only_with_the_setting_on() -> None:
-    """It said the agent reads a matching card into its prompt. With `CHIMERA_SKILL_CARDS` off —
-    the default, because the A/B that would have turned it on failed its own gate — it does not."""
+    """It said the agent reads a matching card into its prompt. With `CHIMERA_SKILL_CARDS` off — the
+    default, since the owner's decision of 2026-11-10 after the revised measurement — it does not."""
     result = CliRunner().invoke(app, ["skills-library", "--help"], env={"COLUMNS": "200"})
 
     assert result.exit_code == 0, result.output
-    assert "CHIMERA_SKILL_CARDS=on" in result.output
+    text = " ".join(result.output.split())  # the help wraps; "by default" may fall across a line break
+    assert "CHIMERA_SKILL_CARDS=on" in text
+    assert "by default" in text

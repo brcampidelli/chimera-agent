@@ -469,19 +469,16 @@ name + description + triggers) and injects them into the worker's reasoning cont
 the agent reuses what worked and avoids known failure modes. This closes the loop —
 before, learned skills were stored and never read back.
 
-Off by default: injecting cards adds prompt tokens, and TRS's *token* savings come from
-shortening long reasoning traces, so on short-answer tasks the upside is accuracy, not
-cost. This is not hypothetical — on the `hard` short-answer suite (paid deepseek-v3.1),
-`skillcard-bench` measured cards costing **+290% tokens** and **−8pp accuracy** vs no
-cards: with a near-ceiling model and no long trace to shorten, generic cards are pure
-overhead that can distract. Enable cards for **long-reasoning** workloads (math/coding
-with lengthy traces) where the token math flips, and always measure your own trade-off
-first with a ground-truth check:
+Off by default, by the owner's decision of 2026-11-10 after the revised measurement: the shipped
+configuration costs +37-48% tokens (two runs), and accuracy moved +16.7 pp, then -8.3 pp, between
+identical runs of 12 tasks, so no gain is shown. Cards add prompt tokens. Where that trade-off is
+worth it to you, measure your own with a ground-truth check, and switch reading on with
+`CHIMERA_SKILL_CARDS=on`:
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # turn reading on, once the trade-off is worth it to you
 ```
 
 The bench reports accuracy with vs without cards, the token delta, the card hit-rate, and

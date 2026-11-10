@@ -26,7 +26,7 @@ from chimera.telemetry import get_logger
 if TYPE_CHECKING:
     from chimera.server.attachments import Attachments
 from chimera.server.inbound_media import MEDIA_DISABLED_REPLY, too_long_reply
-from chimera.server.voice import VOICE_MAX_SECONDS, VoiceTooLong
+from chimera.server.voice import VOICE_MAX_SECONDS, VoiceTooLong, VoiceUnavailable
 
 _log = get_logger("server.gateway")
 
@@ -427,6 +427,9 @@ class MessageGateway:
                 )
             except VoiceTooLong:
                 return too_long_reply(self._voice_max_seconds)
+            except VoiceUnavailable as exc:
+                _log.warning("inbound audio not transcribed: %s", exc)
+                return f"I cannot listen to voice notes right now: {exc}."
             except Exception as exc:
                 _log.warning("inbound audio transcription failed: %s", exc)
                 return "Could not transcribe the attached audio."

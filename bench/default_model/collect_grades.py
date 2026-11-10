@@ -47,6 +47,11 @@ def collect(grade_dir: Path, phase: str, arm: str) -> dict[str, object]:
 
 
 if __name__ == "__main__":
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+    from _legacy_defaults import pin_legacy_defaults
+    pin_legacy_defaults()  # the five 2026-11-10 defaults, back to the value these numbers used
     grade_dir, phase, arm, out_dir = Path(sys.argv[1]), sys.argv[2], sys.argv[3], Path(sys.argv[4])
     rep = collect(grade_dir, phase, arm)
     out = out_dir / f"dflt-{phase}-{arm}.dflt_{phase}_{arm}.json"

@@ -323,7 +323,13 @@ def build_right_hand(
     # recorded refusal (`home=None`, for the reason given above).
     from chimera.tools.pull_request import OpenPullRequestTool
 
-    pull_request = registry.get("open_pull_request") if "open_pull_request" in registry else None
+    # Deferred (`CHIMERA_DEFER_TOOLS`, on by default) it is not in the declared list but is still the
+    # tool object `tool_call` runs, so the approver is installed on it there too.
+    pull_request = (
+        registry.get("open_pull_request")
+        if "open_pull_request" in registry
+        else registry.deferred.get("open_pull_request")
+    )
     if isinstance(pull_request, OpenPullRequestTool):
         from chimera.governance.approval import always_ask
 

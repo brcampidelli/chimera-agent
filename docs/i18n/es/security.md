@@ -1,5 +1,5 @@
 ---
-source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
+source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
 ---
 
 # Seguridad y salvaguardas
@@ -342,6 +342,8 @@ anterior: **Permitir que Claude opere esta app**, **Control total** y, desde la 
   `/v1/chat/completions` solo mientras `CHIMERA_SERVER_TOKEN` esté definido. Un módulo,
   `chimera/governance/surfaces.py`, decide qué tipo de superficie es un nombre, por su familia
   (`platform:discord` es un bot); un test falla si un módulo vuelve a escribir su propia lista.
+
+**El ciclo de cierre hace push por sí mismo.** Cuando la verificación de un turno de código pasa y su comprobación del diff está limpia, Chimera hace commit de los cambios del turno en la rama del espacio de trabajo y envía esa rama a `origin` para abrir un pull request. Nunca envía a la rama predeterminada y nunca fuerza un push. Solo fusiona si el dueño activó `CHIMERA_CLOSE_LOOP_MERGE`, y entonces nunca un pull request que toque facturación, una migración destructiva, seguridad a nivel de fila, un grant o un secreto. Lo inicia la pantalla del dueño; el puente, los canales y el trabajo en segundo plano no.
 
 ## Límites honestos
 

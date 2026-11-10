@@ -6607,6 +6607,11 @@ export interface components {
              * @default false
              */
             close_loop: boolean;
+            /**
+             * Close Loop Merge
+             * @default false
+             */
+            close_loop_merge: boolean;
             /** Denied Tools */
             denied_tools?: string[];
             /** Egress Allow */

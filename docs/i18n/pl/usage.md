@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -483,20 +483,16 @@ opisie + triggerach) i wstrzykuje je do kontekstu rozumowania workera, więc age
 ponownie wykorzystuje to, co zadziałało, i unika znanych trybów porażki. To zamyka pętlę —
 wcześniej nauczone skille były zapisywane i nigdy odczytywane z powrotem.
 
-Domyślnie wyłączone: wstrzykiwanie kart dodaje tokeny promptu, a *tokenowe* oszczędności
-TRS pochodzą ze skracania długich śladów rozumowania, więc na zadaniach z krótką
-odpowiedzią zysk to dokładność, nie koszt. To nie jest hipotetyczne — na zestawie
-krótkich odpowiedzi `hard` (płatny deepseek-v3.1), `skillcard-bench` zmierzył karty
-kosztujące **+290% tokenów** i **−8pp dokładności** wobec braku kart: przy modelu blisko
-sufitu i bez długiego śladu do skrócenia, generyczne karty to czysty narzut, który może
-rozpraszać. Włącz karty do obciążeń **długiego rozumowania** (matematyka/kodowanie z
-długimi śladami), gdzie matematyka tokenów się odwraca, i zawsze zmierz najpierw własny
-kompromis kontrolą wobec ziemi odniesienia:
+Domyślnie wyłączone, z decyzji właściciela z 10.11.2026 po zrewidowanym pomiarze: dostarczona
+konfiguracja kosztuje +37–48% tokenów (dwa przebiegi), a dokładność zmieniła się o +16,7 pp, a potem
+o −8,3 pp, między identycznymi przebiegami 12 zadań, więc żaden zysk nie jest wykazany. Karty dodają
+tokeny do promptu; jeśli ten kompromis ci się opłaca, zmierz go sprawdzeniem względem prawdy
+referencyjnej i włącz odczyt przez `CHIMERA_SKILL_CARDS=on`:
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # włącza odczyt, gdy kompromis ci się opłaca
 ```
 
 Benchmark raportuje dokładność z kartami vs bez, deltę tokenów, wskaźnik trafień kart, i

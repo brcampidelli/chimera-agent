@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera —— 使用指南
@@ -433,18 +433,13 @@ description + triggers 做 BM25 检索），并把它们注入到 worker 的推�
 过去奏效的做法，并避开已知的失败模式。这补上了此前缺失的一环——在此之前，学到的技能只会被
 存起来，从不会被读回来使用。
 
-默认关闭：注入卡片会增加提示词 token，而 TRS 的*token* 节省来自于缩短冗长的推理轨迹，所以
-在短答案任务上，它带来的收益体现在准确率上，而不是成本上。这不是纸上谈兵——在 `hard`
-短答案套件（付费的 deepseek-v3.1）上，`skillcard-bench` 实测到，相比不用卡片，用了卡片会
-让 token 消耗**增加 290%**、准确率**下降 8 个百分点**：在一个已经接近能力天花板、又没有
-冗长轨迹可缩短的模型上，通用的卡片纯粹是负担，甚至可能造成干扰。请在**长推理**负载（带有
-长推理轨迹的数学/编程任务）上启用卡片——那时 token 账本的方向会反过来——并且始终先用一个
-真实基准（ground-truth check）自己测量一下这笔交易划不划算：
+默认关闭，由所有者于 2026-11-10 在修订后的测量之后决定：随版本发布的配置使 token 增加 +37%～+48%（两次运行）；在 12 个任务的相同运行之间，准确率变化为 +16.7
+个百分点随后为 −8.3 个百分点，未显示增益。卡片会增加提示词 token；如果这一权衡对你值得，请用基准真值检查自行测量，并用 `CHIMERA_SKILL_CARDS=on` 开启读取：
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # 当权衡对你值得时开启读取
 ```
 
 该基准会报告有卡片和无卡片时的准确率、token 差值、卡片命中率，以及按命中/未命中拆分的

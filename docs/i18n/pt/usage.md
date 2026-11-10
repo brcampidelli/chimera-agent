@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera — Guia de Uso
@@ -490,20 +490,16 @@ do trabalhador, então o agente reaproveita o que funcionou e evita modos de fal
 conhecidos. Isso fecha o loop — antes, as skills aprendidas eram armazenadas e nunca lidas
 de volta.
 
-Desligado por padrão: injetar cartões adiciona tokens de prompt, e a economia de *tokens*
-do TRS vem de encurtar traces de raciocínio longos, então em tarefas de resposta curta o
-ganho é acurácia, não custo. Isso não é hipotético — na suíte de resposta curta `hard`
-(deepseek-v3.1 pago), o `skillcard-bench` mediu cartões custando **+290% de tokens** e
-**−8pp de acurácia** contra não usar cartões: com um modelo perto do teto e sem um trace
-longo para encurtar, cartões genéricos são puro overhead que pode distrair. Habilite os
-cartões para cargas de trabalho de **raciocínio longo** (matemática/código com traces
-extensos) onde a matemática de tokens se inverte, e sempre meça seu próprio trade-off
-primeiro com uma checagem de ground-truth:
+Desligado por padrão, por decisão do dono em 10/11/2026 após a medição revisada: a configuração
+enviada custa +37–48% de tokens (duas rodadas), e a acurácia variou +16,7 pp e depois −8,3 pp entre
+rodadas idênticas de 12 tarefas, então nenhum ganho é mostrado. Os cartões adicionam tokens ao
+prompt; se esse trade-off compensa para você, meça com uma checagem de verdade de referência e ligue
+a leitura com `CHIMERA_SKILL_CARDS=on`:
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # liga a leitura, quando o trade-off compensa
 ```
 
 O bench reporta a acurácia com vs. sem cartões, o delta de tokens, a taxa de acerto do
