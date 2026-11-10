@@ -168,7 +168,7 @@ function DiffCommentLine({
   }
   return (
     <div className={cn("flex items-start", diffLineClass(text))}>
-      <span className="w-12 shrink-0 select-none pr-2 text-right text-muted-foreground" aria-hidden="true">
+      <span className="flex w-12 shrink-0 select-none justify-end pr-2 text-muted-foreground" aria-hidden="true">
         {ref.line}
       </span>
       <Button
