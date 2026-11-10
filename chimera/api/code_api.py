@@ -6749,6 +6749,17 @@ def register_code_api(
         durable_queue=durable_queue,
         waiting_sessions=_waiting_sessions,
     )
+    # The side chat (`chimera/api/side_chat.py`): a question about this conversation, answered from
+    # its transcript with no tools, and never written back into it. Reads the store; writes nothing.
+    from chimera.api.side_chat import register_side_chat
+
+    register_side_chat(
+        app,
+        guard,
+        store=store,
+        live=live,
+        project_model_for=lambda ws: projects.model_for(ws or workspace),
+    )
     # The rest of what `GET /api/service/activity` counts as work in progress: messages waiting in
     # a conversation's queue, and background works not yet finished. A restart that ignored them
     # would not cut them short (both are durable) but would delay them behind a cold start.
