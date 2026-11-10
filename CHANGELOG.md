@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Side chat (Ctrl/Cmd+;) for a quick question about the conversation without adding to it.** It reads the conversation as data, answers with no tools, and writes nothing into the conversation's history; "Bring into the conversation" only fills the composer, and when the conversation has read outside content it quotes the answer as data and asks first. Its cost is recorded (an interrupted answer as an estimate), local models stay free under a daily cap, and the shortcuts help moved to Ctrl/Cmd+/. (#1204)
+
 ## [0.85.0] - 2026-11-04
 ### Fixed
 
