@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Suggested-task cards: the agent proposes side work instead of drifting into it.** When it notices something outside the task (dead code, a stale doc, a missing test, a security issue seen in passing) it can only propose a card; you see the full prompt before anything runs and choose Start (a new conversation in the same project), Do it here, Options or Dismiss, with Start all asking for confirmation and capped at five. Only the owner's screen starts a card, the server keeps the prompt (the page sends only the card id), and a card proposed by a turn that read outside content starts its conversation marked as tainted and without "Ignore permissions", with a warning on the card. (#1206)
+
 ## [0.85.0] - 2026-11-04
 ### Fixed
 
