@@ -3104,7 +3104,7 @@ def build_api_app(
 
     @app.post("/api/fs/exec", dependencies=[guard], responses=SSE_RESPONSE)
     async def fs_exec_stream(req: ExecRequest) -> EventSourceResponse:
-        # HONEST command-runner (NOT an interactive terminal): each call is a FRESH subprocess — cwd/env
+        # HONEST command-runner (the interactive terminal is /api/terminal): each call is a FRESH subprocess — cwd/env
         # do NOT persist between commands. Streams combined stdout+stderr line by line on the local
         # sandbox; honors CHIMERA_SANDBOX (non-local runs one-shot inside the sandbox, isolated). Same
         # side-effecting power as `run_shell` / a terminal in the workspace, gated the same way (bearer
@@ -3533,6 +3533,12 @@ def build_api_app(
     from chimera.api.commands_api import register_commands_api
 
     register_commands_api(app, guard, workspace, settings, live_settings=live_settings)
+    # /api/terminal — the owner's real terminal (a PTY) on the Code screen. Unconditional, for the
+    # schema-dump reason above; absent from the bridge's table, and refused for it, a bot, a guest,
+    # a paired device and a paired browser tab alike (`chimera/api/terminal_api.py`).
+    from chimera.api.terminal_api import register_terminal_api
+
+    register_terminal_api(app, guard, _resolve_fs_workspace, settings, live_settings=live_settings)
     # /api/design — Chimera Design documents, versions, proposals and export (plan D2).
     # Unconditional, for the schema-dump reason above. A model proposes; only /ops changes a design.
     from chimera.api.design_api import register_design_api

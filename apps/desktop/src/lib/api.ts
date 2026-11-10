@@ -3709,3 +3709,96 @@ export async function exportDesign(id: string, format: string): Promise<{ blob: 
   const named = /filename="([A-Za-z0-9_.-]+)"/.exec(disposition)?.[1];
   return { blob: await res.blob(), filename: named ?? `design-${id}.${format}` };
 }
+
+// --- Terminal (a real PTY; the owner's shell — /api/terminal) -------------------------------------
+//
+// SSE for the output and a POST per burst of keystrokes, not a WebSocket: the server has none, and a
+// browser WebSocket cannot send the screen credential. Every call carries the screen credential,
+// because the server opens a terminal only for the desktop app's own screen.
+
+export interface TerminalOpened {
+  id: string;
+  shell: string;
+  cwd: string;
+}
+
+export interface TerminalStatus {
+  available: boolean;
+  reason: string;
+  open: number;
+  max: number;
+}
+
+export interface TerminalStreamHandlers {
+  onData: (text: string) => void;
+  onExit: (code: number | null) => void;
+  onError: (message: string) => void;
+}
+
+const terminalHeaders = (): HeadersInit => screenJsonHeaders();
+
+export const getTerminalStatus = () =>
+  json<TerminalStatus>("/api/terminal/status", { headers: terminalHeaders() });
+
+export const openTerminal = (workspace: string | null, cols: number, rows: number) =>
+  json<TerminalOpened>("/api/terminal", {
+    method: "POST",
+    headers: terminalHeaders(),
+    body: JSON.stringify({ workspace, cols, rows }),
+  });
+
+export const sendTerminalInput = (id: string, data: string) =>
+  json<{ ok: boolean }>(`/api/terminal/${encodeURIComponent(id)}/input`, {
+    method: "POST",
+    headers: terminalHeaders(),
+    body: JSON.stringify({ data }),
+  });
+
+export const resizeTerminal = (id: string, cols: number, rows: number) =>
+  json<{ ok: boolean }>(`/api/terminal/${encodeURIComponent(id)}/resize`, {
+    method: "POST",
+    headers: terminalHeaders(),
+    body: JSON.stringify({ cols, rows }),
+  });
+
+export const closeTerminal = (id: string) =>
+  json<{ ok: boolean }>(`/api/terminal/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: terminalHeaders(),
+  });
+
+/** Follow a terminal's output until the shell ends. The stream ending also ends the shell on the
+ *  server, so aborting `signal` is itself a way to close it. */
+export async function streamTerminal(
+  id: string,
+  handlers: TerminalStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/terminal/${encodeURIComponent(id)}/stream`), {
+      headers: authHeaders(terminalHeaders()),
+      signal,
+    });
+  } catch (err) {
+    if (!signal?.aborted) handlers.onError(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError(await streamRefusal(res));
+    return;
+  }
+  const cut = await readFrames(res.body, (frame) => {
+    const { event, data } = parseSseFrame(frame);
+    if (!data) return;
+    try {
+      const payload = JSON.parse(data) as { text?: string; code?: number | null };
+      if (event === "data") handlers.onData(payload.text ?? "");
+      else if (event === "error") handlers.onError((payload as { message?: string }).message ?? "terminal error");
+      else if (event === "exit") handlers.onExit(payload.code ?? null);
+    } catch {
+      // A frame that is not JSON is not output; dropping it beats painting garbage in a terminal.
+    }
+  });
+  if (cut && !signal?.aborted) handlers.onError(cut);
+}
