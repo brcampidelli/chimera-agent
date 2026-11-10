@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { deleteCodeProject, deleteCodeSession, listCodeSessions } from "@/lib/api";
+import { readLineComments, saveLineComment } from "@/lib/line-comments";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
 import { renderWithProviders } from "@/test/utils";
 
@@ -163,5 +164,40 @@ describe("SessionSidebar — deleting", () => {
 
     await waitFor(() => expect(readLastSession("C:\\loja")).toBeNull());
     expect(readLastSession("C:\\blog")).toBe("s3");
+  });
+
+  // A diff comment waiting in a conversation is for that conversation. Once the conversation is
+  // gone, the comment has nowhere to be sent, so it must not stay in storage.
+  it("forgets the pending diff comments of a deleted conversation", async () => {
+    saveLineComment("s1", { origin: "git", file: "src/a.ts", side: "new", line: 1, marker: "+", content: "x" }, "pending");
+    const user = userEvent.setup();
+    render();
+
+    await user.click(await screen.findByRole("button", { name: /(Apagar|Delete) Corrigir o carrinho/i }));
+    await user.click(screen.getByRole("button", { name: /^Apagar$|^Delete$/i }));
+
+    await waitFor(() => expect(deleteCodeSession).toHaveBeenCalledWith("s1"));
+    await waitFor(() => expect(readLineComments("s1")).toEqual([]));
+    expect(localStorage.getItem("chimera:code:line-comments:s1")).toBeNull();
+  });
+
+  // Deleting a project deletes every conversation in it. Comments of those conversations go with
+  // them; comments of another project's conversation are not touched.
+  it("forgets the pending diff comments of every conversation of a deleted project", async () => {
+    const comment = { origin: "git", file: "src/a.ts", side: "new" as const, line: 1, marker: "+" as const, content: "x" };
+    saveLineComment("s1", comment, "in loja");
+    saveLineComment("s2", comment, "in loja too");
+    saveLineComment("s3", comment, "in blog");
+    const user = userEvent.setup();
+    render();
+
+    await user.click(await screen.findByRole("button", { name: /(Mais opções de|More for) loja/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /(Excluir o projeto|Delete the project) loja/i }));
+    await user.click(screen.getByRole("button", { name: /^Apagar$|^Delete$/i }));
+
+    await waitFor(() => expect(deleteCodeProject).toHaveBeenCalledWith("C:\\loja"));
+    await waitFor(() => expect(readLineComments("s1")).toEqual([]));
+    expect(readLineComments("s2")).toEqual([]);
+    expect(readLineComments("s3")).toHaveLength(1);
   });
 });
