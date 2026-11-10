@@ -25,8 +25,10 @@ vi.mock("@/lib/api", () => ({
 }));
 
 /**
- * The Code turn's close loop switch (C1). Off unless the owner turns it on, worded as a warning, and the
- * hint says what it may never merge, so the row does not read as "the agent now merges on its own".
+ * The Code turn's close loop switch (C1). On by default since the owner's decision of 2026-11-10, worded
+ * as a warning because it pushes to a remote. A server that reports nothing about it still reads as off,
+ * which is the schema's own default. The merge is a separate switch with its own test
+ * (`Settings.closeLoopMerge.test.tsx`), so this row no longer says it merges.
  */
 const CONFIG = {
   models: {
@@ -87,10 +89,10 @@ describe("Settings — the Code close loop switch", () => {
     renderWithProviders(<Settings />);
 
     const toggle = await screen.findByRole("switch", {
-      name: "Let a finished Code turn commit, open a pull request and merge it once CI is green",
+      name: "Let a finished Code turn commit, open a pull request and follow its CI",
     });
     expect(toggle).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText(/billing, a destructive migration, row-level security or a secret/i)).toBeInTheDocument();
+    expect(screen.getByText(/billing, a destructive migration, row-level security or a grant/i)).toBeInTheDocument();
   });
 
   it("saves the owner's choice under CHIMERA_CODE_CLOSE_LOOP", async () => {
@@ -100,7 +102,7 @@ describe("Settings — the Code close loop switch", () => {
 
     await user.click(
       await screen.findByRole("switch", {
-        name: "Let a finished Code turn commit, open a pull request and merge it once CI is green",
+        name: "Let a finished Code turn commit, open a pull request and follow its CI",
       }),
     );
 

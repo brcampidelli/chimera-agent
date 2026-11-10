@@ -157,10 +157,34 @@ def test_a_curated_name_on_altered_content_is_a_strangers_file(tmp_path: Path, h
     assert (skill.provenance, skill.status) == ("tainted", "pending")
 
 
+def _plain(output: str) -> str:
+    """Help text as a reader sees it: no ANSI escapes, no frame glyphs, one space between words."""
+    import re
+
+    stripped = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output)
+    return " ".join(re.sub("[│╭╮╰╯─┌┐└┘]", " ", stripped).split())
+
+
 def test_the_library_help_says_the_cards_are_read_only_with_the_setting_on() -> None:
-    """It said the agent reads a matching card into its prompt. With `CHIMERA_SKILL_CARDS` off —
-    the default, because the A/B that would have turned it on failed its own gate — it does not."""
-    result = CliRunner().invoke(app, ["skills-library", "--help"], env={"COLUMNS": "200"})
+    """It said the agent reads a matching card into its prompt. With `CHIMERA_SKILL_CARDS` off — the
+    default, since the owner's decision of 2026-11-10 after the revised measurement — it does not."""
+    # Fixed width and no colour: rich draws a frame and wraps to the terminal's width, and a narrow CI
+    # terminal put a frame glyph and an escape between "by" and "default".
+    result = CliRunner().invoke(
+        app, ["skills-library", "--help"], env={"COLUMNS": "200", "NO_COLOR": "1", "TERM": "dumb"}
+    )
 
     assert result.exit_code == 0, result.output
-    assert "CHIMERA_SKILL_CARDS=on" in result.output
+    text = _plain(result.output)
+    # The literal is pinned: the help names the exact switch value and says the setting is off by default.
+    assert "CHIMERA_SKILL_CARDS=on" in text
+    assert "it is off by default" in text
+
+
+def test_the_help_check_survives_a_narrow_framed_coloured_terminal() -> None:
+    """The same sentences, read from output rich wrapped at 60 columns inside a frame with colour."""
+    framed = CliRunner().invoke(app, ["skills-library", "--help"], env={"COLUMNS": "60", "FORCE_COLOR": "1"})
+
+    text = _plain(framed.output)
+    assert "CHIMERA_SKILL_CARDS=on" in text
+    assert "it is off by default" in text

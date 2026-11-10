@@ -69,7 +69,7 @@ const ENTRIES: readonly SearchEntry[] = [
   {
     tab: "general",
     label: "settings.row.closeLoop",
-    hint: "settings.hint.closeLoop",
+    hint: "settings.hint.closeLoopNoSecret",
     anchor: "settings-close-loop",
     terms: "settings.search.terms.closeLoop",
   },
@@ -79,6 +79,13 @@ const ENTRIES: readonly SearchEntry[] = [
     hint: "settings.hint.archiveOnPrMerge",
     anchor: "settings-archive-on-pr-merge",
     terms: "settings.search.terms.archiveOnPrMerge",
+  },
+  {
+    tab: "general",
+    label: "settings.row.closeLoopMerge",
+    hint: "settings.hint.closeLoopMerge",
+    anchor: "settings-close-loop-merge",
+    terms: "settings.search.terms.closeLoopMerge",
   },
   // The Security screen's Access card: the browser's way to the owner's screen (a code, then a session).
   {
@@ -100,7 +107,7 @@ const ENTRIES: readonly SearchEntry[] = [
   {
     ...inAdvanced("settings-voice-listen-discord"),
     label: "settings.row.voiceListen",
-    hint: "settings.hint.voiceListen",
+    hint: "settings.hint.voiceListenDownload",
     terms: "settings.search.terms.voice",
   },
   {

@@ -139,7 +139,7 @@ def build_evolution_context(
     # every one of those buys a card the loop cannot retrieve.
     #
     # Reading stays off because it was measured, not because it was forgotten (`bench/skillcard`:
-    # +16.7pp, CI includes zero, +300% tokens — the registered gate failed). So the half to change
+    # not significant: +16.7pp then -8.3pp between identical runs; +37-48% tokens — the registered gate failed). So the half to change
     # is the writing, and the escape hatch is explicit for the person who wants a library anyway.
     mint = use_cards or settings.mint_unreadable_skills
     if evolve_skills and not mint:

@@ -28,6 +28,7 @@ import os
 from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -313,3 +314,47 @@ def _prices_put_back() -> Iterator[None]:
     yield
     receipts._PRICES[:] = saved
     receipts._catalog_registered = registered
+
+
+
+
+@pytest.fixture(autouse=True)
+def _built_ins_declared_as_before_the_default_changed(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Pin `CHIMERA_DEFER_TOOLS` to the value it had before 2026-11-10: off, so built-ins are declared.
+
+    Deferral is on by default now: the built-ins outside files, search and shell sit behind
+    `tool_list` / `tool_call` instead of in the declared list. Most tests here are about something else
+    (a gate, a screen, a governance rule, a CLI contract), and they assert on the declared names they
+    were written against, so they run with the old shape. Tests whose subject IS the default, or the
+    deferral itself, set the switch in the environment, or remove the pin with
+    the `product_default` marker: `tests/test_the_product_defers_the_builtins_by_default.py` and the
+    deferral tests named there carry it.
+
+    The pin is applied where a `Settings` is built and no value is set in the environment or the call. It
+    is not written to `os.environ`: an environment write here is seen by the hygiene fixture above as a
+    leak from the test body, and it is not one.
+
+    Limits of the pin, so nobody trusts it further than it goes: it only sees a `Settings` built with the
+    `CHIMERA_DEFER_TOOLS` key absent from both the kwargs and `os.environ`. A value read from a dotenv file
+    (`.env` in the working directory) is not in either, so the pin overrides it with `False`; a
+    `Settings.model_validate(...)` / `model_construct` path never calls `__init__` with these kwargs, so it
+    gets the product default (on). A test that depends on either must set the value itself.
+    """
+    from chimera.config import Settings
+
+    original = Settings.__init__
+
+    def declared_by_default(self: Settings, *args: Any, **kwargs: Any) -> None:
+        if "CHIMERA_DEFER_TOOLS" not in kwargs and "CHIMERA_DEFER_TOOLS" not in os.environ:
+            kwargs["CHIMERA_DEFER_TOOLS"] = False
+        original(self, *args, **kwargs)
+
+    if request.node.get_closest_marker("product_default") is not None:
+        yield  # the subject is the product's default: no pin
+        return
+    original_init = Settings.__init__
+    Settings.__init__ = declared_by_default  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        Settings.__init__ = original_init  # type: ignore[method-assign]

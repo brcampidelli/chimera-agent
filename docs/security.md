@@ -353,6 +353,8 @@ owner's decision of 2026-10-18, **Full control through the bridge** on Settings 
   surface a name is, by its family (`platform:discord` is a bot); a test fails if a module writes its
   own list again.
 
+**The close loop pushes on its own.** When a Code turn's verification passes and its diff check is clean, Chimera commits the turn's changes to the workspace's branch and pushes that branch to `origin` to open a pull request. It never pushes to the default branch and never force-pushes. It merges only if the owner has switched `CHIMERA_CLOSE_LOOP_MERGE` on, and then never a pull request that touches billing, a destructive migration, row-level security, a grant or a secret. The owner's screen starts it; the bridge, channels and background work do not.
+
 ## Honest limits
 
 This measures whether an *already-injected* agent's harmful action is stopped — not whether

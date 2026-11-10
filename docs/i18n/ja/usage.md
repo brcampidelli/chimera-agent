@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera — 利用ガイド
@@ -475,20 +475,15 @@ uv run chimera fusion-bench --tasks hard              # full vs selective, token
 失敗モードを避けられます。これはループを閉じます — 以前は、学習されたスキルは保存される
 だけで、読み戻されることはありませんでした。
 
-デフォルトではオフです: カードの注入はプロンプトトークンを増やし、TRSの*トークン*節約は
-長い推論トレースを短くすることから来るため、短い回答のタスクでは上振れは精度であって
-コストではありません。これは仮説ではありません — `hard` 短答スイート(有料の
-deepseek-v3.1)では、`skillcard-bench` はカードなしと比べて、カードが**トークン+290%**、
-**精度−8ポイント**であることを計測しました: 天井に近いモデルで、短縮すべき長いトレースが
-ない場合、汎用的なカードは純粋なオーバーヘッドであり、気を散らせる可能性があります。カードは
-(数学/コーディングのように長いトレースを持つ)**長い推論**のワークロードに有効にしてください
-— そこではトークンの計算が逆転します。そして常に、まず正解データによるチェックで自分自身の
-トレードオフを測定してください。
+2026-11-10 にオーナーの判断で既定はオフです。測定を改訂した結果、同梱の設定はトークンを +37〜+48%（2 回の実行）増やし、同一の 12 タスクの実行間で精度は +16.7pp、次いで
+−8.3pp
+と変動したため、利得は示されていません。カードはプロンプトのトークンを増やします。このトレードオフが見合うなら、グラウンドトゥルースの確認で自分で測り、`CHIMERA_SKILL_CARDS=on`
+で読み込みをオンにしてください：
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # トレードオフが見合うときに読み込みをオン
 ```
 
 このベンチは、カードあり/なしの精度、トークンの差分、カードのヒット率、ヒット/ミスで

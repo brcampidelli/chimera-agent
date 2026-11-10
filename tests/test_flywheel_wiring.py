@@ -26,7 +26,10 @@ def _agent(tmp_path: Path, **over: Any) -> Any:
 
     ws = tmp_path / "ws"
     ws.mkdir(exist_ok=True)
-    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    # Cards pinned off: this asserts the write side stays off when reading is off (see the last line).
+    import os
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_SKILL_CARDS=os.environ.get("CHIMERA_SKILL_CARDS", "0"))
     return _build_solve_agent(RunRequest(task="t", **over), ws, lambda _e: None, settings)
 
 

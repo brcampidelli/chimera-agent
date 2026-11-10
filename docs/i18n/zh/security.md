@@ -1,5 +1,5 @@
 ---
-source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
+source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
 ---
 
 # 安全与防护措施
@@ -230,6 +230,8 @@ export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorizatio
 - **所有者的连接器远离陌生人能打开的门。** OpenAPI 连接器用所有者的密钥向外调用，因此会回答驱动这次运行的任何人。只要有任何已配置的机器人没有 allowlist，它就不会在消息类界面上加载；
   在 GitHub issue 任务中永远不加载（任何人都能写 issue，只校验仓库）；在 `/v1/chat/completions` 上只有设置了 `CHIMERA_SERVER_TOKEN` 时才加载。由一个模块
   `chimera/governance/surfaces.py` 按家族判断一个名字属于哪种界面（`platform:discord` 是机器人）；如果某个模块再次自己写一份列表，测试就会失败。
+
+**闭环会自行推送。** 当代码轮次的验证通过且 diff 检查干净时，Chimera 会把该轮次的改动提交到工作区分支，并将该分支推送到 `origin` 以开启拉取请求。它从不推送到默认分支，也从不强制推送。只有所有者开启了 `CHIMERA_CLOSE_LOOP_MERGE` 才会合并，并且涉及计费、破坏性迁移、行级安全、授权或机密的拉取请求永远不会被合并。只有所有者的界面能启动它；桥接、渠道和后台任务不能。
 
 ## 诚实的边界
 

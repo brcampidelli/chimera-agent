@@ -711,7 +711,26 @@ class LedgeredTool(Tool):
         Resolved through the whole wrapper chain, not just ``self.inner``: under ``--guard --taint``
         the inner tool is a :class:`GovernedTool`, and reading one level deep lost the marker.
         """
-        return name in FETCH_TOOLS or is_untrusted_output(self.inner)
+        return name in FETCH_TOOLS or self._untrusted_target(name)
+
+    def _untrusted_target(self, name: str) -> bool:
+        """Whether the tool that will run ``name`` marks its output untrusted.
+
+        Through the deferral proxy (always ``untrusted_output``, because it cannot know its target when
+        the flag is read) the answer is the TARGET's: otherwise every deferred tool, ``todo_write``
+        included, tainted the turn and `CHIMERA_TRUSTED_SOURCES` could never trust a deferred fetch.
+        """
+        seen = 0
+        current: Any = self.inner
+        while current is not None and seen < 16:
+            target = getattr(current, "target_tool", None)
+            if callable(target) and name != getattr(current, "name", None):
+                resolved = target(name)
+                if resolved is not None:
+                    return is_untrusted_output(resolved)
+            current = getattr(current, "inner", None)
+            seen += 1
+        return is_untrusted_output(self.inner)
 
     def _trusted_source(self, name: str, args: Mapping[str, Any], result: str) -> str | None:
         """The host that makes this successful fetch trusted, or None (the content taints the run).
@@ -725,7 +744,7 @@ class LedgeredTool(Tool):
         """
         if name not in {"http_get", "fetch_url", "scrape", "extract", "download_media", "browser", "web_search"}:
             return None
-        if is_untrusted_output(self.inner):
+        if self._untrusted_target(name):
             return None
         if isinstance(result, Refusal):
             return None

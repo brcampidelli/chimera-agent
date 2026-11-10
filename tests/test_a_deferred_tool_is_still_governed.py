@@ -36,8 +36,7 @@ from chimera.governance.policy import Decision
 from chimera.governance.proxy import DEFERRED_PROXY, see_through
 from chimera.interface import ChatSession
 from chimera.tools.base import Tool
-from chimera.tools.defer import ToolCallTool, defer_builtins
-from chimera.tools.registry import ToolRegistry
+from chimera.tools.defer import ToolCallTool, _Deferred
 
 RM_RF = "import os; os.system('rm -rf /')"
 EXFIL = "https://collector.example/c?data=SECRET"
@@ -61,18 +60,18 @@ class _Recorder(Tool):
 
 
 def _deferred() -> tuple[Tool, dict[str, _Recorder]]:
-    """The real `tool_call` proxy, over stand-ins for the tools the switch defers."""
+    """The real `tool_call` proxy, over stand-ins named like the tools the governance keys on.
+
+    `execute_code` is turn-bound now (`defer.TURN_BOUND`: it is never deferred), so `defer_builtins`
+    would leave it declared. The premise of what follows is the PROXY's: whatever sits behind it is
+    judged by the name it runs under. So the catalogue is built directly, which keeps every kernel and
+    ledger assertion below on the same names it always used.
+    """
     behind = {
         "execute_code": _Recorder("execute_code", "code"),
         "http_get": _Recorder("http_get", "url"),
     }
-    registry = ToolRegistry()
-    registry.register(_Recorder("read_file", "path"))  # the core stays declared
-    for tool in behind.values():
-        registry.register(tool)
-    deferred, count = defer_builtins(registry)
-    assert count == 2
-    return deferred.get("tool_call"), behind
+    return ToolCallTool(_Deferred(list(behind.values()), frozenset(), None)), behind
 
 
 def _tainted() -> TaintLedger:
@@ -223,6 +222,9 @@ def test_the_terminal_keeps_the_reach_floor_behind_the_proxy(
     registry = build_right_hand(tmp_path, settings=get_settings(), surface="chat").registry
 
     assert "run_shell" not in registry.names()  # the floor on the declared half, as before
+    # Turn-bound, so they are declared tools and the floor removes them by name: reachable neither
+    # declared nor behind the proxy.
+    assert not {"execute_code", "code_interpreter"} & set(registry.names())
     assert not {"execute_code", "code_interpreter"} & _behind(registry)
     assert "no tool named 'execute_code'" in str(registry.run("tool_describe", tool="execute_code"))
     assert "no tool named 'execute_code'" in str(
@@ -238,7 +240,8 @@ def test_without_a_floor_the_terminal_still_reaches_them(
 
     registry = build_right_hand(tmp_path, settings=get_settings(), surface="chat").registry
 
-    assert {"execute_code", "code_interpreter"} <= _behind(registry)
+    assert {"execute_code", "code_interpreter"} <= set(registry.names())  # turn-bound: declared
+    assert {"scrape", "http_get"} <= _behind(registry)  # and the deferred ones are behind the proxy
 
 
 def _app_chat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
@@ -273,6 +276,7 @@ def test_the_app_chat_guard_reaches_behind_the_proxy(
     registry = _registry(_app_chat(tmp_path, _env)["factory"]())
 
     assert "run_shell" not in registry.names()
+    assert not {"execute_code", "code_interpreter"} & set(registry.names())
     assert not {"execute_code", "code_interpreter"} & _behind(registry)
     assert "no tool named 'code_interpreter'" in str(
         registry.run("tool_describe", tool="code_interpreter")
@@ -286,4 +290,5 @@ def test_the_unguarded_surface_keeps_what_it_declares(
     registry = _registry(_app_chat(tmp_path, _env)["openai_factory"]())
 
     assert "run_shell" in registry.names()
-    assert {"execute_code", "code_interpreter"} <= _behind(registry)
+    assert {"execute_code", "code_interpreter"} <= set(registry.names())
+    assert {"scrape", "http_get"} <= _behind(registry)

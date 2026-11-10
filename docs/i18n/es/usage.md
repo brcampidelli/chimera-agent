@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera — Guía de uso
@@ -481,20 +481,16 @@ nombre + descripción + triggers) y las inyecta en el contexto de razonamiento d
 el agente reutiliza lo que funcionó y evita modos de fallo conocidos. Esto cierra el ciclo —
 antes, las skills aprendidas se almacenaban y nunca se volvían a leer.
 
-Desactivado por defecto: inyectar tarjetas agrega tokens de prompt, y los ahorros de *tokens*
-de TRS vienen de acortar trazas de razonamiento largas, así que en tareas de respuesta corta la
-ventaja es precisión, no costo. Esto no es hipotético — en la suite de respuesta corta `hard`
-(deepseek-v3.1 de pago), `skillcard-bench` midió que las tarjetas costaban **+290% de tokens**
-y **−8pp de precisión** frente a no usar tarjetas: con un modelo cerca del techo y sin traza
-larga que acortar, las tarjetas genéricas son puro overhead que puede distraer. Habilita las
-tarjetas para cargas de trabajo de **razonamiento largo** (matemáticas/programación con trazas
-extensas) donde la matemática de tokens se invierte, y siempre mide tu propia compensación
-primero con una comprobación de verdad de referencia:
+Desactivado por defecto, por decisión del dueño del 10/11/2026 tras la medición revisada: la
+configuración enviada cuesta +37–48 % de tokens (dos rondas), y la precisión varió +16,7 pp y luego
+−8,3 pp entre rondas idénticas de 12 tareas, así que no se muestra ninguna mejora. Las tarjetas
+añaden tokens al prompt; si ese compromiso te compensa, mídelo con una comprobación de verdad de
+referencia y activa la lectura con `CHIMERA_SKILL_CARDS=on`:
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # activa la lectura, cuando el compromiso te compense
 ```
 
 El bench reporta la precisión con vs. sin tarjetas, la delta de tokens, la tasa de acierto de

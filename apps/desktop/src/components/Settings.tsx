@@ -325,13 +325,12 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_PULL_REQUESTS: String(v) })}
         />
       </Row>
-      {/* A finished Code turn closes its own loop (`chimera/core/close_loop.py`): commit, pull request,
-          CI, and a merge when CI is green. Off unless the owner turns it on, and worded as a warning:
-          it pushes to a remote and merges. Billing, a destructive migration, row-level security and a
-          secret are never merged by it. The desktop bridge cannot write it. */}
+      {/* A finished Code turn closes its own loop (`chimera/core/close_loop.py`): commit, pull request
+          and CI, on by default (owner's decision, 2026-11-10). Worded as a warning: it pushes to a
+          remote. The desktop bridge cannot write it. */}
       <Row
         label={t("settings.row.closeLoop")}
-        hint={t("settings.hint.closeLoop")}
+        hint={t("settings.hint.closeLoopNoSecret")}
         warn
         env="CHIMERA_CODE_CLOSE_LOOP"
       >
@@ -353,6 +352,21 @@ function AutonomyCard({
           id="settings-archive-on-pr-merge"
           on={c.autonomy.archive_on_pr_merge ?? true}
           onChange={(v) => save({ CHIMERA_ARCHIVE_ON_PR_MERGE: String(v) })}
+        />
+      </Row>
+      {/* The merge is its own switch, off, and owner-only like the one above. A merge puts the change on
+          the default branch, so opening a pull request never implies merging one. Billing, a destructive
+          migration, row-level security and a secret are never merged, whatever this says. */}
+      <Row
+        label={t("settings.row.closeLoopMerge")}
+        hint={t("settings.hint.closeLoopMerge")}
+        warn
+        env="CHIMERA_CLOSE_LOOP_MERGE"
+      >
+        <Toggle
+          id="settings-close-loop-merge"
+          on={c.autonomy.close_loop_merge ?? false}
+          onChange={(v) => save({ CHIMERA_CLOSE_LOOP_MERGE: String(v) })}
         />
       </Row>
       {/* The owner's lifecycle hooks (owner's decision, 2026-10-05; docs/hooks-threat-model.md).
@@ -1553,10 +1567,11 @@ export function MessagingCard({
           ) : null}
         </>
       ) : null}
-      {/* Voice, on both bots that carry audio. Read when the bot starts, so the line says so. */}
+      {/* Voice, on both bots that carry audio. Read when the bot starts, so the line says so. Listening is
+          on by default (owner's decision, 2026-11-10); answering in voice stays off. */}
       <Row
         label={t("settings.row.voiceListen")}
-        hint={t("settings.hint.voiceListen")}
+        hint={t("settings.hint.voiceListenDownload")}
         applies={listenApplies}
         env="CHIMERA_CHAT_INBOUND_MEDIA"
       >
@@ -2342,7 +2357,7 @@ export function Settings({
               without this they are never read back, so the agent learns and does not use it. */}
                   <Row
                     label={t("settings.row.skillCards")}
-                    hint={t("settings.hint.skillCards")}
+                    hint={t("settings.hint.skillCardsRevised")}
                     env="CHIMERA_SKILL_CARDS"
                   >
                     <Toggle
@@ -2658,8 +2673,8 @@ export function Settings({
                       }
                     />
                   </Row>
-                  {/* Tools reached on demand. Off: the built-in bench was inconclusive and the MCP
-                half was never measured — the hints quote `bench/tool_defer/RESULT.md` and say so.
+                  {/* Tools reached on demand. On by default by the owner's decision (2026-11-10), although the
+                built-in bench was inconclusive; the MCP half is off, as it was never measured — the hints quote `bench/tool_defer/RESULT.md` and say so.
                 Under each, the token half as THIS install measures it, a loss included. */}
                   <Row
                     label={t("settings.row.deferTools")}

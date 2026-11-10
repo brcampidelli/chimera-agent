@@ -1,5 +1,5 @@
 ---
-source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
+source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
 ---
 
 # Sécurité & garde-fous
@@ -354,6 +354,8 @@ du 2026-10-18, **Contrôle total par le pont**, dans Réglages > Sécurité.
   vérifié), et sur `/v1/chat/completions` seulement tant que `CHIMERA_SERVER_TOKEN` est défini. Un
   module, `chimera/governance/surfaces.py`, décide quel type de surface est un nom, par sa famille
   (`platform:discord` est un bot) ; un test échoue si un module réécrit sa propre liste.
+
+**La boucle de clôture pousse d'elle-même.** Quand la vérification d'un tour de code réussit et que sa vérification du diff est propre, Chimera commite les changements du tour sur la branche de l'espace de travail et pousse cette branche vers `origin` pour ouvrir une pull request. Elle ne pousse jamais sur la branche par défaut et ne force jamais un push. Elle ne fusionne que si le propriétaire a activé `CHIMERA_CLOSE_LOOP_MERGE`, et alors jamais une pull request qui touche à la facturation, à une migration destructive, à la sécurité au niveau des lignes, à un grant ou à un secret. Seul l'écran du propriétaire la lance ; ni le pont, ni les canaux, ni les tâches de fond.
 
 ## Limites honnêtes
 

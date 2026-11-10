@@ -132,7 +132,7 @@ describe("Settings search — the pull-request and close-the-loop switches", () 
   describe.each(Object.keys(DICTS) as Lang[])("the close-the-loop switch in %s", (lang) => {
     it("is found by a search term that neither its label nor its hint contains", async () => {
       const label = DICTS[lang]["settings.row.closeLoop"];
-      const haystack = `${label} ${DICTS[lang]["settings.hint.closeLoop"]}`.toLocaleLowerCase();
+      const haystack = `${label} ${DICTS[lang]["settings.hint.closeLoopNoSecret"]}`.toLocaleLowerCase();
       const term = DICTS[lang]["settings.search.terms.closeLoop"]
         .split(",")
         .map((word) => word.trim())

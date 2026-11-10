@@ -1,6 +1,6 @@
 """A finished Code turn closes its own loop: commit, pull request, CI, and merge when it is green.
 
-The owner's decision (C1, opt-in and default OFF: ``CHIMERA_CODE_CLOSE_LOOP``). When a coding turn
+The owner's decision (C1; ON by default since 2026-11-10: ``CHIMERA_CODE_CLOSE_LOOP``). When a coding turn
 that the owner's own screen started ends with its verification PASSED and its own diff check CLEAN,
 the turn:
 
@@ -15,8 +15,10 @@ the turn:
 5. when a check fails, reads the failing log (bounded, redacted, fenced as untrusted data) and asks
    for ONE follow-up fix turn in the same conversation; at most :data:`MAX_FIX_ATTEMPTS` fix turns,
    then it stops and reports;
-6. when CI is green, merges (squash, pinned to the head it watched) — unless the pull request as a
-   whole touches an exception (:func:`excepted_reasons`, read from the PR's diff at merge time too).
+6. when CI is green and the owner turned merging on (``CHIMERA_CLOSE_LOOP_MERGE``, OFF by default),
+   merges (squash, pinned to the head it watched) — unless the pull request as a whole touches an
+   exception (:func:`excepted_reasons`, read from the PR's diff at merge time too). With merging off
+   the green pull request is left open, and the receipt says so.
 
 Every outward step is an argument list through the runner the pull request module uses (no shell,
 no prompt, bounded, token-free). Every external call goes through :class:`Hooks`, so the tests drive
@@ -94,6 +96,11 @@ def _sleep(seconds: float) -> None:
     time.sleep(seconds)
 
 
+def _merge_off() -> bool:
+    """The default: a green pull request is left open for the owner, never merged."""
+    return False
+
+
 @dataclass(frozen=True)
 class Hooks:
     """Everything the loop touches outside itself. Production gets the defaults; tests pass fakes.
@@ -101,6 +108,8 @@ class Hooks:
     ``gh`` is the command that runs the GitHub CLI (None finds the installed one). ``ask_fix`` starts
     one follow-up fix turn with the failing log and reports whether it was started. ``report`` is
     called on every change of state, so the receipt can be kept in step with the watch.
+    ``merge_allowed`` is read at the moment of merging, not when the watch starts, so turning the
+    switch off while CI runs stops the merge. Off unless the caller says otherwise.
     """
 
     gh: Sequence[str] | None = None
@@ -109,6 +118,7 @@ class Hooks:
     clock: Callable[[], float] = time.monotonic
     ask_fix: Callable[[str, int], bool] = _no_fix_turn
     report: Callable[[CloseLoop], None] = _nothing
+    merge_allowed: Callable[[], bool] = _merge_off
 
 
 @dataclass
@@ -619,21 +629,19 @@ def close_at_turn_end(
     if gh is None:
         state.skipped_reason = "the GitHub CLI (gh) is not installed"
         return state
-    refused = _readiness_refusal(root, branch, gh)
-    if refused:
-        state.skipped_reason = refused
+    # Readiness is decided BEFORE the local commit, for both branches: a push that would be refused
+    # must not leave a commit behind. ``nothing_ahead`` is expected here, since the commit is not made.
+    ready = readiness(root, branch=branch, gh=gh)
+    if ready.reason and ready.reason != "nothing_ahead":
+        state.skipped_reason = sentence(ready.reason)
         return state
+    existing = _existing_pr(root, hooks, gh, branch)
     subject = subject_of(message)
     if not _commit_turn_checked(root, paths, subject, commit_body(message, paths), state):
         return state
     state.branch = branch
-    existing = _existing_pr(root, hooks, gh, branch)
     if existing:
         # The branch already has an open pull request: the commit goes on it, and no second one is opened.
-        ready = readiness(root, branch=branch, gh=gh)
-        if not ready.ready:
-            state.error = sentence(ready.reason)
-            return state
         pushed = push_head(root, ready.push_target, state.commit, branch)
         if pushed.returncode != 0:
             state.error = redact(_first_line(pushed.stderr or pushed.stdout))
@@ -788,6 +796,12 @@ def fix_request(log: str, attempt: int) -> str:
 
 
 def _merge(root: Path, state: CloseLoop, hooks: Hooks, gh: Sequence[str], head: str) -> None:
+    if not hooks.merge_allowed():
+        # Keep a reason already recorded at commit time (billing, a migration): it says more than "off".
+        state.merge_blocked_reason = state.merge_blocked_reason or (
+            "merging is off (CHIMERA_CLOSE_LOOP_MERGE); left open for the owner"
+        )
+        return
     diff = _pr_diff(root, state, hooks, gh)
     if diff is None:
         state.merge_blocked_reason = (

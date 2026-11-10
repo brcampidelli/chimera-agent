@@ -82,6 +82,9 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     # prefix the worktree cleanup force-deletes under.
     "CHIMERA_PULL_REQUESTS": ("false", "true"),
     "CHIMERA_CODE_CLOSE_LOOP": ("false", "true"),
+    # The close loop's merge (2026-11-10): a separate switch, because a merge puts the change on the
+    # default branch. Owner-only like the two above.
+    "CHIMERA_CLOSE_LOOP_MERGE": ("false", "true"),
     "CHIMERA_BRANCH_PREFIX": ("chimera", "feature"),
     # The project pack narrows (P7.6): switching it off hands back what the pack took away.
     "CHIMERA_PROJECT_PACK": ("true", "false"),
@@ -385,7 +388,7 @@ def test_a_body_that_mixes_an_owner_setting_with_a_writable_one_is_refused_whole
     get_settings.cache_clear()
 
 
-@pytest.mark.parametrize("key", ["CHIMERA_PULL_REQUESTS", "CHIMERA_CODE_CLOSE_LOOP"])
+@pytest.mark.parametrize("key", ["CHIMERA_PULL_REQUESTS", "CHIMERA_CODE_CLOSE_LOOP", "CHIMERA_CLOSE_LOOP_MERGE"])
 def test_full_control_never_writes_the_switches_that_widen_where_code_goes(
     key: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

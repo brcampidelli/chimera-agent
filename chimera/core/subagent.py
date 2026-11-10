@@ -33,6 +33,13 @@ SUBAGENT_SYSTEM = (
 )
 
 
+
+def _declared(registry: object) -> list[str]:
+    """Every name a grant may reach; a registry without the deferral split reads as its own names."""
+    declared = getattr(registry, "declared_names", None)
+    return list(declared()) if callable(declared) else list(registry.names())  # type: ignore[attr-defined]
+
+
 class SubAgentTool(Tool):
     """Lets the main agent delegate a subtask to an isolated, tool-scoped subagent."""
 
@@ -103,7 +110,10 @@ class SubAgentTool(Tool):
         """Resolved per call, not at construction — the allowlist has to follow the same late
         binding, or a subagent would be granted names from a registry it no longer draws from."""
         registry = self._current()
-        base = set(self._allowed_names) if self._allowed_names is not None else set(registry.names())
+        base = (
+            set(self._allowed_names) if self._allowed_names is not None
+            else set(_declared(registry))
+        )
         base.discard(self.name)  # never grant the spawn tool itself -> no recursion
         return base
 
@@ -119,6 +129,9 @@ class SubAgentTool(Tool):
         for name in sorted(names):
             if name in source:
                 sub.register(source.get(name))
+            elif name in getattr(source, "deferred", {}):
+                # Declared by the agent, so it is granted: deferral changes how it is LOOKED UP, not whether.
+                sub.register(source.deferred[name])
         return sub
 
     def run(self, **kwargs: Any) -> str:

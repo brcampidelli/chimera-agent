@@ -126,6 +126,11 @@ def main(tier_b: Path, baseline: Path, vendor_baseline: Path) -> None:
 
 
 if __name__ == "__main__":
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+    from _legacy_defaults import pin_legacy_defaults
+    pin_legacy_defaults()  # the five 2026-11-10 defaults, back to the value these numbers used
     ap = argparse.ArgumentParser()
     ap.add_argument("tier_b", type=Path)
     ap.add_argument("--baseline", type=Path, default=Path(__file__).resolve().parent / "results" / "2026-09-19-local-L.jsonl")

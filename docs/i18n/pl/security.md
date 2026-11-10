@@ -1,5 +1,5 @@
 ---
-source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
+source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -322,6 +322,8 @@ Most pulpitu (`chimera mcp desktop`) ma trzy przełączniki, każdy bez znaczeni
   `/v1/chat/completions` tylko wtedy, gdy ustawiony jest `CHIMERA_SERVER_TOKEN`. Jeden moduł,
   `chimera/governance/surfaces.py`, decyduje, jakim rodzajem powierzchni jest nazwa, po jej rodzinie
   (`platform:discord` to bot); test zawodzi, jeśli jakiś moduł znów napisze własną listę.
+
+**Pętla zamknięcia wypycha sama.** Gdy weryfikacja tury kodu przechodzi, a sprawdzenie diffu jest czyste, Chimera robi commit zmian tury na gałęzi obszaru roboczego i wysyła tę gałąź do `origin`, aby otworzyć pull request. Nigdy nie wysyła na gałąź domyślną i nigdy nie wymusza wysyłki. Scala tylko wtedy, gdy właściciel włączył `CHIMERA_CLOSE_LOOP_MERGE`, i wtedy nigdy pull request dotykającego rozliczeń, destrukcyjnej migracji, RLS, grantu ani sekretu. Uruchamia ją tylko ekran właściciela; mostek, kanały i praca w tle nie.
 
 ## Uczciwe granice
 

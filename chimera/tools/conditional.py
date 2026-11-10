@@ -83,10 +83,12 @@ CONDITIONAL_TOOLS: tuple[ConditionalTool, ...] = (
     ConditionalTool("calendar_events", "key", ("CHIMERA_CALENDAR_ICS_URL",), "chimera.tools.calendar:CalendarEventsTool"),
     ConditionalTool("browser", "package", (), "chimera.tools.browser:BrowserTool", requires="playwright"),
     # Every call asks the owner whatever this switch says (`tools/pull_request.py`); the switch only
-    # decides whether the agent may propose one. Owner-only: the desktop bridge cannot write it.
+    # decides whether the agent may propose one. On by default since 2026-11-10 (`default_on`, so the
+    # Tools screen says "switched off", not "off by default", when the owner turns it off).
+    # Owner-only: the desktop bridge cannot write it.
     ConditionalTool(
         "open_pull_request", "setting", ("CHIMERA_PULL_REQUESTS",),
-        "chimera.tools.pull_request:OpenPullRequestTool",
+        "chimera.tools.pull_request:OpenPullRequestTool", default_on=True,
     ),
 )
 """``generate_image`` lights up with a hosted image key or the local diffusers package (the same condition
