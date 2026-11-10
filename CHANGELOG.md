@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Comment on diff lines and send them all to the agent at once.** In the Code screen's diffs, a "+" beside each line opens a comment box; Enter keeps the comment on that line, and "Send comments (N)" or Ctrl/Cmd+Enter sends every pending comment as one message with file, line, the line's text and which diff it came from. Comments are kept per conversation until they are sent, a comment from an older edit is marked as possibly out of date, and the rows are keyboard-navigable. (#1203)
+
 - **The agent's shell no longer receives your API keys.** Child processes of the agent (and the new terminal) used to inherit provider key pools such as `CHIMERA_OPENROUTER_KEYS`, `DATABASE_URL` with a password and cloud credentials, so any command the agent ran could print them. They now get an environment with secrets removed by name and by value (proxy settings still pass), while the GitHub CLI keeps the token it needs. (#1208)
 
 - **A real terminal in the Code screen (Ctrl+`).** Tabs (up to eight) open a real shell in the conversation's folder or worktree, so `cd`, `export` and interactive programs work. Only the desktop app's own screen opens one: the bridge, paired browser tabs and devices, chat bots and guests cannot, a folder whose commands are off has no terminal, and nothing typed is logged. Closing a tab, the conversation or the app ends the shell and everything it started (a job object on Windows).

@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { ChangeFileDiff } from "@/components/code/side/ChangeFileDiff";
 import { PullRequestStatusLine, useHasPullRequest } from "@/components/code/side/PullRequestLine";
 import { CHANGES_SHOWN } from "@/components/code/side/rules";
 import { getGitStatus } from "@/lib/api";
+import type { GitFile as GitFileRow } from "@/lib/types";
 import { useConversationSide } from "@/lib/conversation-side";
 import { useT } from "@/lib/i18n";
 
@@ -41,20 +44,45 @@ export function ChangesCard({ alone = false }: { alone?: boolean } = {}) {
       <p className="text-sm">{t("side.changes.files", { n: files.length })}</p>
       <ul className="space-y-0.5">
         {shown.map((file) => (
-          <li key={file.path} className="flex min-w-0 items-center gap-2 text-xs">
-            <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground" title={file.path}>
-              {file.path}
-            </span>
-            <span className="shrink-0 font-mono text-muted-foreground">
-              {file.untracked ? "??" : `${file.x === " " ? "·" : file.x}${file.y === " " ? "·" : file.y}`}
-            </span>
-          </li>
+          <ChangedFile key={file.path} file={file} workspace={workspace} sessionId={sessionId} />
         ))}
       </ul>
       {files.length > shown.length ? (
         <p className="text-xs text-muted-foreground">{t("side.changes.more", { n: files.length - shown.length })}</p>
       ) : null}
     </div>
+  );
+}
+
+/** One changed file: a row that opens its diff under it, with the status code the git panel uses. */
+function ChangedFile({
+  file,
+  workspace,
+  sessionId,
+}: {
+  file: GitFileRow;
+  workspace: string;
+  sessionId: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const code = file.untracked ? "??" : `${file.x === " " ? "·" : file.x}${file.y === " " ? "·" : file.y}`;
+  return (
+    <li className="text-xs">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full min-w-0 items-center gap-2 rounded-chip px-1 py-0.5 text-left hover:bg-surface-hover"
+      >
+        <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground" title={file.path}>
+          {file.path}
+        </span>
+        <span className="shrink-0 font-mono text-muted-foreground">{code}</span>
+      </button>
+      {open && workspace ? (
+        <ChangeFileDiff workspace={workspace} path={file.path} staged={file.staged && !file.untracked} sessionId={sessionId} />
+      ) : null}
+    </li>
   );
 }
 
