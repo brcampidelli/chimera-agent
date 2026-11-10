@@ -12,14 +12,16 @@ So the owner's bearer token says *who may call the API*, and this says *the requ
 owner's screen*. Its properties are the whole of the argument:
 
 * **Drawn per start, kept in memory.** Never written to a file, a record, a log or ``.env``, never
-  returned by a route (``/api/info`` included), never inherited by a child (the variable that
-  carries it in is removed from this process's environment as it is read, and ``_child_env`` strips
-  every name that says TOKEN anyway).
+  returned by a route (``/api/info`` included), never inherited by a child (``_child_env`` strips
+  every name that says TOKEN) — and, under the desktop shell, never in this process's start-up
+  environment either: it arrives on stdin (``chimera/launch_secrets.py``), because removing a
+  variable from ``os.environ`` does not change ``/proc/<pid>/environ``, which any process of the
+  same user, the agent's shell included, can read.
 * **Never the owner's token.** An owner-chosen ``CHIMERA_SERVER_TOKEN`` sits in ``.env`` — on disk —
   so a value equal to the bearer token is refused as a screen credential, and the desktop shell
   draws this one fresh on every launch even when it reuses the owner's token.
-* **Delivered only where a screen is.** The desktop shell (Tauri) passes it in
-  :data:`ENV_VAR` and hands it to the webview through its initialization script, the same way it
+* **Delivered only where a screen is.** The desktop shell (Tauri) passes it on the backend's stdin
+  (:data:`ENV_VAR` is the fallback for a shell that predates that, and for tests) and hands it to the webview through its initialization script, the same way it
   hands over the bearer token: no URL, no disk, no page-callable IPC. A browser served by
   ``chimera app`` receives it in the page's ``<meta name="chimera-screen">`` on a loopback request —
   exactly where and when that page already receives the bearer token, so that mode is no more
@@ -52,6 +54,8 @@ import secrets
 import time
 from dataclasses import dataclass
 from typing import Literal
+
+from chimera import launch_secrets
 
 #: The variable the desktop shell starts the backend with. Read once and removed.
 ENV_VAR = "CHIMERA_SCREEN_TOKEN"
@@ -155,8 +159,17 @@ def may_switch_bypass_on(credential: ScreenCredential | None) -> bool:
 
 
 def _take_from_environment() -> str:
-    """The launcher's value, removed from the environment so no child — and no later reader — sees it."""
-    return (os.environ.pop(ENV_VAR, None) or "").strip()
+    """The launcher's value: from the shell's stdin line when that is how it started this process,
+    else from the environment (the fallback — ``chimera/launch_secrets.py`` says what it risks).
+
+    The variable is removed in both cases so no child, and no later reader, sees it. When the shell
+    said it would deliver on stdin, an environment value is not wanted at all: the shell does not
+    send one, so one that is there came from somebody else.
+    """
+    from_env = (os.environ.pop(ENV_VAR, None) or "").strip()
+    if launch_secrets.channel_requested():
+        return launch_secrets.take("screen_token") or ""
+    return from_env
 
 
 def take_launcher_key() -> str | None:
@@ -167,6 +180,8 @@ def take_launcher_key() -> str | None:
     only a service keeps what it returns (``publish_service``).
     """
     offered = (os.environ.pop(LAUNCHER_ENV, None) or "").strip()
+    if launch_secrets.channel_requested():
+        offered = launch_secrets.take("launcher_key") or ""
     if os.environ.get("CHIMERA_TAURI_SIDECAR") != "1" or len(offered) < MIN_SECRET:
         return None
     return offered
@@ -191,12 +206,16 @@ def for_mode(mode: Mode | None, *, server_token: str | None = None) -> ScreenCre
 
     In every case a value equal to the owner's bearer token is refused — that one may be in ``.env``.
     """
-    offered = _take_from_environment()
     launcher = take_launcher_key()
-    if mode == "service":
-        return ScreenCredential(launcher_key=launcher)
     native = os.environ.get("CHIMERA_TAURI_SIDECAR") == "1"
-    if native:
-        value = offered if offered and offered != (server_token or "").strip() else None
-        return ScreenCredential(value=value, launcher_key=launcher)
-    return ScreenCredential(value=secrets.token_urlsafe(32), in_page=True, launcher_key=launcher)
+    # The mode is decided before the credential is consumed: only the desktop shell's backend adopts
+    # one. Anything else still removes the variable (no child may inherit it) and drops what the
+    # channel held, but never reads either as a value.
+    if mode == "service" or not native:
+        _take_from_environment()
+        if mode == "service":
+            return ScreenCredential(launcher_key=launcher)
+        return ScreenCredential(value=secrets.token_urlsafe(32), in_page=True, launcher_key=launcher)
+    offered = _take_from_environment()
+    value = offered if offered and offered != (server_token or "").strip() else None
+    return ScreenCredential(value=value, launcher_key=launcher)

@@ -11,6 +11,7 @@
 
 mod attach;
 mod dotenv_value;
+mod launch_secrets;
 mod prefs;
 mod shell_request;
 mod sidecar_http;
@@ -583,28 +584,39 @@ fn start_sidecar_with(
         cmd.arg("--standalone");
     }
     backend_env(&mut cmd, &data_dir, &workspace_dir, install_dir().as_deref());
+    launch_secrets::arm(&mut cmd);
     cmd
         // Not the launcher key: only a service this shell spawns gets one (`attach.rs`).
         .env_remove(attach::LAUNCHER_ENV)
-        // The credential is inherited by the sidecar rather than placed in args, where process
-        // listings and crash diagnostics would expose it.
-        .env("CHIMERA_SERVER_TOKEN", server_token)
-        // A separate variable, never the same value: the backend refuses one equal to the bearer
-        // token, and removes this from its own environment as it reads it, so no child inherits it.
-        .env("CHIMERA_SCREEN_TOKEN", screen_token)
-        // The backend inherits no stdin, because there is nobody on the other end of it. Inherited,
+        // The bearer token and the screen credential travel on the child's stdin, never in its
+        // environment or arguments (`launch_secrets.rs`): `/proc/<pid>/environ`, `ps eww` and
+        // Process Explorer show a process's STARTING environment to any process of the same user,
+        // the agent's shell among them, and the backend removing a variable later does not change
+        // what they show. Two separate values: the backend refuses a screen credential equal to the
+        // bearer token.
+        // The backend inherits no console stdin, because there is nobody on the other end of it. Inherited,
         // and combined with the CREATE_NO_WINDOW below, Windows hands the child a console with no
         // window: `isatty()` reports a terminal, the host-exec gate believes it, and the first
         // command the agent chose to run blocks on a confirmation prompt drawn where no human can
         // see it — permanently, cancel included. The backend now also declares this for itself, and
         // both halves stay: this one makes the file descriptor tell the truth, that one makes the
         // answer independent of the file descriptor.
-        .stdin(Stdio::null())
+        // stdin is the pipe `launch_secrets::arm` set: a pipe is not a terminal, so `isatty()` tells
+        // the truth here as well, and the shell closes it right after writing the line.
         .stderr(Stdio::piped());
     hide_console(&mut cmd);
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to launch backend {exe:?}: {e}"))?;
+    launch_secrets::deliver(
+        &mut child,
+        &launch_secrets::Secrets {
+            server_token: Some(server_token),
+            screen_token: Some(screen_token),
+            launcher_key: None,
+        }
+        .line(),
+    );
 
     // Drain it on a thread. Reading it only after a failure would deadlock instead of diagnosing:
     // a pipe nobody reads fills, and a backend blocked writing to a full pipe never reaches the
@@ -623,6 +635,15 @@ fn start_sidecar_with(
             let _ = child.wait();
             format!("{why}\n\nDiagnostics written to:\n{}", report.display())
         })?;
+    // A backend that serves a protected route with no token is not running the guard this shell
+    // launched it for (an older executable that ignored the launch channel): every local process
+    // could drive the agent. It was started here, so it is ended here, with the reason on screen.
+    if let Err(why) = sidecar_http::token_is_enforced(&url) {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_file(&port_file);
+        return Err(why);
+    }
     let _ = std::fs::remove_file(&port_file);
 
     // Remember what we actually got, which is not always what we asked for. Best-effort on purpose:
@@ -1250,15 +1271,16 @@ impl attach::Services for RealServices<'_> {
         let mut cmd = Command::new(&exe);
         cmd.args(["service", "run", "--port", &port.to_string()]);
         backend_env(&mut cmd, &paths.data_dir, &workspace_dir, install_dir().as_deref());
-        cmd.env(attach::LAUNCHER_ENV, &self.state.launcher_key)
-            .env("CHIMERA_SERVICE_CHANNEL", &self.live.channel)
+        // The launcher key and the owner's token go on stdin (`launch_secrets.rs`), not in the
+        // environment: this process outlives the window, so a `/proc/<pid>/environ` copy of the key
+        // would sit there for as long as the service runs.
+        launch_secrets::arm(&mut cmd);
+        cmd.env("CHIMERA_SERVICE_CHANNEL", &self.live.channel)
             .env("CHIMERA_SERVICE_DIR", &self.live.service_dir)
             // Rich writes dashes and arrows; a log opened as cp1252 would crash the server on one.
             .env("PYTHONUNBUFFERED", "1")
             .env("PYTHONIOENCODING", "utf-8")
-            .env("PYTHONUTF8", "1")
-            // A service has no screen of its own; the window leases it one (`attach.rs`).
-            .env_remove("CHIMERA_SCREEN_TOKEN");
+            .env("PYTHONUTF8", "1");
         if std::env::var_os("OPENBLAS_NUM_THREADS").is_none() {
             cmd.env("OPENBLAS_NUM_THREADS", "1");
         }
@@ -1266,23 +1288,42 @@ impl attach::Services for RealServices<'_> {
             cmd.env("OMP_NUM_THREADS", "1");
         }
         // The owner's token, or the one this session already uses, wins; with none the service
-        // uses its folder's persistent `service.token`, read back from its record below.
-        match token {
-            Some(t) => cmd.env("CHIMERA_SERVER_TOKEN", t),
-            None => cmd.env_remove("CHIMERA_SERVER_TOKEN"),
-        };
+        // uses its folder's persistent `service.token`, read back from its record below. A service
+        // has no screen of its own, so no screen credential: the window leases it one (`attach.rs`).
+        let secrets = launch_secrets::Secrets {
+            server_token: token,
+            screen_token: None,
+            launcher_key: Some(&self.state.launcher_key),
+        }
+        .line();
         // The working folder is the install's too in a packaged build, set by `backend_env`. It
         // used to be this process's own CWD, the install folder only when opened from there.
-        let mut child = attach::spawn_detached(&mut cmd, &log)?;
+        let mut child = attach::spawn_detached(&mut cmd, &log, Some(&secrets))?;
 
         let deadline = Instant::now() + self.budget.url + self.budget.listen;
         while Instant::now() < deadline {
             if let Some(record) = attach::read_record(&self.live.record_path()) {
                 let fresh = previous.as_deref() != Some(record.id.as_str());
-                if fresh
-                    && attach::same_home(&record.home, &home)
-                    && matches!(attach::probe_http(&record), attach::Probe::Alive { .. })
-                {
+                if fresh && attach::same_home(&record.home, &home) {
+                    match attach::probe_http(&record) {
+                        attach::Probe::Alive { .. } => {}
+                        // Started here, so ended here: an open service must not be left running.
+                        attach::Probe::OpenAccess => {
+                            let _ = child.kill();
+                            return Err(sidecar_http::OPEN_BACKEND.to_string());
+                        }
+                        _ => {
+                            if let Ok(Some(status)) = child.try_wait() {
+                                return Err(format!(
+                                    "the background service exited ({status}) before it was ready \u{2014} see {}\n\n{}",
+                                    log.display(),
+                                    attach::log_tail(&log, 30)
+                                ));
+                            }
+                            std::thread::sleep(Duration::from_millis(250));
+                            continue;
+                        }
+                    }
                     attach::clean_old_copies(&paths.data_dir, version, None);
                     let mut attached = attach::attached_from(&record, true);
                     attached.log = log;
@@ -2219,8 +2260,10 @@ mod tests {
             if cfg!(windows) {
                 body.push_str("@echo off\r\n");
                 if let Some(tally) = self.tally {
-                    // The token it was started with, so a test can see a restart reuse it.
-                    body.push_str(&format!(">>\"{}\" echo ran %CHIMERA_SERVER_TOKEN% %CHIMERA_SCREEN_TOKEN%\r\n", tally.display()));
+                    // What it was started with, so a test can see a restart reuse it: the line on its
+                    // stdin, and what its ENVIRONMENT held (which must be nothing).
+                    body.push_str("set /p secrets=\r\n");
+                    body.push_str(&format!(">>\"{}\" echo ran %secrets% env[%CHIMERA_SERVER_TOKEN%%CHIMERA_SCREEN_TOKEN%]\r\n", tally.display()));
                 }
                 body.push_str("echo fake backend speaking 1>&2\r\n");
                 if let Some(marker) = self.breaks_when {
@@ -2238,7 +2281,8 @@ mod tests {
             } else {
                 body.push_str("#!/bin/sh\n");
                 if let Some(tally) = self.tally {
-                    body.push_str(&format!("echo \"ran $CHIMERA_SERVER_TOKEN $CHIMERA_SCREEN_TOKEN\" >> \"{}\"\n", tally.display()));
+                    body.push_str("read -r secrets\n");
+                    body.push_str(&format!("echo \"ran $secrets env[$CHIMERA_SERVER_TOKEN$CHIMERA_SCREEN_TOKEN]\" >> \"{}\"\n", tally.display()));
                 }
                 body.push_str("echo 'fake backend speaking' >&2\n");
                 if let Some(marker) = self.breaks_when {
@@ -2398,6 +2442,39 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// A backend that serves a protected route to a request with NO token is not running the guard
+    /// the shell launched it for (an older executable that ignored the launch channel). The shell
+    /// ends it and says so; it does not hand the window an open API.
+    #[test]
+    fn a_backend_that_does_not_require_a_token_is_refused_and_ended() {
+        use std::io::{Read, Write};
+
+        let dir = scratch("open-backend");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port to serve on");
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        // The stand-in answers 200 to everything, token or not: the open backend.
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut stream = stream;
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                let _ = stream.write_all(b"HTTP/1.0 200 OK\r\n\r\n[]");
+            }
+        });
+        let paths = Paths {
+            exe: Fake { dir: &dir, url: &url, lingers: true, breaks_when: None, tally: None }.write(),
+            data_dir: dir.clone(),
+            port_file: dir.join("port.txt"),
+        };
+
+        let refused = start_sidecar(&paths, 0, quick(Tuning::default()).budget, "test-server-token", "test-screen-token");
+
+        let why = refused.err().expect("an open backend must not be adopted");
+        assert!(why.contains("does not require a token"), "{why}");
+        assert!(why.contains("reinstall"), "the error does not say what to do: {why}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// A backend that comes up and dies, over and over, is not restarted forever.
     #[test]
     fn a_flapping_backend_burns_the_fuse_and_the_app_says_so() {
@@ -2438,11 +2515,13 @@ mod tests {
         // the page it is supposed to rescue with 401. The screen credential too, and as its own
         // variable: a restart that dropped it would turn every approval click into "needs a code".
         for line in lines.lines() {
-            assert_eq!(
-                line.trim(),
-                "ran test-server-token test-screen-token",
+            assert!(
+                line.contains(r#""server_token":"test-server-token""#)
+                    && line.contains(r#""screen_token":"test-screen-token""#),
                 "a restart used another token: {lines}"
             );
+            // Delivered on stdin, never in the environment: that block outlives any removal.
+            assert!(line.trim_end().ends_with("env[]"), "a secret reached the child's environment: {lines}");
         }
         assert_eq!(
             runs,
@@ -5075,15 +5154,22 @@ mod tray_tests {
 
     /// The launcher key is what lets this shell — and no other holder of the owner's token — lease
     /// the window's screen credential to a service (`chimera/api/service_windows.py`). It goes to
-    /// exactly one place: the environment of a service this process spawns. Never the page, never
-    /// the app's own child, never a file.
+    /// exactly one place: the stdin of a service this process spawns. Never the page, never the
+    /// app's own child, never a file — and never an ENVIRONMENT variable, which a same-user process
+    /// reads back from `/proc/<pid>/environ` for as long as the service runs.
     #[test]
     fn the_launcher_key_goes_only_to_the_service_this_shell_spawns() {
         let source = production_only();
-        let handed = source.matches(".env(attach::LAUNCHER_ENV").count();
+        assert_eq!(
+            source.matches(".env(attach::LAUNCHER_ENV").count(),
+            0,
+            "the launcher key is back in a child's environment"
+        );
+        let handed = source.matches("launcher_key: Some(").count();
         assert_eq!(handed, 1, "the launcher key is handed out in {handed} places");
         let spawn = body_of(&source, concat!("fn spawn_", "service("));
-        assert!(spawn.contains(".env(attach::LAUNCHER_ENV, &self.state.launcher_key)"), "{spawn}");
+        assert!(spawn.contains("launcher_key: Some(&self.state.launcher_key)"), "{spawn}");
+        assert!(spawn.contains("launch_secrets::arm(&mut cmd)"), "{spawn}");
         assert!(source.contains(".env_remove(attach::LAUNCHER_ENV)"), "the app's own child could inherit it");
         let init = body_of(&source, concat!("fn init_", "script("));
         assert!(!init.contains("launcher"), "the page must never see the launcher key");
