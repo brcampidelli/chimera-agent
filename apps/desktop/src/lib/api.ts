@@ -2116,6 +2116,77 @@ export async function revertCodeTurn(
   );
 }
 
+/** A finished side answer: the model that gave it and what it cost. `usd` is null when the price of
+ *  that model is not known, which the receipt says rather than showing a guessed zero. */
+export interface SideChatDone {
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  usd: number | null;
+}
+
+/** The first frame of a side answer: whether the conversation's last turn read untrusted content, and
+ *  the model that will answer. Sent before any text, so the screen can mark the answer as it arrives. */
+export interface SideChatStart {
+  tainted: boolean;
+  model: string;
+}
+
+export interface SideChatHandlers {
+  onStart?: (start: SideChatStart) => void;
+  onToken?: (text: string) => void;
+  onDone?: (done: SideChatDone) => void;
+  onError?: (message: string) => void;
+}
+
+/** Ask the side chat one question about a conversation and stream the answer. Nothing it sends or
+ *  receives is written into the conversation: the server reads the transcript and does not save
+ *  the exchange. Mirrors {@link streamCodeTurn}'s reading of the SSE, minus the resume, because a
+ *  side answer is cheap to ask again and a resumed one would double its cost. */
+export async function streamSideChat(
+  sessionId: string,
+  req: { message: string; model?: string },
+  handlers: SideChatHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/code/sessions/${encodeURIComponent(sessionId)}/side`), {
+      method: "POST",
+      headers: authHeaders(screenJsonHeaders()),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    if (!signal?.aborted) handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(await streamRefusal(res));
+    return;
+  }
+  let settled = false;
+  const cut = await readFrames(res.body, (raw) => {
+    const frame = parseSseFrame(raw);
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(frame.data) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (frame.event === "start") handlers.onStart?.(payload as unknown as SideChatStart);
+    else if (frame.event === "token") handlers.onToken?.(String(payload.text ?? ""));
+    else if (frame.event === "done") {
+      settled = true;
+      handlers.onDone?.(payload as unknown as SideChatDone);
+    } else if (frame.event === "error") {
+      settled = true;
+      handlers.onError?.(String(payload.message ?? ""));
+    }
+  });
+  if (cut && !settled && !signal?.aborted) handlers.onError?.(cut);
+}
+
 /** Send one turn of a coding conversation and stream it. Mirrors {@link streamRun}: the SSE lives
  *  on a POST, so we read the body and parse the frames ourselves.
  *

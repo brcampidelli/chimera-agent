@@ -17074,6 +17074,34 @@
         "title": "ShellRequestOut",
         "type": "object"
       },
+      "SideChatIn": {
+        "description": "One question for the side chat. ``model`` is the conversation's own when left empty.",
+        "properties": {
+          "message": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "SideChatIn",
+        "type": "object"
+      },
       "SkillStatOut": {
         "properties": {
           "kind": {
@@ -21805,6 +21833,58 @@
           }
         },
         "summary": "Revoke Share"
+      }
+    },
+    "/api/code/sessions/{session_id}/side": {
+      "post": {
+        "operationId": "side_chat_api_code_sessions__session_id__side_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SideChatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Side Chat"
       }
     },
     "/api/code/sessions/{session_id}/unarchive": {

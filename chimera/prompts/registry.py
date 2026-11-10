@@ -526,6 +526,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        "unmeasured",
        note="turn context, only on a Code turn whose folder has commands on; the suite rule is "
             "chimera/tools/suite_gate.py, measured 2026-10-29 to 31 (suites started beside each other)"),
+    # The side chat (`chimera/api/side_chat.py`): one question about a conversation, asked with no
+    # tools and fenced transcript data. Its own call, so the layer is "call", as the judges are.
+    _c("code.side_chat", "chimera.api.side_chat:SIDE_CHAT_SYSTEM", "call", ("S2",), "unmeasured",
+       note="the side chat's system prompt; its user turn is the fenced transcript and the question"),
     _i("tool.design_description", "chimera.tools.design:DesignTool", "tool", ("S2",),
        note="offered per turn by the intent detector, never in the default registry"),
     # ---- bench-only ----------------------------------------------------------------------------
