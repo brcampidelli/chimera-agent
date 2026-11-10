@@ -65,7 +65,12 @@ CORE = frozenset(
 #: surface that owns it (the chart and design canvases stream their frame, the browser its screenshot,
 #: `ask_user` the question card, the Code screen its interpreter). Deferring one would route the turn's
 #: own output through `tool_call` into a sink the proxy does not carry, so these stay declared.
-TURN_BOUND = frozenset({"render_chart", "design", "browser", "ask_user", "execute_code", "code_interpreter"})
+TURN_BOUND = frozenset({
+    "render_chart", "design", "browser", "ask_user", "execute_code", "code_interpreter",
+    # The task cards: each is built over the turn's own tray (`TaskSuggestionTray`), which streams the
+    # card to the screen. Routed through `tool_call` they would reach a tray the proxy does not carry.
+    "suggest_task", "dismiss_task",
+})
 
 _NEVER_DEFERRED = CORE | frozenset({"mcp_list", "mcp_describe", "mcp_call"}) | TURN_BOUND
 

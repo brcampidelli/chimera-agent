@@ -164,5 +164,6 @@ def test_the_library_help_says_the_cards_are_read_only_with_the_setting_on() -> 
 
     assert result.exit_code == 0, result.output
     text = " ".join(result.output.split())  # the help wraps; "by default" may fall across a line break
+    # The literal is pinned: the help names the exact switch value and says the setting is off by default.
     assert "CHIMERA_SKILL_CARDS=on" in text
-    assert "by default" in text
+    assert "it is off by default" in text
