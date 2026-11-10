@@ -152,6 +152,7 @@ from chimera.core.diff_self_check import (
 )
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.pr_auto_archive import Sweeper
+from chimera.core.pr_auto_archive import has_work as pr_has_work
 from chimera.core.project_place import Place
 from chimera.core.task_cards import (
     BROKEN_REASON,
@@ -6489,7 +6490,9 @@ def register_code_api(
         # a minute, and its archives show on the next look (`chimera/core/pr_auto_archive.py`).
         # The pass gets the snapshot this look already read: it schedules and reads nothing here.
         pr_sweeper.kick(
-            lambda: _sweep_pull_requests(marks), enabled=bool(live().archive_on_pr_merge)
+            lambda: _sweep_pull_requests(marks),
+            enabled=bool(live().archive_on_pr_merge),
+            has_work=pr_has_work(marks),
         )
         for row in rows:
             sid = str(row["id"])

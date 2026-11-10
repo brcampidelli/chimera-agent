@@ -48,11 +48,6 @@ from chimera.core.code_session_marks import (
 SWEEP_SECONDS = 60.0
 #: How long the sweeper waits after GitHub could not answer before it tries again.
 BACKOFF_SECONDS = 600.0
-#: How long the background thread waits before its first read. The list that kicked it is still
-#: answering, and the sweep's own reads (the marks, the pending questions, `gh`) must not land inside
-#: that answer: a poll's cost is fixed by the list alone (`test_the_state_adds_a_constant_number_of_
-#: reads_...`), and a thread that starts reading at once makes it depend on thread timing.
-START_DELAY_SECONDS = 2.0
 #: Bounds the reads one pass makes. Settled conversations are skipped before they count.
 MAX_PER_SWEEP = 25
 
@@ -73,6 +68,15 @@ class SweepBlocked(Exception):
 def pull_request_archive_reason(*, pr_state: str, state: str) -> str:
     """See :func:`chimera.core.code_session_marks.archive_reason_for_pr`."""
     return archive_reason_for_pr(pr_state=pr_state, state=state)
+
+
+def has_work(snapshot: Mapping[str, ConversationMark]) -> bool:
+    """Whether any conversation in the snapshot has a PR the sweep could still read: recorded, not
+    archived, not merged. Decided in memory, so a list with none starts no thread and reads nothing."""
+    return any(
+        m.archived_at is None and m.pull_request is not None and m.pr_state != "merged"
+        for m in snapshot.values()
+    )
 
 
 def _same_url(recorded: str, read: str) -> bool:
@@ -152,12 +156,10 @@ class Sweeper:
         interval: float = SWEEP_SECONDS,
         *,
         backoff: float = BACKOFF_SECONDS,
-        delay: float = START_DELAY_SECONDS,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.interval = interval
         self.backoff = backoff
-        self.delay = delay
         self._clock = clock
         self._lock = threading.Lock()
         self._running = False
@@ -169,11 +171,12 @@ class Sweeper:
         with self._lock:
             return self._running
 
-    def kick(self, run: Callable[[], object], *, enabled: bool) -> bool:
+    def kick(self, run: Callable[[], object], *, enabled: bool, has_work: bool = True) -> bool:
         """Start one pass in the background when the switch is on, the interval has passed and no
         backoff is in force. Returns whether a pass was started. With the switch off nothing starts and
-        the clock does not move, so turning it on later sweeps at once."""
-        if not enabled:
+        the clock does not move, so turning it on later sweeps at once. With ``has_work`` false (no
+        conversation has a PR left to read) it starts no thread and moves nothing."""
+        if not enabled or not has_work:
             return False
         at = self._clock()
         with self._lock:
@@ -184,8 +187,6 @@ class Sweeper:
 
         def work() -> None:
             try:
-                if self.delay > 0:
-                    time.sleep(self.delay)
                 run()
             except SweepBlocked:
                 with self._lock:
