@@ -45,6 +45,13 @@ from chimera.tools.base import Tool
 #: accident, which is the criterion `_DOCUMENT_ARGS` exists to serve.
 _IDENTIFIERS = frozenset({
     "action",
+    # `suggest_task` / `dismiss_task`: what the card is and which one. `tldr` is a one-line summary
+    # (280 characters at most) and `reason` a one-line note on a withdrawal: the identity of the
+    # proposal on an audit line, the way `title` is. The card's `prompt`, the instruction for a new
+    # conversation, is the document and is classified as one. `id` names the card a turn withdraws.
+    "id",
+    "reason",
+    "tldr",
     # `spawn_subagent`: select a named Markdown agent, rather than supplying a body.
     "agent",
     # `schedule_once` (S30-48): when the reminder fires, a timestamp, no body.

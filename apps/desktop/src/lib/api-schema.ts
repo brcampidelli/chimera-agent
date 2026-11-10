@@ -1324,6 +1324,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/task-cards/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task Card Status
+         * @description Whether the task card store failed its integrity check, for the owner's standing warning.
+         */
+        get: operations["task_card_status_api_code_task_cards_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/task-suggestions/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Task Suggestion
+         * @description Start a proposed card in its own conversation, in the project it was proposed in.
+         *
+         *     Who may click: the owner's screen credential, which a browser tab holds once it is paired with a
+         *     code from the desktop app. A bearer token (the agent's shell reads one from disk) and the desktop
+         *     bridge are refused, and so is a paired phone, which is not a screen. The card is checked in order:
+         *     it must exist in that conversation, it must not have been started, the conversation must have a
+         *     folder, and only then is it claimed. A failed placement gives the claim back.
+         */
+        post: operations["start_task_suggestion_api_code_task_suggestions_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/turn": {
         parameters: {
             query?: never;
@@ -8375,6 +8421,8 @@ export interface components {
              * @default false
              */
             summarise_compaction: boolean;
+            /** Task Card Id */
+            task_card_id?: string | null;
             /** Thinking */
             thinking?: boolean | null;
             /** Title */
@@ -14348,6 +14396,37 @@ export interface components {
             /** Verify */
             verify?: string | null;
         };
+        /**
+         * TaskCardStatusOut
+         * @description The task card store's state. ``broken`` is true until the owner deletes ``files`` from the home.
+         */
+        TaskCardStatusOut: {
+            /** Broken */
+            broken: boolean;
+            /** Files */
+            files: string[];
+        };
+        /**
+         * TaskSuggestionStartIn
+         * @description The owner's "Iniciar" on a proposed card: the card's id and the owner's two options.
+         *
+         *     The title, prompt and taint are read from the server's record of the card (`chimera/core/task_cards.py`),
+         *     never from this body. There is no posture field: a new conversation uses the project's posture,
+         *     and the bypass rules are the ones in `_start_turn`.
+         */
+        TaskSuggestionStartIn: {
+            /** Card Id */
+            card_id: string;
+            /** Model */
+            model?: string | null;
+            /**
+             * New Worktree
+             * @default false
+             */
+            new_worktree: boolean;
+            /** Origin Session Id */
+            origin_session_id: string;
+        };
         /** TiersOut */
         TiersOut: {
             /** Mid */
@@ -17202,6 +17281,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetworkShareOut"];
+                };
+            };
+        };
+    };
+    task_card_status_api_code_task_cards_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskCardStatusOut"];
+                };
+            };
+        };
+    };
+    start_task_suggestion_api_code_task_suggestions_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskSuggestionStartIn"];
+            };
+        };
+        responses: {
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
