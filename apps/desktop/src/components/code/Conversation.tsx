@@ -58,6 +58,7 @@ import { useRetireWhenNotWaiting } from "@/lib/usePendingUserQuestions";
 import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
+import { SideChat, useSideChatKey } from "@/components/code/SideChat";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { RewindTimeline } from "@/components/code/RewindTimeline";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
@@ -95,6 +96,7 @@ import { ToolRow } from "@/components/code/ToolRow";
 // Kept importable from here: the transcript-view tests reach the row through the conversation.
 export { ToolRow };
 import { EditDiff } from "@/components/code/EditDiff";
+import { LineCommentsBar } from "@/components/code/LineComments";
 import { LastTurnMetrics } from "@/components/code/LastTurnMetrics";
 import { useSideDrawer } from "@/components/shell/sideDrawer";
 import { ConversationMenu, ConversationMenuItem, ConversationMenuToggle } from "@/components/code/ConversationMenu";
@@ -136,6 +138,14 @@ import { Elapsed, formatElapsed } from "@/components/code/Elapsed";
 export { formatElapsed };
 import { useAgent, type AgentState } from "@/lib/agent-context";
 import { contextPercent, readContext, useConversationSidePublisher } from "@/lib/conversation-side";
+import {
+  buildLineCommentsMessage,
+  clearLineComments,
+  latestEditTurns,
+  lineCommentLabels,
+  setLineCommentsNotice,
+  useSendLineCommentsRequest,
+} from "@/lib/line-comments";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
 import { writeLastSession } from "@/lib/workspace";
@@ -836,6 +846,10 @@ export function Conversation({
   // Following later changes live would re-open, mid-conversation, cards the person had just folded.
   const [transcriptView] = useState(getTranscriptView);
   const [draft, setDraft] = useState("");
+  // The side question (Mod+;): a panel beside this conversation, answered from its transcript and
+  // never written into it. Only what the person takes from it reaches the composer.
+  const [sideOpen, setSideOpen] = useState(false);
+  useSideChatKey(() => setSideOpen((open) => !open));
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(busy);
   busyRef.current = busy;
@@ -1122,6 +1136,22 @@ export function Conversation({
   // (so the new one lands under them, not under a blank screen that the replay then overwrites),
   // and no turn of its own running — `send` would queue the words alone and drop the lines. A run
   // writing in this project holds it too, as it holds anything typed here.
+  // The diff comments the owner left on this conversation's edits, sent as one message. It keeps the
+  // draft and the chips where they are, and waits while a turn runs: the comments stay listed until
+  // the send actually goes out.
+  function sendLineComments() {
+    if (!sessionId) return;
+    if (busy || busyElsewhere) {
+      setLineCommentsNotice(sessionId, t("code.lineComments.busy"));
+      return;
+    }
+    const message = buildLineCommentsMessage(sessionId, lineCommentLabels(t), latestEditTurns(exchanges));
+    if (message === null) return;
+    // Cleared only once the conversation has taken the message: a refusal keeps every comment.
+    if (send(true, message, false, false, undefined, undefined, true)) clearLineComments(sessionId);
+  }
+  useSendLineCommentsRequest(sessionId ?? "", sendLineComments);
+
   const sentSeed = useRef<number | null>(null);
   useEffect(() => {
     if (!seed || !replayed || busy || busyElsewhere || sentSeed.current === seed.id) return;
@@ -1787,12 +1817,15 @@ export function Conversation({
     auto = false,
     retry?: PolicyRetry,
     extra?: ContextEntry,
-  ) {
+    // A message that is not the box's: the diff comments go out this way, so the draft, the chips and
+    // the attachments the owner is writing stay where they are.
+    keepComposer = false,
+  ): boolean {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
     // the wrong text.
     const message = (override ?? draft).trim();
-    if (busyElsewhere) return;
+    if (busyElsewhere) return false;
     // A message the user typed is a new instruction, not a continuation of the old one: whatever
     // automatic budget the previous task had left belongs to that task, so it is spent back to
     // zero here. An automatic continuation is the same task, so it preserves the counter; a typed
@@ -1808,6 +1841,9 @@ export function Conversation({
     // Busy is no longer a wall. Losing a thought because a turn is still running is the whole
     // complaint; the message waits, visibly, and goes out when the turn ends.
     if (busy) {
+      // A comments message is never steered or queued: it would take the draft's place in the box
+      // or be sent as the owner's words later. The caller keeps the comments and says why.
+      if (keepComposer) return false;
       if (message) {
         if (currentTurnRef.current || followingRef.current) steer(message);
         else {
@@ -1815,22 +1851,22 @@ export function Conversation({
           setDraft("");
         }
       }
-      return;
+      return message !== "";
     }
-    if (!message) return;
+    if (!message) return false;
     // Several jobs in one message is the request for a parallel batch. It is proposed rather than
     // taken, because worktrees are a real side effect — and `force` is how "send it as one message"
     // gets past this without the proposal reappearing on every keystroke.
     const jobs = force ? [] : decompose(message);
     if (jobs.length >= 2) {
       setProposal(jobs);
-      return;
+      return false;
     }
     setProposal(null);
     // A retry is pressed on a card, not sent from the box: whatever is being typed there meanwhile
     // is the next message, and stays — and so does a suggestion picked into it, which has not been
     // sent yet.
-    if (!retry) {
+    if (!retry && !keepComposer) {
       // The box held a suggestion the person picked, and it is going out now: the "sent" half of the
       // rate. Only for a message the person sent — an automatic continuation is not one — and with
       // whether they changed it first, because "taken as offered" and "used as a start" differ.
@@ -1842,16 +1878,16 @@ export function Conversation({
       setDraft("");
       setAttached([]);
     }
-    const files = retry ? retry.attachments : attached.map((a) => a.id);
+    const files = retry ? retry.attachments : keepComposer ? [] : attached.map((a) => a.id);
     // A retry is of the refused turn as it was, and its mentions went with it; the chips in the
     // composer belong to the next message.
     // `extra` is what another screen handed this one message (the Editor's selection): it joins the
     // chips by the same rule, so the same lines pointed at twice are sent once.
-    const context = retry ? [] : (extra ? addEntry(mentionsRef.current, extra) : mentionsRef.current).map((m) => m.item);
+    const context = retry || keepComposer ? [] : (extra ? addEntry(mentionsRef.current, extra) : mentionsRef.current).map((m) => m.item);
     const selection = extra?.item.kind === "file" && extra.item.start_line != null && extra.item.end_line != null
       ? { path: extra.item.path, start_line: extra.item.start_line, end_line: extra.item.end_line }
       : null;
-    if (!retry) {
+    if (!retry && !keepComposer) {
       setMentions([]);
       setMentionRefused("");
     }
@@ -2289,6 +2325,7 @@ export function Conversation({
       },
       controller.signal,
     );
+    return true;
   }
 
   sendRef.current = send;
@@ -2678,7 +2715,7 @@ export function Conversation({
               {e.edits.map((edit, j) => {
                 return (
                   <CardChrome key={j} id={cardId(i, "diff", j)} kind="diff" cards={cards} summary={edit.path}>
-                    <EditDiff path={edit.path} patch={edit.patch} detailed={viewShowsToolDetail(transcriptView)} onOpenFile={onOpenFile} />
+                    <EditDiff path={edit.path} patch={edit.patch} detailed={viewShowsToolDetail(transcriptView)} onOpenFile={onOpenFile} commentScope={sessionId ? { sessionId, origin: `edit:${i}:${j}` } : undefined} />
                   </CardChrome>
                 );
               })}
@@ -2966,6 +3003,9 @@ export function Conversation({
             ? t("composer.mention.results", { n: mention.options.length })
             : mentionSaid}
         </p>
+        {sessionId ? (
+          <LineCommentsBar sessionId={sessionId} disabled={busy || busyElsewhere} onSend={sendLineComments} />
+        ) : null}
         <textarea
           ref={boxRef}
           className={cn(
@@ -3191,6 +3231,18 @@ export function Conversation({
           </span>
         </div>
       </div>
+      {/* The side question. Unavailable for a brand-new conversation (nothing to ask about yet) and
+          for an external agent (its own conversation is the only one that can answer). */}
+      <SideChat
+        sessionId={sessionId ?? ""}
+        model={model}
+        open={sideOpen}
+        onClose={() => setSideOpen(false)}
+        onTake={(text) => setDraft((current) => (current.trim() ? `${current}
+
+${text}` : text))}
+        unavailable={!sessionId || Boolean(provider)}
+      />
     </div>
   );
 }

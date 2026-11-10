@@ -61,8 +61,14 @@ MEMORY_KIND = "memory"
 #: extraction's rows and the tidy's can still be told apart.
 TIDY_KIND = "memory_tidy"
 
-#: The route kinds of rows that price a call made FOR a conversation, not a turn of it.
-NOT_A_TURN: frozenset[str] = frozenset({MEMORY_KIND, TIDY_KIND})
+#: The ``route_kind`` of a side question's row (`chimera.api.side_chat`): a call made ABOUT a conversation,
+#: never a turn of it. Its price and tokens count everywhere; it is not counted as a turn.
+SIDE_KIND = "side"
+#: The same, for a side question cut before the provider reported usage: its tokens are an estimate.
+SIDE_ESTIMATED_KIND = "side_estimated"
+
+#: The route kinds of rows that price a call made FOR (or ABOUT) a conversation, not a turn of it.
+NOT_A_TURN: frozenset[str] = frozenset({MEMORY_KIND, TIDY_KIND, SIDE_KIND, SIDE_ESTIMATED_KIND})
 
 
 def append_usage(path: Path, record: UsageRecord) -> None:
@@ -323,7 +329,7 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
     counted as ``unpriced_turns`` and never added as 0 — so the total spend is honest about what it
     actually knows the cost of.
 
-    A :data:`MEMORY_KIND` or :data:`TIDY_KIND` row (:data:`NOT_A_TURN`) adds its tokens and price
+    A :data:`MEMORY_KIND`, :data:`TIDY_KIND` or side-chat row (:data:`NOT_A_TURN`) adds its tokens and price
     everywhere, and its unknown price to the unpriced count, but it is not a turn and is not
     counted as one, in the totals or in any group. An unknown extraction price can therefore turn a
     group's price into "unknown" on the screen, which is the direction this file prefers to a total

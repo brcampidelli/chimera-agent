@@ -13,6 +13,7 @@ import {
   Save,
   Shapes,
   Terminal,
+  TerminalSquare,
   WrapText,
   X,
 } from "lucide-react";
@@ -63,6 +64,7 @@ import { AgentBatchSlot, useStartAgentBatch } from "@/components/code/AgentBatch
 import { HtmlPreview } from "@/components/code/HtmlPreview";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { ProjectPackCard } from "@/components/code/ProjectPackCard";
+import { TerminalPanel } from "@/components/code/TerminalPanel";
 import { useRunSession } from "@/lib/run-session";
 import { screenInBrowser } from "@/lib/server";
 import { useNum, useT } from "@/lib/i18n";
@@ -686,6 +688,26 @@ export function Code() {
   const queryClient = useQueryClient();
   const projectRows = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const shellHere = shellGranted(projectRows.data, workspace);
+  // The terminal panel (a real shell, `TerminalPanel`). Mounted once it has been opened, then only
+  // hidden: its tabs keep their shells. Leaving the conversation remounts it (keyed below) and ends them.
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalEver, setTerminalEver] = useState(false);
+  const toggleTerminal = useCallback(() => {
+    setTerminalOpen((open) => !open);
+    setTerminalEver(true);
+  }, []);
+  // Ctrl+` — the chord the apps this is modelled on use. Not in the shortcut table (hotkeys.ts): it
+  // acts on this screen only, and the terminal itself forwards it here instead of typing it.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.ctrlKey && !event.metaKey && !event.altKey && event.code === "Backquote") {
+        event.preventDefault();
+        toggleTerminal();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleTerminal]);
   const configured = (cfg.data?.autonomy.reach || "workspace") as Reach;
   // The project's grant RAISES the reach; it never lowers what the owner configured. Somebody who
   // set `read_only` system-wide means it, and a per-project checkbox is not the place to overrule
@@ -1074,6 +1096,20 @@ export function Code() {
             </button>
           </Tooltip>
         ) : null}
+        {/* A real terminal in this conversation's folder (Ctrl+`). Where commands are off it still
+            opens, and says why it cannot start a shell, instead of being a button that vanishes. */}
+        <Tooltip label={t("terminal.hint")}>
+          <Button
+            size="sm"
+            type="button"
+            variant="ghost"
+            aria-pressed={terminalOpen}
+            aria-label={t("terminal.title")}
+            onClick={toggleTerminal}
+          >
+            <TerminalSquare className="h-4 w-4" /> {t("terminal.title")}
+          </Button>
+        </Tooltip>
         {/* The way out of a project, which did not exist.
             A conversation with no workspace works — the turn runs, answers, is priced and reads
             memory — and the sidebar already groups those under their own heading. What was missing
@@ -1360,6 +1396,16 @@ export function Code() {
               consequence now, and the only question it still asks was asked before the worktrees
               existed rather than reported after they did. */}
           <AgentBatchSlot />
+          {terminalEver ? (
+            <TerminalPanel
+              key={conversationKey}
+              // The conversation's own folder: its worktree when it has one.
+              workspace={currentSessionMeta?.workspace || workspace || null}
+              commandsOn={shellHere}
+              visible={terminalOpen}
+              onHide={() => setTerminalOpen(false)}
+            />
+          ) : null}
         </main>
         {/* The viewer is a consequence of opening a file, not a permanent third of the window. */}
         {/* `min-w-0` for the same reason as the conversation column beside it: a fixed

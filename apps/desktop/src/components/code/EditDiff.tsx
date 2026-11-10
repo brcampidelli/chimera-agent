@@ -10,11 +10,15 @@ export function EditDiff({
   patch,
   detailed,
   onOpenFile,
+  commentScope,
 }: {
   path: string;
   patch: string;
   detailed: boolean;
   onOpenFile?: (path: string) => void;
+  /** The conversation the edit belongs to and where this diff sits in it: when given, the lines take
+   *  comments sent to that conversation. */
+  commentScope?: { sessionId: string; origin: string };
 }) {
   const t = useT();
   const { additions, deletions } = diffStat(patch);
@@ -37,7 +41,7 @@ export function EditDiff({
         <span className="shrink-0 text-muted-foreground">{t("code.chat.diff.show")}</span>
       </summary>
       <div className="mt-2">
-        <DiffView patch={patch} />
+        <DiffView patch={patch} commentable={commentScope ? { ...commentScope, file: path } : undefined} />
       </div>
     </details>
   );

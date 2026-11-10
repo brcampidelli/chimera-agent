@@ -17112,6 +17112,34 @@
         "title": "ShellRequestOut",
         "type": "object"
       },
+      "SideChatIn": {
+        "description": "One question for the side chat. ``model`` is the conversation's own when left empty.",
+        "properties": {
+          "message": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "SideChatIn",
+        "type": "object"
+      },
       "SkillStatOut": {
         "properties": {
           "kind": {
@@ -17976,6 +18004,134 @@
           "card_id"
         ],
         "title": "TaskSuggestionStartIn",
+        "type": "object"
+      },
+      "TerminalInputIn": {
+        "properties": {
+          "data": {
+            "maxLength": 65536,
+            "title": "Data",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "TerminalInputIn",
+        "type": "object"
+      },
+      "TerminalOkOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "TerminalOkOut",
+        "type": "object"
+      },
+      "TerminalOpenIn": {
+        "properties": {
+          "cols": {
+            "default": 80,
+            "title": "Cols",
+            "type": "integer"
+          },
+          "rows": {
+            "default": 24,
+            "title": "Rows",
+            "type": "integer"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Folder to open in (the conversation's, its worktree when it has one).",
+            "title": "Workspace"
+          }
+        },
+        "title": "TerminalOpenIn",
+        "type": "object"
+      },
+      "TerminalOpenOut": {
+        "properties": {
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "shell": {
+            "title": "Shell",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "shell",
+          "cwd"
+        ],
+        "title": "TerminalOpenOut",
+        "type": "object"
+      },
+      "TerminalResizeIn": {
+        "properties": {
+          "cols": {
+            "maximum": 500.0,
+            "minimum": 10.0,
+            "title": "Cols",
+            "type": "integer"
+          },
+          "rows": {
+            "maximum": 200.0,
+            "minimum": 2.0,
+            "title": "Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cols",
+          "rows"
+        ],
+        "title": "TerminalResizeIn",
+        "type": "object"
+      },
+      "TerminalStatusOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "max": {
+            "title": "Max",
+            "type": "integer"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "open",
+          "max"
+        ],
+        "title": "TerminalStatusOut",
         "type": "object"
       },
       "TiersOut": {
@@ -21960,6 +22116,58 @@
           }
         },
         "summary": "Revoke Share"
+      }
+    },
+    "/api/code/sessions/{session_id}/side": {
+      "post": {
+        "operationId": "side_chat_api_code_sessions__session_id__side_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SideChatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Side Chat"
       }
     },
     "/api/code/sessions/{session_id}/unarchive": {
@@ -30541,6 +30749,241 @@
           }
         },
         "summary": "Suggestion Stats Endpoint"
+      }
+    },
+    "/api/terminal": {
+      "post": {
+        "operationId": "terminal_open_api_terminal_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalOpenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOpenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Terminal Open"
+      }
+    },
+    "/api/terminal/status": {
+      "get": {
+        "operationId": "terminal_status_api_terminal_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Terminal Status"
+      }
+    },
+    "/api/terminal/{terminal_id}": {
+      "delete": {
+        "operationId": "terminal_close_api_terminal__terminal_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "terminal_id",
+            "required": true,
+            "schema": {
+              "title": "Terminal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Terminal Close"
+      }
+    },
+    "/api/terminal/{terminal_id}/input": {
+      "post": {
+        "operationId": "terminal_input_api_terminal__terminal_id__input_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "terminal_id",
+            "required": true,
+            "schema": {
+              "title": "Terminal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalInputIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Terminal Input"
+      }
+    },
+    "/api/terminal/{terminal_id}/resize": {
+      "post": {
+        "operationId": "terminal_resize_api_terminal__terminal_id__resize_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "terminal_id",
+            "required": true,
+            "schema": {
+              "title": "Terminal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalResizeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalOkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Terminal Resize"
+      }
+    },
+    "/api/terminal/{terminal_id}/stream": {
+      "get": {
+        "operationId": "terminal_stream_api_terminal__terminal_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "terminal_id",
+            "required": true,
+            "schema": {
+              "title": "Terminal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Terminal Stream"
       }
     },
     "/api/tools": {

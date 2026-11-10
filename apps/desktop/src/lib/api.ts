@@ -2123,6 +2123,77 @@ export async function revertCodeTurn(
   );
 }
 
+/** A finished side answer: the model that gave it and what it cost. `usd` is null when the price of
+ *  that model is not known, which the receipt says rather than showing a guessed zero. */
+export interface SideChatDone {
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  usd: number | null;
+}
+
+/** The first frame of a side answer: whether the conversation's last turn read untrusted content, and
+ *  the model that will answer. Sent before any text, so the screen can mark the answer as it arrives. */
+export interface SideChatStart {
+  tainted: boolean;
+  model: string;
+}
+
+export interface SideChatHandlers {
+  onStart?: (start: SideChatStart) => void;
+  onToken?: (text: string) => void;
+  onDone?: (done: SideChatDone) => void;
+  onError?: (message: string) => void;
+}
+
+/** Ask the side chat one question about a conversation and stream the answer. Nothing it sends or
+ *  receives is written into the conversation: the server reads the transcript and does not save
+ *  the exchange. Mirrors {@link streamCodeTurn}'s reading of the SSE, minus the resume, because a
+ *  side answer is cheap to ask again and a resumed one would double its cost. */
+export async function streamSideChat(
+  sessionId: string,
+  req: { message: string; model?: string },
+  handlers: SideChatHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/code/sessions/${encodeURIComponent(sessionId)}/side`), {
+      method: "POST",
+      headers: authHeaders(screenJsonHeaders()),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    if (!signal?.aborted) handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(await streamRefusal(res));
+    return;
+  }
+  let settled = false;
+  const cut = await readFrames(res.body, (raw) => {
+    const frame = parseSseFrame(raw);
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(frame.data) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (frame.event === "start") handlers.onStart?.(payload as unknown as SideChatStart);
+    else if (frame.event === "token") handlers.onToken?.(String(payload.text ?? ""));
+    else if (frame.event === "done") {
+      settled = true;
+      handlers.onDone?.(payload as unknown as SideChatDone);
+    } else if (frame.event === "error") {
+      settled = true;
+      handlers.onError?.(String(payload.message ?? ""));
+    }
+  });
+  if (cut && !settled && !signal?.aborted) handlers.onError?.(cut);
+}
+
 /** Send one turn of a coding conversation and stream it. Mirrors {@link streamRun}: the SSE lives
  *  on a POST, so we read the body and parse the frames ourselves.
  *
@@ -3651,4 +3722,97 @@ export async function exportDesign(id: string, format: string): Promise<{ blob: 
   const disposition = res.headers.get("Content-Disposition") ?? "";
   const named = /filename="([A-Za-z0-9_.-]+)"/.exec(disposition)?.[1];
   return { blob: await res.blob(), filename: named ?? `design-${id}.${format}` };
+}
+
+// --- Terminal (a real PTY; the owner's shell — /api/terminal) -------------------------------------
+//
+// SSE for the output and a POST per burst of keystrokes, not a WebSocket: the server has none, and a
+// browser WebSocket cannot send the screen credential. Every call carries the screen credential,
+// because the server opens a terminal only for the desktop app's own screen.
+
+export interface TerminalOpened {
+  id: string;
+  shell: string;
+  cwd: string;
+}
+
+export interface TerminalStatus {
+  available: boolean;
+  reason: string;
+  open: number;
+  max: number;
+}
+
+export interface TerminalStreamHandlers {
+  onData: (text: string) => void;
+  onExit: (code: number | null) => void;
+  onError: (message: string) => void;
+}
+
+const terminalHeaders = (): HeadersInit => screenJsonHeaders();
+
+export const getTerminalStatus = () =>
+  json<TerminalStatus>("/api/terminal/status", { headers: terminalHeaders() });
+
+export const openTerminal = (workspace: string | null, cols: number, rows: number) =>
+  json<TerminalOpened>("/api/terminal", {
+    method: "POST",
+    headers: terminalHeaders(),
+    body: JSON.stringify({ workspace, cols, rows }),
+  });
+
+export const sendTerminalInput = (id: string, data: string) =>
+  json<{ ok: boolean }>(`/api/terminal/${encodeURIComponent(id)}/input`, {
+    method: "POST",
+    headers: terminalHeaders(),
+    body: JSON.stringify({ data }),
+  });
+
+export const resizeTerminal = (id: string, cols: number, rows: number) =>
+  json<{ ok: boolean }>(`/api/terminal/${encodeURIComponent(id)}/resize`, {
+    method: "POST",
+    headers: terminalHeaders(),
+    body: JSON.stringify({ cols, rows }),
+  });
+
+export const closeTerminal = (id: string) =>
+  json<{ ok: boolean }>(`/api/terminal/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: terminalHeaders(),
+  });
+
+/** Follow a terminal's output until the shell ends. The stream ending also ends the shell on the
+ *  server, so aborting `signal` is itself a way to close it. */
+export async function streamTerminal(
+  id: string,
+  handlers: TerminalStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/terminal/${encodeURIComponent(id)}/stream`), {
+      headers: authHeaders(terminalHeaders()),
+      signal,
+    });
+  } catch (err) {
+    if (!signal?.aborted) handlers.onError(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError(await streamRefusal(res));
+    return;
+  }
+  const cut = await readFrames(res.body, (frame) => {
+    const { event, data } = parseSseFrame(frame);
+    if (!data) return;
+    try {
+      const payload = JSON.parse(data) as { text?: string; code?: number | null };
+      if (event === "data") handlers.onData(payload.text ?? "");
+      else if (event === "error") handlers.onError((payload as { message?: string }).message ?? "terminal error");
+      else if (event === "exit") handlers.onExit(payload.code ?? null);
+    } catch {
+      // A frame that is not JSON is not output; dropping it beats painting garbage in a terminal.
+    }
+  });
+  if (cut && !signal?.aborted) handlers.onError(cut);
 }

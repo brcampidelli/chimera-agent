@@ -189,17 +189,39 @@ def test_the_desktop_shell_hands_the_backend_a_stdin_that_tells_the_truth() -> N
     cannot spawn a Tauri shell, and leaving the Rust side untested would leave the fix depending on
     a line nobody would notice being deleted. Read together with the comment above it, which says
     why `CREATE_NO_WINDOW` and an inherited stdin cannot both stand.
+
+    What matters is that the stdin is NEVER inherited. It used to be `Stdio::null()`; the shell now
+    hands the backend its secrets on a pipe (`launch_secrets.rs`), which is not a terminal either, so
+    `isatty()` still tells the truth. The backend closes the other half of the promise: after it
+    reads the line it points fd 0 at the null device (`launch_secrets._silence_stdin`, exercised for
+    real in `test_the_shell_secrets_arrive_on_stdin.py`), so nothing it starts inherits the pipe.
     """
-    main_rs = Path(__file__).resolve().parents[1] / "apps/desktop/src-tauri/src/main.rs"
-    source = main_rs.read_text(encoding="utf-8")
+    src = Path(__file__).resolve().parents[1] / "apps/desktop/src-tauri/src"
+    source = (src / "main.rs").read_text(encoding="utf-8")
     # The whole builder, from `Command::new` to `.spawn()`: a fixed character window broke the day
     # a comment about the server token was added above the stdin line, without the line moving.
     start = source.index("let mut cmd = Command::new(&exe);")
     spawn = source[start : source.index(".spawn()", start)]
-    assert re.search(r"\.stdin\(Stdio::null\(\)\)", spawn), (
+    armed = "launch_secrets::arm(&mut cmd)" in spawn
+    explicit = re.search(r"\.stdin\(Stdio::(null|piped)\(\)\)", spawn) is not None
+    assert armed or explicit, (
         "the backend is spawned with an inherited stdin again; under CREATE_NO_WINDOW that is a "
         "console with no window, and isatty() will lie to the host-exec gate"
     )
+    if armed:
+        arm = (src / "launch_secrets.rs").read_text(encoding="utf-8")
+        assert ".stdin(Stdio::piped())" in arm.split("pub fn arm", 1)[1].split("\n}", 1)[0], (
+            "launch_secrets::arm no longer gives the child a piped stdin"
+        )
+    assert not re.search(r"\.stdin\(Stdio::inherit\(\)\)", spawn)
+
+
+def test_the_backend_points_fd_0_at_the_null_device_after_reading_the_shells_line() -> None:
+    """The other half of the guarantee, by construction: the reader switches fd 0 to the null device
+    once the line is in, on the success path (the abort paths end the process)."""
+    source = (Path(__file__).resolve().parents[1] / "chimera/launch_secrets.py").read_text(encoding="utf-8")
+    adopt = source.split("def adopt_from_stdin", 1)[1]
+    assert "_silence_stdin()" in adopt and "os.devnull" in source.split("def _silence_stdin", 1)[1]
 
 
 def test_the_code_surface_no_longer_asserts_what_it_cannot_enforce() -> None:

@@ -5,12 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **One mode picker under the prompt (Ctrl/Cmd+Shift+M): Manual, Accept edits, Plan, Auto, Don't ask, and Ignore permissions when the project allows it.** Each mode maps onto the existing posture instead of adding a third mechanism; the conversation's mode is saved and starts from what Settings say (never → Don't ask, suspicious → Auto, always → Manual). Accept edits shows a card before each command unless it only reads or the sandbox isolates it, and Plan never runs wider than Auto. The bridge can only move a conversation to a mode that widens nothing. Ctrl/Cmd+Shift+O opens the model picker and Ctrl/Cmd+Shift+E the effort picker; maximise moved to Ctrl/Cmd+Shift+Enter. (#1207)
 
+- **Comment on diff lines and send them all to the agent at once.** In the Code screen's diffs, a "+" beside each line opens a comment box; Enter keeps the comment on that line, and "Send comments (N)" or Ctrl/Cmd+Enter sends every pending comment as one message with file, line, the line's text and which diff it came from. Comments are kept per conversation until they are sent, a comment from an older edit is marked as possibly out of date, and the rows are keyboard-navigable. (#1203)
+
+- **The agent's shell no longer receives your API keys.** Child processes of the agent (and the new terminal) used to inherit provider key pools such as `CHIMERA_OPENROUTER_KEYS`, `DATABASE_URL` with a password and cloud credentials, so any command the agent ran could print them. They now get an environment with secrets removed by name and by value (proxy settings still pass), while the GitHub CLI keeps the token it needs. (#1208)
+
+- **A real terminal in the Code screen (Ctrl+`).** Tabs (up to eight) open a real shell in the conversation's folder or worktree, so `cd`, `export` and interactive programs work. Only the desktop app's own screen opens one: the bridge, paired browser tabs and devices, chat bots and guests cannot, a folder whose commands are off has no terminal, and nothing typed is logged. Closing a tab, the conversation or the app ends the shell and everything it started (a job object on Windows).
+
+- **Side chat (Ctrl/Cmd+;) for a quick question about the conversation without adding to it.** It reads the conversation as data, answers with no tools, and writes nothing into the conversation's history; "Bring into the conversation" only fills the composer, and when the conversation has read outside content it quotes the answer as data and asks first. Its cost is recorded (an interrupted answer as an estimate), local models stay free under a daily cap, and the shortcuts help moved to Ctrl/Cmd+/. (#1204)
+
 - **Suggested-task cards: the agent proposes side work instead of drifting into it.** When it notices something outside the task (dead code, a stale doc, a missing test, a security issue seen in passing) it can only propose a card; you see the full prompt before anything runs and choose Start (a new conversation in the same project), Do it here, Options or Dismiss, with Start all asking for confirmation and capped at five. Only the owner's screen starts a card, the server keeps the prompt (the page sends only the card id), and a card proposed by a turn that read outside content starts its conversation marked as tainted and without "Ignore permissions", with a warning on the card. (#1206)
+
+### Fixed
+
+- **The desktop app no longer hands the backend its secrets through the environment.** The server token, the screen credential and the launcher key used to travel as environment variables, which on Linux stay readable in `/proc/<pid>/environ` to any process of the same user, the agent's shell included. They now arrive on the backend's stdin as one line that is read and closed; the server token is kept in memory rather than in the process environment; a missing or malformed line stops the backend instead of starting it without a token; and the app refuses to use a backend that answers without one. (#1209)
 
 ## [0.85.0] - 2026-11-04
 ### Fixed

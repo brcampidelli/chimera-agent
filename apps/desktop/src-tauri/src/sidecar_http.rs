@@ -203,6 +203,31 @@ pub fn request(
     Ok(Reply { status, body })
 }
 
+/// What the shell says when a backend answers a protected route with no token. The app starts its
+/// backend with a token it generated (or the owner's), so a server that does not ask for it is not
+/// running the guard this shell expects: an older executable that ignored the launch channel
+/// (`launch_secrets.rs`), left behind by a half-finished update.
+pub const OPEN_BACKEND: &str =
+    "the backend does not require a token \u{2014} reinstall Chimera (the app and its backend are not the same version)";
+
+/// Whether a reply to a request that carried NO token means the route was served anyway.
+pub fn served_without_token(status: u16) -> bool {
+    (200..300).contains(&status)
+}
+
+/// Ask a protected route for something with no token, and refuse a backend that serves it.
+///
+/// `GET /api/approvals` sits behind the backend's guard. 401 or 403 is the answer a guarded backend
+/// gives. A 2xx means every local process can drive the agent, so the caller must not use it. An
+/// unreachable or silent backend, or any other status, proves nothing about the guard and passes:
+/// this is a check for a backend that is OPEN, not for one that is slow.
+pub fn token_is_enforced(origin: &str) -> Result<(), String> {
+    match request("GET", origin, "/api/approvals", None, &[], None, Duration::from_secs(1)) {
+        Ok(reply) if served_without_token(reply.status) => Err(OPEN_BACKEND.to_string()),
+        _ => Ok(()),
+    }
+}
+
 fn super_addr(hostport: &str) -> Option<std::net::SocketAddr> {
     use std::net::ToSocketAddrs;
     hostport.to_socket_addrs().ok()?.next()
@@ -347,6 +372,38 @@ mod tests {
     use std::net::TcpListener;
     use std::sync::mpsc;
     use std::time::Duration;
+
+    /// A server that answers every request with `status`, for as long as the test runs.
+    fn answering(status: u16) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port");
+        let origin = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut stream = stream;
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                let _ = stream.write_all(format!("HTTP/1.0 {status} X\r\n\r\n{{}}").as_bytes());
+            }
+        });
+        origin
+    }
+
+    #[test]
+    fn a_backend_that_serves_a_protected_route_without_a_token_is_refused() {
+        let open = super::token_is_enforced(&answering(200)).expect_err("a 200 with no token is an open backend");
+        assert!(open.contains("does not require a token"), "{open}");
+        assert!(super::token_is_enforced(&answering(401)).is_ok());
+        assert!(super::token_is_enforced(&answering(403)).is_ok());
+    }
+
+    #[test]
+    fn a_backend_that_cannot_be_asked_is_not_called_open() {
+        let closed = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://127.0.0.1:{}", closed.local_addr().unwrap().port());
+        drop(closed);
+        assert!(super::token_is_enforced(&origin).is_ok());
+        assert!(super::served_without_token(204) && !super::served_without_token(404));
+    }
 
     #[test]
     fn the_owners_token_is_reused_instead_of_replaced() {

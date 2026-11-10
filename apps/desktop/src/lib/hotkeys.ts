@@ -58,7 +58,7 @@ export interface ShortcutDefinition {
 /**
  * Every keyboard shortcut the app has, in the order the help sheet lists them.
  *
- * One table, read by three things: the listeners below match on it, the help sheet (⌘;) renders it,
+ * One table, read by three things: the listeners below match on it, the help sheet (⌘/) renders it,
  * and the command palette shows each command's chord from it. Before it, the chords lived as `if`s
  * in the listener and nowhere else, so the only way to learn one was to read this file — and a sheet
  * written separately would have started drifting from the listener the day a key changed.
@@ -101,7 +101,12 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "zoomIn", labelKey: "hotkeys.zoomIn", keys: "Mod+=" },
   { id: "zoomOut", labelKey: "hotkeys.zoomOut", keys: "Mod+-" },
   { id: "zoomReset", labelKey: "hotkeys.zoomReset", keys: "Mod+0" },
-  { id: "help", labelKey: "hotkeys.help", keys: "Mod+;" },
+  // Asked of the Code conversation's own listener (`useSideChatKey`), and allowed while typing: it
+  // opens a panel and writes nothing into the draft, so it destroys no work.
+  { id: "sideChat", labelKey: "hotkeys.sideChat", keys: "Mod+;" },
+  // ⌘/ is the help sheet, as in the Claude app. ⌘; moved to the side question, and no other chord
+  // was ever bound to ⌘/, so the sheet keeps its key without a second binding for it.
+  { id: "help", labelKey: "hotkeys.help", keys: "Mod+/" },
 ];
 
 function isMac(): boolean {
@@ -167,7 +172,7 @@ export interface Hotkeys {
   onMaximize?: () => void;
   /** ⌘⇧A: go to the approval waiting in the conversation. */
   onApproval?: () => void;
-  /** ⌘;: the sheet that lists this table. */
+  /** ⌘/: the sheet that lists this table. */
   onHelp?: () => void;
   /** ⌘= / ⌘- / ⌘0: interface zoom, one step up or down, or back to 100%. */
   onZoom?: (direction: "in" | "out" | "reset") => void;

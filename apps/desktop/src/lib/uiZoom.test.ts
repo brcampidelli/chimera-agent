@@ -102,7 +102,10 @@ describe("the zoom before first paint", () => {
 describe("the code preview's theme scope in index.css", () => {
   // Vitest stubs CSS imports to "", so the stylesheet is read from disk (see design-system.test.ts).
   const css = readFileSync(join(process.cwd(), "src/index.css"), "utf8");
-  const diffView = readFileSync(join(process.cwd(), "src/components/code/DiffView.tsx"), "utf8");
+  // The + and − colours live in diffRows.ts (diffLineClass), so both files are what DiffView paints with.
+  const diffView = ["src/components/code/DiffView.tsx", "src/components/code/diffRows.ts"]
+    .map((file) => readFileSync(join(process.cwd(), file), "utf8"))
+    .join("\n");
 
   it("puts each preview half in the SAME rule as its theme's palette, so no palette is written twice", () => {
     expect(css).toMatch(/\.theme-scope\[data-theme-scope='dark'\],\s*:root\s*\{[^}]*--background:/);
