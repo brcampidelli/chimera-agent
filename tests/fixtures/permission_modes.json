@@ -1,0 +1,199 @@
+{
+  "rows": [
+    {
+      "mode": "manual",
+      "base": {
+        "reach": "workspace",
+        "approval": "suspicious"
+      },
+      "posture": {
+        "reach": "workspace",
+        "approval": "always",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "accept_edits",
+      "base": {
+        "reach": "workspace",
+        "approval": "suspicious"
+      },
+      "posture": {
+        "reach": "workspace_shell",
+        "approval": "never",
+        "commands": "asks"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "plan",
+      "base": {
+        "reach": "workspace",
+        "approval": "suspicious"
+      },
+      "posture": {
+        "reach": "workspace",
+        "approval": "suspicious",
+        "commands": "granted"
+      },
+      "planGate": true
+    },
+    {
+      "mode": "auto",
+      "base": {
+        "reach": "workspace",
+        "approval": "suspicious"
+      },
+      "posture": {
+        "reach": "workspace",
+        "approval": "suspicious",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "dont_ask",
+      "base": {
+        "reach": "workspace",
+        "approval": "suspicious"
+      },
+      "posture": {
+        "reach": "workspace",
+        "approval": "never",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "manual",
+      "base": {
+        "reach": "read_only",
+        "approval": "always"
+      },
+      "posture": {
+        "reach": "read_only",
+        "approval": "always",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "accept_edits",
+      "base": {
+        "reach": "read_only",
+        "approval": "always"
+      },
+      "posture": {
+        "reach": "read_only",
+        "approval": "never",
+        "commands": "asks"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "plan",
+      "base": {
+        "reach": "read_only",
+        "approval": "always"
+      },
+      "posture": {
+        "reach": "read_only",
+        "approval": "always",
+        "commands": "granted"
+      },
+      "planGate": true
+    },
+    {
+      "mode": "auto",
+      "base": {
+        "reach": "read_only",
+        "approval": "always"
+      },
+      "posture": {
+        "reach": "read_only",
+        "approval": "suspicious",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "dont_ask",
+      "base": {
+        "reach": "read_only",
+        "approval": "always"
+      },
+      "posture": {
+        "reach": "read_only",
+        "approval": "never",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "manual",
+      "base": {
+        "reach": "workspace_shell",
+        "approval": "never"
+      },
+      "posture": {
+        "reach": "workspace_shell",
+        "approval": "always",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "accept_edits",
+      "base": {
+        "reach": "workspace_shell",
+        "approval": "never"
+      },
+      "posture": {
+        "reach": "workspace_shell",
+        "approval": "never",
+        "commands": "asks"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "plan",
+      "base": {
+        "reach": "workspace_shell",
+        "approval": "never"
+      },
+      "posture": {
+        "reach": "workspace_shell",
+        "approval": "suspicious",
+        "commands": "granted"
+      },
+      "planGate": true
+    },
+    {
+      "mode": "auto",
+      "base": {
+        "reach": "workspace_shell",
+        "approval": "never"
+      },
+      "posture": {
+        "reach": "workspace_shell",
+        "approval": "suspicious",
+        "commands": "granted"
+      },
+      "planGate": false
+    },
+    {
+      "mode": "dont_ask",
+      "base": {
+        "reach": "workspace_shell",
+        "approval": "never"
+      },
+      "posture": {
+        "reach": "workspace_shell",
+        "approval": "never",
+        "commands": "granted"
+      },
+      "planGate": false
+    }
+  ]
+}

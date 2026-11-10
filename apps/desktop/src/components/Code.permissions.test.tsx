@@ -2,7 +2,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@/components/Code";
-import { getFsTree, getGitStatus, getRuns, listCodeSessions, patchCodeBypass } from "@/lib/api";
+import { getFsTree, getGitStatus, getRuns, listCodeSessions, patchCodeBypass, setCodeSessionPermissionMode } from "@/lib/api";
 import { emptyTree, gitStatus } from "@/test/code-api-mock";
 import { scriptTurn } from "@/test/code-api-mock";
 import { streamCodeTurn } from "@/lib/api";
@@ -89,5 +89,13 @@ describe("Code — conversation permission bypass", () => {
     await user.click(buttons[buttons.length - 1]);
 
     expect(vi.mocked(patchCodeBypass).mock.calls.map((call) => call[1])).toEqual([true, false]);
+  });
+
+  it("writes a picked permission mode to the conversation, so a reload keeps it", async () => {
+    const user = await openCode();
+    await user.click(await screen.findByRole("button", { name: /^Permissions:/ }));
+    await user.click(screen.getByRole("option", { name: /Plan/ }));
+
+    await waitFor(() => expect(setCodeSessionPermissionMode).toHaveBeenCalledWith("s1", "plan"));
   });
 });

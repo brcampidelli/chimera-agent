@@ -1454,7 +1454,7 @@ export interface RunRequestInput {
   cascade?: boolean;
   // How far the agent may reach and when it stops to ask. The server resolves it into tool denials
   // and pause flags, and mints a thread when a pause is asked for and none was sent.
-  posture?: { reach: Reach; approval: Approval } | null;
+  posture?: PostureAxes | null;
   // Which tier each ROLE draws from. Not a claim that routing helps — see bench/role_routing.
   profile?: Profile | null;
   /** One model slug per role, overriding whatever the profile resolves that role to. Omitted keys
@@ -1689,7 +1689,7 @@ export interface CodeTurnInput {
   max_usd?: number | null;
   repo_map?: boolean;
   explorer?: boolean;
-  posture?: { reach: Reach; approval: Approval } | null;
+  posture?: PostureAxes | null;
   profile?: Profile | null;
   /** Ids from {@link uploadAttachment}. This turn only — an image re-sent on every later turn is
    *  paid for again each time, for what is, after the first answer, no new information. */
@@ -2370,6 +2370,10 @@ function dispatchCodeTurn(frame: string, h: CodeTurnHandlers, seen = 0): Applied
 
 export type Reach = "read_only" | "workspace" | "workspace_shell";
 export type Approval = "always" | "suspicious" | "never";
+/** Whether a command asks first ("asks") or runs as the project's grant says ("granted", the default). */
+export type Commands = "granted" | "asks";
+/** The posture a turn is sent with. `commands` is optional: an absent value is "granted". */
+export type PostureAxes = { reach: Reach; approval: Approval; commands?: Commands };
 
 /** What the chosen posture means on THIS machine, right now. Structured rather than prose so the
  *  sentence can be rendered in every language — a server that returned English would make this the
@@ -2499,6 +2503,8 @@ export const getWorth = (workspace?: string) =>
 export interface CodeSessionMeta {
   /** Where the switch comes from when it is on: "conversation" or "project". Empty when off. */
   bypass_source?: string;
+  /** The permission mode the owner chose for this conversation; "" when Settings decide. */
+  permission_mode?: string;
   id: string;
   bypass_permissions?: boolean;
   title: string;
@@ -2618,6 +2624,14 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
 /** Change the owner-only approval setting for one conversation. Turning it on also answers the cards
  *  of that conversation that were already waiting; `left_waiting` counts those the switch would not
  *  release, which the owner must still answer. */
+/** Store the permission mode a conversation runs under, so a reload or a switch keeps it. The server
+ *  refuses bypass (not a stored mode) and, for a paired device, anything wider than the current mode. */
+export const setCodeSessionPermissionMode = (sessionId: string, mode: string) =>
+  json<{ id: string; permission_mode: string }>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}/permission-mode`,
+    { method: "PATCH", headers: screenJsonHeaders(), body: JSON.stringify({ mode }) },
+  );
+
 export const patchCodeBypass = (sessionId: string, bypass_permissions: boolean) =>
   json<{ id: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number; warning?: string | null }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/permissions`,
@@ -3107,7 +3121,7 @@ export interface AgentsRequestInput {
   // Sent, never omitted. An absent posture resolves server-side to no tool denials and no pause,
   // and an absent profile to a Manager reviewing with the very model that wrote the patch — so a
   // task run as one of several would be quietly weaker than the same task run alone.
-  posture?: { reach: Reach; approval: Approval } | null;
+  posture?: PostureAxes | null;
   profile?: Profile | null;
 }
 

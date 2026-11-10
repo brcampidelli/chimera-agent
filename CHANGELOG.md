@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **One mode picker under the prompt (Ctrl/Cmd+Shift+M): Manual, Accept edits, Plan, Auto, Don't ask, and Ignore permissions when the project allows it.** Each mode maps onto the existing posture instead of adding a third mechanism; the conversation's mode is saved and starts from what Settings say (never → Don't ask, suspicious → Auto, always → Manual). Accept edits shows a card before each command unless it only reads or the sandbox isolates it, and Plan never runs wider than Auto. The bridge can only move a conversation to a mode that widens nothing. Ctrl/Cmd+Shift+O opens the model picker and Ctrl/Cmd+Shift+E the effort picker; maximise moved to Ctrl/Cmd+Shift+Enter. (#1207)
+
 - **Comment on diff lines and send them all to the agent at once.** In the Code screen's diffs, a "+" beside each line opens a comment box; Enter keeps the comment on that line, and "Send comments (N)" or Ctrl/Cmd+Enter sends every pending comment as one message with file, line, the line's text and which diff it came from. Comments are kept per conversation until they are sent, a comment from an older edit is marked as possibly out of date, and the rows are keyboard-navigable. (#1203)
 
 - **The agent's shell no longer receives your API keys.** Child processes of the agent (and the new terminal) used to inherit provider key pools such as `CHIMERA_OPENROUTER_KEYS`, `DATABASE_URL` with a password and cloud credentials, so any command the agent ran could print them. They now get an environment with secrets removed by name and by value (proxy settings still pass), while the GitHub CLI keeps the token it needs. (#1208)

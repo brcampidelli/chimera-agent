@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Cpu, Search } from "lucide-react";
 
@@ -70,6 +70,8 @@ export function ModelPicker({
   offerDefault = true,
   quickFirst = false,
   blurb,
+  openRequest,
+  onOpenRequestHandled,
 }: {
   /** The chosen slug, or "" for whatever the install's default is. */
   value: string;
@@ -98,9 +100,18 @@ export function ModelPicker({
   /** What the dialog says under its title. The composer's line ("applies to this conversation…")
    *  is wrong for a picker that writes a setting; that caller says what its pick is instead. */
   blurb?: string;
+  /** True while the ⌘⇧O shortcut is asking for the dialog to open. */
+  openRequest?: boolean;
+  /** Called once the request is taken, so it cannot reopen the dialog on a later mount. */
+  onOpenRequestHandled?: () => void;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!openRequest) return;
+    setOpen(true);
+    onOpenRequestHandled?.();
+  }, [openRequest, onOpenRequestHandled]);
 
   // Read from the cache the dialog fills, to answer one question: can the picked model call tools?
   // `enabled: false` means this never fetches on its own — a composer nobody has touched costs no
