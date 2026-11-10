@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Comment on diff lines and send them all to the agent at once.** In the Code screen's diffs, a "+" beside each line opens a comment box; Enter keeps the comment on that line, and "Send comments (N)" or Ctrl/Cmd+Enter sends every pending comment as one message with file, line, the line's text and which diff it came from. Comments are kept per conversation until they are sent, a comment from an older edit is marked as possibly out of date, and the rows are keyboard-navigable. (#1203)
+
 ## [0.85.0] - 2026-11-04
 ### Fixed
 
