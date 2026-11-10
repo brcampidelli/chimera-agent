@@ -49,11 +49,14 @@ function markRuleRead(): void {
 export function ComposerSettings({
   summary,
   collapseWhen = false,
+  openRequest = false,
   children,
 }: {
   summary: string[];
   /** True while a turn runs: a panel opened for this visit folds back to its line. */
   collapseWhen?: boolean;
+  /** True while a shortcut asks for a picker inside this panel: it opens for this visit first. */
+  openRequest?: boolean;
   children: ReactNode;
 }) {
   const t = useT();
@@ -73,6 +76,10 @@ export function ComposerSettings({
   useEffect(() => {
     if (collapseWhen) setVisiting(false);
   }, [collapseWhen]);
+
+  useEffect(() => {
+    if (openRequest) setVisiting(true);
+  }, [openRequest]);
 
   const open = kept || visiting;
   const expandLabel = t("layout.card.expand", { name });

@@ -39,7 +39,8 @@ import unicodedata
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
@@ -68,13 +69,19 @@ from chimera.api.folder_locks import FolderLocks
 from chimera.api.posture import (
     DEFAULT_APPROVAL,
     DEFAULT_REACH,
+    STORABLE_MODES,
     Approval,
+    PermissionMode,
     Posture,
     PostureFacts,
     Reach,
     ResolvedPosture,
+    bridge_mode,
+    bridge_turn,
+    commands_run_without_asking,
     deployment_posture,
     describe,
+    mode_for_approval,
 )
 from chimera.api.posture import resolve as _resolve_posture
 from chimera.api.proposed_change import change_note, proposal_target
@@ -1214,11 +1221,28 @@ def assemble_registry(
         _log.info("no shell grant recorded for %s: the request's workspace_shell runs as workspace", ws)
     reach_mounts_shell = not (EXEC_TOOLS & set(resolve_posture(posture_in).deny_tools))
     owner_refuses = (settings.host_exec or "ask").lower() == "deny"
-    ungated = seams.allow_host_exec and granted and reach_mounts_shell and not owner_refuses
+    # A posture that asks before each command (`commands="asks"`) is not ungated, whatever the grant.
+    ungated = (
+        commands_run_without_asking(posture_in, seams.allow_host_exec)
+        and granted and reach_mounts_shell and not owner_refuses
+    )
 
     from chimera.tools.shell import HostExecTurnLimiter
 
-    host_exec_confirm = None if ungated else resolve_host_exec_confirm(settings)
+    # `commands="asks"` puts each command on the turn's own card. A server has no terminal, so the
+    # resolver's `ask` would be a refusal nobody can answer; `command_approver` is bound to the turn's
+    # approver once it exists (below), and until then a question is refused, as it always was.
+    command_approver: list[Any] = [None]
+    asks_each_command = posture_in is not None and posture_in.commands == "asks"
+    card_ask = _ask_command_on_card(command_approver) if asks_each_command else None
+    host_exec_confirm = None if ungated else resolve_host_exec_confirm(settings, ask=card_ask)
+    if card_ask is not None and host_exec_confirm is None and not ungated:
+        # `CHIMERA_HOST_EXEC=allow` makes the resolver return None before it looks at `ask`, which
+        # would let a mode that promised a question run its commands without one. The card is the
+        # gate here; a command that provably only reads still passes, as it does under `ask`.
+        from chimera.sandbox.confirm import _skip_what_only_reads
+
+        host_exec_confirm = _skip_what_only_reads(card_ask)
     if host_exec_confirm is not None:
         grant_folder = grant_root or seams._grant_root or ws
         host_exec_confirm = HostExecTurnLimiter(
@@ -1318,6 +1342,7 @@ def assemble_registry(
             approval_sink=approval_sink,
             run_id=run_id,
         )
+    command_approver[0] = owner
     # The browser's Google searches are written to this turn's audit. General browser navigation
     # keeps `owner` (including its site-boundary questions); Google search gets an explicit card
     # approver below, so `approval_mode=allow` cannot turn this owner-only action into a standing yes.
@@ -1871,6 +1896,26 @@ def turn_bypass_switch(
     return switch
 
 
+def _ask_command_on_card(holder: list[Any]) -> Callable[[str], bool]:
+    """A host-command confirm that puts the command on the turn's approval card.
+
+    The card's first line is ``run_shell: <command>``, the same shape the approval rules match, so
+    "always allow this command" on the card works for a command as it does for any other tool. The
+    approver is read from ``holder`` at each question: until the turn binds one, and when nothing is
+    bound, the command is refused, which is what an unanswered question is.
+    """
+
+    def ask(command: str) -> bool:
+        approve = holder[0]
+        if approve is None:
+            return False
+        action = f"run_shell: {command}"
+        question = SimpleNamespace(action=action, reason="a command on this machine, in a conversation that asks before each one", decision=None)
+        return bool(approve(question, action))
+
+    return ask
+
+
 def _live_flag(value: bool | Callable[[], bool]) -> Callable[[], bool]:
     """The switch as a question asked when it is needed: a fixed bool, or a live reader."""
     if callable(value):
@@ -2244,6 +2289,10 @@ class CodeTurnRequest(CodeSeams):
     """The conversation this turn belongs to. None mints a new one, returned in the first frame."""
     bypass_permissions: bool = Field(default=False, exclude=True)
     """Untrusted legacy request field; only process-local screen state enables this mode."""
+    permission_mode: str | None = Field(default=None, max_length=32, exclude=True)
+    """The mode a paired device asks for. Honoured only from the bridge, and only at or below the
+    conversation's current mode (`posture.bridge_mode`). The owner's own mode travels by its PATCH
+    route and is stored there, so an owner turn ignores this field."""
     source: Literal["app", "terminal", "bridge"] = Field(default="app", exclude=True)
     """The authenticated caller surface, stamped by the desktop bridge and never a tool argument."""
     title: str | None = Field(default=None, max_length=500)
@@ -3283,6 +3332,8 @@ def register_code_api(
         # The body's `bypass_permissions` is never honoured, from any origin: only turn_bypass_switch
         # decides, from the owner's stored switch and these scope marks.
         req.bypass_permissions = False
+        if from_bridge:
+            _bridge_turn_mode(req)
         req.close_loop_follow = None
         turn_browser_link = browser_link if browser_allowed else None
         card_claim = _claim_card_for_here(req, from_bridge=from_bridge or via_bridge, screen=browser_allowed)
@@ -3484,6 +3535,45 @@ def register_code_api(
         browser = bool(request.scope.get(BROWSER_SCOPE_KEY))
         if turning_on and (browser or not screen_credential.may_switch_bypass_on(screen)):
             raise HTTPException(status_code=403, detail=screen_credential.BROWSER_BYPASS_REFUSAL)
+
+    def _approval_setting() -> Approval:
+        """The approval the owner configured, or the default when Settings state none."""
+        from chimera.api.posture import DEFAULT_APPROVAL
+
+        return cast(Approval, (live().approval or "").strip() or DEFAULT_APPROVAL)
+
+    def _current_mode(session_id: str | None) -> PermissionMode:
+        """The mode a conversation runs under: the one it stored, or the Settings default."""
+        stored = store.stored_permission_mode(session_id) if session_id else ""
+        if stored in STORABLE_MODES:
+            return cast("PermissionMode", stored)
+        return mode_for_approval(_approval_setting())
+
+    def _configured_reach() -> Reach:
+        """The reach Settings state, or the default when they state none."""
+        return cast(Reach, (live().reach or "").strip() or DEFAULT_REACH)
+
+    def _bridge_turn_mode(req: CodeTurnRequest) -> None:
+        """A paired device's turn runs under the mode the server gives it, never a wider one.
+
+        The mode is the requested one only when it widens nothing against the conversation's current
+        mode on any axis (`posture.widens`); its posture is built from the CONFIGURED reach and
+        approval, and a posture the device sent narrows it axis by axis, so the device can take
+        something away and never add. Bypass yields the current mode.
+        """
+        # A turn that names no mode, sends no posture and belongs to a conversation with no stored mode
+        # is the legacy bridge turn: it keeps exactly the posture it had (no denials at all).
+        stored = store.stored_permission_mode(req.session_id) if req.session_id else ""
+        if req.posture is None and req.permission_mode is None and stored not in STORABLE_MODES:
+            return
+        _, turn = bridge_turn(
+            req.permission_mode, _current_mode(req.session_id), _configured_reach(), _approval_setting(), req.posture
+        )
+        req.posture = turn.posture
+        if turn.plan_gate:
+            req.plan_gate = True
+        if turn.posture.commands == "asks":
+            req.allow_host_exec = False
 
     def _session_known(session_id: str) -> bool:
         """A stored conversation, or one whose first turn is still running and not yet saved."""
@@ -6554,6 +6644,7 @@ def register_code_api(
             source = _bypass_source(str(row["id"]), str(row.get("workspace") or ""), memo)
             row["bypass_permissions"] = bool(source)
             row["bypass_source"] = source
+            row["permission_mode"] = store.stored_permission_mode(str(row["id"]))
         listed = [r for r in (*unsaved, *rows) if (r["archived_at"] is not None) == archived]
         if limit is None and cursor is None and state is None and project is None and q is None:
             return sorted(listed, key=lambda r: float(r["updated_at"]), reverse=True)
@@ -6784,6 +6875,31 @@ def register_code_api(
             if memo[workspace]:
                 return "project"
         return ""
+
+    @app.patch("/api/code/sessions/{session_id}/permission-mode", dependencies=[guard])
+    def set_code_permission_mode(request: Request, session_id: str, req: dict[str, Any]) -> dict[str, str]:
+        """Store the permission mode a conversation runs under, so a reload or a switch keeps it.
+
+        Bypass is not a stored mode and is refused. A paired device or the bridge may store only a
+        mode that widens nothing against the current one on any axis (the same rule as the turn);
+        the owner's screen may store any mode. The rule is the rename route's: no per-conversation
+        scope for a device, narrowing only.
+        """
+        mode = str(req.get("mode") or "")
+        if mode not in STORABLE_MODES:
+            raise HTTPException(status_code=400, detail="not a storable permission mode")
+        if not _session_known(session_id):
+            raise HTTPException(status_code=404, detail="no such conversation")
+        from_bridge = bool(request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY))
+        if from_bridge and bridge_mode(
+            mode, _current_mode(session_id), _configured_reach(), _approval_setting()
+        ) != mode:
+            raise HTTPException(status_code=403, detail="a paired device may not widen the permission mode")
+        try:
+            store.set_stored_permission_mode(session_id, mode)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail="the conversation file is unreadable; the mode was not changed") from exc
+        return {"id": session_id, "permission_mode": mode}
 
     @app.patch(
         "/api/code/sessions/{session_id}/permissions",

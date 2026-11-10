@@ -46,16 +46,14 @@ import {
   streamCodeTurn,
   streamSessionLive,
   undoWork,
-  type Approval,
   type CodeBrowserFrame,
   CodeToolEvent,
   type CodeTurnDone,
   type Attachment,
   type CodeVerified,
   type Profile,
-  type Reach,
 } from "@/lib/api";
-import type { CodeApprovalEvent, SessionLiveFrame, UserQuestionEvent } from "@/lib/api";
+import type { CodeApprovalEvent, PostureAxes, SessionLiveFrame, UserQuestionEvent } from "@/lib/api";
 import { useRetireWhenNotWaiting } from "@/lib/usePendingUserQuestions";
 import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import type { ConversationSeed } from "@/lib/appCommands";
@@ -721,6 +719,8 @@ export function Conversation({
   onEdited,
   busyElsewhere,
   posture,
+  forcePlanGate = false,
+  permissionControl,
   provider = "",
   model = "",
   style = "default",
@@ -747,7 +747,13 @@ export function Conversation({
   openFile: string | null;
   /** The same reach/approval the verified run uses — pressing one button rather than the other must
    *  not change what the agent is allowed to do. */
-  posture: { reach: Reach; approval: Approval };
+  posture: PostureAxes;
+  /** Plan mode: the turn stops on its plan before it touches anything, whatever the plan-first
+   *  choice below says. Set by the Code screen from the selected permission mode. */
+  forcePlanGate?: boolean;
+  /** The permission-mode selector, drawn in the row beneath the prompt. Owned by the Code screen,
+   *  which knows the project's switch and the settings this conversation reads. */
+  permissionControl?: ReactNode;
   /** Who does the work: "" for Chimera's own loop, or an external agent key. */
   provider?: string;
   /** Which model answers, for THIS conversation. "" leaves the install's default in charge, which
@@ -1967,12 +1973,16 @@ export function Conversation({
         // The second lock, beside the first. The reach mounts the shell tools; this decides whether
         // a mounted one may run on the host. Sent together because they are one decision made in
         // one place — a request carrying the reach without this asks for tools it cannot use.
-        allow_host_exec: posture.reach === "workspace_shell",
+        // `commands: "asks"` (Accept edits) keeps this false whatever the grant says: the server
+        // then confirms each command rather than running it ungated (`commands_run_without_asking`).
+        allow_host_exec: posture.reach === "workspace_shell" && posture.commands !== "asks",
         profile,
         fuse: turnFuse,
         // Auto omits the field so the server's rule decides (`chimera/api/big_task.py`). Always and
         // Never send what the owner chose, and the rule does not override either.
-        ...(planMode === "auto" ? {} : { plan_gate: planMode === "always" }),
+        // Plan mode is the one the screen sets: it wins over the plan-first choice, which this row
+        // shows locked while it holds.
+        ...(forcePlanGate ? { plan_gate: true } : planMode === "auto" ? {} : { plan_gate: planMode === "always" }),
         // The message was heard, not read, and the answer will be read back: the model is told to
         // answer for the ear, and asked not to think before it does — measured, the thinking is
         // where the wait before the first spoken word went (2–15 s on the default model), and a
@@ -3080,6 +3090,7 @@ export function Conversation({
           </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
+          {permissionControl}
           <AttachButton onAdded={(a) => setAttached((prev) => [...prev, a])} />
           <DictateButton
             onText={(text) =>
@@ -3117,7 +3128,7 @@ export function Conversation({
           <div
             role="group"
             aria-label={t("composer.planGate")}
-            title={t("composer.planGateHint")}
+            title={forcePlanGate ? t("composer.planForced") : t("composer.planGateHint")}
             className="inline-flex items-center gap-0.5"
           >
             <span className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
@@ -3130,6 +3141,7 @@ export function Conversation({
                 variant={planMode === mode ? "outline" : "ghost"}
                 className={planMode === mode ? "border-accent/60 text-accent-ink" : undefined}
                 aria-pressed={planMode === mode}
+                disabled={forcePlanGate}
                 onClick={() => setPlanMode(mode)}
               >
                 {t(PLAN_MODE_LABEL[mode])}

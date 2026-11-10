@@ -315,6 +315,8 @@ class CodeSessionMetaOut(BaseModel):
     bypass_permissions: bool = False
     #: Where the switch comes from when it is on: ``conversation`` or ``project``; "" when it is off.
     bypass_source: str = ""
+    #: The permission mode the owner chose for this conversation, or "" (the Settings default applies).
+    permission_mode: str = ""
     #: Why it did not parse, when ``damaged`` (the parser's first words).
     damage: str = ""
 

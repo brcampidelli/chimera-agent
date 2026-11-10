@@ -25,6 +25,7 @@ import {
   listCodeSessions,
   saveFile,
   patchCodeBypass,
+  setCodeSessionPermissionMode,
   type Approval,
   type CodeSessionMeta,
   type Profile,
@@ -40,6 +41,8 @@ import { useOptionalToast } from "@/components/ui/toast";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
 import { EffortPicker } from "@/components/code/EffortPicker";
+import { PermissionModePicker } from "@/components/code/PermissionModePicker";
+import { isStorableMode, modeForApproval, modeTurn, type PermissionMode } from "@/lib/permission-modes";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
 import { StylePicker, styleLabel } from "@/components/code/StylePicker";
@@ -77,7 +80,7 @@ import { designIdFromSearch, withoutDesignParam } from "@/lib/design/deepLink";
 import { useRoute } from "@/lib/router";
 import { readViewerWrap, writeViewerWrap, type WrapKind } from "@/lib/viewerWrap";
 import { rememberClosed, takeClosed } from "@/lib/closedConversations";
-import { useConversationHotkeys } from "@/lib/hotkeys";
+import { useComposerHotkeys, useConversationHotkeys } from "@/lib/hotkeys";
 import { CONVERSATION_WINDOW_FEATURES, conversationUrl, conversationWindowName } from "@/lib/float/protocol";
 
 const fieldCls = "field w-full px-3 text-sm";
@@ -712,7 +715,6 @@ export function Code() {
   const reach: Reach =
     shellHere && configured === "workspace" ? "workspace_shell" : configured;
   const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
-  const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
   const storedSessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   // The side cards (C5) describe this folder and this posture: the same pair every turn is sent with,
   // so the Environment card cannot state a posture the next turn will not run under.
@@ -727,6 +729,34 @@ export function Code() {
   const bypassOn = currentSessionMeta?.bypass_permissions
     ?? (sessionId ? bypassKnown[sessionId] : undefined)
     ?? false;
+  // The project's switch covers every conversation in it, a new one included, so it is read here as
+  // well as the conversation's own. `bypassCovers` is what the server will answer for this turn.
+  const projectBypassOn = Boolean(projectRows.data?.find((row) => row.path === workspace)?.bypass_permissions);
+  const bypassCovers = bypassOn || projectBypassOn;
+  // Held by the project: this conversation cannot turn it off, so the selector locks the other modes.
+  const projectHoldsBypass = projectBypassOn || currentSessionMeta?.bypass_source === "project";
+  // The mode the person chose for THIS conversation. null is the Settings default, read from the
+  // approval the owner configured. Reset with the conversation (`startConversation`), like the model.
+  const [modeChoice, setModeChoice] = useState<Exclude<PermissionMode, "bypass"> | null>(null);
+  // The conversation's own stored choice comes next: a reopened conversation keeps the mode it had.
+  const storedMode = currentSessionMeta?.permission_mode ?? "";
+  const modeChosen = modeChoice ?? (isStorableMode(storedMode) ? storedMode : modeForApproval(approval));
+  const turn = useMemo(() => modeTurn(modeChosen, { reach, approval }), [modeChosen, reach, approval]);
+  const posture = turn.posture;
+  const planForced = turn.planGate;
+  // What the selector shows: Ignore permissions while the switch answers the conversation, otherwise
+  // the mode the person chose.
+  const shownMode: PermissionMode = bypassCovers ? "bypass" : modeChosen;
+  // ⌘⇧M, ⌘⇧O and ⌘⇧E ask for one of the three pickers under the prompt. The request is taken by the
+  // picker that answers it, so a picker that mounts later inside the collapsed panel does not reopen
+  // from a request that was already served.
+  const [pickerRequest, setPickerRequest] = useState<"permission" | "model" | "effort" | null>(null);
+  const pickerRequestHandled = useCallback(() => setPickerRequest(null), []);
+  useComposerHotkeys({
+    onPermissionMode: () => setPickerRequest("permission"),
+    onModel: () => setPickerRequest("model"),
+    onEffort: () => setPickerRequest("effort"),
+  });
   const onToggleBypass = async () => {
     if (!sessionId || bypassPending) return;
     const enabled = !bypassOn;
@@ -757,6 +787,24 @@ export function Code() {
     } finally {
       setBypassPending(false);
     }
+  };
+  // The choice is written to the conversation, so a reload or a switch keeps it. It waits for the
+  // conversation's id when the first turn has not minted one yet, and the write is idempotent.
+  useEffect(() => {
+    if (!sessionId || modeChoice === null) return;
+    setCodeSessionPermissionMode(sessionId, modeChoice)
+      .then(() => queryClient.invalidateQueries({ queryKey: ["code-sessions"] }))
+      .catch(() => toastRef.current?.(t("code.permissions.error"), "bad"));
+  }, [sessionId, modeChoice]);
+  /** The selector's choice. Leaving Ignore permissions turns this conversation's own switch off first,
+   *  as the old control did; a switch the project holds stays on, so the selector refuses to leave it. */
+  const onPickMode = async (next: PermissionMode) => {
+    if (next === "bypass" || runBusy) return;
+    if (bypassCovers) {
+      if (projectHoldsBypass || !sessionId) return;
+      await onToggleBypass();
+    }
+    setModeChoice(next);
   };
   useEffect(() => {
     publishSide({
@@ -874,6 +922,7 @@ export function Code() {
     setModel("");
     setModelPinned(false);
     setStyle("default");
+    setModeChoice(null);
   }, []);
 
   /** Open a stored conversation: from the sidebar, from ⌘⇧T, from Ctrl+Tab. One function because
@@ -1232,6 +1281,18 @@ export function Code() {
             busyElsewhere={runBusy}
             runLive={runBusy}
             posture={posture}
+            forcePlanGate={planForced}
+            permissionControl={
+              <PermissionModePicker
+                value={shownMode}
+                onChange={(next) => void onPickMode(next)}
+                bypassListed={bypassCovers}
+                locked={projectHoldsBypass}
+                disabled={runBusy}
+                openRequest={pickerRequest === "permission"}
+                onOpenRequestHandled={pickerRequestHandled}
+              />
+            }
             provider={provider}
             model={model}
             style={style}
@@ -1255,6 +1316,7 @@ export function Code() {
                     posture note below is outside it on purpose: the no-sandbox warning never hides. */}
                 <ComposerSettings
                   collapseWhen={runBusy}
+                  openRequest={pickerRequest === "model" || pickerRequest === "effort"}
                   summary={[
                     provider === "" ? t("code.provider.native") : provider,
                     ...(provider === "" ? [t(`code.roles.profile.${profile}`)] : []),
@@ -1293,11 +1355,23 @@ export function Code() {
                     selector next to them would offer a choice this app cannot make — and the turn
                     would run on something other than what the row says. */}
                 {provider === "" ? (
-                  <ModelPicker value={model} onChange={pickModel} disabled={runBusy} />
+                  <ModelPicker
+                    value={model}
+                    onChange={pickModel}
+                    disabled={runBusy}
+                    openRequest={pickerRequest === "model"}
+                    onOpenRequestHandled={pickerRequestHandled}
+                  />
                 ) : null}
                 {/* The reasoning variant of that model, only where its route takes one. */}
                 {provider === "" ? (
-                  <EffortPicker value={model} onChange={pickModel} disabled={runBusy} />
+                  <EffortPicker
+                    value={model}
+                    onChange={pickModel}
+                    disabled={runBusy}
+                    focusRequest={pickerRequest === "effort"}
+                    onFocusRequestHandled={pickerRequestHandled}
+                  />
                 ) : null}
                 {/* Only for Chimera's own loop, like the model: an external agent's prompt is not ours
                     to suffix, and the server would not apply the style there. */}
@@ -1305,10 +1379,12 @@ export function Code() {
                   <StylePicker value={style} onChange={setStyle} disabled={runBusy} />
                 ) : null}
                 </ComposerSettings>
+                {/* The sentence describes the posture the next turn runs under: the selected mode's,
+                    which can differ from Settings (Accept edits, Auto, Plan). */}
                 <PostureNote
                   workspace={workspace}
-                  reach={reach}
-                  approval={approval}
+                  reach={posture.reach}
+                  approval={posture.approval}
                   provider={provider}
                 />
               </div>

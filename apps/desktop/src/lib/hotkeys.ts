@@ -80,7 +80,13 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "findPrevious", labelKey: "hotkeys.findPrevious", keys: "Shift+F3" },
   { id: "findClose", labelKey: "hotkeys.findClose", keys: "Escape" },
   { id: "focusMode", labelKey: "hotkeys.focusMode", keys: "Mod+Shift+F" },
-  { id: "maximize", labelKey: "hotkeys.maximize", keys: "Mod+Shift+M" },
+  { id: "maximize", labelKey: "hotkeys.maximize", keys: "Mod+Shift+Enter" },
+  // The composer's three pickers, answered by the Code screen (`useComposerHotkeys`). Mod+Shift+M was
+  // maximise until the permission picker took it; maximise moved rather than the picker losing the
+  // letter every other app gives its mode menu.
+  { id: "permissionMode", labelKey: "hotkeys.permissionMode", keys: "Mod+Shift+M" },
+  { id: "model", labelKey: "hotkeys.model", keys: "Mod+Shift+O" },
+  { id: "effort", labelKey: "hotkeys.effort", keys: "Mod+Shift+E" },
   { id: "approval", labelKey: "hotkeys.approval", keys: "Mod+Shift+A" },
   { id: "toggleLeft", labelKey: "hotkeys.toggleLeft", keys: "Mod+B" },
   { id: "toggleRight", labelKey: "hotkeys.toggleRight", keys: "Mod+Alt+B" },
@@ -279,6 +285,46 @@ export function useConversationHotkeys(handlers: ConversationHotkeys): void {
   }, []);
 }
 
+
+export interface ComposerHotkeys {
+  /** ⌘⇧M: open the permission-mode picker under the prompt. */
+  onPermissionMode?: () => void;
+  /** ⌘⇧O: open the model picker. */
+  onModel?: () => void;
+  /** ⌘⇧E: open the reasoning-effort picker. */
+  onEffort?: () => void;
+}
+
+/**
+ * The three pickers under the prompt, answered while the Code screen is mounted.
+ *
+ * Unlike the conversation shortcuts these fire while typing: they open a choice and destroy no
+ * text, and the person writing a message is exactly who reaches for the mode. The listener only
+ * opens; it never picks a value on the person's behalf.
+ */
+export function useComposerHotkeys(handlers: ComposerHotkeys): void {
+  const ref = useRef(handlers);
+  ref.current = handlers;
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      const h = ref.current;
+      const bindings: [string, (() => void) | undefined][] = [
+        ["permissionMode", h.onPermissionMode],
+        ["model", h.onModel],
+        ["effort", h.onEffort],
+      ];
+      for (const [id, run] of bindings) {
+        if (run && matchesShortcut(e, id)) {
+          e.preventDefault();
+          run();
+          return;
+        }
+      }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+}
 
 /** Hold to dictate: ⌘⇧Space on macOS, Ctrl+Shift+Space elsewhere — by the physical key, like ⌘B.
  *

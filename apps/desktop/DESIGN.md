@@ -399,7 +399,8 @@ question a person actually has, or a feature you want them to notice.
 | `⌘,` | settings |
 | `⌘B` / `⌘⌥B` | hide or show the left sidebar / the right panel (by the physical B key) |
 | `⌘⇧F` | focus mode on and off |
-| `⌘⇧M` | maximise the panel that holds focus, or restore the maximised one |
+| `⌘⇧Enter` | maximise the panel that holds focus, or restore the maximised one |
+| `⌘⇧M` / `⌘⇧O` / `⌘⇧E` | open the permission-mode picker / the model picker / the reasoning-effort picker under the prompt |
 | `⌘⇧A` | go to the approval waiting in the conversation |
 | `⌘⇧Space` (hold) | dictate into the composer while held, by the physical key; release to stop. Only where the composer and its Dictate button are on screen — visible, not just mounted: a composer kept under a maximised viewer does not listen. Not `⌘D`, the browser's bookmark |
 | `Esc` | restore a maximised panel, from anywhere (a menu or dialog open first takes it) |

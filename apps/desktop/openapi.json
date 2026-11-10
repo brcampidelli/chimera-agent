@@ -4279,6 +4279,11 @@
             "title": "Id",
             "type": "string"
           },
+          "permission_mode": {
+            "default": "",
+            "title": "Permission Mode",
+            "type": "string"
+          },
           "project": {
             "default": "",
             "title": "Project",
@@ -5013,6 +5018,18 @@
               }
             ],
             "title": "Open File"
+          },
+          "permission_mode": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permission Mode"
           },
           "plan_gate": {
             "anyOf": [
@@ -14315,7 +14332,7 @@
         "type": "object"
       },
       "Posture": {
-        "description": "The two axes, as a client sends them.",
+        "description": "The two axes, as a client sends them, and the one question a mode needs beyond them.",
         "properties": {
           "approval": {
             "default": "suspicious",
@@ -14325,6 +14342,15 @@
               "never"
             ],
             "title": "Approval",
+            "type": "string"
+          },
+          "commands": {
+            "default": "granted",
+            "enum": [
+              "granted",
+              "asks"
+            ],
+            "title": "Commands",
             "type": "string"
           },
           "reach": {
@@ -21471,6 +21497,62 @@
           }
         },
         "summary": "Session Live"
+      }
+    },
+    "/api/code/sessions/{session_id}/permission-mode": {
+      "patch": {
+        "description": "Store the permission mode a conversation runs under, so a reload or a switch keeps it.\n\nBypass is not a stored mode and is refused. A paired device or the bridge may store only a\nmode that widens nothing against the current one on any axis (the same rule as the turn);\nthe owner's screen may store any mode. The rule is the rename route's: no per-conversation\nscope for a device, narrowing only.",
+        "operationId": "set_code_permission_mode_api_code_sessions__session_id__permission_mode_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Req",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Set Code Permission Mode Api Code Sessions  Session Id  Permission Mode Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Code Permission Mode"
       }
     },
     "/api/code/sessions/{session_id}/permissions": {
