@@ -38,7 +38,7 @@ describe("useHotkeys", () => {
     const onHelp = vi.fn();
     const onZoom = vi.fn();
     const { user } = setup({ onHelp, onZoom });
-    await user.keyboard("{Control>};{/Control}");
+    await user.keyboard("{Control>}/{/Control}");
     await user.keyboard("{Control>}={/Control}");
     await user.keyboard("{Control>}-{/Control}");
     await user.keyboard("{Control>}0{/Control}");
@@ -47,7 +47,7 @@ describe("useHotkeys", () => {
   });
 
   it("allows the help shortcut inventory to be the source rendered by the help sheet", () => {
-    expect(SHORTCUTS.map(({ id, keys }) => [id, keys])).toContainEqual(["help", "Mod+;"]);
+    expect(SHORTCUTS.map(({ id, keys }) => [id, keys])).toContainEqual(["help", "Mod+/"]);
     expect(SHORTCUTS.map(({ id, keys }) => [id, keys])).toContainEqual(["zoomReset", "Mod+0"]);
   });
 
@@ -62,7 +62,7 @@ describe("useHotkeys", () => {
     const onZoom = vi.fn();
     const { user } = setup({ onHelp, onZoom });
     await user.click(screen.getByLabelText("composer"));
-    await user.keyboard("{Control>};{/Control}{Control>}={/Control}");
+    await user.keyboard("{Control>}/{/Control}{Control>}={/Control}");
     expect(onHelp).not.toHaveBeenCalled();
     expect(onZoom).not.toHaveBeenCalled();
   });

@@ -60,6 +60,7 @@ import { useRetireWhenNotWaiting } from "@/lib/usePendingUserQuestions";
 import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
+import { SideChat, useSideChatKey } from "@/components/code/SideChat";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { RewindTimeline } from "@/components/code/RewindTimeline";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
@@ -830,6 +831,10 @@ export function Conversation({
   // Following later changes live would re-open, mid-conversation, cards the person had just folded.
   const [transcriptView] = useState(getTranscriptView);
   const [draft, setDraft] = useState("");
+  // The side question (Mod+;): a panel beside this conversation, answered from its transcript and
+  // never written into it. Only what the person takes from it reaches the composer.
+  const [sideOpen, setSideOpen] = useState(false);
+  useSideChatKey(() => setSideOpen((open) => !open));
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(busy);
   busyRef.current = busy;
@@ -3179,6 +3184,18 @@ export function Conversation({
           </span>
         </div>
       </div>
+      {/* The side question. Unavailable for a brand-new conversation (nothing to ask about yet) and
+          for an external agent (its own conversation is the only one that can answer). */}
+      <SideChat
+        sessionId={sessionId ?? ""}
+        model={model}
+        open={sideOpen}
+        onClose={() => setSideOpen(false)}
+        onTake={(text) => setDraft((current) => (current.trim() ? `${current}
+
+${text}` : text))}
+        unavailable={!sessionId || Boolean(provider)}
+      />
     </div>
   );
 }
