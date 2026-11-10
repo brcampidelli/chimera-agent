@@ -334,9 +334,15 @@ _GOVERNANCE_FILES = (
     # The browser tabs that are the owner's screen (`chimera/api/browser_screen.py`): a file a process
     # could write would be a session the cookie checks accept, so the agent's shell may not touch it.
     "browser-screen.json",
+    # The proposed task cards and the key that signs them (`chimera/core/task_cards.py`): a card the shell
+    # could rewrite would let the agent clear the taint it was proposed under, or read the key to forge it.
+    "task_cards.json",
+    "task_cards.key",
+    "task_cards.seen",
 )
 _GOVERNANCE_NAME = re.compile(
-    r"\b(?:code_projects|code_bypass_switches|app_worktrees|prepared_setups|browser-screen)\.json\b",
+    r"\b(?:(?:code_projects|code_bypass_switches|app_worktrees|prepared_setups|browser-screen|task_cards)\.json"
+    r"|task_cards\.(?:key|seen))\b",
     re.IGNORECASE,
 )
 
