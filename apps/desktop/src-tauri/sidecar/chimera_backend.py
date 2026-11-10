@@ -40,6 +40,12 @@ def main() -> None:
         print(chimera.__version__)
         return
 
+    # Before anything builds the settings: the shell's secrets arrive on stdin, not in the
+    # environment, where a same-user process could read them back (`chimera/launch_secrets.py`).
+    from chimera import launch_secrets
+
+    launch_secrets.adopt_from_stdin()
+
     from chimera.cli.main import app
 
     original_argv = sys.argv
