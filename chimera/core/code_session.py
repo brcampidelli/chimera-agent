@@ -673,6 +673,9 @@ class CodeSessionStore:
         # The owner's model pin, cached with the same file version so a transcript save can preserve
         # a concurrent settings-card decision without reopening an unchanged transcript.
         self._model_cache: dict[str, tuple[tuple[int, int], str]] = {}
+        # The owner's permission mode per file version, filled by the same writes and reads as the
+        # model pin, so a save or a list never reads a file just to know it.
+        self._mode_cache: dict[str, tuple[tuple[int, int], str]] = {}
         # What each workspace string of an UNSTAMPED conversation is a checkout of, for the life of
         # the process: a few dozen strings, each answered by reading two or three small files once.
         # A folder that could not be read is not remembered, so it is asked again next time.
@@ -722,6 +725,11 @@ class CodeSessionStore:
         path = self._path(session.session_id)
         with self._guard(path):
             document = session.to_dict()
+            # The permission mode is the owner's choice, written by its own setter; a turn's save must
+            # not drop it, so the file's value is carried over (or no key at all, when none was stored).
+            kept_mode = self._mode_of_file(path) if path.exists() else None
+            if kept_mode:
+                document["permission_mode"] = kept_mode
             if not session.pin_changed and path.exists():
                 # A settings card can update the pin while a turn is running. Its final transcript
                 # save must preserve that newer owner decision rather than its stale in-memory pin.
@@ -795,6 +803,12 @@ class CodeSessionStore:
             self._model_cache[str(path)] = (
                 version,
                 str(saved_document.get("selected_model") or "")
+                if isinstance(saved_document, dict)
+                else "",
+            )
+            self._mode_cache[str(path)] = (
+                version,
+                str(saved_document.get("permission_mode") or "")
                 if isinstance(saved_document, dict)
                 else "",
             )
@@ -1056,6 +1070,53 @@ class CodeSessionStore:
         )
         return dict(recorded[-1]) if recorded else None
 
+    def stored_permission_mode(self, session_id: str) -> str:
+        """The permission mode a stored conversation chose, or "" (none chosen: Settings decide)."""
+        try:
+            path = self._path(session_id)
+        except ValueError:
+            return ""
+        return self._mode_of_file(path) or ""
+
+    def _mode_of_file(self, path: Path) -> str | None:
+        """The mode in ``path``, from the cache while the file's version is the cached one, else read.
+
+        None when the file cannot be read. The cache is what keeps a save, and every row of the
+        conversation list, from opening a file only to learn a field that did not change.
+        """
+        try:
+            st = path.stat()
+            version = (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
+        with self._meta_lock:
+            cached = self._mode_cache.get(str(path))
+        if cached is not None and cached[0] == version:
+            return cached[1]
+        data = self._read_document(path)
+        if data is None:
+            return None
+        mode = str(data.get("permission_mode") or "")
+        with self._meta_lock:
+            self._mode_cache[str(path)] = (version, mode)
+        return mode
+
+    def set_stored_permission_mode(self, session_id: str, mode: str) -> None:
+        """Set/clear a conversation's permission mode without replacing its transcript.
+
+        The same contract as :meth:`set_stored_model`: the mode is the owner's choice, written in the
+        conversation's own file so it survives a reload and a switch to another conversation.
+        """
+        path = self._path(session_id)
+        with self._guard(path):
+            existed = path.exists()
+            document = self._read_document(path)
+            if existed and document is None:
+                raise ValueError("the conversation file is unreadable; its permission mode was not changed")
+            document = document or {}
+            document["permission_mode"] = mode
+            self._write(path, redact_json(document))
+
     def stored_model(self, session_id: str) -> str:
         """The model a stored conversation is pinned to, or "" (none pinned, nothing stored, or an
         unreadable file — all of which mean "follow the install default")."""
@@ -1197,6 +1258,8 @@ class CodeSessionStore:
                 del self._pull_request_cache[gone]
             for gone in [k for k in self._model_cache if k not in seen]:
                 del self._model_cache[gone]
+            for gone in [k for k in self._mode_cache if k not in seen]:
+                del self._mode_cache[gone]
         out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
         return out
 
@@ -1219,6 +1282,9 @@ class CodeSessionStore:
             with self._meta_lock:
                 self._model_cache[str(path)] = (
                     (st.st_mtime_ns, st.st_size), str(data.get("selected_model") or "")
+                )
+                self._mode_cache[str(path)] = (
+                    (st.st_mtime_ns, st.st_size), str(data.get("permission_mode") or "")
                 )
         if not meta["project"] and meta["workspace"]:
             meta.update(_checkout_fields(self._derived_checkout(str(meta["workspace"]))))

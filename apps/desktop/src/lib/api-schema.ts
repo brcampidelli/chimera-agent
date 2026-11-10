@@ -936,6 +936,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/permission-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Code Permission Mode
+         * @description Store the permission mode a conversation runs under, so a reload or a switch keeps it.
+         *
+         *     Bypass is not a stored mode and is refused. A paired device or the bridge may store only a
+         *     mode at or below the conversation's current one; the owner's screen may store any mode.
+         */
+        patch: operations["set_code_permission_mode_api_code_sessions__session_id__permission_mode_patch"];
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/permissions": {
         parameters: {
             query?: never;
@@ -7988,6 +8011,11 @@ export interface components {
             /** Id */
             id: string;
             /**
+             * Permission Mode
+             * @default
+             */
+            permission_mode: string;
+            /**
              * Project
              * @default
              */
@@ -8317,6 +8345,8 @@ export interface components {
             model_pinned: boolean;
             /** Open File */
             open_file?: string | null;
+            /** Permission Mode */
+            permission_mode?: string | null;
             /** Plan Gate */
             plan_gate?: boolean | null;
             posture?: components["schemas"]["Posture"] | null;
@@ -12642,7 +12672,7 @@ export interface components {
         };
         /**
          * Posture
-         * @description The two axes, as a client sends them.
+         * @description The two axes, as a client sends them, and the one question a mode needs beyond them.
          */
         Posture: {
             /**
@@ -12651,6 +12681,12 @@ export interface components {
              * @enum {string}
              */
             approval: "always" | "suspicious" | "never";
+            /**
+             * Commands
+             * @default granted
+             * @enum {string}
+             */
+            commands: "granted" | "asks";
             /**
              * Reach
              * @default workspace
@@ -16530,6 +16566,45 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_code_permission_mode_api_code_sessions__session_id__permission_mode_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */

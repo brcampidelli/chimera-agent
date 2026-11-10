@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { SHORTCUTS, useDictateKey, useHotkeys, type Hotkeys } from "@/lib/hotkeys";
+import { SHORTCUTS, useComposerHotkeys, useDictateKey, useHotkeys, type Hotkeys } from "@/lib/hotkeys";
 
 function Harness(handlers: Hotkeys) {
   useHotkeys(handlers);
@@ -122,7 +122,8 @@ describe("useHotkeys", () => {
     const { user } = setup({ onFocusMode, onMaximize, onApproval });
 
     await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}");
-    await user.keyboard("{Control>}{Shift>}m{/Shift}{/Control}");
+    // Maximise moved to Mod+Shift+Enter when the permission picker took Mod+Shift+M.
+    await user.keyboard("{Control>}{Shift>}{Enter}{/Shift}{/Control}");
     await user.keyboard("{Control>}{Shift>}a{/Shift}{/Control}");
 
     expect(onFocusMode).toHaveBeenCalledOnce();
@@ -244,5 +245,59 @@ describe("useDictateKey", () => {
     view.rerender(<DictateHarness onPress={vi.fn()} onRelease={nextRelease} />);
     key("keyup", { code: "Space", key: " ", ctrlKey: true, shiftKey: true });
     expect(nextRelease).toHaveBeenCalledOnce();
+  });
+});
+
+function ComposerHarness(handlers: Parameters<typeof useComposerHotkeys>[0]) {
+  useComposerHotkeys(handlers);
+  return <textarea aria-label="composer" />;
+}
+
+describe("the composer's permission, model and effort shortcuts", () => {
+  it("binds Mod+Shift+M, Mod+Shift+O and Mod+Shift+E, and frees Mod+Shift+M from maximise", () => {
+    const keys = Object.fromEntries(SHORTCUTS.map((s) => [s.id, s.keys]));
+    expect(keys.permissionMode).toBe("Mod+Shift+M");
+    expect(keys.model).toBe("Mod+Shift+O");
+    expect(keys.effort).toBe("Mod+Shift+E");
+    expect(keys.maximize).toBe("Mod+Shift+Enter");
+  });
+
+  it("no two shortcuts share a chord", () => {
+    const chords = SHORTCUTS.map((s) => s.keys);
+    expect(new Set(chords).size).toBe(chords.length);
+  });
+
+  it("each chord asks for its picker, including while the prompt holds text", async () => {
+    const user = userEvent.setup();
+    const handlers = { onPermissionMode: vi.fn(), onModel: vi.fn(), onEffort: vi.fn() };
+    render(<ComposerHarness {...handlers} />);
+    await user.click(screen.getByRole("textbox", { name: "composer" }));
+    await user.keyboard("draft");
+    await user.keyboard("{Control>}{Shift>}m{/Shift}{/Control}");
+    await user.keyboard("{Control>}{Shift>}o{/Shift}{/Control}");
+    await user.keyboard("{Control>}{Shift>}e{/Shift}{/Control}");
+    expect(handlers.onPermissionMode).toHaveBeenCalledOnce();
+    expect(handlers.onModel).toHaveBeenCalledOnce();
+    expect(handlers.onEffort).toHaveBeenCalledOnce();
+  });
+
+  it("does not answer the bare letter or the chord without Shift", async () => {
+    const user = userEvent.setup();
+    const handlers = { onPermissionMode: vi.fn(), onModel: vi.fn(), onEffort: vi.fn() };
+    render(<ComposerHarness {...handlers} />);
+    await user.keyboard("{Control>}m{/Control}");
+    await user.keyboard("m");
+    expect(handlers.onPermissionMode).not.toHaveBeenCalled();
+  });
+
+  it("Mod+Shift+Enter maximises, and Mod+Shift+M no longer does", async () => {
+    const user = userEvent.setup();
+    const onMaximize = vi.fn();
+    render(<Harness {...{ onPalette: vi.fn(), onSettings: vi.fn(), onNewChat: vi.fn(), onNavigate: vi.fn(), onMaximize }} />);
+    await user.click(document.body);
+    await user.keyboard("{Control>}{Shift>}m{/Shift}{/Control}");
+    expect(onMaximize).not.toHaveBeenCalled();
+    await user.keyboard("{Control>}{Shift>}{Enter}{/Shift}{/Control}");
+    expect(onMaximize).toHaveBeenCalledOnce();
   });
 });

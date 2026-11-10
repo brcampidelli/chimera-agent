@@ -45,16 +45,35 @@ Reach = Literal["read_only", "workspace", "workspace_shell"]
 
 #: When the run stops and waits for a human.
 Approval = Literal["always", "suspicious", "never"]
+#: Whether a command on this machine runs when the project's grant allows commands ("granted"), or
+#: stops for the owner before each one ("asks"). A third axis would be a mechanism of its own; this is
+#: the existing host-exec confirm, exposed on the posture so a turn can ask for it. It only narrows.
+Commands = Literal["granted", "asks"]
 
 DEFAULT_REACH: Reach = "workspace"
 DEFAULT_APPROVAL: Approval = "suspicious"
+DEFAULT_COMMANDS: Commands = "granted"
 
 
 class Posture(BaseModel):
-    """The two axes, as a client sends them."""
+    """The two axes, as a client sends them, and the one question a mode needs beyond them."""
 
     reach: Reach = DEFAULT_REACH
     approval: Approval = DEFAULT_APPROVAL
+    commands: Commands = DEFAULT_COMMANDS
+
+
+def commands_run_without_asking(posture: Posture | None, allow_host_exec: bool) -> bool:
+    """Whether a host command runs with no confirm, given the turn's grant and its posture.
+
+    ``allow_host_exec`` is what the request asked for. ``commands="asks"`` overrides it: a turn
+    that stops before every command must not be ungated because its project granted commands, or
+    the mode that promised a question would quietly stop asking. Absent a posture, the request
+    decides exactly as it always has.
+    """
+    if posture is not None and posture.commands == "asks":
+        return False
+    return allow_host_exec
 
 
 @dataclass(frozen=True)
@@ -391,3 +410,136 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
         registry, ledger, narrow_on_taint=resolved.narrow_on_taint, audit=audit, approve=approve,
         rope_lite=get_settings().taint_rope_lite,
     ), ledger
+
+
+#: The permission modes a conversation can be in, as the Code screen names them. ``bypass`` is the
+#: owner's switch (``Ignore permissions``), read from the stored switch, never a mode a conversation
+#: stores or a bridge may choose.
+PermissionMode = Literal["manual", "accept_edits", "plan", "auto", "dont_ask", "bypass"]
+
+#: Every mode, in the order the selector lists them. Restrictiveness is NOT a rank over this list: a
+#: mode is not "above" another, it sets four things (reach, approval, commands, the plan gate), and
+#: ``Accept edits`` is narrower than ``Auto`` on two of them and WIDER on reach (it mounts the shell).
+#: What a paired device may choose is decided axis by axis in :func:`widens`.
+ALL_MODES: tuple[str, ...] = ("manual", "accept_edits", "plan", "auto", "dont_ask", "bypass")
+
+#: The modes a conversation may STORE. ``bypass`` is the owner's switch, never a stored mode.
+STORABLE_MODES: frozenset[str] = frozenset(ALL_MODES) - {"bypass"}
+
+_REACH_RANK: dict[str, int] = {"read_only": 0, "workspace": 1, "workspace_shell": 2}
+_APPROVAL_RANK: dict[str, int] = {"always": 0, "suspicious": 1, "never": 2}
+_COMMANDS_RANK: dict[str, int] = {"asks": 0, "granted": 1}
+
+
+class ModeTurn(BaseModel):
+    """What one permission mode means for a turn: the posture, and whether the plan gate is forced."""
+
+    posture: Posture
+    plan_gate: bool = False
+
+
+def mode_for_approval(approval: Approval) -> PermissionMode:
+    """The mode a conversation takes when nothing is stored, read from the owner's Settings approval.
+
+    ``always`` is Manual, ``suspicious`` is Auto and ``never`` is Don't ask: each Settings value keeps
+    the posture it always had, so nobody's configured behaviour moves when the selector appears.
+    """
+    if approval == "always":
+        return "manual"
+    if approval == "never":
+        return "dont_ask"
+    return "auto"
+
+
+def mode_turn(mode: PermissionMode, base_reach: Reach, base_approval: Approval) -> ModeTurn:
+    """The posture one turn runs under for ``mode``, over the configured reach and approval.
+
+    The same table the Code screen applies (``apps/desktop/src/lib/permission-modes.ts``), held to the
+    same fixture by ``tests/test_permission_modes_table.py``. A bridge turn is built here, on the
+    server, so the bridge cannot pick a posture the table does not give.
+    """
+    if mode == "manual":
+        return ModeTurn(posture=Posture(reach=base_reach, approval="always", commands="granted"))
+    if mode == "accept_edits":
+        reach: Reach = "read_only" if base_reach == "read_only" else "workspace_shell"
+        return ModeTurn(posture=Posture(reach=reach, approval="never", commands="asks"))
+    if mode == "plan":
+        return ModeTurn(
+            posture=Posture(reach=base_reach, approval=min(base_approval, "suspicious", key=_APPROVAL_RANK.__getitem__), commands="granted"),
+            plan_gate=True,
+        )
+    if mode == "auto":
+        return ModeTurn(posture=Posture(reach=base_reach, approval="suspicious", commands="granted"))
+    if mode == "dont_ask":
+        return ModeTurn(posture=Posture(reach=base_reach, approval="never", commands="granted"))
+    return ModeTurn(posture=Posture(reach=base_reach, approval=base_approval, commands="granted"))
+
+
+def narrow_posture(a: Posture, b: Posture) -> Posture:
+    """The posture that is the more restrictive of the two on every axis, axis by axis.
+
+    Reach: the lower; approval: the one that stops sooner; commands: ``asks`` wins. Never wider than
+    either argument, so a posture a device sent can only take something away from the mode's.
+    """
+    return Posture(
+        reach=min(a.reach, b.reach, key=_REACH_RANK.__getitem__),
+        approval=min(a.approval, b.approval, key=_APPROVAL_RANK.__getitem__),
+        commands=min(a.commands, b.commands, key=_COMMANDS_RANK.__getitem__),
+    )
+
+
+def widens(candidate: ModeTurn, reference: ModeTurn) -> bool:
+    """Whether ``candidate`` lets the agent do more than ``reference`` on ANY axis.
+
+    Four axes: reach, approval, commands and the plan gate (a gate the reference forces and the
+    candidate drops is wider). One axis wider is enough: a mode is not wider because it is narrower
+    somewhere else.
+    """
+    c, r = candidate.posture, reference.posture
+    return (
+        _REACH_RANK[c.reach] > _REACH_RANK[r.reach]
+        or _APPROVAL_RANK[c.approval] > _APPROVAL_RANK[r.approval]
+        or _COMMANDS_RANK[c.commands] > _COMMANDS_RANK[r.commands]
+        or (reference.plan_gate and not candidate.plan_gate)
+    )
+
+
+def bridge_mode(
+    requested: str | None,
+    current: PermissionMode,
+    base_reach: Reach = DEFAULT_REACH,
+    base_approval: Approval = DEFAULT_APPROVAL,
+) -> PermissionMode:
+    """The mode a bridge turn runs under, given what it asked for and the conversation's current mode.
+
+    The bridge gets what it asked for only when that mode widens nothing against the current one, on
+    any of the four axes (:func:`widens`). Anything wider, anything unknown, ``bypass`` and no request
+    at all leave the current mode in force: a paired device can narrow a conversation, never widen it.
+    """
+    if requested is None or requested == "bypass" or requested not in STORABLE_MODES:
+        return current
+    asked = cast("PermissionMode", requested)
+    if widens(mode_turn(asked, base_reach, base_approval), mode_turn(current, base_reach, base_approval)):
+        return current
+    return asked
+
+
+def bridge_turn(
+    requested: str | None,
+    current: PermissionMode,
+    base_reach: Reach,
+    base_approval: Approval,
+    sent: Posture | None = None,
+) -> tuple[PermissionMode, ModeTurn]:
+    """The mode and posture a paired device's turn runs under.
+
+    :func:`bridge_mode` picks the mode; :func:`mode_turn` gives its posture over the CONFIGURED reach
+    and approval (never the device's); and a posture the device sent narrows it further, axis by axis
+    (:func:`narrow_posture`). What the device sent can take away, never add: the old replacement of the
+    sent posture by the mode's could widen a ``{always, asks}`` into ``{suspicious, granted}``.
+    """
+    chosen = bridge_mode(requested, current, base_reach, base_approval)
+    turn = mode_turn(chosen, base_reach, base_approval)
+    if sent is not None:
+        turn = ModeTurn(posture=narrow_posture(turn.posture, sent), plan_gate=turn.plan_gate)
+    return chosen, turn

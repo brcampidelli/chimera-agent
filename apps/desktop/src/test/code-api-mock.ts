@@ -38,6 +38,8 @@ class MockApiError extends Error {
 export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
+    // A pick in the selector is written to the conversation (Code.tsx); the mock keeps it in memory.
+    setCodeSessionPermissionMode: vi.fn(async (id: string, mode: string) => ({ id, permission_mode: mode })),
     // Browser screen pairing (`BrowserScreenPairing.tsx`, `BrowserScreenPrompt.tsx`): nothing paired and
     // no code in flight by default, so a Code suite never reaches a pairing route.
     mintBrowserScreenCode: vi.fn(async () => ({ code: "ABCD-EFGH", expires_at: 0, seconds: 300 })),

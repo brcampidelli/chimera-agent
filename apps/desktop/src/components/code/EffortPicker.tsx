@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -56,13 +57,24 @@ export function EffortPicker({
   value,
   onChange,
   disabled,
+  focusRequest,
+  onFocusRequestHandled,
 }: {
   /** The conversation's model slug, with or without a variant. */
   value: string;
   onChange: (slug: string) => void;
   disabled?: boolean;
+  /** True while the ⌘⇧E shortcut asks for focus in the group. Taken once, drawn or not. */
+  focusRequest?: boolean;
+  onFocusRequestHandled?: () => void;
 }) {
   const t = useT();
+  const group = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusRequest) return;
+    group.current?.querySelector<HTMLButtonElement>("button[aria-pressed='true']")?.focus();
+    onFocusRequestHandled?.();
+  }, [focusRequest, onFocusRequestHandled]);
   // The cache the model dialog fills; never fetched from here (`enabled: false`), like the picker's.
   const listing = useQuery({ queryKey: ["models", ""], queryFn: () => getModels(), enabled: false });
   const [base, effort] = splitEffort(value);
@@ -72,7 +84,7 @@ export function EffortPicker({
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-xs uppercase tracking-wider text-muted-foreground">{t("code.effort.label")}</span>
       <Tooltip label={t("code.effort.hint")} side="top">
-        <div className="flex overflow-hidden rounded-chip border border-border" role="group" aria-label={t("code.effort.label")}>
+        <div ref={group} className="flex overflow-hidden rounded-chip border border-border" role="group" aria-label={t("code.effort.label")}>
           {EFFORTS.map((option) => (
             <button
               key={option || "default"}
