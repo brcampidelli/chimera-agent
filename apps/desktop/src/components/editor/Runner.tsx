@@ -9,11 +9,13 @@ import { useT } from "@/lib/i18n";
 /**
  * The command runner, next to the file you are editing.
  *
- * **It is not a terminal, and it says so.** There is no PTY: each command is a fresh subprocess, so
- * `cd` and `export` do not persist, nothing interactive works, and a program that asks a question
- * gets EOF. That is a real limitation and the panel states it rather than letting people find out by
- * losing an hour to a prompt they cannot answer. The alternative — a real PTY — was cut from the
- * plan on purpose; half a terminal that looks like a whole one is worse than an honest runner.
+ * **It is not a terminal, and it says so.** Each command is a fresh subprocess, so `cd` and `export`
+ * do not persist, nothing interactive works, and a program that asks a question gets EOF. That is a
+ * real limitation and the panel states it rather than letting people find out by losing an hour to a
+ * prompt they cannot answer. Half a terminal that looks like a whole one is worse than an honest
+ * runner — which is why the REAL terminal (a PTY, with tabs, resize and interactive programs) is a
+ * separate thing: `components/code/TerminalPanel.tsx` on the Code screen, backed by
+ * `chimera/api/pty_terminal.py`. This runner stays for one-off, stoppable commands next to the editor.
  *
  * **Stop actually stops.** It asks the server to kill the process tree, not just the shell we hold:
  * a command is usually a launcher, and killing the launcher leaves the port busy while the panel

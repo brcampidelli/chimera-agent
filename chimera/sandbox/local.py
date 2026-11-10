@@ -17,15 +17,20 @@ from pathlib import Path
 # os.environ). Defined in `chimera.core.redact`, which is the module the meaning belongs to, and
 # imported here because this file has always been where it was read. It used to be the other way
 # round, which made the redaction module drag in this whole subsystem.
-from chimera.core.redact import _SECRET_MARKERS
+from chimera.core.redact import scrubbed_environ
 from chimera.proc.decode import console_text
 from chimera.proc.stdio import kill_tree, no_window
 from chimera.sandbox.base import SandboxResult
 
 
 def _child_env() -> dict[str, str]:
-    """os.environ minus anything that looks like a secret, plus the non-interactive overrides."""
-    env = {k: v for k, v in os.environ.items() if not any(m in k.upper() for m in _SECRET_MARKERS)}
+    """os.environ minus anything that looks like a secret, plus the non-interactive overrides.
+
+    The filter is `chimera.core.redact.scrubbed_environ`, shared with the owner's terminal: by name
+    (markers, `_KEY`/`_KEYS`/`_TOKEN`/... endings, `AWS_ACCESS_KEY_ID`), by value (a URL carrying a
+    password), and the whole `CHIMERA_` namespace but `CHIMERA_HOME`.
+    """
+    env = scrubbed_environ()
     env.update(_NONINTERACTIVE_ENV)
     return env
 

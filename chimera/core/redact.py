@@ -46,7 +46,7 @@ from __future__ import annotations
 import base64
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import lru_cache
 from urllib.parse import unquote_to_bytes
 
@@ -61,6 +61,56 @@ from urllib.parse import unquote_to_bytes
 #: deliberately not installed, and died on `No module named 'rich'` before scanning a single byte.
 #: Keep this module importable with the standard library alone.
 _SECRET_MARKERS = ("API_KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL", "PRIVATE_KEY", "PAIRING")
+
+#: Name endings that say "this holds a secret": `CHIMERA_OPENROUTER_KEYS` (a pool of keys),
+#: `STRIPE_KEY`, `DEPLOY_TOKEN`. `API_KEY` alone, the old rule, missed every one of them.
+_SECRET_SUFFIXES = (
+    "_KEY", "_KEYS", "_TOKEN", "_TOKENS", "_SECRET", "_SECRETS", "_PASSWORD", "_PASSWD",
+)
+#: Name fragments that mark a credential wherever they sit: `AWS_ACCESS_KEY_ID` ends in `_ID`, so no
+#: suffix catches it, and the id half of a pair is half of a login.
+_SECRET_FRAGMENTS = ("ACCESS_KEY", "SECRET_ACCESS")
+
+#: A URL with a user AND a password in it — `postgres://app:hunter2@host/db`. The credential is in the
+#: VALUE, so `DATABASE_URL`, `REDIS_URL` and whatever the next service calls it are all caught by what
+#: they hold and not by a list of names.
+_URL_WITH_PASSWORD = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*://[^/\s:@]*:[^/\s@]+@")
+
+#: `CHIMERA_*` variables that hold a secret WITHOUT saying so in their name. Every other secret in
+#: that namespace already ends in `_KEY(S)`, `_TOKEN`, `_SECRET(S)` or `_PASSWORD`
+#: (`CHIMERA_OPENROUTER_KEYS`, `CHIMERA_SERVER_TOKEN`, `CHIMERA_SCREEN_TOKEN`, `CHIMERA_SMTP_PASSWORD`,
+#: `CHIMERA_GITHUB_WEBHOOK_SECRETS`). `CHIMERA_ENDPOINTS` is a JSON list of named endpoints that may
+#: carry an API key inside it. The namespace as a whole is NOT dropped: a child shell is entitled to the
+#: app's ordinary configuration (`CHIMERA_HOME`, a workspace marker), which is a contract the
+#: sandbox and job tests hold ("the filter removes secrets, not the environment").
+_CHIMERA_SECRET_NAMES = frozenset({"CHIMERA_ENDPOINTS"})
+
+
+def is_secret_env(name: str, value: str = "") -> bool:
+    """Whether an environment variable must not reach a shell the agent or the owner types into.
+
+    By NAME (the old markers, the suffixes and fragments above, and the few secrets in the `CHIMERA_`
+    namespace that do not say so) and by VALUE, for a URL that carries a password.
+    """
+    upper = name.upper()
+    if upper in _CHIMERA_SECRET_NAMES:
+        return True
+    if any(marker in upper for marker in _SECRET_MARKERS) or any(f in upper for f in _SECRET_FRAGMENTS):
+        return True
+    if upper.endswith(_SECRET_SUFFIXES):
+        return True
+    if upper.endswith("_PROXY"):
+        # `HTTP_PROXY=http://user:pass@proxy:3128` is how git, pip, npm and gh get through an
+        # authenticated proxy; dropping it breaks them there. By name only, and only the proxy
+        # family (`NO_PROXY` and the lower-case spellings included, hence the upper-casing above).
+        return False
+    return bool(value) and _URL_WITH_PASSWORD.match(value) is not None
+
+
+def scrubbed_environ(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """``os.environ`` without anything :func:`is_secret_env` names. One function for every child shell."""
+    source = os.environ if environ is None else environ
+    return {k: v for k, v in source.items() if not is_secret_env(k, v)}
 
 MASK = "[redacted]"
 
