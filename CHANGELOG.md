@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Conversations archive themselves when their pull request is merged or closed (on by default).** A background sweep, at most once a minute, archives a conversation whose recorded pull request changes to merged or closed, and stores why; it never archives one with a turn running, a question or approval waiting, background work or a share link, it does not re-archive a conversation you brought back for the same pull request, and it deletes nothing. A GitHub login or network failure pauses the sweep for ten minutes; a problem with one pull request only skips that conversation. Turn it off in Settings › General › Autonomy. (#1205)
+
 ## [0.85.0] - 2026-11-04
 ### Fixed
 
