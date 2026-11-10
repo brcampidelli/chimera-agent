@@ -80,6 +80,14 @@ class _World:
         self.sandbox = _IsolatedSandbox()
 
 
+@pytest.fixture(autouse=True)
+def _declared_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pinned off: these tests call tools by name on the registry, and built-in tools are on demand by
+    # default since 2026-11-10. A deferred tool is not in the registry under its own name; its governance
+    # through `tool_call` is tested in test_a_deferred_tool_is_still_governed.
+    monkeypatch.setenv("CHIMERA_DEFER_TOOLS", "0")
+
+
 def _install(monkeypatch: pytest.MonkeyPatch, world: _World) -> None:
     import chimera.governance.pending as pending
     import chimera.sandbox as sandbox_mod

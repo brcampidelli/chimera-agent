@@ -1,5 +1,5 @@
 ---
-source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
+source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
 ---
 
 # Sicurezza & salvaguardie
@@ -349,6 +349,8 @@ proprietario del 2026-10-18, **Controllo completo tramite il ponte**, in Imposta
   repository), e su `/v1/chat/completions` solo finché `CHIMERA_SERVER_TOKEN` è impostato. Un modulo,
   `chimera/governance/surfaces.py`, decide che tipo di superficie è un nome, in base alla sua famiglia
   (`platform:discord` è un bot); un test fallisce se un modulo torna a scrivere la propria lista.
+
+**Il ciclo di chiusura fa push da solo.** Quando la verifica di un turno di codice passa e il suo controllo del diff è pulito, Chimera fa commit delle modifiche del turno sul branch dello spazio di lavoro e invia quel branch a `origin` per aprire una pull request. Non invia mai al branch predefinito e non forza mai un push. Esegue il merge solo se il proprietario ha attivato `CHIMERA_CLOSE_LOOP_MERGE`, e in quel caso mai una pull request che tocchi fatturazione, una migrazione distruttiva, RLS, un grant o un segreto. La avvia solo la schermata del proprietario; il bridge, i canali e il lavoro in background no.
 
 ## Limiti onesti
 

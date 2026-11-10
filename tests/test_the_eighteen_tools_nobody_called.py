@@ -20,9 +20,13 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from chimera.tools.base import Tool
 from chimera.tools.defer import CORE, defer_builtins, describe_saving
 from chimera.tools.registry import ToolRegistry
+
+pytestmark = pytest.mark.product_default  # these are about deferral, which is on by default
 
 
 class _Falsa(Tool):
@@ -51,14 +55,16 @@ def _registro(*nomes: str) -> ToolRegistry:
 
 
 def test_the_core_stays_declared_and_the_rest_does_not() -> None:
+    # `render_chart` is TURN_BOUND (it needs its canvas sink), so it stays declared with the core.
     reg = _registro("read_file", "write_file", "scrape", "crawl", "render_chart")
 
     enxuto, n = defer_builtins(reg)
 
-    assert n == 3
+    assert n == 2
     assert set(enxuto.names()) == {
         "read_file",
         "write_file",
+        "render_chart",
         "tool_list",
         "tool_describe",
         "tool_call",
@@ -213,7 +219,7 @@ def test_the_real_registry_keeps_every_core_tool() -> None:
 # ------------------------------------------------------------------ that the switch reaches the app
 
 
-def test_the_setting_changes_what_a_real_request_gets(tmp_path: Any) -> None:
+def test_the_setting_changes_what_a_real_request_gets(tmp_path: Any, monkeypatch: Any) -> None:
     """Through `assemble_registry`, the function a coding turn actually calls.
 
     Every test above builds a registry by hand. A flag read nowhere on the request path is the
@@ -234,8 +240,11 @@ def test_the_setting_changes_what_a_real_request_gets(tmp_path: Any) -> None:
         )
         return registry
 
-    declarado = monta()
+    # The default is on since 2026-11-10; the declared arm pins it off so the comparison is two arms.
+    # This test's subject is the default, so the environment's pin (conftest) is removed for it.
+    declarado = monta(CHIMERA_DEFER_TOOLS="0")
     deferido = monta(CHIMERA_DEFER_TOOLS="1")
+    assert "tool_list" in monta(), "and the default is the deferred arm"
 
     assert "scrape" in declarado and "tool_list" not in declarado
     assert "tool_list" in deferido and "scrape" not in deferido
@@ -246,7 +255,7 @@ def test_the_setting_changes_what_a_real_request_gets(tmp_path: Any) -> None:
     )
 
 
-def test_the_cli_path_defers_too(tmp_path: Any) -> None:
+def test_the_cli_path_defers_too(tmp_path: Any, monkeypatch: Any) -> None:
     """`solve` and `run` route their tool governance through `_apply_tool_allowlist`, not through
     the API's `assemble_registry`.
 
@@ -269,8 +278,9 @@ def test_the_cli_path_defers_too(tmp_path: Any) -> None:
             settings=Settings(CHIMERA_HOME=str(tmp_path / "home"), **over),
         )
 
-    assert "tool_list" not in monta()
+    assert "tool_list" not in monta(CHIMERA_DEFER_TOOLS="0")
     assert "tool_list" in monta(CHIMERA_DEFER_TOOLS="1")
+    assert "tool_list" in monta(), "the default is on since 2026-11-10"
 
 
 def test_deferral_still_obeys_a_cli_denylist(tmp_path: Any) -> None:
@@ -296,3 +306,106 @@ def test_deferral_still_obeys_a_cli_denylist(tmp_path: Any) -> None:
     assert "scrape" not in registry
     assert "scrape" not in registry.get("tool_list").run()
     assert "no tool named" in registry.get("tool_call").run(tool="scrape", arguments={})
+
+
+def test_a_policy_change_after_deferral_still_denies_the_proxy(tmp_path: Any, monkeypatch: Any) -> None:
+    """The owner edits `policy.json` with a conversation already open: the catalogue was built before,
+    so the proxy has to ask again at call time, as `ToolRegistry.run` does for a declared tool."""
+    import json
+
+    from chimera.config import get_settings
+
+    reg = _registro("read_file", "scrape")
+    alvo = reg.get("scrape")
+    enxuto, _ = defer_builtins(reg)
+    assert "scrape" in enxuto.get("tool_list").run()  # permitted when deferred
+
+    home = tmp_path / "home"
+    monkeypatch.setenv("CHIMERA_HOME", str(home))
+    get_settings.cache_clear()
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "policy.json").write_text(
+        json.dumps({"rules": [{"action": "tool.use", "resource": "scrape", "effect": "deny"}]}),
+        encoding="utf-8",
+    )
+    try:
+        saida = enxuto.get("tool_call").run(tool="scrape", arguments={})
+        assert alvo.executada is False, "the proxy ran a tool the policy now denies"  # type: ignore[attr-defined]
+        assert "denied" in saida or "no tool named" in saida
+        assert "scrape" not in enxuto.get("tool_list").run()
+        assert "no tool named" in enxuto.get("tool_describe").run(tool="scrape")
+    finally:
+        get_settings.cache_clear()
+
+
+def test_the_proxy_runs_through_the_registry_door() -> None:
+    """One execution path: an argument the schema does not declare is refused by the shared door."""
+    class _Tipada(_Falsa):
+        parameters: dict[str, Any] = {"type": "object", "properties": {"url": {"type": "string"}}}
+
+    reg = ToolRegistry()
+    reg.register(_Falsa("read_file"))
+    alvo = _Tipada("scrape")
+    reg.register(alvo)
+    enxuto, _ = defer_builtins(reg)
+
+    saida = enxuto.get("tool_call").run(tool="scrape", arguments={"nope": 1})
+
+    assert alvo.executada is False  # type: ignore[attr-defined]
+    assert "nope" in saida
+
+
+def test_a_turn_ledger_judges_the_target_behind_the_proxy() -> None:
+    """`tool_call(todo_write)` is not a fetch and must not taint the turn; `tool_call(web_search)` is."""
+    from chimera.governance import TaintLedger, ledger_registry
+
+    class _Web(_Falsa):
+        untrusted_output = True
+
+    reg = ToolRegistry()
+    reg.register(_Falsa("read_file"))
+    reg.register(_Falsa("todo_write"))
+    reg.register(_Web("web_search"))
+    enxuto, _ = defer_builtins(reg)
+
+    def turno(alvo: str) -> bool:
+        ledger = TaintLedger()
+        guarded = ledger_registry(enxuto, ledger, approve=lambda *_a, **_k: True)
+        guarded.run("tool_call", tool=alvo, arguments={})
+        return ledger.taint_epoch > 0
+
+    assert turno("todo_write") is False
+    assert turno("web_search") is True
+
+
+def test_a_chat_turn_with_the_real_default_hides_and_refuses(tmp_path: Any) -> None:
+    """The chat surface as `serve.py` builds it: default settings (deferral on), the guard's denials
+    handed to the deferral, then `guard_chat_registry`."""
+    from chimera.api.posture import chat_guard_denials, guard_chat_registry
+    from chimera.config import Settings
+    from chimera.tools import default_registry
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    assert settings.defer_tools is True
+    for negada in chat_guard_denials():
+        registro, _ = defer_builtins(default_registry(tmp_path), denied=frozenset(chat_guard_denials()))
+        guarded, _ledger = guard_chat_registry(registro)  # a fresh ledger per call: no taint carries over
+        assert "tool_call" in guarded
+        assert negada not in guarded.names()
+        assert "no tool named" in guarded.run("tool_call", tool=negada, arguments={})
+
+
+def test_a_pack_that_denies_a_tool_is_refused_through_assemble_registry(tmp_path: Any) -> None:
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.config import Settings
+
+    class _Gateway:
+        def complete(self, *_a: Any, **_kw: Any) -> Any:  # pragma: no cover
+            raise AssertionError("no model call belongs in this test")
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_TOOL_DENYLIST="scrape")
+    registry, _ = assemble_registry(CodeSeams(), tmp_path, settings, _Gateway(), steps=4, surface="test")
+
+    assert "tool_call" in registry
+    assert "scrape" not in registry.declared_names()
+    assert "no tool named" in registry.run("tool_call", tool="scrape", arguments={"url": "http://x"})

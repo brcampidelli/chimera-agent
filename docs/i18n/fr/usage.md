@@ -1,5 +1,5 @@
 ---
-source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
+source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
 ---
 
 # Chimera — Guide d'utilisation
@@ -500,21 +500,16 @@ Do / Avoid / Check / Risk (plus des mots-clés de recherche) — à la fois à p
 worker, si bien que l'agent réutilise ce qui a fonctionné et évite les modes d'échec connus.
 Cela referme la boucle — auparavant, les skills apprises étaient stockées et jamais relues.
 
-Désactivé par défaut : injecter des cartes ajoute des tokens de prompt, et les économies de
-*tokens* de TRS viennent du raccourcissement des longues traces de raisonnement, donc sur des
-tâches à réponse courte le bénéfice porte sur la précision, pas sur le coût. Ce n'est pas
-hypothétique — sur la suite `hard` à réponses courtes (deepseek-v3.1 payant),
-`skillcard-bench` a mesuré des cartes coûtant **+290 % de tokens** et **−8 pp de précision**
-par rapport à l'absence de cartes : avec un modèle proche du plafond et aucune longue trace à
-raccourcir, des cartes génériques sont une pure surcharge qui peut distraire. Activez les
-cartes pour des charges de travail à **raisonnement long** (maths/code avec des traces
-longues) où l'équation de tokens s'inverse, et mesurez toujours votre propre compromis
-d'abord avec une vérification à vérité terrain :
+Désactivé par défaut, par décision du propriétaire du 10/11/2026 après la mesure révisée : la
+configuration livrée coûte +37 à +48 % de tokens (deux passages), et la précision a varié de +16,7
+pts puis de −8,3 pts entre des passages identiques de 12 tâches : aucun gain n'est démontré. Les
+cartes ajoutent des tokens au prompt ; si ce compromis vaut le coup pour vous, mesurez-le avec une
+vérification de vérité terrain et activez la lecture avec `CHIMERA_SKILL_CARDS=on` :
 
 ```bash
 uv run chimera skillcard-bench --tasks hard          # demo cards vs no cards
 uv run chimera skillcard-bench --use-store --tasks hard   # bench your own learned cards
-export CHIMERA_SKILL_CARDS=on CHIMERA_SKILL_CARDS_K=3      # enable, once it earns its place
+export CHIMERA_SKILL_CARDS=on       # active la lecture, quand le compromis vaut le coup
 ```
 
 Le bench rapporte la précision avec vs sans cartes, le delta de tokens, le taux de succès des

@@ -1,5 +1,5 @@
 ---
-source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
+source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
 ---
 
 # Segurança & salvaguardas
@@ -322,6 +322,8 @@ A ponte do desktop (`chimera mcp desktop`) tem três chaves, cada uma sem efeito
   `/v1/chat/completions` só enquanto `CHIMERA_SERVER_TOKEN` estiver definido. Um módulo,
   `chimera/governance/surfaces.py`, decide que tipo de superfície um nome é, pela família
   (`platform:discord` é um bot); um teste falha se um módulo voltar a escrever sua própria lista.
+
+**O ciclo de fechamento faz push sozinho.** Quando a verificação de um turno de código passa e a checagem do diff está limpa, o Chimera faz commit das alterações do turno no branch do workspace e envia esse branch para o `origin` para abrir um pull request. Nunca envia para o branch padrão e nunca força um push. Só faz merge se o dono tiver ligado `CHIMERA_CLOSE_LOOP_MERGE`, e então nunca um pull request que mexa em cobrança, migração destrutiva, RLS, grant ou segredo. Só a tela do dono inicia o ciclo; a ponte, os canais e o trabalho em segundo plano não.
 
 ## Limites honestos
 

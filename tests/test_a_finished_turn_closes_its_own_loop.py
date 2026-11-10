@@ -208,13 +208,17 @@ def repos(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _wiring(
-    fake: FakeGh, *, enabled: bool = True, amend: Callable[[str, str, dict[str, Any]], int] | None = None,
+    fake: FakeGh, *, enabled: bool = True, merge: bool = False,
+    amend: Callable[[str, str, dict[str, Any]], int] | None = None,
     enqueue: Callable[[str, str, dict[str, Any]], bool] | None = None,
 ) -> Any:
     from chimera.api.code_close_loop import CloseLoopWiring
 
+    # `merge` is pinned explicitly: the merge switch is off by default, and a test that is not about
+    # merging must not depend on that default either way.
     return CloseLoopWiring(
         enabled=lambda: enabled,
+        merge_enabled=lambda: merge,
         amend=amend or (lambda session, turn, payload: 0),
         enqueue=enqueue or (lambda session, client, payload: True),
         locked=lambda session: threading.Lock(),
@@ -224,7 +228,11 @@ def _wiring(
     )
 
 
-def _hooks(fake: FakeGh, clock: Clock, *, fix: bool = True) -> tuple[Hooks, list[tuple[str, int]], list[CloseLoop]]:
+def _hooks(
+    fake: FakeGh, clock: Clock, *, fix: bool = True, merge: bool = True,
+) -> tuple[Hooks, list[tuple[str, int]], list[CloseLoop]]:
+    """`merge` defaults to ON here because most of these tests are about what a merge does or refuses.
+    The default that matters (merging OFF) is pinned by its own test."""
     asks: list[tuple[str, int]] = []
     reports: list[CloseLoop] = []
 
@@ -235,6 +243,7 @@ def _hooks(fake: FakeGh, clock: Clock, *, fix: bool = True) -> tuple[Hooks, list
     hooks = Hooks(
         gh=fake.command(), sleep=clock.sleep, clock=clock.clock, ask_fix=ask,
         report=lambda state: reports.append(CloseLoop.from_payload(state.to_payload())),
+        merge_allowed=lambda: merge,
     )
     return hooks, asks, reports
 
@@ -260,6 +269,20 @@ def test_the_setting_decides_by_default_and_a_request_can_only_narrow_it_or_be_w
     assert turn_may_close(True, False, True) is False  # a request may always narrow
     assert turn_may_close(False, True, False) is False  # a bridge's `true` is ignored
     assert turn_may_close(False, True, True) is True  # the owner's own screen may widen
+
+
+def test_the_owners_defaults_are_the_loop_on_and_the_merge_off() -> None:
+    """Owner's decision, 2026-11-10: the loop opens its pull request by default; the merge stays off.
+
+    The loop used to be off by default too. The change is the owner's, so the new default is what is
+    asserted here, and the merge switch has a separate default of its own.
+    """
+    from chimera.config import Settings
+
+    settings = Settings(_env_file=None, CHIMERA_HOME="/nonexistent")  # type: ignore[call-arg]
+    assert settings.code_close_loop is True
+    assert settings.close_loop_merge is False
+    assert core.Hooks().merge_allowed() is False
 
 
 # --- the gates ---------------------------------------------------------------------------------------
@@ -591,7 +614,7 @@ def test_a_green_pr_that_touches_an_exception_is_never_merged_and_the_reason_is_
     head = _commit_widget(ws)
     diff, reason_word = EXCEPTIONS[name]
     fake = FakeGh(tmp_path, pr_diff=diff)
-    hooks, _asks, _reports = _hooks(fake, Clock())
+    hooks, _asks, _reports = _hooks(fake, Clock(), merge=True)
     state = _pr_state(head)
 
     follow_ci(ws, state, hooks, head=head, gh=fake.command())
@@ -603,13 +626,27 @@ def test_a_green_pr_that_touches_an_exception_is_never_merged_and_the_reason_is_
     assert ("pr", "merge") not in fake.verbs()
 
 
+def test_a_green_pr_is_left_open_while_merging_is_off(repos: tuple[Path, Path], tmp_path: Path) -> None:
+    ws, _origin = repos
+    head = _commit_widget(ws)
+    fake = FakeGh(tmp_path, pr_diff=CLEAN_DIFF)
+    hooks, _asks, _reports = _hooks(fake, Clock(), merge=False)
+    state = _pr_state(head)
+
+    follow_ci(ws, state, hooks, head=head, gh=fake.command())
+
+    assert state.ci == "passed" and state.merged is False
+    assert "merging is off" in state.merge_blocked_reason
+    assert ("pr", "merge") not in fake.verbs()
+
+
 def test_a_green_pr_with_an_ordinary_diff_is_merged_pinned_to_the_head_it_watched(
     repos: tuple[Path, Path], tmp_path: Path,
 ) -> None:
     ws, _origin = repos
     head = _commit_widget(ws)
     fake = FakeGh(tmp_path, pr_diff=CLEAN_DIFF)
-    hooks, _asks, _reports = _hooks(fake, Clock())
+    hooks, _asks, _reports = _hooks(fake, Clock(), merge=True)
     state = _pr_state(head)
 
     follow_ci(ws, state, hooks, head=head, gh=fake.command())
@@ -623,7 +660,7 @@ def test_an_unreadable_diff_is_never_merged(repos: tuple[Path, Path], tmp_path: 
     ws, _origin = repos
     head = _commit_widget(ws)
     fake = FakeGh(tmp_path, pr_diff_fails=True)
-    hooks, _asks, _reports = _hooks(fake, Clock())
+    hooks, _asks, _reports = _hooks(fake, Clock(), merge=True)
     state = _pr_state(head)
 
     follow_ci(ws, state, hooks, head=head, gh=fake.command())
@@ -728,7 +765,7 @@ class _Passing:
 def _turn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ws: Path, agent: _EditingAgent, *,
     message: str, setting: bool, verify: str | None, body: dict[str, Any] | None = None,
-    fake: FakeGh | None = None, screen: bool = True,
+    fake: FakeGh | None = None, screen: bool = True, merge: bool = False,
 ) -> tuple[Any, dict[str, Any], str]:
     pytest.importorskip("fastapi")
     pytest.importorskip("sse_starlette")
@@ -755,7 +792,7 @@ def _turn(
             raise AssertionError("the turn must run on the agent the test built")
 
     settings = Settings(_env_file=None, CHIMERA_HOME=str(tmp_path / "home"),  # type: ignore[call-arg]
-                        CHIMERA_CODE_CLOSE_LOOP=setting)
+                        CHIMERA_CODE_CLOSE_LOOP=setting, CHIMERA_CLOSE_LOOP_MERGE=merge)
     app = build_api_app(lambda: ChatSession(_Idle()), workspace=ws, settings=settings)
     client = TestClient(app)
     # The owner's screen sends its per-launch credential. Only a turn that carries it is the owner's
@@ -873,6 +910,7 @@ def test_a_verified_clean_turn_commits_opens_the_pr_and_merges_once_ci_is_green(
 
     client, done, session_id = _turn(
         tmp_path, monkeypatch, ws, agent, message=WIDGET_REQUEST, setting=True, verify="python -c pass", fake=fake,
+        merge=True,
     )
     _join_watches()
 
@@ -909,7 +947,8 @@ def test_a_secret_in_the_staged_diff_refuses_the_commit_and_pushes_nothing(
     assert _commits(ws) == before
     assert _git(ws, "diff", "--cached", "--name-only") == ""  # unstaged again
     assert _remote_head(origin, "feat/turn") == ""
-    assert fake.verbs() == []
+    # Readiness is read BEFORE the commit now (`pr view`), which changes nothing; what must not happen is a write.
+    assert [v for v in fake.verbs() if v != ("pr", "view")] == []
 
 
 def test_a_billing_change_commits_and_opens_the_pr_but_its_merge_is_blocked(
@@ -928,7 +967,7 @@ def test_a_billing_change_commits_and_opens_the_pr_but_its_merge_is_blocked(
     assert state.committed is True and state.pr_url == PR_URL
     assert "touches billing" in state.merge_blocked_reason
     assert _remote_head(origin, "feat/turn") == state.commit
-    hooks, _asks, _reports = _hooks(fake, Clock())
+    hooks, _asks, _reports = _hooks(fake, Clock(), merge=True)
     state.ci = "pending"
     follow_ci(ws, state, hooks, head=state.commit, gh=fake.command())
     assert state.ci == "passed" and state.merged is False

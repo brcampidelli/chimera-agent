@@ -1,5 +1,5 @@
 ---
-source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
+source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -356,6 +356,8 @@ Die Desktop-Brücke (`chimera mcp desktop`) hat drei Schalter, jeder ohne den vo
   Modul, `chimera/governance/surfaces.py`, entscheidet, welche Art Oberfläche ein Name ist, nach
   seiner Familie (`platform:discord` ist ein Bot); ein Test schlägt fehl, wenn ein Modul wieder seine
   eigene Liste schreibt.
+
+**Der Abschlusszyklus pusht selbstständig.** Wenn die Prüfung eines Code-Turns besteht und seine Diff-Prüfung sauber ist, committet Chimera die Änderungen des Turns auf den Branch des Arbeitsbereichs und pusht diesen Branch nach `origin`, um einen Pull Request zu öffnen. Er pusht nie auf den Standard-Branch und erzwingt nie einen Push. Gemergt wird nur, wenn der Eigentümer `CHIMERA_CLOSE_LOOP_MERGE` eingeschaltet hat, und dann nie ein Pull Request, der Abrechnung, eine destruktive Migration, Row-Level-Security, einen Grant oder ein Geheimnis betrifft. Gestartet wird er nur vom Bildschirm des Eigentümers; Bridge, Kanäle und Hintergrundarbeit nicht.
 
 ## Ehrliche Grenzen
 

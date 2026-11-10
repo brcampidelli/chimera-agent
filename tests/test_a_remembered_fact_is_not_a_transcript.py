@@ -118,19 +118,24 @@ def test_an_answer_that_is_only_whitespace_leaves_the_task_alone() -> None:
 # --- and the other half of the same screen --------------------------------------------------------
 
 
-def test_the_skills_endpoint_says_whether_anything_reads_the_cards(tmp_path: Any) -> None:
+def test_the_skills_endpoint_says_whether_anything_reads_the_cards(
+    tmp_path: Any, monkeypatch: Any
+) -> None:
     """A count of zero means two different things, and the screen was showing the count alone.
 
     Measured: fourteen cards, all marked ACTIVE, all reading `0 uses`. The available reading is
-    that the agent tried them and they were useless; the truth is that retrieval is off by default,
-    so nothing consulted them. The flag has to travel with the count or the count misleads.
+    that the agent tried them and they were useless; the truth was that retrieval was off, so nothing
+    consulted them. The flag has to travel with the count or the count misleads. The setting is pinned
+    off here on purpose: the default is on since the owner's decision of 2026-11-10, and this test is
+    about what the endpoint says when reading is off, not about the default.
     """
     from tests.test_api import _client  # noqa: PLC0415
 
+    monkeypatch.setenv("CHIMERA_SKILL_CARDS", "0")
     body = _client(tmp_path).get("/api/skills").json()
 
     assert "cards_read" in body, "the screen cannot explain why every count is zero"
-    assert body["cards_read"] is False, "CHIMERA_SKILL_CARDS is off by default and this must say so"
+    assert body["cards_read"] is False, "CHIMERA_SKILL_CARDS=0 must read as not reading the cards"
 
 
 def test_the_flag_follows_the_setting_rather_than_being_hardcoded(tmp_path: Any) -> None:

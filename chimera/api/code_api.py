@@ -2331,8 +2331,8 @@ class CodeTurnRequest(CodeSeams):
     turn may do."""
 
     close_loop: bool | None = None
-    """Close this turn's loop (commit, pull request, CI, merge) for this turn only. ``false`` always
-    narrows; ``true`` widens only from the owner's screen, a bridge's ``true`` is ignored and the setting
+    """Close this turn's loop (commit, pull request, CI; a merge only with ``CHIMERA_CLOSE_LOOP_MERGE``)
+    for this turn only. ``false`` always narrows; ``true`` widens only from the owner's screen, a bridge's ``true`` is ignored and the setting
     decides. Omitted: the owner's ``CHIMERA_CODE_CLOSE_LOOP`` (`chimera/core/close_loop.py`)."""
     close_loop_follow: dict[str, Any] | None = None
     """Server-set only: the state of a close loop waiting for the fix turn it asked for. The endpoint
@@ -5984,6 +5984,7 @@ def register_code_api(
 
     close_loop_wiring = CloseLoopWiring(
         enabled=lambda: bool(live().code_close_loop),
+        merge_enabled=lambda: bool(live().close_loop_merge),
         amend=store.amend_close_loop,
         enqueue=_enqueue_fix_turn,
         locked=lock_for,

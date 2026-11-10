@@ -967,12 +967,14 @@ class AutonomyCfgOut(BaseModel):
     can post into that channel. Without one, a review on an unattended surface is a refusal —
     which the refusal now says, naming this setting."""
     pull_requests: bool = False
-    """``CHIMERA_PULL_REQUESTS``: whether the agent has ``open_pull_request``. Off by default, and a
+    """``CHIMERA_PULL_REQUESTS``: whether the agent has ``open_pull_request``. On by default, and a
     server without the field is off. On or off, every pull request the agent proposes asks the owner."""
     close_loop: bool = False
     """``CHIMERA_CODE_CLOSE_LOOP``: whether a finished Code turn commits its changes, opens the pull
-    request, follows CI and merges a green one (unless an exception applies). Off by default; a server
-    without the field is off."""
+    request and follows CI. On by default; a server without the field is off."""
+    close_loop_merge: bool = False
+    """``CHIMERA_CLOSE_LOOP_MERGE``: whether the close loop may merge a green pull request (unless an
+    exception applies). Off by default, and a server without the field is off."""
     hooks: bool = False
     """``CHIMERA_HOOKS``: whether the owner's lifecycle hooks (``<home>/chimera-hooks.json``) run
     around tool calls. Off by default; on, a hook can only deny, ask or annotate
@@ -2132,8 +2134,8 @@ class SkillsOut(BaseModel):
 
     Without it the screen lists cards marked *active* with ``0 uses`` and no explanation, and the
     only available reading is that the agent tried them and they were useless. The truth is that
-    nothing consulted them: reading was measured (+16.7pp, a confidence interval including zero,
-    +300% tokens) and left off. A count of zero means two very different things depending on this
+    nothing consulted them: reading was measured (accuracy moved +16.7pp then -8.3pp between identical
+    runs, not significant; the shipped configuration costs +37-48% tokens) and left off. A count of zero means two very different things depending on this
     flag, and the screen was showing the count without the flag."""
 
 

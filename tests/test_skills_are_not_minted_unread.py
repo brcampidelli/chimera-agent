@@ -5,7 +5,7 @@ trabalho — cunharam **14 skills e usaram 0**. As duas causas sao independentes
 dinheiro em toda corrida recorrente:
 
 1. **Cunhar o que o agente nao le.** Ler cartoes e' opt-in porque foi MEDIDO e nao passou o portao
-   registrado (`bench/skillcard`: +16,7 pp, IC inclui zero, +300% de tokens). Escrever nunca foi
+   registrado (`bench/skillcard/RESULTS.md`: +16,7 pp e depois −8,3 pp entre rodadas idênticas, IC inclui zero; custo +37–48% de tokens). Escrever nunca foi
    acoplado a isso, entao a instalacao padrao paga uma chamada de proposta, uma validacao e um teste
    de fumaca — e no caminho do painel, uma proposta por modelo do painel mais uma sondagem de
    transferencia em nove modelos — para produzir cartoes que o laco nunca recupera.

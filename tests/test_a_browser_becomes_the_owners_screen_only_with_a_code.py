@@ -54,7 +54,11 @@ SCREEN_SETTING = {"CHIMERA_PULL_REQUESTS": "false"}
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def _clean_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # `PATCH /api/config` writes `.env` in the working directory. With the screen credential it succeeds,
+    # and left in the repository root it wrote `CHIMERA_PULL_REQUESTS=false` there for every later test
+    # to read: invisible while that was the default, a failure in two other files once it became `true`.
+    monkeypatch.chdir(tmp_path)
     # The app reads the server token from the environment and the settings cache: restore both.
     monkeypatch.setenv("CHIMERA_SERVER_TOKEN", TOKEN)
     monkeypatch.setenv("CHIMERA_PULL_REQUESTS", "")

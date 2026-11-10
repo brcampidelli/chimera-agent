@@ -263,6 +263,10 @@ def _maybe_defer(
     """
     if not settings.defer_tools:
         return registry
+    # A stand-in with no catalogue of its own cannot be deferred (there is nothing to list), so it is
+    # handed back as it is; every real registry has `tools()`.
+    if not callable(getattr(registry, "tools", None)):
+        return registry
     from chimera.api.posture import deployment_fence
     from chimera.tools.defer import defer_builtins
 

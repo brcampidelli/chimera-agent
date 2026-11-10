@@ -1678,6 +1678,11 @@
             "title": "Close Loop",
             "type": "boolean"
           },
+          "close_loop_merge": {
+            "default": false,
+            "title": "Close Loop Merge",
+            "type": "boolean"
+          },
           "denied_tools": {
             "items": {
               "type": "string"

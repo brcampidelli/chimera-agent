@@ -206,12 +206,16 @@ def test_the_search_files_alias_still_takes_its_own_file_glob(tmp_path: Path) ->
 
 def test_a_deferred_tool_call_is_checked_too() -> None:
     """``tool_call`` runs the deferred tool itself, not through the registry."""
-    probe = _Counting()
+    class _Scrape(_Counting):
+        # Only a name the product ships is deferred (`defer.SHIPPED_BUILTINS`), so the probe borrows one.
+        name = "scrape"
+
+    probe = _Scrape()
     deferred, count = defer_builtins(_registry(probe))
     assert count == 1, "precondition: the probe sits behind tool_call"
-    out = deferred.run("tool_call", tool="probe", arguments={"x": "a", "offset": 2})
+    out = deferred.run("tool_call", tool="scrape", arguments={"x": "a", "offset": 2})
 
-    assert out == "error: probe: unknown argument 'offset'; accepted: x"
+    assert out == "error: scrape: unknown argument 'offset'; accepted: x"
     assert probe.calls == 0
 
 

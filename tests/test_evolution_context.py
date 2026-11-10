@@ -35,10 +35,11 @@ def test_apply_to_has_the_six_seams() -> None:
 
 
 def test_factory_builds_default_seams(tmp_path: Path) -> None:
+    # Cards pinned off: reading is on by default since 2026-11-10, and this test is the cards-off shape.
     ctx = build_evolution_context(
-        _settings(), _FakeGateway(), "m", home=tmp_path
+        _settings(CHIMERA_SKILL_CARDS="0"), _FakeGateway(), "m", home=tmp_path
     )
-    # experience always on; trajectories/cards off by default (collect=False, skill_cards default off)
+    # experience always on; trajectories/cards off here (collect=False, skill_cards pinned off)
     assert isinstance(ctx.experience, ExperienceBuffer)
     assert ctx.trajectories is None
     assert ctx.cards is None
@@ -66,7 +67,8 @@ def test_da_para_colecionar_de_proposito(tmp_path: Path) -> None:
     """Uma pessoa ainda le' os cartoes na tela de Conhecimento, entao juntar uma biblioteca de
     proposito continua possivel — o que deixou de existir e' pagar por ela sem pedir."""
     ctx = build_evolution_context(
-        _settings(CHIMERA_MINT_UNREADABLE_SKILLS="1"), _FakeGateway(), "m", home=tmp_path
+        _settings(CHIMERA_MINT_UNREADABLE_SKILLS="1", CHIMERA_SKILL_CARDS="0"),
+        _FakeGateway(), "m", home=tmp_path
     )
 
     assert ctx.cards is None
@@ -103,7 +105,7 @@ def test_skill_cards_toggle(tmp_path: Path) -> None:
 def test_couple_read_off_by_default_leaves_cards_off(tmp_path: Path) -> None:
     # A1 flip-point default OFF: evolving skills does NOT imply reading them (unchanged behaviour).
     ctx = build_evolution_context(
-        _settings(), _FakeGateway(), "m", home=tmp_path, evolve_skills=True
+        _settings(CHIMERA_SKILL_CARDS="0"), _FakeGateway(), "m", home=tmp_path, evolve_skills=True
     )
     assert ctx.cards is None
 
@@ -117,7 +119,7 @@ def test_couple_read_on_couples_reading_to_evolving(tmp_path: Path) -> None:
     assert isinstance(on.cards, CardRetriever)
     # ...but with evolving OFF and no independent skill_cards, reading stays off.
     off = build_evolution_context(
-        _settings(CHIMERA_SKILL_CARDS_READ="true"),
+        _settings(CHIMERA_SKILL_CARDS_READ="true", CHIMERA_SKILL_CARDS="0"),
         _FakeGateway(), "m", home=tmp_path, evolve_skills=False,
     )
     assert off.cards is None

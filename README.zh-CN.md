@@ -185,7 +185,7 @@ Chimera 并不打算在*渠道数量*上去和那些巨型智能体项目一较�
 ### 🧬 记忆与自我改进
 - **长期记忆** —— 它会保留短期、近期、事实性和关于你的记忆，还有一张记录事物之间如何关联的关系图。它可以把记忆存进一个快速的全文数据库、把你的偏好档案带进每一次对话、自动合并重复的笔记，并在你提到某个偏好时温和地建议把它保存下来。
 - **学习新技能** —— 当它不止一次成功完成同一类任务时，会自动把它变成一个经过测试、可复用的技能。
-- **一座你能读、也能扩充的精选技能库** —— [`skills/`](skills/) 里有 24 张技能卡，其中 13 张写自本项目自己踩过的坑。一张卡是**数据，不是代码**：一段 frontmatter 加上 Trigger / Do / Avoid / Check / Risk，它本身什么都不执行 —— 当某张卡匹配上时，智能体会把它读进 prompt，而这需要**用 `--skill-cards`（或 `CHIMERA_SKILL_CARDS=1`）手动开启，默认是关闭的**：那次本来要把“读卡”默认打开的登记 A/B，测出 +16.7 个百分点却*并不显著*，代价还是 +300% 的 token，所以它没能过自己那道翻转门槛，就一直关着（[`bench/skillcard/RESULTS.md`](bench/skillcard/RESULTS.md)）。这些卡按它们在工作流程里生效的位置分组（define · build · verify · review · ship），描述、正文和触发词都译成了九种语言 —— 由一个测试来保证诚实：只要某个语言的翻译过期了、或者只做了一半，它就会失败。用 `chimera skills-import skills/<name>` 导入一张。它同时也是门槛最低的贡献入口：审你的 pull request 就是读一页 markdown，而不是审一份 diff（[`skills/README.md`](skills/README.md)）。
+- **一座你能读、也能扩充的精选技能库** —— [`skills/`](skills/) 里有 24 张技能卡，其中 13 张写自本项目自己踩过的坑。一张卡是**数据，不是代码**：一段 frontmatter 加上 Trigger / Do / Avoid / Check / Risk，它本身什么都不执行 —— 当某张卡匹配上时，智能体会把它读进 prompt，而这需要**默认关闭；用 `--skill-cards`（或 `CHIMERA_SKILL_CARDS=on`）手动开启**：随版本发布的配置使 token 增加 +37%～+48%；在 12 个任务的相同运行之间，准确率变化为 +16.7 个百分点随后 −8.3 个百分点，未显示增益（[`bench/skillcard/RESULTS.md`](bench/skillcard/RESULTS.md)）。这些卡按它们在工作流程里生效的位置分组（define · build · verify · review · ship），描述、正文和触发词都译成了九种语言 —— 由一个测试来保证诚实：只要某个语言的翻译过期了、或者只做了一半，它就会失败。用 `chimera skills-import skills/<name>` 导入一张。它同时也是门槛最低的贡献入口：审你的 pull request 就是读一页 markdown，而不是审一份 diff（[`skills/README.md`](skills/README.md)）。
 - **可选的自我训练（进阶）** —— 它可以记录自己的经历，方便你日后据此微调一个模型。默认关闭；没有你的要求，什么都不会被拿去训练。
 
 ### 📏 一个可以被测量、并会说出自己迷路了的循环

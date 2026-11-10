@@ -103,14 +103,52 @@ def speakable(text: str, language: str) -> str:
     return f"{head} {CLOSING.get(language, CLOSING['en'])}".strip()
 
 
+WHISPER_RETRY_SECONDS = 300.0
+"""After a failed model download, the next note waits this long before trying again.
+
+A bot that retries a download on every voice note sends the whole model's worth of traffic again for
+each one, and a stranger can send many. The failure is cached for this long, then the download is
+tried once more.
+"""
+_DOWNLOAD_FAILED_AT: dict[str, float] = {}
+
+
 def whisper_snapshot(models_dir: Path, size: str) -> str:
-    """The local folder of the Whisper model ``size``, downloaded at its pinned commit when needed."""
+    """The local folder of the Whisper model ``size``, downloaded at its pinned commit when needed.
+
+    The first use downloads the model (about 150 MB for ``base``). The log says so before the download
+    starts. A failed download is remembered for :data:`WHISPER_RETRY_SECONDS` and refused without a
+    second attempt, so a bot does not re-download on every note.
+    """
+    import time
+
     from huggingface_hub import snapshot_download
 
     repo, revision = WHISPER_PINS.get(size, (f"Systran/faster-whisper-{size}", "main"))
     if size not in WHISPER_PINS:
         _log.warning("whisper model %s has no pinned revision; loading it from main", size)
-    return str(snapshot_download(repo_id=repo, revision=revision, cache_dir=str(models_dir)))
+    key = f"{models_dir}:{repo}@{revision}"
+    failed_at = _DOWNLOAD_FAILED_AT.get(key)
+    if failed_at is not None and time.monotonic() - failed_at < WHISPER_RETRY_SECONDS:
+        raise VoiceUnavailable(
+            "the speech model download failed a moment ago; the bot will try again in a few minutes"
+        )
+    try:
+        return str(snapshot_download(
+            repo_id=repo, revision=revision, cache_dir=str(models_dir), local_files_only=True,
+        ))
+    except Exception:  # noqa: BLE001 - not cached yet: the download below is the first use
+        pass
+    _log.warning(
+        "downloading the speech model %s (about 150 MB) once, on first use; voice notes wait until it is here",
+        repo,
+    )
+    try:
+        return str(snapshot_download(repo_id=repo, revision=revision, cache_dir=str(models_dir)))
+    except Exception as exc:
+        _DOWNLOAD_FAILED_AT[key] = time.monotonic()
+        _log.warning("speech model download failed: %s", type(exc).__name__)
+        raise VoiceUnavailable("the speech model could not be downloaded") from exc
 
 
 @lru_cache(maxsize=2)

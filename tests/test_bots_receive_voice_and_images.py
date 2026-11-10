@@ -99,12 +99,13 @@ def test_media_transcript_is_sanitized_and_fenced(monkeypatch: Any, tmp_path: An
     assert "<<external-data:" in value and "<<end-external-data>>" in value
 
 
-def test_settings_default_to_media_disabled(monkeypatch: Any) -> None:
+def test_settings_default_to_media_enabled_and_the_owner_can_disable_it(monkeypatch: Any) -> None:
     from chimera.config import Settings
 
+    # ON by default since the owner's decision of 2026-11-10. Off stays one switch away.
     monkeypatch.delenv("CHIMERA_CHAT_INBOUND_MEDIA", raising=False)
-    assert Settings().chat_inbound_media is False
-    assert Settings(CHIMERA_CHAT_INBOUND_MEDIA=True).chat_inbound_media is True
+    assert Settings().chat_inbound_media is True
+    assert Settings(CHIMERA_CHAT_INBOUND_MEDIA=False).chat_inbound_media is False
 
 
 def test_platform_parsing_does_not_fetch_media(monkeypatch: Any) -> None:

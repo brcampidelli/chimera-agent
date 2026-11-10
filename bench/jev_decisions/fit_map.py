@@ -59,5 +59,10 @@ def fit(path: Path = DEFAULT_ROWS) -> PlattMap:
 
 
 if __name__ == "__main__":
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+    from _legacy_defaults import pin_legacy_defaults
+    pin_legacy_defaults()  # the five 2026-11-10 defaults, back to the value these numbers used
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     print(json.dumps(fit(Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_ROWS).to_dict(), indent=2, ensure_ascii=False))

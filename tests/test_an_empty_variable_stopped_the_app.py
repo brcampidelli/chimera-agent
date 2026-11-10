@@ -29,8 +29,12 @@ from chimera.config import Settings
 
 
 def test_an_empty_boolean_reads_as_unset() -> None:
-    """The whole defect, on the field the bench tripped over."""
-    assert Settings(CHIMERA_DEFER_TOOLS="").defer_tools is False
+    """The whole defect, on the field the bench tripped over.
+
+    Empty reads as unset, so it takes the field's default. That default is ON since the owner's
+    decision of 2026-11-10, so the assertion is the new default, not the old "off".
+    """
+    assert Settings(CHIMERA_DEFER_TOOLS="").defer_tools is True
 
 
 @pytest.mark.parametrize(
@@ -109,7 +113,7 @@ def test_it_works_through_the_environment_and_not_only_through_kwargs(
 
     settings = Settings()
 
-    assert settings.defer_tools is False
+    assert settings.defer_tools is True  # empty = unset = the default, which is on (2026-11-10)
     assert isinstance(settings.guard_chat, bool)
 
 

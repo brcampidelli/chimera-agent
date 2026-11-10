@@ -38,6 +38,10 @@ class ToolRegistry:
         #: ``None`` — every plugin the owner switched on — on an attended surface; on an unattended
         #: one, the owner's ``CHIMERA_UNATTENDED_PLUGINS``, stamped by ``governed_profile``.
         self.plugin_scope: frozenset[str] | None = None
+        #: Built-in tools `CHIMERA_DEFER_TOOLS` moved behind ``tool_call``: still the same tool objects,
+        #: out of the declared list. A grant that names one (a Markdown agent's `tools:`, a subagent's
+        #: allowlist) must still reach it, so the grant is read against ``declared_names()``, not ``names()``.
+        self.deferred: dict[str, Tool] = {}
 
     @classmethod
     def like(cls, source: object) -> ToolRegistry:
@@ -71,6 +75,10 @@ class ToolRegistry:
 
     def names(self) -> list[str]:
         return list(self._tools)
+
+    def declared_names(self) -> list[str]:
+        """Every name a grant can reach: the declared tools, then the ones deferral moved out."""
+        return list(self._tools) + [name for name in self.deferred if name not in self._tools]
 
     def tools(self) -> list[Tool]:
         return list(self._tools.values())

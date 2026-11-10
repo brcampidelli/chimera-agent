@@ -432,10 +432,18 @@ class Settings(BaseSettings):
         default=False, validation_alias="CHIMERA_CODE_VERIFY_RETRY"
     )
     # A finished Code turn closes its own loop: commit on its branch, open the pull request, follow
-    # CI, merge a green one unless it touches billing, a destructive migration, RLS or a secret
-    # (`chimera/core/close_loop.py`). It pushes to a remote and merges, so it is OFF by default and
-    # owner-only: the desktop bridge may not switch it on (`bridge_routes.REACH_SETTINGS`).
-    code_close_loop: bool = Field(default=False, validation_alias="CHIMERA_CODE_CLOSE_LOOP")
+    # CI, and read a red CI back for up to two fix turns (`chimera/core/close_loop.py`). ON by default
+    # (owner's decision, 2026-11-10); the merge is a separate switch below, which stays off. It pushes
+    # to a remote, so it is owner-only: the desktop bridge may not switch it on
+    # (`bridge_routes.REACH_SETTINGS`). Every refusal in the loop (main branch, detached HEAD, force
+    # push, a secret) holds whatever this says.
+    code_close_loop: bool = Field(default=True, validation_alias="CHIMERA_CODE_CLOSE_LOOP")
+    # Whether the close loop may MERGE a green pull request (squash, pinned to the head it watched).
+    # OFF by default and kept off by the owner's decision (2026-11-10): a merge puts the change on
+    # the default branch, so it is a separate choice from opening the pull request. A pull request
+    # that touches billing, a destructive migration, row-level security or a grant never merges, and
+    # a secret never reaches a commit, whatever this says. Owner-only, like the switch above.
+    close_loop_merge: bool = Field(default=False, validation_alias="CHIMERA_CLOSE_LOOP_MERGE")
 
     # --- The desktop bridge: may an MCP client (Claude Code / Claude Desktop, through
     # `chimera mcp desktop`) operate this running app? Both OFF by default, and the second means
@@ -537,11 +545,12 @@ class Settings(BaseSettings):
     #
     # `chimera.tools.defer.CORE` is declared in full regardless, so the tools that observed use
     # actually reaches are never behind a lookup, and the saving comes from schemas the model did not
-    # ask for. OFF by default for the reason above it: selection accuracy is still the unmeasured
-    # half, and this project has rules against turning something on by conviction.
+    # ask for. ON by default by the owner's decision (2026-11-10), taken knowing that selection
+    # accuracy is still the unmeasured half: the bench below is inconclusive, and this default is a
+    # choice, not a finding. The owner can switch it off in Settings at any time.
     # `chimera.tools.defer.describe_saving` reports the measured half on your own registry — and can
     # report a LOSS, which below a handful of tools it truthfully is.
-    defer_tools: bool = Field(default=False, validation_alias="CHIMERA_DEFER_TOOLS")
+    defer_tools: bool = Field(default=True, validation_alias="CHIMERA_DEFER_TOOLS")
     #: A project's `.chimera/pack.json` narrowing the skills, MCP servers and tools a run in that
     #: folder receives (study 29, P7.6; `chimera/core/project_pack.py`). OFF until measured:
     #: narrowing changes what a run can do, and `bench/project_pack/PREREGISTRATION.md` registers
@@ -587,12 +596,13 @@ class Settings(BaseSettings):
     research_agent: bool = Field(default=False, validation_alias="CHIMERA_RESEARCH_AGENT")
     # --- `open_pull_request` (study 29, P8.1; chimera/tools/pull_request.py). On, every surface that
     # builds the default registry — the Code screen, chat, cron, the bots — gains a tool that pushes
-    # the workspace's current branch to `origin` and opens a pull request with the GitHub CLI. OFF by
-    # default: it publishes the owner's code and text to a remote, which is a new place for their
-    # data to go. On or off, EVERY call is a question to the owner — no approval mode, posture,
+    # the workspace's current branch to `origin` and opens a pull request with the GitHub CLI. ON by
+    # default (owner's decision, 2026-11-10), so the tool is in every registry unless the owner
+    # switches it off. It publishes the owner's code and text to a remote, which is a place their
+    # data goes. On or off, EVERY call is a question to the owner — no approval mode, posture,
     # governance mode or remembered answer turns it into a yes (`approval.always_ask`). Owner-only:
     # the desktop bridge may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`).
-    pull_requests: bool = Field(default=False, validation_alias="CHIMERA_PULL_REQUESTS")
+    pull_requests: bool = Field(default=True, validation_alias="CHIMERA_PULL_REQUESTS")
     # --- Where an approval question goes when there is nobody at a console.
     #
     # This is what makes the three-state gate reachable on the surfaces that need it most. A cron
@@ -642,10 +652,14 @@ class Settings(BaseSettings):
     #: Off until the bench says otherwise. Arm A of that bench IS "today's tool surface", so turning
     #: this on by default would delete the control arm before the comparison ran — and the schema
     #: rides in every prompt for the rest of the run, a cost this project has watched swallow a
-    #: gain before (`bench/skillcard/RESULTS.md`: +16.7pp, not significant, at +300% tokens).
+    #: gain before (`bench/skillcard/RESULTS.md`: +16.7pp then -8.3pp on rerun, not significant; +37-48% tokens).
     edit_batch: bool = Field(default=False, validation_alias="CHIMERA_EDIT_BATCH")
     # Formatting executes project-selected host tools after a write, so only the owner may opt in.
     format_after_edit: bool = Field(default=False, validation_alias="CHIMERA_FORMAT_AFTER_EDIT")
+    # Read learned skill cards and Code-screen lessons back into a prompt. OFF by default, the owner's
+    # decision of 2026-11-10 after the revised measurement (`bench/skillcard/RESULTS.md`): the shipped
+    # configuration costs +37-48% tokens, and accuracy moved +16.7 then -8.3 pp between identical runs
+    # (n=12), so no gain is shown. Turn it on to read what it learned.
     skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
     skill_cards_k: int = Field(default=1, validation_alias="CHIMERA_SKILL_CARDS_K")
     # Relevance gate + render budget (M19-A1 cost reduction): inject a card only when it shares at
@@ -659,16 +673,16 @@ class Settings(BaseSettings):
     # M19-A1 flip-point: when on, card READING couples to skill EVOLVING (a run that can mint a
     # skill also reads the retrieved ones), instead of the independent `skill_cards` toggle. Stays
     # OFF by default — the paired A/B is in (bench/skillcard/RESULTS.md, goldilocks n=12): accuracy
-    # +16.7pp but NOT significant (CI includes 0) and +300% tokens, so it fails the registered
-    # flip gate and reading cards stays opt-in. Pair with CHIMERA_PROVISIONAL_SKILLS + the lifecycle
+    # moved +16.7pp then -8.3pp between identical runs, NOT significant (CI includes 0), so it fails
+    # the registered flip gate and reading cards stays opt-in. (Token cost of the shipped cheap
+    # configuration: +37-48%, not the +300% of the first configuration.) Pair with CHIMERA_PROVISIONAL_SKILLS + the lifecycle
     # cron if you do opt in, so a misfiring card is born on probation and auto-demoted.
     skill_cards_couple_read: bool = Field(
         default=False, validation_alias="CHIMERA_SKILL_CARDS_READ"
     )
     #: Mint learned skills even when the agent cannot read them back. OFF, and that is the point.
     #:
-    #: Reading is opt-in because it was MEASURED and did not clear its gate (`bench/skillcard`:
-    #: +16.7pp, CI includes zero, +300% tokens). Minting was never coupled to it, so the default
+    #: Reading was MEASURED and did not clear its gate (`bench/skillcard/RESULTS.md`: the shipped configuration costs +37-48% tokens, and accuracy moved +16.7 then -8.3 pp between identical runs (n=12), so no gain is shown). Minting was never coupled to it, so the default
     #: install paid for a proposal call, a validation and a smoke test — and on the panel path a
     #: proposal per panel model plus a nine-model transfer probe — to produce cards nothing in the
     #: loop would ever read. Four projects run end to end minted 14 of them and used 0.
@@ -1120,9 +1134,10 @@ class Settings(BaseSettings):
     # `bench/chat_history`, because the Discord bot in production runs this path.
     chat_real_history: bool = Field(default=False, validation_alias="CHIMERA_CHAT_REAL_HISTORY")
 
-    # Process inbound voice notes and images from configured chat bots. Transcription and image
-    # forwarding may trigger extra model cost, so the bot owner must enable them explicitly.
-    chat_inbound_media: bool = Field(default=False, validation_alias="CHIMERA_CHAT_INBOUND_MEDIA")
+    # Process inbound voice notes and images from configured chat bots. ON by default (owner's
+    # decision, 2026-11-10). Voice notes are transcribed on this computer (faster-whisper); images go
+    # to the chat model's vision path, which may cost extra model tokens. Off refuses both with a reply.
+    chat_inbound_media: bool = Field(default=True, validation_alias="CHIMERA_CHAT_INBOUND_MEDIA")
     # Answer a voice note with a voice note as well as text (`chimera/server/voice.py`). Local
     # only: the speech is synthesised on this computer, never sent to a hosted service. Off, and
     # owner-only like the switch above, because it makes the bot speak in the owner's name.
