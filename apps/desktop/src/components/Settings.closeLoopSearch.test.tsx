@@ -41,7 +41,7 @@ function config() {
     },
     memory: { backend: "json", semantic: false, auto_consolidate: false, remember_from_chat: false },
     cache: { completion: false, prompt: false },
-    autonomy: { reach: "", approval: "", host_exec: "ask", denied_tools: [], pull_requests: false, close_loop: false },
+    autonomy: { reach: "", approval: "", host_exec: "ask", denied_tools: [], pull_requests: false, close_loop: false, archive_on_pr_merge: true },
     sandbox: { mode: "local", image: "python:3.12-slim" },
     server: { token_set: false },
     mcp: { autoload: false },

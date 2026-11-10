@@ -64,6 +64,7 @@ function config() {
     pull_requests: false,
     close_loop: false,
     close_loop_merge: false,
+    archive_on_pr_merge: true,
     hooks: false,
     hooks_host_exec: false,
   },

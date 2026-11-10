@@ -6793,6 +6793,11 @@ export interface components {
              */
             approval_webhook_set: boolean;
             /**
+             * Archive On Pr Merge
+             * @default true
+             */
+            archive_on_pr_merge: boolean;
+            /**
              * Close Loop
              * @default false
              */
@@ -8154,6 +8159,11 @@ export interface components {
          *     be grouped by project instead of being a flat pile of past questions with no owner.
          */
         CodeSessionMetaOut: {
+            /**
+             * Archive Reason
+             * @default
+             */
+            archive_reason: string;
             /** Archived At */
             archived_at?: number | null;
             /** Branch */

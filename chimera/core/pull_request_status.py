@@ -46,6 +46,19 @@ _CACHE_LOCK = threading.Lock()
 #: What gh prints when it has no usable credentials. Matched case-insensitively in ``pr view``'s
 #: stderr — the exit code alone is the same for "signed out" and "no such PR".
 _AUTH_HINTS = ("gh auth login", "not logged in", "authentication", "http 401", "bad credentials")
+#: What gh prints when GitHub cannot be reached at all. Deliberately NOT "could not resolve": GitHub
+#: answers a PR that no longer exists with "Could not resolve to a PullRequest", which is about one PR.
+_NETWORK_HINTS = (
+    "could not resolve host",
+    "no such host",
+    "dial tcp",
+    "i/o timeout",
+    "connection refused",
+    "connection reset",
+    "network is unreachable",
+    "tls handshake",
+    "timed out",
+)
 
 
 @dataclass(frozen=True)
@@ -57,6 +70,12 @@ class PullRequestStatus:
     pending: int = 0
     failing_names: tuple[str, ...] = ()
     error: str = ""
+    #: The PR's URL as GitHub reports it. The sweep compares it with the URL recorded for the PR
+    #: before it archives anything, so a number that now names another PR is never acted on.
+    url: str = ""
+    #: True when the error says GitHub cannot be asked at all (signed out, offline, CLI missing): every
+    #: other PR would fail the same way, so a sweep stops and waits. False for an error about this PR.
+    blocking: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -108,6 +127,7 @@ def parse_status(payload: object) -> PullRequestStatus:
         if name not in failed_names:
             failed_names.append(name)
     return PullRequestStatus(
+        url=str(payload.get("url") or "")[:2048],
         state=state.lower(),
         mergeable=mergeable.lower(),
         passed=buckets.count("passed"),
@@ -125,13 +145,17 @@ def clear_status_cache() -> None:
 
 def _read(command: Sequence[str], root: Path, number: int) -> PullRequestStatus:
     viewed = run_quiet(
-        [*command, "pr", "view", str(number), "--json", "state,mergeable,statusCheckRollup"],
+        [*command, "pr", "view", str(number), "--json", "state,mergeable,statusCheckRollup,url"],
         root,
     )
     if viewed.returncode != 0:
         said = f"{viewed.stderr or ''} {viewed.stdout or ''}".lower()
         if any(hint in said for hint in _AUTH_HINTS):
-            return PullRequestStatus(error="GitHub CLI (gh) is not authenticated; run `gh auth login`")
+            return PullRequestStatus(
+                error="GitHub CLI (gh) is not authenticated; run `gh auth login`", blocking=True
+            )
+        if any(hint in said for hint in _NETWORK_HINTS):
+            return PullRequestStatus(error="GitHub could not be reached", blocking=True)
         return PullRequestStatus(error="Could not read pull request from GitHub")
     try:
         return parse_status(json.loads(viewed.stdout))
@@ -158,7 +182,7 @@ def pull_request_status(
             return cached[1]
     command = list(gh) if gh is not None else gh_command()
     if not command:
-        return PullRequestStatus(error="GitHub CLI (gh) is not installed")
+        return PullRequestStatus(error="GitHub CLI (gh) is not installed", blocking=True)
     result = _read(command, root, number)
     if result.error:
         return result  # never cached: the next read, or the refresh button, asks again

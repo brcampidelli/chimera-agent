@@ -2529,6 +2529,8 @@ export interface CodeSessionMeta {
   pull_request_count?: number;
   /** When it was archived; null or absent while it is in the list. */
   archived_at?: number | null;
+  /** Why it was archived ("owner", "inactive", "pr_merged", "pr_closed"); "" or absent otherwise. */
+  archive_reason?: string;
   /** The repository `workspace` is a checkout of — its main working tree, the same for every linked
    *  worktree — or the folder itself outside git. "" when unknown (and for the server's own folder):
    *  the sidebar then groups by `workspace`. Absent from a server older than #965. */

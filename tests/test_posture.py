@@ -391,6 +391,9 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
         # 2026-11-10, since nothing set it. Its merge is a separate switch, off, and read here too.
         "close_loop": True,
         "close_loop_merge": False,
+        # Whether a conversation leaves the list once its PR is merged or closed. ON by default, the
+        # owner's decision: nothing set it, so the default is what the screen shows.
+        "archive_on_pr_merge": True,
         # The owner's lifecycle hooks and their host switch (2026-10-05) — off, since nothing set
         # them.
         "hooks": False,

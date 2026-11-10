@@ -50,6 +50,17 @@ import { readLastSession, writeLastSession } from "@/lib/workspace";
 /** Rows a section shows before "show more". Five is what fits a 240px column several projects deep
  *  without the first project pushing every other one below the fold. */
 const ROWS_PER_PROJECT = 5;
+/**
+ * The reasons the server writes on an archived conversation (`code_session_marks.ARCHIVE_REASONS`), each
+ * mapped to its full i18n key, written out here so every key is a literal the reachability check sees.
+ */
+const ARCHIVE_REASON_LABELS = {
+  owner: "code.sessions.archiveReason.owner",
+  inactive: "code.sessions.archiveReason.inactive",
+  pr_merged: "code.sessions.archiveReason.pr_merged",
+  pr_closed: "code.sessions.archiveReason.pr_closed",
+  worktree_pruned: "code.sessions.archiveReason.worktree_pruned",
+} as const;
 
 /** The conversations in the order the sidebar lists them, top to bottom — what Ctrl+Tab walks. Built
  *  from the same grouping the list draws with (`sidebar-groups.ts`), and reading the grouping switch
@@ -673,6 +684,12 @@ export function SessionSidebar({
           ) : (
             (archived.data ?? []).map((session) => {
               const name = session.title || t("code.sessions.untitled");
+              // Why it left the list, shown before the person brings it back (the stored reason).
+              const stored = session.archive_reason ?? "";
+              const labelKey = Object.prototype.hasOwnProperty.call(ARCHIVE_REASON_LABELS, stored)
+                ? ARCHIVE_REASON_LABELS[stored as keyof typeof ARCHIVE_REASON_LABELS]
+                : undefined;
+              const reason = labelKey ? t(labelKey) : "";
               return (
                 <div key={session.id} className="group/session flex items-center">
                   <button
@@ -687,6 +704,9 @@ export function SessionSidebar({
                     )}
                   >
                     {name}
+                    {reason ? (
+                      <span className="block truncate text-xs text-muted-foreground/80">{reason}</span>
+                    ) : null}
                   </button>
                   <button
                     type="button"

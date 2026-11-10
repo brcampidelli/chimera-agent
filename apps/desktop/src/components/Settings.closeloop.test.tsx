@@ -52,7 +52,7 @@ const CONFIG = {
     governance: "off",
     approval_webhook_set: false,
     pull_requests: false,
-    close_loop: false,
+    close_loop: false, archive_on_pr_merge: true,
   },
   sandbox: { mode: "local", image: "python:3.12-slim" },
   server: { token_set: false },
@@ -96,7 +96,7 @@ describe("Settings — the Code close loop switch", () => {
   });
 
   it("saves the owner's choice under CHIMERA_CODE_CLOSE_LOOP", async () => {
-    vi.mocked(getConfig).mockResolvedValue(config({ close_loop: false }) as never);
+    vi.mocked(getConfig).mockResolvedValue(config({ close_loop: false, archive_on_pr_merge: true }) as never);
     const user = userEvent.setup();
     renderWithProviders(<Settings />);
 

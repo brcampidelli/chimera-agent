@@ -75,6 +75,13 @@ const ENTRIES: readonly SearchEntry[] = [
   },
   {
     tab: "general",
+    label: "settings.row.archiveOnPrMerge",
+    hint: "settings.hint.archiveOnPrMerge",
+    anchor: "settings-archive-on-pr-merge",
+    terms: "settings.search.terms.archiveOnPrMerge",
+  },
+  {
+    tab: "general",
     label: "settings.row.closeLoopMerge",
     hint: "settings.hint.closeLoopMerge",
     anchor: "settings-close-loop-merge",

@@ -1673,6 +1673,11 @@
             "title": "Approval Webhook Set",
             "type": "boolean"
           },
+          "archive_on_pr_merge": {
+            "default": true,
+            "title": "Archive On Pr Merge",
+            "type": "boolean"
+          },
           "close_loop": {
             "default": false,
             "title": "Close Loop",
@@ -4207,6 +4212,11 @@
       "CodeSessionMetaOut": {
         "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
         "properties": {
+          "archive_reason": {
+            "default": "",
+            "title": "Archive Reason",
+            "type": "string"
+          },
           "archived_at": {
             "anyOf": [
               {

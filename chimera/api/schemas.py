@@ -294,6 +294,9 @@ class CodeSessionMetaOut(BaseModel):
     pull_request_count: int = 0
     #: When it was archived; None for a conversation in the list.
     archived_at: float | None = None
+    #: Why it was archived: ``owner``, ``inactive``, ``pr_merged``, ``pr_closed`` or ``worktree_pruned``. "" in the list.
+    #: Shown on the archived row, so bringing a conversation back is a choice made knowing why it left.
+    archive_reason: str = ""
     #: The repository ``workspace`` is a checkout of: the main working tree's path, the same for
     #: the main checkout and every linked worktree of it, or the folder itself when it is not in a
     #: git repository (`chimera/core/checkout.py`). Stamped at each turn, so a removed worktree
@@ -977,6 +980,10 @@ class AutonomyCfgOut(BaseModel):
     close_loop_merge: bool = False
     """``CHIMERA_CLOSE_LOOP_MERGE``: whether the close loop may merge a green pull request (unless an
     exception applies). Off by default, and a server without the field is off."""
+    archive_on_pr_merge: bool = True
+    """``CHIMERA_ARCHIVE_ON_PR_MERGE``: whether a conversation whose pull request is merged or closed
+    leaves the list. On by default, the owner's decision; archiving touches nothing. A server without
+    the field is on, the same default the settings carry."""
     hooks: bool = False
     """``CHIMERA_HOOKS``: whether the owner's lifecycle hooks (``<home>/chimera-hooks.json``) run
     around tool calls. Off by default; on, a hook can only deny, ask or annotate

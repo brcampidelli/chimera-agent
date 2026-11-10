@@ -340,6 +340,20 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_CODE_CLOSE_LOOP: String(v) })}
         />
       </Row>
+      {/* A conversation whose pull request is merged or closed leaves the list (`chimera/core/pr_auto_archive.py`).
+          On by default, the owner's decision: archiving deletes nothing and merges nothing, so it is not
+          a warning, and the owner switches it off to keep those conversations listed. */}
+      <Row
+        label={t("settings.row.archiveOnPrMerge")}
+        hint={t("settings.hint.archiveOnPrMerge")}
+        env="CHIMERA_ARCHIVE_ON_PR_MERGE"
+      >
+        <Toggle
+          id="settings-archive-on-pr-merge"
+          on={c.autonomy.archive_on_pr_merge ?? true}
+          onChange={(v) => save({ CHIMERA_ARCHIVE_ON_PR_MERGE: String(v) })}
+        />
+      </Row>
       {/* The merge is its own switch, off, and owner-only like the one above. A merge puts the change on
           the default branch, so opening a pull request never implies merging one. Billing, a destructive
           migration, row-level security and a secret are never merged, whatever this says. */}

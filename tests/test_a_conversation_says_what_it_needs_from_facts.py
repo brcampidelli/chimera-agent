@@ -467,7 +467,11 @@ def _count_opens(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     real = io.open
 
     def counting(file: Any, *a: Any, **kw: Any) -> Any:
-        seen.append(str(file))
+        # A number is a file DESCRIPTOR, not a file: `subprocess` wraps each pipe of a `gh` the PR sweep
+        # spawns with `io.open(fd)`. On a runner with `gh` installed that thread's pipes landed in this
+        # window as '103', '106' and were counted as reads of the home. Only paths are reads.
+        if not isinstance(file, int):
+            seen.append(str(file))
         return real(file, *a, **kw)
 
     monkeypatch.setattr(io, "open", counting)
@@ -505,3 +509,61 @@ def test_the_state_adds_a_constant_number_of_reads_to_the_list_whatever_its_leng
     assert [o for o in outside if o.endswith("code_sessions.marks.json")] != []
     assert len([o for o in outside if o.endswith("code_sessions.marks.json")]) == 1, outside
     assert len(outside) <= 3, outside
+
+
+_GH_BEHAVIOURS = {
+    "absent": None,
+    "signed-out": "import sys; sys.stderr.write('To get started with GitHub CLI, please run: gh auth login'); sys.exit(1)",
+    "offline": "import sys; sys.stderr.write('dial tcp: i/o timeout'); sys.exit(1)",
+    "this-pr-is-gone": "import sys; sys.stderr.write('Could not resolve to a PullRequest'); sys.exit(1)",
+    "open": "import sys; print('{\"state\":\"OPEN\",\"url\":\"' + 'https://github.com/o/r/pull/' + sys.argv[3] + '\"}')",
+}
+
+
+@pytest.mark.parametrize("behaviour", list(_GH_BEHAVIOURS))
+def test_the_pr_sweep_thread_reads_no_file_whatever_gh_answers_while_no_pr_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: type, behaviour: str
+) -> None:
+    """With `gh` missing, signed out, offline, failing for one PR, or saying every PR is still open,
+    the sweep the list starts opens no PATH: not the marks, not the approvals, not a conversation. Its
+    `gh` runs for real here (a stand-in executable), so its pipe descriptors are in play as on a runner."""
+    import builtins
+    import io
+    import sys
+    import time
+
+    from chimera.core import pull_request_status
+
+    script = _GH_BEHAVIOURS[behaviour]
+    command = None if script is None else [sys.executable, "-c", script]
+    monkeypatch.setattr(pull_request_status, "gh_command", lambda: command)
+    pull_request_status.clear_status_cache()
+    app = App(tmp_path, monkeypatch, agent)
+    folder = app.home / "code_sessions"
+    folder.mkdir(parents=True, exist_ok=True)
+    store = CodeSessionStore(folder)
+    for i in range(3):
+        (folder / f"s{i}.json").write_text(
+            json.dumps({"session_id": f"s{i}", "workspace": str(app.folder), "messages": []}),
+            encoding="utf-8",
+        )
+        store.marks.pull_request_opened(
+            f"s{i}", number=i + 1, url=f"https://github.com/o/r/pull/{i + 1}"
+        )
+    seen: list[str] = []
+    real = io.open
+
+    def counting(file: Any, *a: Any, **kw: Any) -> Any:
+        if threading.current_thread().name == "pr-auto-archive" and not isinstance(file, int):
+            seen.append(str(file))
+        return real(file, *a, **kw)
+
+    monkeypatch.setattr(io, "open", counting)
+    monkeypatch.setattr(builtins, "open", counting)
+    app.rows()
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline and any(
+        t.name == "pr-auto-archive" for t in threading.enumerate()
+    ):
+        time.sleep(0.01)
+    assert seen == []

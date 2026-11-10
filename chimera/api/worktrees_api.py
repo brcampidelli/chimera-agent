@@ -206,7 +206,7 @@ def register_worktree_api(
             if result.removed:
                 for conv in by_folder.get(_key(result.path), []):
                     if not conv["archived"]:
-                        store.marks.archive(conv["id"], at=now)
+                        store.marks.archive(conv["id"], at=now, reason="worktree_pruned")
                         archived.append(conv["id"])
             out.append(
                 {
