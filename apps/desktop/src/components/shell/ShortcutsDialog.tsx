@@ -3,7 +3,7 @@ import { formatKeys, SHORTCUTS } from "@/lib/hotkeys";
 import { useT } from "@/lib/i18n";
 
 /**
- * Help › Keyboard shortcuts (⌘;): every row of `SHORTCUTS`, in its order, and nothing else.
+ * Help › Keyboard shortcuts (⌘/): every row of `SHORTCUTS`, in its order, and nothing else.
  *
  * Rendered from the table the listeners match on, so a key added, moved or removed there is the
  * sheet's next state without anyone remembering to edit it — the sheet cannot advertise a chord the
