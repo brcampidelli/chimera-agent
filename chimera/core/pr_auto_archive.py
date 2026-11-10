@@ -31,12 +31,17 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from chimera.core.code_session_marks import PR_STATES, CodeSessionMarks, ConversationMark
+from chimera.core.code_session_marks import (
+    PR_STATES,
+    CodeSessionMarks,
+    ConversationMark,
+    archive_reason_for_pr,
+)
 
 #: At most this often a sweep reads GitHub. The list is polled, so the throttle is what keeps the
 #: switch from costing a request per poll.
@@ -61,19 +66,8 @@ class SweepBlocked(Exception):
 
 
 def pull_request_archive_reason(*, pr_state: str, state: str) -> str:
-    """Why a conversation leaves the list because its PR is now ``state``, or ``""`` when it does not.
-
-    Only a change from a recorded ``open`` counts. Anything else read ``merged`` or ``closed`` is a
-    state met for the first time, or one already archived for: a conversation brought back from the
-    archive keeps its settled PR and is not archived again for it.
-    """
-    if pr_state != "open":
-        return ""
-    if state == "merged":
-        return "pr_merged"
-    if state == "closed":
-        return "pr_closed"
-    return ""
+    """See :func:`chimera.core.code_session_marks.archive_reason_for_pr`."""
+    return archive_reason_for_pr(pr_state=pr_state, state=state)
 
 
 def _same_url(recorded: str, read: str) -> bool:
@@ -92,6 +86,7 @@ def sweep(
     folder_of: Callable[[str], Path],
     held: Callable[[str], bool],
     now: float,
+    snapshot: Mapping[str, ConversationMark] | None = None,
 ) -> list[str]:
     """One pass: read the latest PR of each candidate conversation and settle the ones that changed.
 
@@ -103,8 +98,12 @@ def sweep(
     conversation and nothing else. A reading that says GitHub cannot be asked at all raises
     :class:`SweepBlocked`, and the pass stops there. Returns the ids archived.
     """
+    # The candidates come from the snapshot the list read (or one read here when none is given). Each
+    # write re-reads its own record under the lock, so a stale snapshot can only skip a conversation for
+    # one pass, never act on a state that has since changed.
     candidates: list[tuple[str, ConversationMark, dict[str, Any]]] = []
-    for sid, mark in marks.all().items():
+    source = marks.all() if snapshot is None else snapshot
+    for sid, mark in source.items():
         pr = mark.pull_request
         if mark.archived_at is None and pr is not None:
             candidates.append((sid, mark, pr))
@@ -113,7 +112,7 @@ def sweep(
 
     archived: list[str] = []
     checked = 0
-    for sid, mark, pr in [*unsettled, *closed]:
+    for sid, _mark, pr in [*unsettled, *closed]:
         if checked >= MAX_PER_SWEEP:
             break
         checked += 1
@@ -125,13 +124,11 @@ def sweep(
             continue  # an error about this PR: this conversation waits, the others do not
         if not _same_url(url, reading.url) or (not url and not reading.url):
             continue
-        reason = pull_request_archive_reason(pr_state=mark.pr_state, state=reading.state)
         outcome = marks.settle_pull_request(
             sid,
             number=number,
             url=url or reading.url,  # a record with no URL takes the one GitHub reports
             state=reading.state,
-            reason=reason,
             at=now,
             free=lambda session_id: not held(session_id),
         )

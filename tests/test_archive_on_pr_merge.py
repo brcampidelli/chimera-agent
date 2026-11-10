@@ -106,7 +106,7 @@ def test_archiving_records_why_and_the_state_it_acted_on(tmp_path: Path) -> None
 
 def _settle(marks: CodeSessionMarks, **overrides: Any) -> str:
     args: dict[str, Any] = {
-        "number": 7, "url": PR_URL, "state": "merged", "reason": "pr_merged",
+        "number": 7, "url": PR_URL, "state": "merged",
         "at": 9.0, "free": lambda sid: True,
     }
     args.update(overrides)
@@ -598,3 +598,28 @@ def test_closed_conversations_never_starve_an_open_one_of_the_bound(
     pr = Pr("open")
     _run(marks, pr)
     assert pr.reads[0] == "live", "unsettled conversations are read before closed ones"
+
+
+def test_a_stale_snapshot_never_archives_on_a_state_the_record_no_longer_has(tmp_path: Path) -> None:
+    """The list's snapshot said the PR was open, but the record has since been settled (recorded merged,
+    not archived). The reason is decided from the record read under the lock, so nothing is archived."""
+    marks = _marks_with_pr(tmp_path, "s1")
+    stale = marks.all()  # pr_state open, as the list saw it
+    marks.set_pr_state("s1", "merged")
+    pr = Pr("merged")
+    outcome = sweep(
+        marks, read=pr, folder_of=lambda sid: Path(sid), held=lambda sid: False, now=5.0, snapshot=stale
+    )
+    assert outcome == []
+    assert marks.get("s1").archived_at is None
+
+
+def test_a_stale_snapshot_never_archives_what_was_already_archived(tmp_path: Path) -> None:
+    marks = _marks_with_pr(tmp_path, "s1")
+    stale = marks.all()
+    marks.archive("s1", at=3.0, reason="owner")
+    assert sweep(
+        marks, read=Pr("merged"), folder_of=lambda sid: Path(sid), held=lambda sid: False, now=5.0,
+        snapshot=stale,
+    ) == []
+    assert marks.get("s1").archive_reason == "owner"

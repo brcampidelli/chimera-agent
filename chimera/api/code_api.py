@@ -6149,7 +6149,7 @@ def register_code_api(
 
     pr_sweeper = Sweeper()
 
-    def _sweep_pull_requests() -> None:
+    def _sweep_pull_requests(snapshot: Any = None) -> None:
         """One pass of the pull-request switch, on the background thread the list starts. Never
         raises into that thread's void silently: a failure is logged and the next pass tries again."""
         from chimera.api.conversation_state import archive_refusal
@@ -6187,7 +6187,12 @@ def register_code_api(
 
         try:
             archived = sweep(
-                store.marks, read=read, folder_of=folder_of, held=held, now=time.time()
+                store.marks,
+                read=read,
+                folder_of=folder_of,
+                held=held,
+                now=time.time(),
+                snapshot=snapshot,
             )
             if archived:
                 _log.info("archived %d conversation(s) whose pull request settled", len(archived))
@@ -6264,7 +6269,10 @@ def register_code_api(
         now = time.time()
         # The PR switch reads GitHub, so the list never waits on it: a background sweep at most once
         # a minute, and its archives show on the next look (`chimera/core/pr_auto_archive.py`).
-        pr_sweeper.kick(_sweep_pull_requests, enabled=bool(live().archive_on_pr_merge))
+        # The pass gets the snapshot this look already read: it schedules and reads nothing here.
+        pr_sweeper.kick(
+            lambda: _sweep_pull_requests(marks), enabled=bool(live().archive_on_pr_merge)
+        )
         for row in rows:
             sid = str(row["id"])
             mark = replace(

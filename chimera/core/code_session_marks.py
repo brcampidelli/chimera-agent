@@ -70,6 +70,20 @@ ARCHIVE_REASONS = ("owner", "inactive", "pr_merged", "pr_closed", "worktree_prun
 PR_STATES = ("open", "merged", "closed")
 
 
+def archive_reason_for_pr(*, pr_state: str, state: str) -> str:
+    """Why a conversation leaves the list because its PR is now ``state``, given the state recorded for
+    it, or ``""``. Only a change from a recorded ``open`` counts: a state met for the first time, or one
+    already archived for, never archives. Decided where the record is written (under the lock), so a
+    snapshot read earlier cannot make it act on a state that has since changed."""
+    if pr_state != "open":
+        return ""
+    if state == "merged":
+        return "pr_merged"
+    if state == "closed":
+        return "pr_closed"
+    return ""
+
+
 def pull_request_record(raw: object) -> dict[str, Any] | None:
     """A stored pull request record, validated, or None when there is none or it is unusable.
 
@@ -313,7 +327,6 @@ class CodeSessionMarks:
         number: int,
         url: str,
         state: str,
-        reason: str,
         at: float,
         free: Callable[[str], bool],
     ) -> str:
@@ -337,8 +350,6 @@ class CodeSessionMarks:
         """
         if state not in PR_STATES:
             raise ValueError(f"not a pull request state: {state!r}")
-        if reason and reason not in ARCHIVE_REASONS:
-            raise ValueError(f"not an archive reason: {reason!r}")
         with self._lock:
             sessions = self._read()
             mark = self._mark(sessions.get(session_id))
@@ -353,6 +364,7 @@ class CodeSessionMarks:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 atomic_write_text(self.path, json.dumps({"sessions": sessions}))
                 return "url_recorded"
+            reason = archive_reason_for_pr(pr_state=mark.pr_state, state=state)
             if reason:
                 if mark.archived_at is not None:
                     return "unchanged"
