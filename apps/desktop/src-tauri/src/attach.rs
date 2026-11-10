@@ -161,6 +161,8 @@ pub enum Probe {
     Unauthorized,
     /// It answered, and not what the record says.
     Incompatible(String),
+    /// It served a protected route to a request with no token: not the guard this shell expects.
+    OpenAccess,
 }
 
 /// What [`ensure_backend`] decided, before acting.
@@ -185,6 +187,12 @@ pub fn plan(record: Option<&Record>, probe: Option<&Probe>, our_version: &str, o
         Probe::Unauthorized => Plan::Refuse(format!(
             "the background service at {} refused the token in its own record — stop it with \
              `chimera service stop` and open the app again",
+            record.url
+        )),
+        Probe::OpenAccess => Plan::Refuse(format!(
+            "{} (the background service at {}) \u{2014} stop it with `chimera service stop`, reinstall, \
+             and open the app again",
+            sidecar_http::OPEN_BACKEND,
             record.url
         )),
         Probe::Incompatible(why) => Plan::Refuse(format!(
@@ -613,6 +621,9 @@ pub fn probe_http(record: &Record) -> Probe {
     if normal_home(&text("home")) != normal_home(&record.home) {
         return Probe::Incompatible("the record and the server name different data folders".into());
     }
+    if sidecar_http::token_is_enforced(&record.url).is_err() {
+        return Probe::OpenAccess;
+    }
     Probe::Alive { protocol: info.get("protocol").and_then(Value::as_i64).unwrap_or(0) }
 }
 
@@ -696,7 +707,11 @@ pub fn window_gone(url: &str, token: &str, window: &str) {
 
 /// Start `cmd` so it outlives this process: its own process group, no console, stdin closed, and
 /// its output appended to `log` — never a pipe, which nobody reads once the app is gone (D10).
-pub fn spawn_detached(cmd: &mut Command, log: &Path) -> Result<Child, String> {
+///
+/// With `stdin_line` the child's stdin is a pipe that receives that line and is closed at once
+/// (`launch_secrets.rs`): the way its secrets arrive without living in its environment. Without it
+/// stdin is closed, as before.
+pub fn spawn_detached(cmd: &mut Command, log: &Path, stdin_line: Option<&str>) -> Result<Child, String> {
     if let Some(parent) = log.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -708,7 +723,17 @@ pub fn spawn_detached(cmd: &mut Command, log: &Path) -> Result<Child, String> {
             .open(log)
             .map_err(|e| format!("cannot open {}: {e}", log.display()))
     };
-    cmd.stdin(Stdio::null()).stdout(open()?).stderr(open()?);
+    cmd.stdout(open()?).stderr(open()?);
+    if stdin_line.is_none() {
+        cmd.stdin(Stdio::null());
+    }
+    let spawn = |cmd: &mut Command| -> std::io::Result<Child> {
+        let mut child = cmd.spawn()?;
+        if let Some(line) = stdin_line {
+            crate::launch_secrets::deliver(&mut child, line);
+        }
+        Ok(child)
+    };
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -717,7 +742,7 @@ pub fn spawn_detached(cmd: &mut Command, log: &Path) -> Result<Child, String> {
         const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
         // Out of a kill-on-close job when the job allows it (a terminal, an IDE); otherwise without.
         cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB);
-        if let Ok(child) = cmd.spawn() {
+        if let Ok(child) = spawn(cmd) {
             return Ok(child);
         }
         cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
@@ -728,7 +753,7 @@ pub fn spawn_detached(cmd: &mut Command, log: &Path) -> Result<Child, String> {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
     }
-    cmd.spawn().map_err(|e| format!("failed to start the background service: {e}"))
+    spawn(cmd).map_err(|e| format!("failed to start the background service: {e}"))
 }
 
 /// Past this size the log is moved to `service.log.1` before the next start appends to it — the
@@ -1415,11 +1440,17 @@ mod tests {
         let home_text = std::fs::canonicalize(&h).unwrap().to_string_lossy().to_string();
         let info = json!({"id": "rec-1", "version": OURS, "protocol": PROTOCOL, "pid": me, "home": home_text}).to_string();
         let server = std::thread::spawn(move || {
-            for _ in 0..4 {
+            for _ in 0..5 {
                 let (mut s, _) = listener.accept().unwrap();
                 let mut buf = vec![0u8; 8192];
                 let n = s.read(&mut buf).unwrap();
                 let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                // The probe's tokenless request to a protected route: a guarded backend says 401.
+                if req.starts_with("GET /api/approvals") {
+                    assert!(!req.contains("Authorization"), "the guard probe must carry no token");
+                    let _ = write!(s, "HTTP/1.0 401 Unauthorized\r\n\r\n{{}}");
+                    continue;
+                }
                 let body = if req.starts_with("GET /api/info") {
                     info.clone()
                 } else if req.starts_with("POST /api/service/stop") {
