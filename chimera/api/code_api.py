@@ -152,6 +152,16 @@ from chimera.core.diff_self_check import (
 )
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.project_place import Place
+from chimera.core.task_cards import (
+    BROKEN_REASON,
+    CARDS_FILE_NAME,
+    KEY_FILE_NAME,
+    SEEN_FILE_NAME,
+    CardOrigin,
+    card_screen_turn,
+    open_store,
+    seed_taint,
+)
 from chimera.evolution.code_turn_learning import record_turn_lesson
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
@@ -162,6 +172,11 @@ from chimera.tools.base import Tool
 from chimera.tools.browser import FrameAnnouncer
 from chimera.tools.chart import ChartAnnouncer
 from chimera.tools.design import DESIGN_TURN_NOTE, DesignAnnouncer, DesignOffer
+from chimera.tools.task_suggestion import (
+    DismissTaskTool,
+    SuggestTaskTool,
+    TaskSuggestionTray,
+)
 
 
 class DesignWriteGate(Tool):
@@ -1111,6 +1126,7 @@ def assemble_registry(
     owner_message: str | None = None,
     grant_root: Path | None = None,
     chart_sink: Any = None,
+    task_tray: Any = None,
     guest: bool = False,
     on_pull_request: Callable[[str], None] | None = None,
     design: DesignOffer | None = None,
@@ -1372,6 +1388,12 @@ def assemble_registry(
                 run_id=run_id or "",
             )
         )
+    # A card the agent proposes instead of drifting off task. Offered only where a screen can show it
+    # (the same condition as the question above), and the tools only record a proposal: nothing here
+    # starts a conversation.
+    if task_tray is not None and surface == "api:turn" and approval_sink is not None and not guest:
+        registry.register(SuggestTaskTool(task_tray))
+        registry.register(DismissTaskTool(task_tray))
     if approval_sink is not None:
         for tool in registry.tools():
             if hasattr(tool, "workspace"):
@@ -2135,6 +2157,27 @@ def _hide_server_only_fields(schema: dict[str, Any]) -> None:
     schema.get("properties", {}).pop("close_loop_follow", None)
 
 
+class TaskSuggestionStartIn(BaseModel):
+    """The owner's "Iniciar" on a proposed card: the card's id and the owner's two options.
+
+    The title, prompt and taint are read from the server's record of the card (`chimera/core/task_cards.py`),
+    never from this body. There is no posture field: a new conversation uses the project's posture,
+    and the bypass rules are the ones in `_start_turn`.
+    """
+
+    origin_session_id: str = Field(min_length=1, max_length=200)
+    card_id: str = Field(pattern=r"^[0-9a-f]{12}$")
+    model: str | None = Field(default=None, max_length=200)
+    new_worktree: bool = False
+
+
+class TaskCardStatusOut(BaseModel):
+    """The task card store's state. ``broken`` is true until the owner deletes ``files`` from the home."""
+
+    broken: bool
+    files: list[str]
+
+
 class CodeTurnRequest(CodeSeams):
     model_config = ConfigDict(json_schema_extra=_hide_server_only_fields)
 
@@ -2161,6 +2204,12 @@ class CodeTurnRequest(CodeSeams):
     #: The desktop bridge forwarded this turn (`VIA_BRIDGE_SCOPE_KEY`, not a paired device). Set only by
     #: :func:`turn_origin` from the scope; the permission switch applies, the browser does not.
     _via_bridge: bool = PrivateAttr(default=False)
+    #: "Do it here": the id of a card proposed in THIS conversation. The server reads the prompt and the
+    #: taint from its own record and ignores `message`; only the owner's screen may send it.
+    task_card_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{12}$")
+    #: Set only in this process (the start route, or `task_card_id` after its checks): the card this
+    #: turn comes from and the taint the server recorded for it. Never parsed from a body.
+    _task_card: CardOrigin | None = PrivateAttr(default=None)
 
     #: The Markdown command this turn's message was expanded from (`chimera.api.commands_api`), and
     #: the line the owner actually typed. PRIVATE for the reason `_channel_origin` is: a body that
@@ -2933,6 +2982,7 @@ def register_code_api(
         run_id: str | None = None,
         notice_sink: Any = None,
         chart_sink: Any = None,
+        task_tray: Any = None,
         guest: bool = False,
         design: DesignOffer | None = None,
         browser_link: Any = None,
@@ -2967,6 +3017,7 @@ def register_code_api(
             notice_sink=notice_sink,
             owner_message=req.shown_message,
             chart_sink=chart_sink,
+            task_tray=task_tray,
             guest=guest,
             bypass_permissions=bypass_permissions,
             wait_forever=wait_forever,
@@ -3140,6 +3191,79 @@ def register_code_api(
     from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
     from chimera.api.devices import DEVICE_SCOPE_KEY
 
+    @app.get("/api/code/task-cards/status", dependencies=[guard], response_model=TaskCardStatusOut)
+    def task_card_status() -> TaskCardStatusOut:
+        """Whether the task card store failed its integrity check, for the owner's standing warning."""
+        store_now = open_store(Path(live().home) / CARDS_FILE_NAME)
+        return TaskCardStatusOut(
+            broken=store_now.broken, files=[CARDS_FILE_NAME, KEY_FILE_NAME, SEEN_FILE_NAME],
+        )
+
+    @app.post(
+        "/api/code/task-suggestions/start", dependencies=[guard], responses=SSE_RESPONSE,
+    )
+    async def start_task_suggestion(
+        request: Request, req: TaskSuggestionStartIn,
+    ) -> EventSourceResponse:
+        """Start a proposed card in its own conversation, in the project it was proposed in.
+
+        Who may click: the owner's screen credential, which a browser tab holds once it is paired with a
+        code from the desktop app. A bearer token (the agent's shell reads one from disk) and the desktop
+        bridge are refused, and so is a paired phone, which is not a screen. The card is checked in order:
+        it must exist in that conversation, it must not have been started, the conversation must have a
+        folder, and only then is it claimed. A failed placement gives the claim back.
+        """
+        from_bridge = bool(request.scope.get(VIA_BRIDGE_SCOPE_KEY))
+        browser_allowed, via_bridge = turn_origin(request.scope)
+        if via_bridge or from_bridge:
+            raise HTTPException(
+                status_code=403,
+                detail="a proposed task is started from the owner's screen, not through the desktop bridge",
+            )
+        if not browser_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail="a proposed task is started from the owner's screen; this request carries no screen credential",
+            )
+        cards = open_store(Path(live().home) / CARDS_FILE_NAME)
+        if cards.broken:
+            raise HTTPException(status_code=409, detail=BROKEN_REASON)
+        card = cards.get(req.origin_session_id, req.card_id)
+        if card is None:
+            raise HTTPException(
+                status_code=404,
+                detail="no proposed task with this id in that conversation",
+            )
+        if card.used:
+            raise HTTPException(status_code=409, detail="this proposed task was already started")
+        folder = _folder_of(req.origin_session_id)
+        if not folder:
+            raise HTTPException(
+                status_code=404,
+                detail="the conversation the task came from has no folder, so there is nowhere to start it",
+            )
+        if cards.claim(req.origin_session_id, req.card_id) != "ok":
+            raise HTTPException(status_code=409, detail="this proposed task was already started")
+        turn = CodeTurnRequest(
+            message=card.prompt,
+            title=card.title,
+            project=folder,
+            model=req.model,
+            worktree="new" if req.new_worktree else None,
+        )
+        turn.bypass_permissions = False
+        turn.close_loop_follow = None
+        turn._via_screen = True
+        turn._via_bridge = False
+        turn._task_card = CardOrigin(tainted=card.tainted)
+        try:
+            turn, place = await _placed(turn)
+            return await _start_turn(turn, place=place, browser_link=browser_link, browser_allowed=True)
+        except BaseException:
+            # A start that did not happen must not use the card up.
+            cards.release(req.origin_session_id, req.card_id)
+            raise
+
     @app.post("/api/code/turn", dependencies=[guard], responses=SSE_RESPONSE)
     async def code_turn(request: Request, req: CodeTurnRequest) -> EventSourceResponse:
         # Scope markers are process-set; only the screen that proved its per-launch credential may
@@ -3159,16 +3283,72 @@ def register_code_api(
         req.bypass_permissions = False
         req.close_loop_follow = None
         turn_browser_link = browser_link if browser_allowed else None
-        place = None
-        if req.project is not None or req.worktree is not None or req.branch is not None:
-            req, place = await _placed(req)
-        if req.mode == "queue":
-            return await _queue_turn(
-                req, browser_link=turn_browser_link, browser_allowed=browser_allowed
+        card_claim = _claim_card_for_here(req, from_bridge=from_bridge or via_bridge, screen=browser_allowed)
+        try:
+            place = None
+            if req.project is not None or req.worktree is not None or req.branch is not None:
+                req, place = await _placed(req)
+            if req.mode == "queue":
+                return await _queue_turn(
+                    req, browser_link=turn_browser_link, browser_allowed=browser_allowed
+                )
+            return await _start_turn(
+                req, place=place, browser_link=turn_browser_link, browser_allowed=browser_allowed
             )
-        return await _start_turn(
-            req, place=place, browser_link=turn_browser_link, browser_allowed=browser_allowed
-        )
+        except BaseException:
+            if card_claim is not None:
+                open_store(Path(live().home) / CARDS_FILE_NAME).release(*card_claim)
+            raise
+        finally:
+            if card_claim is not None:
+                with _here_lock:
+                    _here_inflight.discard(card_claim[0])
+
+    # One "Do it here" per conversation at a time. The live-turn check alone leaves a gap between it and
+    # the turn registering itself; this set closes it, and is released when the start returns.
+    _here_lock = threading.Lock()
+    _here_inflight: set[str] = set()
+
+    def _claim_card_for_here(
+        req: CodeTurnRequest, *, from_bridge: bool, screen: bool,
+    ) -> tuple[str, str] | None:
+        """"Do it here": the prompt of a card of THIS conversation, sent as its next turn.
+
+        The server decides everything the card carries. The message the browser sent is replaced by the
+        card's own prompt, and the card's taint (decided by the server, never read from the body) rides
+        on the request, so the turn that runs it seeds the taint in its ledger and has no bypass: the
+        prompt came from a turn that may have read hostile content, and a click does not clean it.
+        """
+        if req.task_card_id is None:
+            return None
+        if from_bridge or not screen:
+            raise HTTPException(
+                status_code=403,
+                detail="a proposed task is started from the owner's screen; this request carries no screen credential",
+            )
+        if not req.session_id or req.mode == "queue":
+            raise HTTPException(
+                status_code=422, detail="a proposed task is sent into its own conversation, not queued",
+            )
+        cards = open_store(Path(live().home) / CARDS_FILE_NAME)
+        if cards.broken:
+            raise HTTPException(status_code=409, detail=BROKEN_REASON)
+        card = cards.get(req.session_id, req.task_card_id)
+        if card is None:
+            raise HTTPException(
+                status_code=404, detail="no proposed task with this id in that conversation",
+            )
+        if card.used:
+            raise HTTPException(status_code=409, detail="this proposed task was already started")
+        with _here_lock:
+            if req.session_id in _here_inflight or live_turns.of_session(req.session_id) is not None:
+                raise HTTPException(status_code=409, detail="a turn is running here; send the task when it ends")
+            if cards.claim(req.session_id, req.task_card_id) != "ok":
+                raise HTTPException(status_code=409, detail="this proposed task was already started")
+            _here_inflight.add(req.session_id)
+        req.message = card.prompt
+        req._task_card = CardOrigin(tainted=card.tainted)
+        return (req.session_id, req.task_card_id)
 
     async def _placed(req: CodeTurnRequest) -> tuple[CodeTurnRequest, Place]:
         """Resolve ``project`` / ``worktree`` / ``branch`` into the folder the turn runs in.
@@ -4037,6 +4217,22 @@ def register_code_api(
         from chimera.design.intent import detect as detect_design
 
         guest_turn = bool(author) and not req.channel_origin
+        # A card needs a screen that can show it: never a guest's, a linked chat's or a headless turn's.
+        # A card needs a turn whose screen is watching it: not a background work, a linked chat, a guest
+        # or a headless run. Only then is the card store bound to the turn.
+        card_store = open_store(Path(live().home) / CARDS_FILE_NAME)
+        task_tray = (
+            TaskSuggestionTray(store=card_store)
+            if card_screen_turn(
+                background=background, via_screen=req._via_screen,
+                channel_origin=req.channel_origin, guest=guest_turn,
+            )
+            else None
+        )
+        # A conversation begun from a tainted card, or continued after one, starts with the taint seeded
+        # and without the bypass, whatever the project has saved.
+        card_origin = req._task_card
+        seeded = bool(card_origin and card_origin.tainted) or card_store.is_tainted_session(req.session_id)
         design_intent = detect_design(req.message)
         design_sink = DesignAnnouncer()
         design_offer = (
@@ -4093,10 +4289,13 @@ def register_code_api(
             via_screen=via_screen, via_bridge=via_bridge, session_id=req.session_id, store=store,
             project_on=lambda: projects.bypass_for(ws),
         )
+        if seeded:
+            bypass_switch = lambda: False  # noqa: E731 - a tainted conversation never gets the bypass
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
             extra_tools=extra_tools or None, run_id=turn_id, notice_sink=notice_sink,
             chart_sink=chart_sink,
+            task_tray=task_tray,
             # A turn with an author was sent through a share link (`guest_api` never sends an empty
             # name: `_clean_name` falls back to ANONYMOUS), or is a background work one started.
             # A linked chat's turn has an author too - its platform, so the receipt and the live row
@@ -4110,6 +4309,10 @@ def register_code_api(
             bypass_permissions=bypass_switch,
             wait_forever=(via_screen and approval_sink is not None and getattr(approval_sink, "emit", None) is not None),
         )
+        if seeded:
+            seed_taint(ledger)
+        if task_tray is not None:
+            task_tray.tainted = lambda: bool(ledger.run_tainted())
         if design_offer is not None and design_offer.offered:
             design_offer_tool = agent.tools.get("design")
         if background is not None:
@@ -4119,6 +4322,10 @@ def register_code_api(
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
             session.bypass_permissions = bool(bypass_switch())
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        if task_tray is not None:
+            task_tray.session_id = session.session_id
+        if card_origin is not None:
+            card_store.mark_started(session.session_id, tainted=card_origin.tainted)
         if design_offer is not None:
             # The session is known only now; the gate and the design tool read it when they run.
             design_session = session.session_id
@@ -4283,6 +4490,8 @@ def register_code_api(
         # Kept, unlike a browser frame: a chart is part of the answer, not a picture of a moment, and a
         # screen that reconnects mid-turn should get it back. `chart_frame` caps what it carries.
         chart_sink.emit = lambda frame: emit("chart", frame)
+        if task_tray is not None:
+            task_tray.emit = lambda name, data: emit(name, data)
         # Kept for the same reason: a design the agent changed is part of the answer. `design` is one
         # frame per saved change ({document_id, title, revision, ops_applied, action});
         # `design_suggestion` is one per turn whose message asked for a visual design ({level,
@@ -5644,6 +5853,15 @@ def register_code_api(
                 elif turn_id not in deleted_mid_turn and not isinstance(exc, _StoppedWhileWaiting):
                     _turn_ended(session_id, failed=True, edited=bool(edited), only_if_stored=True)
             finally:
+                # A card proposed before a web read in this turn is tainted by the end of it, and the
+                # conversation is marked for the cards it proposes later.
+                try:
+                    card_store.settle_turn(
+                        session_id, task_tray.proposed_ids if task_tray is not None else [],
+                        tainted=bool(ledger.run_tainted()),
+                    )
+                except Exception as exc:  # noqa: BLE001 - the turn is over; the store logs its own failure
+                    _log.warning("could not settle the turn's task cards: %s", type(exc).__name__)
                 for temporary_image in temporary_images:
                     try:
                         temporary_image.unlink(missing_ok=True)

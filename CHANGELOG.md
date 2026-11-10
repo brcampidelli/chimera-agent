@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **Side chat (Ctrl/Cmd+;) for a quick question about the conversation without adding to it.** It reads the conversation as data, answers with no tools, and writes nothing into the conversation's history; "Bring into the conversation" only fills the composer, and when the conversation has read outside content it quotes the answer as data and asks first. Its cost is recorded (an interrupted answer as an estimate), local models stay free under a daily cap, and the shortcuts help moved to Ctrl/Cmd+/. (#1204)
+
+- **Suggested-task cards: the agent proposes side work instead of drifting into it.** When it notices something outside the task (dead code, a stale doc, a missing test, a security issue seen in passing) it can only propose a card; you see the full prompt before anything runs and choose Start (a new conversation in the same project), Do it here, Options or Dismiss, with Start all asking for confirmation and capped at five. Only the owner's screen starts a card, the server keeps the prompt (the page sends only the card id), and a card proposed by a turn that read outside content starts its conversation marked as tainted and without "Ignore permissions", with a warning on the card. (#1206)
 
 ## [0.85.0] - 2026-11-04
 ### Fixed

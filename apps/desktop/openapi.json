@@ -5156,6 +5156,18 @@
             "title": "Summarise Compaction",
             "type": "boolean"
           },
+          "task_card_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Card Id"
+          },
           "thinking": {
             "anyOf": [
               {
@@ -17907,6 +17919,67 @@
         "title": "TaskCardOut",
         "type": "object"
       },
+      "TaskCardStatusOut": {
+        "description": "The task card store's state. ``broken`` is true until the owner deletes ``files`` from the home.",
+        "properties": {
+          "broken": {
+            "title": "Broken",
+            "type": "boolean"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "broken",
+          "files"
+        ],
+        "title": "TaskCardStatusOut",
+        "type": "object"
+      },
+      "TaskSuggestionStartIn": {
+        "description": "The owner's \"Iniciar\" on a proposed card: the card's id and the owner's two options.\n\nThe title, prompt and taint are read from the server's record of the card (`chimera/core/task_cards.py`),\nnever from this body. There is no posture field: a new conversation uses the project's posture,\nand the bypass rules are the ones in `_start_turn`.",
+        "properties": {
+          "card_id": {
+            "pattern": "^[0-9a-f]{12}$",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "new_worktree": {
+            "default": false,
+            "title": "New Worktree",
+            "type": "boolean"
+          },
+          "origin_session_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Origin Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin_session_id",
+          "card_id"
+        ],
+        "title": "TaskSuggestionStartIn",
+        "type": "object"
+      },
       "TiersOut": {
         "properties": {
           "mid": {
@@ -22207,6 +22280,67 @@
           }
         },
         "summary": "Network Open"
+      }
+    },
+    "/api/code/task-cards/status": {
+      "get": {
+        "description": "Whether the task card store failed its integrity check, for the owner's standing warning.",
+        "operationId": "task_card_status_api_code_task_cards_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCardStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Task Card Status"
+      }
+    },
+    "/api/code/task-suggestions/start": {
+      "post": {
+        "description": "Start a proposed card in its own conversation, in the project it was proposed in.\n\nWho may click: the owner's screen credential, which a browser tab holds once it is paired with a\ncode from the desktop app. A bearer token (the agent's shell reads one from disk) and the desktop\nbridge are refused, and so is a paired phone, which is not a screen. The card is checked in order:\nit must exist in that conversation, it must not have been started, the conversation must have a\nfolder, and only then is it claimed. A failed placement gives the claim back.",
+        "operationId": "start_task_suggestion_api_code_task_suggestions_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSuggestionStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Task Suggestion"
       }
     },
     "/api/code/turn": {
