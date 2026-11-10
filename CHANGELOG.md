@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Suggested-task cards: the agent proposes side work instead of drifting into it.** When it notices something outside the task (dead code, a stale doc, a missing test, a security issue seen in passing) it can only propose a card; you see the full prompt before anything runs and choose Start (a new conversation in the same project), Do it here, Options or Dismiss, with Start all asking for confirmation and capped at five. Only the owner's screen starts a card, the server keeps the prompt (the page sends only the card id), and a card proposed by a turn that read outside content starts its conversation marked as tainted and without "Ignore permissions", with a warning on the card. (#1206)
 
+### Fixed
+
+- **The desktop app no longer hands the backend its secrets through the environment.** The server token, the screen credential and the launcher key used to travel as environment variables, which on Linux stay readable in `/proc/<pid>/environ` to any process of the same user, the agent's shell included. They now arrive on the backend's stdin as one line that is read and closed; the server token is kept in memory rather than in the process environment; a missing or malformed line stops the backend instead of starting it without a token; and the app refuses to use a backend that answers without one. (#1209)
+
 ## [0.85.0] - 2026-11-04
 ### Fixed
 
