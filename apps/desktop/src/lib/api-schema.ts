@@ -954,7 +954,9 @@ export interface paths {
          * @description Store the permission mode a conversation runs under, so a reload or a switch keeps it.
          *
          *     Bypass is not a stored mode and is refused. A paired device or the bridge may store only a
-         *     mode at or below the conversation's current one; the owner's screen may store any mode.
+         *     mode that widens nothing against the current one on any axis (the same rule as the turn);
+         *     the owner's screen may store any mode. The rule is the rename route's: no per-conversation
+         *     scope for a device, narrowing only.
          */
         patch: operations["set_code_permission_mode_api_code_sessions__session_id__permission_mode_patch"];
         trace?: never;
