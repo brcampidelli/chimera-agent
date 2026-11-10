@@ -5,9 +5,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-### Added
-
-- **One permission selector under the Code prompt.** Manual, Accept edits, Plan, Auto, Don't ask, and Ignore permissions (when the owner released it) are one choice for the conversation, kept with the conversation and read from Settings until someone picks; a paired device may only narrow it, judged axis by axis (reach, approval, commands, plan gate), and what a device sends can only take away from the mode's posture. Manual and Auto describe only what they do on a Code turn: approval `always` does not yet pause runs there (the taint containment is a separate setting, `CHIMERA_TAINT_NARROW`, on by default, and applies in every mode). Accept edits edits files without asking and asks on a card before each command that changes something (commands that only read pass, as under the `ask` host-exec setting), even with `CHIMERA_HOST_EXEC=allow`, except where the sandbox isolates the command: the posture gained a `commands` axis for it, since the grant used to run every command ungated. Plan forces the plan gate on. ⌘⇧M opens the selector, ⌘⇧O the model and ⌘⇧E the reasoning effort. Maximise moved from ⌘⇧M to ⌘⇧Enter.
 
 ### Added
 
