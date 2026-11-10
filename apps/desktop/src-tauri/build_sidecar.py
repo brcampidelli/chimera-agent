@@ -78,6 +78,13 @@ def main() -> int:
         if importlib.util.find_spec(pkg) is not None
         for arg in ("--collect-all", pkg)
     ]
+    # The Code screen's terminal on Windows (ConPTY, `chimera/api/pty_terminal.py`). pywinpty is
+    # imported by name at run time and ships a native module plus its helper binaries, which a
+    # static scan does not collect. Only when installed: without it the app's terminal says
+    # "unavailable" and nothing else changes.
+    terminal = (
+        ["--collect-all", "winpty"] if importlib.util.find_spec("winpty") is not None else []
+    )
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name", "chimera-backend",
@@ -120,6 +127,7 @@ def main() -> int:
         "--collect-all", "playwright",
         *vault,
         *messaging,
+        *terminal,
         "--collect-data", "chimera",
         # Every module of the package, not only the ones an import STATEMENT names. PyInstaller
         # follows `import x` and `from x import y`; it cannot follow `importlib.import_module(name)`,

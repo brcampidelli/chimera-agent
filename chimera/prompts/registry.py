@@ -458,6 +458,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="the line before a fenced tool failure, so the loop reads it as a failure; the tool's "
             "message stays inside the fence (tests/test_a_fenced_failure_is_still_a_failure.py)"),
     _i("tool.decide_description", "chimera.tools.decide:DecideTool", "tool", ("S9",)),
+    _i("tool.task_suggestion_description", "chimera.tools.task_suggestion:SuggestTaskTool", "tool",
+       ("S1",), note="the card a turn proposes instead of drifting off task; the owner starts it"),
+    _i("tool.task_dismiss_description", "chimera.tools.task_suggestion:DismissTaskTool", "tool",
+       ("S1",), note="withdraws a card this turn proposed"),
     _c("tool.browser_viewport_first", "chimera.tools.browser:_VIEWPORT_FIRST_DESCRIPTION", "tool",
        ("S11",), "measured", "bench/browser_viewport_tasks (lost to the shipped description)"),
     # ---- the browser situation (study 25, S11; off unless CHIMERA_BROWSER_SITUATION) ------------
@@ -526,6 +530,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        "unmeasured",
        note="turn context, only on a Code turn whose folder has commands on; the suite rule is "
             "chimera/tools/suite_gate.py, measured 2026-10-29 to 31 (suites started beside each other)"),
+    # The side chat (`chimera/api/side_chat.py`): one question about a conversation, asked with no
+    # tools and fenced transcript data. Its own call, so the layer is "call", as the judges are.
+    _c("code.side_chat", "chimera.api.side_chat:SIDE_CHAT_SYSTEM", "call", ("S2",), "unmeasured",
+       note="the side chat's system prompt; its user turn is the fenced transcript and the question"),
     _i("tool.design_description", "chimera.tools.design:DesignTool", "tool", ("S2",),
        note="offered per turn by the intent detector, never in the default registry"),
     # ---- bench-only ----------------------------------------------------------------------------
@@ -539,6 +547,7 @@ SECTIONS: tuple[PromptSection, ...] = (
 #: Constants whose names look like prompts but are never sent to a model. Each says why, so the scan
 #: in the test cannot be satisfied by quietly adding a name here.
 NOT_PROMPTS: dict[str, str] = {
+    "chimera.core.task_cards:BROKEN_REASON": "said to the owner in an HTTP refusal and a log line; no model reads it",
     "chimera.api.plan_gate:REASON": "shown to the person on the approval card; no model reads it",
     "chimera.governance.exec_facts:HEADER": (
         "the title of the 'what this runs' block appended to a shell command's approval card and "
