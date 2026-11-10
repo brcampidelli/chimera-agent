@@ -121,7 +121,7 @@ def sweep(
 
     archived: list[str] = []
     checked = 0
-    for sid, _mark, pr in [*unsettled, *closed]:
+    for sid, mark, pr in [*unsettled, *closed]:
         if checked >= MAX_PER_SWEEP:
             break
         checked += 1
@@ -132,6 +132,10 @@ def sweep(
         if reading.state not in PR_STATES:
             continue  # an error about this PR: this conversation waits, the others do not
         if not _same_url(url, reading.url) or (not url and not reading.url):
+            continue
+        if url and reading.state == mark.pr_state:
+            # Nothing the snapshot did not already say: no record to write, so no lock, no file read.
+            # (A record changed since the snapshot is caught by the next pass.)
             continue
         outcome = marks.settle_pull_request(
             sid,

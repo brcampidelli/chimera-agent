@@ -505,3 +505,52 @@ def test_the_state_adds_a_constant_number_of_reads_to_the_list_whatever_its_leng
     assert [o for o in outside if o.endswith("code_sessions.marks.json")] != []
     assert len([o for o in outside if o.endswith("code_sessions.marks.json")]) == 1, outside
     assert len(outside) <= 3, outside
+
+
+def test_the_pr_sweep_thread_reads_no_file_while_every_pr_is_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: type
+) -> None:
+    """The sweep the list starts works from the list's snapshot (marks, folders). With each PR still open
+    nothing changed, so the thread opens no file: not the marks, not the approvals, not a conversation.
+    It was the thread's reads, landing inside a later list call, that the constant-reads test counted."""
+    import builtins
+    import io
+    import time
+
+    from chimera.core.pull_request_status import PullRequestStatus
+
+    monkeypatch.setattr(
+        "chimera.core.pull_request_status.pull_request_status",
+        lambda folder, number: PullRequestStatus(
+            state="open", url=f"https://github.com/o/r/pull/{number}"
+        ),
+    )
+    app = App(tmp_path, monkeypatch, agent)
+    folder = app.home / "code_sessions"
+    folder.mkdir(parents=True, exist_ok=True)
+    store = CodeSessionStore(folder)
+    for i in range(3):
+        (folder / f"s{i}.json").write_text(
+            json.dumps({"session_id": f"s{i}", "workspace": str(app.folder), "messages": []}),
+            encoding="utf-8",
+        )
+        store.marks.pull_request_opened(
+            f"s{i}", number=i + 1, url=f"https://github.com/o/r/pull/{i + 1}"
+        )
+    seen: list[str] = []
+    real = io.open
+
+    def counting(file: Any, *a: Any, **kw: Any) -> Any:
+        if threading.current_thread().name == "pr-auto-archive":
+            seen.append(str(file))
+        return real(file, *a, **kw)
+
+    monkeypatch.setattr(io, "open", counting)
+    monkeypatch.setattr(builtins, "open", counting)
+    app.rows()
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline and any(
+        t.name == "pr-auto-archive" for t in threading.enumerate()
+    ):
+        time.sleep(0.01)
+    assert seen == []

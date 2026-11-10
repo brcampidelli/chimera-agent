@@ -635,3 +635,37 @@ def test_a_list_with_no_open_pr_starts_no_sweep_thread(monkeypatch: pytest.Monke
     assert pr_auto_archive.has_work({"a": ConversationMark(), "b": merged}) is False
     assert sweeper.kick(lambda: None, enabled=True, has_work=False) is False
     assert started == [] and sweeper.running is False
+
+
+def test_a_pass_over_unchanged_open_prs_reads_nothing_from_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sweep reads from the list's snapshot; the marks file and `held()` are touched only when a PR
+    changed. With every PR still open the pass opens no file at all (only `gh`, stubbed here)."""
+    import builtins
+    import io
+
+    marks = _marks_with_pr(tmp_path, "s1", "s2")
+    marks.set_pr_state("s1", "open")
+    marks.set_pr_state("s2", "open")
+    snapshot = marks.all()
+    asked: list[str] = []
+    opened: list[str] = []
+    real = io.open
+
+    def counting(file: Any, *a: Any, **kw: Any) -> Any:
+        opened.append(str(file))
+        return real(file, *a, **kw)
+
+    monkeypatch.setattr(io, "open", counting)
+    monkeypatch.setattr(builtins, "open", counting)
+    outcome = sweep(
+        marks,
+        read=Pr("open"),
+        folder_of=lambda sid: Path(sid),
+        held=lambda sid: asked.append(sid) or False,
+        now=1.0,
+        snapshot=snapshot,
+    )
+    assert outcome == [] and asked == []
+    assert opened == []

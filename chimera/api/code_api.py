@@ -37,7 +37,7 @@ import threading
 import time
 import unicodedata
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
@@ -6368,7 +6368,7 @@ def register_code_api(
 
     pr_sweeper = Sweeper()
 
-    def _sweep_pull_requests(snapshot: Any = None) -> None:
+    def _sweep_pull_requests(snapshot: Any = None, workspaces: Mapping[str, str] | None = None) -> None:
         """One pass of the pull-request switch, on the background thread the list starts. Never
         raises into that thread's void silently: a failure is logged and the next pass tries again."""
         from chimera.api.conversation_state import archive_refusal
@@ -6376,7 +6376,8 @@ def register_code_api(
         from chimera.core.pull_request_status import pull_request_status
 
         def folder_of(sid: str) -> Path:
-            stored = store.stored_workspace(sid)
+            # The list already read each row's folder; only a conversation it did not list is read.
+            stored = workspaces[sid] if workspaces and sid in workspaces else store.stored_workspace(sid)
             return Path(stored).expanduser() if stored else workspace
 
         def held(sid: str) -> bool:
@@ -6490,7 +6491,7 @@ def register_code_api(
         # a minute, and its archives show on the next look (`chimera/core/pr_auto_archive.py`).
         # The pass gets the snapshot this look already read: it schedules and reads nothing here.
         pr_sweeper.kick(
-            lambda: _sweep_pull_requests(marks),
+            lambda: _sweep_pull_requests(marks, {str(r["id"]): str(r.get("workspace") or "") for r in rows}),
             enabled=bool(live().archive_on_pr_merge),
             has_work=pr_has_work(marks),
         )
