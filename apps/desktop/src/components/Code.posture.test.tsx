@@ -90,6 +90,7 @@ describe("Code — reach & approval", () => {
     expect(vi.mocked(streamCodeTurn).mock.calls[0][0].posture).toEqual({
       reach: "workspace",
       approval: "suspicious",
+      commands: "granted",
     });
   });
 
