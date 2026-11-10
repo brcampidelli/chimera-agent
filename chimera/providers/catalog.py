@@ -171,11 +171,11 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",
-        0.09375, 0.25, tools=True, context_k=128, also_seen=((0.075, 0.20),),
+        0.09375, 0.25, tools=True, context_k=32, also_seen=((0.075, 0.20),),
         # Its routes list 16,384 (DeepInfra, Venice), 26,214 (Mistral) and 32,768 (Parasail, no
         # tools) on 2026-09-26; at the 32k ceiling every tool-free call went to Parasail alone.
         max_output=16_384,
-        notes="the local-lift goldilocks model; cheap paid weak with usable tools. The window read\n        256k here until 2026-09-03; the provider serves 131k. Priced 0.075/0.20 here until 2026-10-22, when the live index quoted 0.09375/0.25 on the Venice route; the row carries the higher pair and 0.075/0.20 stays in also_seen",
+        notes="the local-lift goldilocks model; cheap paid weak with usable tools. The window read\n        256k here until 2026-09-03; the provider serves 131k. Priced 0.075/0.20 here until 2026-10-22, when the live index quoted 0.09375/0.25 on the Venice route; the row carries the higher pair and 0.075/0.20 stays in also_seen. On 2026-11-10 the live check on main turned red: the provider serves 32,768, so the row carries 32k.",
     ),
     CatalogEntry(
         "openrouter/meta-llama/llama-3.3-70b-instruct", "weak", "Meta",

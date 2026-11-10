@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The catalogue no longer promises a 128k window for Mistral Small 3.2.** OpenRouter now serves it with 32,768 tokens of context, which the live check on main caught; the row now says 32k, so context sizing and the model picker stop overestimating it. (#1211)
+
 - **The desktop app no longer hands the backend its secrets through the environment.** The server token, the screen credential and the launcher key used to travel as environment variables, which on Linux stay readable in `/proc/<pid>/environ` to any process of the same user, the agent's shell included. They now arrive on the backend's stdin as one line that is read and closed; the server token is kept in memory rather than in the process environment; a missing or malformed line stops the backend instead of starting it without a token; and the app refuses to use a backend that answers without one. (#1209)
 
 ## [0.85.0] - 2026-11-04
