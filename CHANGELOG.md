@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Suggested-task cards: the agent proposes side work instead of drifting into it.** When it notices something outside the task (dead code, a stale doc, a missing test, a security issue seen in passing) it can only propose a card; you see the full prompt before anything runs and choose Start (a new conversation in the same project), Do it here, Options or Dismiss, with Start all asking for confirmation and capped at five. Only the owner's screen starts a card, the server keeps the prompt (the page sends only the card id), and a card proposed by a turn that read outside content starts its conversation marked as tainted and without "Ignore permissions", with a warning on the card. (#1206)
 
+### Changed
+
+- **Reversible features now start on.** Closing the loop on a verified Code turn (commit, open the pull request, follow the CI and run up to two fix turns), pull requests, bots transcribing voice notes locally, and deferred tools are on by default; merging stays off and has its own owner-only switch, and billing, destructive migrations, row-level security, grants and secrets still never merge by themselves. Skill cards stay off, now with the revised measurement on screen (+37–48% tokens, and −8.3 pp in a repeat run). A deferred tool is only loaded later, never granted: the owner's policy, the project pack and the posture are checked again when it is called, a subagent is never handed a denied one, and calling a harmless deferred tool no longer marks the turn as tainted. Benchmarks pin the old defaults so their published numbers still reproduce. (#1210)
+
 ## [0.85.0] - 2026-11-04
 ### Fixed
 
