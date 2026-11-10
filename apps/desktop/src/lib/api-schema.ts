@@ -5499,6 +5499,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/terminal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Terminal Open */
+        post: operations["terminal_open_api_terminal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terminal/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Terminal Status */
+        get: operations["terminal_status_api_terminal_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terminal/{terminal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Terminal Close */
+        delete: operations["terminal_close_api_terminal__terminal_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terminal/{terminal_id}/input": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Terminal Input */
+        post: operations["terminal_input_api_terminal__terminal_id__input_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terminal/{terminal_id}/resize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Terminal Resize */
+        post: operations["terminal_resize_api_terminal__terminal_id__resize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terminal/{terminal_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Terminal Stream */
+        get: operations["terminal_stream_api_terminal__terminal_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tools": {
         parameters: {
             query?: never;
@@ -14463,6 +14565,64 @@ export interface components {
             new_worktree: boolean;
             /** Origin Session Id */
             origin_session_id: string;
+        };
+        /** TerminalInputIn */
+        TerminalInputIn: {
+            /** Data */
+            data: string;
+        };
+        /** TerminalOkOut */
+        TerminalOkOut: {
+            /** Ok */
+            ok: boolean;
+        };
+        /** TerminalOpenIn */
+        TerminalOpenIn: {
+            /**
+             * Cols
+             * @default 80
+             */
+            cols: number;
+            /**
+             * Rows
+             * @default 24
+             */
+            rows: number;
+            /**
+             * Workspace
+             * @description Folder to open in (the conversation's, its worktree when it has one).
+             */
+            workspace?: string | null;
+        };
+        /** TerminalOpenOut */
+        TerminalOpenOut: {
+            /** Cwd */
+            cwd: string;
+            /** Id */
+            id: string;
+            /** Shell */
+            shell: string;
+        };
+        /** TerminalResizeIn */
+        TerminalResizeIn: {
+            /** Cols */
+            cols: number;
+            /** Rows */
+            rows: number;
+        };
+        /** TerminalStatusOut */
+        TerminalStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Max */
+            max: number;
+            /** Open */
+            open: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
         };
         /** TiersOut */
         TiersOut: {
@@ -23983,6 +24143,192 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuggestionStatsOut"];
+                };
+            };
+        };
+    };
+    terminal_open_api_terminal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalOpenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalOpenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminal_status_api_terminal_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalStatusOut"];
+                };
+            };
+        };
+    };
+    terminal_close_api_terminal__terminal_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                terminal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalOkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminal_input_api_terminal__terminal_id__input_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                terminal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalInputIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalOkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminal_resize_api_terminal__terminal_id__resize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                terminal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalResizeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalOkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminal_stream_api_terminal__terminal_id__stream_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                terminal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

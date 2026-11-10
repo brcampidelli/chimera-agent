@@ -2030,4 +2030,14 @@ def get_settings() -> Settings:
     names = startup_names(env_file)
     if names:
         load_into_environment(names=names, env_file=env_file)
-    return Settings(_env_file=env_file)  # type: ignore[call-arg]  # pydantic-settings runtime-only constructor option
+    settings = Settings(_env_file=env_file)  # type: ignore[call-arg]  # pydantic-settings runtime-only constructor option
+    # The bearer token the desktop shell delivered on stdin (`chimera/launch_secrets.py`). It is held
+    # in memory and applied here rather than put in `os.environ`, where on Windows a same-user process
+    # reads it from the live environment block. A value placed in the environment after start-up (the
+    # owner saving a new token, a service adopting its own) is deliberately the one that wins.
+    from chimera import launch_secrets
+
+    delivered = launch_secrets.server_token()
+    if delivered and not os.environ.get("CHIMERA_SERVER_TOKEN"):
+        settings.server_token = delivered
+    return settings

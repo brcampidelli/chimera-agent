@@ -42,6 +42,7 @@ import { aliasesOf, loadProjects } from "@/lib/projects";
 import { groupSessions, matchesSearch, orderedSessions, type SidebarGroup } from "@/lib/sidebar-groups";
 import { readCollapsed, readGroupWorktrees, writeCollapsed, writeGroupWorktrees } from "@/lib/sidebar-prefs";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
+import { forgetLineComments } from "@/lib/line-comments";
 import { usePendingUserQuestions } from "@/lib/usePendingUserQuestions";
 import { cn } from "@/lib/utils";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
@@ -181,7 +182,7 @@ export function SessionSidebar({
   // and count it, instead of asking "are you sure?" about nothing in particular.
   const [confirming, setConfirming] = useState<
     | { kind: "session"; session: CodeSessionMeta }
-    | { kind: "project"; project: string; label: string; workspaces: string[]; n: number }
+    | { kind: "project"; project: string; label: string; workspaces: string[]; n: number; sessionIds: string[] }
     | null
   >(null);
   // One order for every view: the filter and the search narrow the full list rather than building
@@ -280,6 +281,8 @@ export function SessionSidebar({
     mutationFn: async (target: NonNullable<typeof confirming>) => {
       if (target.kind === "session") {
         await deleteCodeSession(target.session.id);
+        // Its unsent diff comments were for a conversation that no longer exists.
+        forgetLineComments(target.session.id);
         // Not the one its project reopens any more: an unknown id opens empty under the old id.
         if (readLastSession(target.session.workspace) === target.session.id)
           writeLastSession(target.session.workspace, null);
@@ -297,6 +300,8 @@ export function SessionSidebar({
         await deleteCodeProject(folder);
         writeLastSession(folder, null);
       }
+      // Every conversation of the project is gone, so its unsent diff comments go with them.
+      for (const id of target.sessionIds) forgetLineComments(id);
     },
     // Closed on settle, not on success: a delete that failed leaves the row on screen, and a dialog
     // that stays open over it reads as "still working" for something that already stopped.
@@ -371,7 +376,14 @@ export function SessionSidebar({
     const whole = allGroups.find((g) => g.key === key);
     const sessions = whole?.sessions ?? [];
     const workspaces = [...new Set([key, ...sessions.map((s) => s.workspace)])];
-    setConfirming({ kind: "project", project: key, label: whole?.label || key, workspaces, n: sessions.length });
+    setConfirming({
+      kind: "project",
+      project: key,
+      label: whole?.label || key,
+      workspaces,
+      n: sessions.length,
+      sessionIds: sessions.map((s) => s.id),
+    });
   }
 
   const rowActions: SessionRowActions = {

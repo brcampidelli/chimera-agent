@@ -63,7 +63,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from chimera.core.redact import _SECRET_MARKERS
+from chimera.core.redact import is_secret_env
 from chimera.core.worktree import is_git_repo
 from chimera.proc.stdio import no_window
 
@@ -209,7 +209,7 @@ def _env() -> dict[str, str]:
     env = {
         k: v
         for k, v in os.environ.items()
-        if k.upper() in _GH_CREDENTIALS or not any(m in k.upper() for m in _SECRET_MARKERS)
+        if k.upper() in _GH_CREDENTIALS or not is_secret_env(k, v)
     }
     env.update(
         GIT_TERMINAL_PROMPT="0",

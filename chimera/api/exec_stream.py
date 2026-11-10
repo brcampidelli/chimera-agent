@@ -1,4 +1,5 @@
-"""Streaming command-runner for the Code screen — an HONEST command-runner, NOT an interactive terminal.
+"""Streaming command-runner for the Code screen — an HONEST command-runner, NOT an interactive terminal
+(the real one, a PTY, is `chimera/api/pty_terminal.py`).
 
 Each call is a **fresh subprocess**: cwd/env do NOT persist between calls (no ``cd``/``export`` state).
 On the local sandbox it streams the child's combined ``stdout``+``stderr`` line by line so the UI can

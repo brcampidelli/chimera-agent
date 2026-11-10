@@ -420,6 +420,10 @@ _NEVER = (
     "/api/fs/",
     "/api/git/",
     "/api/lsp/",
+    # A shell, and the output of one. The route also refuses a device by itself
+    # (`terminal_api.owner_refusal`); this is the second lock, because a stream is a GET and a GET
+    # reaches everything not named here.
+    "/api/terminal",
     # Answers that ARE a door: a messaging bot's pending pairing code makes whoever sends it the
     # bot's owner; the memory export, the diagnostics and the troubleshooting report carry the
     # machine's paths, logs and settings wholesale.

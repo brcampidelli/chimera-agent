@@ -216,6 +216,11 @@ desktop = [
     # package, and making the agent refuse to start where that wheel does not build would trade the
     # whole product for a telemetry readout. Absent, the panel says "unavailable" and names this.
     "psutil>=5.9",
+    # The terminal on the Code screen (`chimera/api/pty_terminal.py`). Windows only: POSIX gets its pty
+    # from the standard library. A compiled wheel (ConPTY), so it lives here and not in the core; MIT.
+    # Absent, the terminal answers "unavailable" with this install hint and the rest of the app is
+    # untouched — it never falls back to a pipe dressed as a terminal.
+    "pywinpty>=2.0; sys_platform == 'win32'",
 ]
 # Opt-in model evolution (LoRA/SFT/DPO). Heavy + GPU-bound — never required by the
 # agent; install only to run a `chimera evolve recipe` training script.
