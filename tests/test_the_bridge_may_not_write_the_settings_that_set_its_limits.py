@@ -173,6 +173,7 @@ BRIDGE_WRITABLE: frozenset[str] = frozenset(
         "CHIMERA_KEEP_AWAKE",
         "CHIMERA_KEEP_AWAKE_ON_BATTERY",
         "CHIMERA_ARCHIVE_AFTER_DAYS",  # archives; deletes nothing
+        "CHIMERA_ARCHIVE_ON_PR_MERGE",  # archives on a PR's state; deletes nothing, merges nothing
         # Display and experiments that add no reach: the browser's window, the context it is given,
         # the explorer's report format, and a research sub-agent with the read-only web tools the
         # Code turn already holds (`http_get` is in `default_registry`), inside the same ledger.

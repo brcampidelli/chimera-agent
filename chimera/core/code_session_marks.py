@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,16 @@ _log = get_logger("core.code_session_marks")
 
 #: The owner's switches for a conversation's pull request, both OFF until the owner turns them on.
 PULL_REQUEST_OPTIONS = ("fix_on_ci_failure", "cleanup_on_merge")
+
+#: Why a conversation was archived, kept on its record so the archived row can say it: ``owner`` (the
+#: person's own archive), ``inactive`` (``CHIMERA_ARCHIVE_AFTER_DAYS``), ``pr_merged`` / ``pr_closed``
+#: (``CHIMERA_ARCHIVE_ON_PR_MERGE``, `chimera/core/pr_auto_archive.py`), ``worktree_pruned`` (the
+#: worktree of the conversation was removed by the project's prune).
+ARCHIVE_REASONS = ("owner", "inactive", "pr_merged", "pr_closed", "worktree_pruned")
+
+#: The last state read for a conversation's latest pull request. ``open`` is written when the PR is
+#: recorded; a later read that finds it merged or closed is the change the automatic archive acts on.
+PR_STATES = ("open", "merged", "closed")
 
 
 def pull_request_record(raw: object) -> dict[str, Any] | None:
@@ -110,6 +121,9 @@ class ConversationMark:
 
     #: When it was archived, or None while it is in the list.
     archived_at: float | None = None
+    #: Why it was archived (:data:`ARCHIVE_REASONS`), kept after it is brought back so the archived
+    #: row can say why before the person brings it back. "" when it never was.
+    archive_reason: str = ""
     #: When it was last brought back from the archive. The automatic rule measures inactivity from
     #: the later of this and the last write, or a conversation someone just unarchived would go
     #: straight back on the next look, because unarchiving writes nothing to the transcript.
@@ -131,6 +145,10 @@ class ConversationMark:
     #: URL is the identity, so a retried call that reports the same PR again is not counted twice.
     #: The options belong to each PR: switching them on for one is not consent for the next.
     pull_requests: list[dict[str, Any]] = field(default_factory=list)
+    #: The state the pull-request sweep last read for the latest PR (:data:`PR_STATES`), "" when none
+    #: was read. Recorded ``open`` when the PR is recorded, so a merge the sweep finds later is a
+    #: change it saw, not a state it met for the first time (`chimera/core/pr_auto_archive.py`).
+    pr_state: str = ""
     #: The owner said this conversation is done. Only the owner's own route sets it, and the next
     #: turn that ends clears it: new work after "done" is not done. Whether a PR was MERGED is not
     #: read here — that is a network question, and a list that guessed it would be believed.
@@ -201,6 +219,8 @@ class CodeSessionMarks:
             if record is not None
         ]
         mark.completed = mark.completed is True
+        mark.archive_reason = mark.archive_reason if mark.archive_reason in ARCHIVE_REASONS else ""
+        mark.pr_state = mark.pr_state if mark.pr_state in PR_STATES else ""
         # Titles are read back from a file other versions write too: a non-string is no title, and
         # one longer than the cap is cut rather than drawn whole into a row.
         mark.title = clean_title(mark.title) if isinstance(mark.title, str) else ""
@@ -282,8 +302,85 @@ class CodeSessionMarks:
             mark.pull_requests = merge_pull_requests(mark.pull_requests, legacy)
             if not any(_same_pull_request(item, record) for item in mark.pull_requests):
                 mark.pull_requests.append(record)
+                mark.pr_state = "open"
 
         return self._update(session_id, change)
+
+    def settle_pull_request(
+        self,
+        session_id: str,
+        *,
+        number: int,
+        url: str,
+        state: str,
+        reason: str,
+        at: float,
+        free: Callable[[str], bool],
+    ) -> str:
+        """Record what the sweep read for a conversation's latest PR, and archive it when the read is a
+        settled change — all under this store's lock, after revalidating what the read was about.
+
+        The read was made earlier, outside the lock, so before anything is written the latest PR must
+        still be the one that was read (same number, and the same URL when one is recorded), and the
+        conversation must still be free — ``free`` is asked now, not at the start of the pass. Returns
+        ``archived``, ``recorded``, ``url_recorded``, ``unchanged``, ``held`` or ``moved``. ``moved`` means
+        the PR the read was about is no longer the conversation's latest, and nothing is written.
+
+        ``free`` runs UNDER the lock on purpose: it reads live turns, pending questions and share links,
+        none of which takes this lock, so it cannot deadlock, and checking it outside would leave a window
+        between the check and the write in which a turn could start. The residual window that remains is
+        the one after the write: a turn that starts then finds the conversation archived and brings it back
+        (the same rule as any turn in an archived conversation), so it is shown, not lost.
+
+        A record with no URL (C1 allowed one) is identified by its number. The first read that carries the
+        URL writes it and archives nothing in that pass (``url_recorded``); the next pass compares URLs.
+        """
+        if state not in PR_STATES:
+            raise ValueError(f"not a pull request state: {state!r}")
+        if reason and reason not in ARCHIVE_REASONS:
+            raise ValueError(f"not an archive reason: {reason!r}")
+        with self._lock:
+            sessions = self._read()
+            mark = self._mark(sessions.get(session_id))
+            latest = mark.pull_request
+            if latest is None or latest["number"] != number or (latest["url"] and latest["url"] != url):
+                return "moved"
+            if not latest["url"]:
+                if not url:
+                    return "unchanged"
+                mark.pull_requests[-1]["url"] = url
+                sessions[session_id] = asdict(mark)
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(self.path, json.dumps({"sessions": sessions}))
+                return "url_recorded"
+            if reason:
+                if mark.archived_at is not None:
+                    return "unchanged"
+                if not free(session_id):
+                    return "held"
+                mark.archived_at = at
+                mark.archive_reason = reason
+                mark.pr_state = state
+                outcome = "archived"
+            elif state != mark.pr_state:
+                mark.pr_state = state
+                outcome = "recorded"
+            else:
+                return "unchanged"
+            sessions[session_id] = asdict(mark)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(self.path, json.dumps({"sessions": sessions}))
+            return outcome
+
+    def set_pr_state(self, session_id: str, state: str) -> None:
+        """Record the state the sweep read for the latest PR (:data:`PR_STATES`)."""
+        if state not in PR_STATES:
+            raise ValueError(f"not a pull request state: {state!r}")
+
+        def change(mark: ConversationMark) -> None:
+            mark.pr_state = state
+
+        self._update(session_id, change)
 
     def set_pull_request_options(
         self,
@@ -369,9 +466,27 @@ class CodeSessionMarks:
 
         self._update(target_id, change)
 
-    def archive(self, session_id: str, *, at: float) -> ConversationMark:
+    def archive(
+        self,
+        session_id: str,
+        *,
+        at: float,
+        reason: str = "owner",
+        pr_state: str | None = None,
+    ) -> ConversationMark:
+        """Move a conversation out of the list, recording why. ``pr_state`` is written in the same
+        step when the pull-request sweep archives on a change it read — so the record of the state
+        and the archive cannot disagree after a crash between two writes."""
+        if reason not in ARCHIVE_REASONS:
+            raise ValueError(f"not an archive reason: {reason!r}")
+        if pr_state is not None and pr_state not in PR_STATES:
+            raise ValueError(f"not a pull request state: {pr_state!r}")
+
         def change(mark: ConversationMark) -> None:
             mark.archived_at = at
+            mark.archive_reason = reason
+            if pr_state is not None:
+                mark.pr_state = pr_state
 
         return self._update(session_id, change)
 

@@ -122,6 +122,11 @@ _EDITABLE_SETTINGS = {
     # `conversation_state.due_for_archive`). Shipped with no row, so the only way to turn it on was
     # `.env`. Read on every look at the list, so no APPLIES_WHEN entry.
     "CHIMERA_ARCHIVE_AFTER_DAYS",
+    # Archive a coding conversation once its pull request is merged or closed
+    # (`chimera/core/pr_auto_archive.py`). On by default; read on every sweep, so no APPLIES_WHEN
+    # entry. Bridge-writable like the switch above: it archives and deletes nothing, and the sweep
+    # only reads GitHub's state with the owner's own `gh` login, as the PR card already does.
+    "CHIMERA_ARCHIVE_ON_PR_MERGE",
     # NOT here, by design: CHIMERA_APPROVE_VIA_CHAT. Answering a pending approval from a chat bot
     # widens who can approve to whoever holds that channel, so turning it on stays a deliberate
     # edit of `.env` by the owner — never a switch a screen (or the desktop bridge) can flip.
@@ -813,6 +818,9 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "pull_requests": settings.pull_requests,
             # Whether a finished Code turn closes its own loop (`chimera/core/close_loop.py`). Off by default.
             "close_loop": settings.code_close_loop,
+            # Whether a conversation leaves the list once its pull request is merged or closed
+            # (`chimera/core/pr_auto_archive.py`). On by default; archiving touches nothing.
+            "archive_on_pr_merge": settings.archive_on_pr_merge,
             # The owner's lifecycle hooks and whether a shell hook may run on the host
             # (`docs/hooks-threat-model.md`). Both off by default; both owner-only.
             "hooks": settings.hooks,
@@ -1239,6 +1247,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_HOOKS_HOST_EXEC": _check_boolean("CHIMERA_HOOKS_HOST_EXEC"),
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
     "CHIMERA_CODE_CLOSE_LOOP": _check_boolean("CHIMERA_CODE_CLOSE_LOOP"),
+    "CHIMERA_ARCHIVE_ON_PR_MERGE": _check_boolean("CHIMERA_ARCHIVE_ON_PR_MERGE"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }
 

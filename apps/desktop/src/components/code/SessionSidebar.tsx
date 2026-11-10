@@ -48,6 +48,8 @@ import { readLastSession, writeLastSession } from "@/lib/workspace";
 /** Rows a section shows before "show more". Five is what fits a 240px column several projects deep
  *  without the first project pushing every other one below the fold. */
 const ROWS_PER_PROJECT = 5;
+/** The reasons the server writes on an archived conversation (`code_session_marks.ARCHIVE_REASONS`). */
+const ARCHIVE_REASON_KEYS = new Set(["owner", "inactive", "pr_merged", "pr_closed", "worktree_pruned"]);
 
 /** The conversations in the order the sidebar lists them, top to bottom — what Ctrl+Tab walks. Built
  *  from the same grouping the list draws with (`sidebar-groups.ts`), and reading the grouping switch
@@ -654,6 +656,10 @@ export function SessionSidebar({
           ) : (
             (archived.data ?? []).map((session) => {
               const name = session.title || t("code.sessions.untitled");
+              // Why it left the list, shown before the person brings it back (the stored reason).
+              const reason = ARCHIVE_REASON_KEYS.has(session.archive_reason ?? "")
+                ? t(`code.sessions.archiveReason.${session.archive_reason}`)
+                : "";
               return (
                 <div key={session.id} className="group/session flex items-center">
                   <button
@@ -668,6 +674,9 @@ export function SessionSidebar({
                     )}
                   >
                     {name}
+                    {reason ? (
+                      <span className="block truncate text-xs text-muted-foreground/80">{reason}</span>
+                    ) : null}
                   </button>
                   <button
                     type="button"

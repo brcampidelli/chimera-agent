@@ -73,6 +73,13 @@ const ENTRIES: readonly SearchEntry[] = [
     anchor: "settings-close-loop",
     terms: "settings.search.terms.closeLoop",
   },
+  {
+    tab: "general",
+    label: "settings.row.archiveOnPrMerge",
+    hint: "settings.hint.archiveOnPrMerge",
+    anchor: "settings-archive-on-pr-merge",
+    terms: "settings.search.terms.archiveOnPrMerge",
+  },
   // The Security screen's Access card: the browser's way to the owner's screen (a code, then a session).
   {
     tab: "security",

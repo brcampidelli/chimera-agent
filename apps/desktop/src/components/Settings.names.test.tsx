@@ -62,7 +62,7 @@ function config() {
     governance: "off",
     approval_webhook_set: false,
     pull_requests: false,
-    close_loop: false,
+    close_loop: false, archive_on_pr_merge: true,
     hooks: false,
     hooks_host_exec: false,
   },

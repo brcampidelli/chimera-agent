@@ -151,6 +151,7 @@ from chimera.core.diff_self_check import (
     named_paths_of,
 )
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
+from chimera.core.pr_auto_archive import Sweeper
 from chimera.core.project_place import Place
 from chimera.evolution.code_turn_learning import record_turn_lesson
 from chimera.governance.approval import ApprovalAnnouncer
@@ -6146,6 +6147,57 @@ def register_code_api(
         warmed = await run_in_threadpool(warm_transcriber)
         return TranscriberWarmOut(warmed=warmed, seconds=round(time.perf_counter() - began, 2))
 
+    pr_sweeper = Sweeper()
+
+    def _sweep_pull_requests() -> None:
+        """One pass of the pull-request switch, on the background thread the list starts. Never
+        raises into that thread's void silently: a failure is logged and the next pass tries again."""
+        from chimera.api.conversation_state import archive_refusal
+        from chimera.core.pr_auto_archive import PrReading, SweepBlocked, sweep
+        from chimera.core.pull_request_status import pull_request_status
+
+        def folder_of(sid: str) -> Path:
+            stored = store.stored_workspace(sid)
+            return Path(stored).expanduser() if stored else workspace
+
+        def held(sid: str) -> bool:
+            # Asked for this conversation at the moment it is decided, never from a snapshot taken
+            # before the pass: a turn that starts or a question that arrives mid-pass must hold it.
+            return bool(
+                archive_refusal(
+                    running=live_turns.of_session(sid) is not None,
+                    waiting=sid in _waiting_sessions(),
+                    background=sid in work_store.active_parents(),
+                    shared=bool(shares.for_session(sid)),
+                )
+            )
+
+        def read(folder: Path, number: int) -> PrReading:
+            # An error about this one conversation (its folder is gone, the PR was deleted, a generic
+            # failure) waits that conversation; only a blocking error stops the pass for all of them.
+            if not folder.is_dir():
+                return PrReading()
+            try:
+                status = pull_request_status(folder, number)
+            except OSError:
+                return PrReading()
+            if status.error:
+                return PrReading(failed=status.blocking)
+            return PrReading(state=status.state, url=status.url)
+
+        try:
+            archived = sweep(
+                store.marks, read=read, folder_of=folder_of, held=held, now=time.time()
+            )
+            if archived:
+                _log.info("archived %d conversation(s) whose pull request settled", len(archived))
+        except SweepBlocked:
+            # GitHub could not answer: the sweeper waits before the next pass, and logs nothing per row.
+            _log.info("pull request archive paused: GitHub could not be asked; retrying later")
+            raise
+        except Exception as exc:  # a background pass must not die silently; the next one retries
+            _log.warning("pull request archive pass failed: %s", exc)
+
     def _waiting_sessions() -> set[str]:
         """The conversations a waiting question belongs to: the join `GET /api/approvals` makes,
         so the list's "waiting" and the approvals card can never count two different things."""
@@ -6210,6 +6262,9 @@ def register_code_api(
         listed_prs = store.listed_pull_requests(marks)
         after_days = live().archive_after_days
         now = time.time()
+        # The PR switch reads GitHub, so the list never waits on it: a background sweep at most once
+        # a minute, and its archives show on the next look (`chimera/core/pr_auto_archive.py`).
+        pr_sweeper.kick(_sweep_pull_requests, enabled=bool(live().archive_on_pr_merge))
         for row in rows:
             sid = str(row["id"])
             mark = replace(
@@ -6236,8 +6291,10 @@ def register_code_api(
                 background=sid in with_work,
                 shared=bool(shares.for_session(sid)),
             ):
-                mark = store.marks.archive(sid, at=now)
+                mark = store.marks.archive(sid, at=now, reason="inactive")
             row["archived_at"] = mark.archived_at
+            # Why it is archived, shown on the archived row before the person brings it back.
+            row["archive_reason"] = mark.archive_reason if mark.archived_at is not None else ""
         stored = {row["id"] for row in rows}
         unsaved: list[dict[str, Any]] = [
             apply_title({
@@ -6249,6 +6306,7 @@ def register_code_api(
                 "running": True,
                 "state": "blocked" if sid in waiting else "running",
                 "archived_at": None,
+                "archive_reason": "",
                 "pull_request": None,
                 "pull_request_count": 0,
                 # Read from the folder now: the stamp is written with the file, which a first turn
@@ -6437,7 +6495,9 @@ def register_code_api(
         done = remove_merged_worktree(folder)
         archived = False
         if done.removed and not done.kept:
-            store.marks.archive(session_id, at=time.time())
+            # The PR was read merged just above, so the record says so too: a brought-back conversation
+            # must not be archived again for a merge the sweep already had (`pr_auto_archive.sweep`).
+            store.marks.archive(session_id, at=time.time(), reason="pr_merged", pr_state="merged")
             archived = True
         return {
             "archived": archived,

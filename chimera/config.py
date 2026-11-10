@@ -1271,6 +1271,11 @@ class Settings(BaseSettings):
     archive_after_days: float | None = Field(
         default=None, validation_alias="CHIMERA_ARCHIVE_AFTER_DAYS"
     )
+    # Archive a coding conversation when its pull request is merged or closed
+    # (`chimera/core/pr_auto_archive.py`). ON by default (the owner's decision): archiving only moves
+    # the conversation out of the list, deletes nothing, and the owner switches it off to keep them
+    # listed. Read on every sweep, so a change applies at once. Nothing here merges or pushes.
+    archive_on_pr_merge: bool = Field(default=True, validation_alias="CHIMERA_ARCHIVE_ON_PR_MERGE")
 
     # Whether a conversation can be shared with a second person at all (`chimera/api/sharing.py`).
     # ON by default because that is what the app did before the switch existed: a share link is made

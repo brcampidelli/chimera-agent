@@ -341,6 +341,20 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_CODE_CLOSE_LOOP: String(v) })}
         />
       </Row>
+      {/* A conversation whose pull request is merged or closed leaves the list (`chimera/core/pr_auto_archive.py`).
+          On by default, the owner's decision: archiving deletes nothing and merges nothing, so it is not
+          a warning, and the owner switches it off to keep those conversations listed. */}
+      <Row
+        label={t("settings.row.archiveOnPrMerge")}
+        hint={t("settings.hint.archiveOnPrMerge")}
+        env="CHIMERA_ARCHIVE_ON_PR_MERGE"
+      >
+        <Toggle
+          id="settings-archive-on-pr-merge"
+          on={c.autonomy.archive_on_pr_merge ?? true}
+          onChange={(v) => save({ CHIMERA_ARCHIVE_ON_PR_MERGE: String(v) })}
+        />
+      </Row>
       {/* The owner's lifecycle hooks (owner's decision, 2026-10-05; docs/hooks-threat-model.md).
           Off by default. On, a hook can only deny, ask or annotate — never allow — so the row is
           not a warning; the host row below it is, because it lets the owner's shell hooks leave the
