@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **Claude Code's instruction files reach the run.** Beside `AGENTS.md`, Chimera now reads `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`, with their `@file` imports (`CHIMERA_CLAUDE_COMPAT`, on by default), and the Context card names the files a turn was given. Your personal `~/.claude/CLAUDE.md` joins only your own surfaces, the CLI chat and code and the desktop Code turn, never a bot, webhook, scheduled job, subagent or shared-link guest, and it has its own budget. Imports stay inside the folder they belong to, are capped in size and count, and are re-read when their content changes. Prompt snapshots and benchmarks pin the switch off so they do not depend on the machine. (#1221)
+
+- **Select an element in the preview and send it to the agent.** "Select element" in the Preview panel (or Ctrl/Cmd+Shift+S) shows a picture of the dev server's page; a click on it puts the element in the composer as chips, its tag and text plus a crop. It runs in Chimera's own browser with a throwaway cookie profile, injects no script into the project's page, only reaches the conversation's own dev server, and refuses the pick if the page changed since the picture. What comes from the page is outside content: the text and the crop both taint the turn. (#1218)
 
 - **Claude Code subagents work in Chimera.** Agents written for Claude Code in `.claude/agents` (up to the repository root), `~/.claude/agents` and plugins are listed beside `.chimera/agents`, with their origin, role and memory shown on the Agents screen. A file can only narrow what it gets: its tools are intersected with the session's governed tools, `permissionMode` can only restrict, `bypassPermissions` is ignored with a warning, and a model name such as `opus` maps to a role the owner sets in Settings. An agent with memory keeps fenced notes through scoped Read/Write/Edit, and notes that come from the repository are treated as untrusted when the workspace isn't trusted. (#1219)
 

@@ -4349,6 +4349,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/preview/select/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Select Capture
+         * @description Open the running server's page in Chimera's browser and return a picture of it to click on.
+         */
+        post: operations["preview_select_capture_api_preview_select_capture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preview/select/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Select Close */
+        post: operations["preview_select_close_api_preview_select_close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preview/select/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Select Discard
+         * @description Delete picked-element attachments nobody received (no conversation was open to take them).
+         *
+         *     Only an attachment that is marked as page content can be deleted here: this is not a way to remove
+         *     the owner's other files.
+         */
+        post: operations["preview_select_discard_api_preview_select_discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preview/select/pick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Select Pick
+         * @description The element at a point of the captured page, stored as attachments for the next message.
+         */
+        post: operations["preview_select_pick_api_preview_select_pick_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/preview/servers": {
         parameters: {
             query?: never;
@@ -13223,6 +13303,36 @@ export interface components {
             /** Names */
             names: string[];
         };
+        /** PreviewAttachmentOut */
+        PreviewAttachmentOut: {
+            /**
+             * Chars
+             * @default 0
+             */
+            chars: number;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** PreviewCaptureOut */
+        PreviewCaptureOut: {
+            /** Height */
+            height: number;
+            /** Image */
+            image: string;
+            /** Url */
+            url: string;
+            /** Width */
+            width: number;
+        };
         /**
          * PreviewCfgOut
          * @description ``CHIMERA_PREVIEW_AUTO_VERIFY`` — whether a front-end turn is checked against the dev server.
@@ -13233,6 +13343,11 @@ export interface components {
              * @default true
              */
             auto_verify: boolean;
+        };
+        /** PreviewDiscardIn */
+        PreviewDiscardIn: {
+            /** Ids */
+            ids: string[];
         };
         /**
          * PreviewItem
@@ -13265,6 +13380,36 @@ export interface components {
             message: string;
             /** Ok */
             ok: boolean;
+        };
+        /** PreviewPickOut */
+        PreviewPickOut: {
+            attachment: components["schemas"]["PreviewAttachmentOut"];
+            /** Attrs */
+            attrs: {
+                [key: string]: string;
+            };
+            /** Box */
+            box: number[];
+            crop?: components["schemas"]["PreviewAttachmentOut"] | null;
+            /** Label */
+            label: string;
+            /** Selector */
+            selector: string;
+            /** Tag */
+            tag: string;
+            /** Text */
+            text: string;
+        };
+        /** PreviewPointIn */
+        PreviewPointIn: {
+            /** Name */
+            name: string;
+            /** Workspace */
+            workspace?: string | null;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
         };
         /** PreviewServerOut */
         PreviewServerOut: {
@@ -22742,6 +22887,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginUpdateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_select_capture_api_preview_select_capture_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewNameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewCaptureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_select_close_api_preview_select_close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOkOut"];
+                };
+            };
+        };
+    };
+    preview_select_discard_api_preview_select_discard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewDiscardIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_select_pick_api_preview_select_pick_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewPointIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewPickOut"];
                 };
             };
             /** @description Validation Error */

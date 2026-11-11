@@ -1,9 +1,22 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, Square, X } from "lucide-react";
+import { MousePointerClick, Play, Square, X } from "lucide-react";
 
-import { getDevServerLog, listDevServers, startDevServer, stopDevServer, type DevServer } from "@/lib/api";
+import {
+  capturePreview,
+  closePreviewSelect,
+  discardPreviewAttachments,
+  getDevServerLog,
+  listDevServers,
+  pickPreviewElement,
+  startDevServer,
+  stopDevServer,
+  type DevServer,
+  type PreviewCapture,
+} from "@/lib/api";
 import { focusRing } from "@/components/ui/focus";
+import { requestAddAttachments } from "@/lib/attach-request";
+import { matchesShortcut, shortcutLabel } from "@/lib/hotkeys";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +40,12 @@ import { cn } from "@/lib/utils";
  * Show, or Show for one already running at a `url`), never because it happens to be listening, and never
  * when its port is the app's own (`sharesAppOrigin`, by PORT: a second host name for the same port is
  * still the same server).
+ *
+ * **Selecting an element** (Ctrl/Cmd+Shift+S, or the button) cannot ask the frame what is under a click:
+ * it has an opaque origin, and nothing is injected into it. The server opens the same page in Chimera's
+ * own browser and returns a picture; the click on that picture is sent as a point, the server resolves the
+ * element at that point in the SAME page, and what comes back is stored as attachments and put in the
+ * composer's tray. The page's words reach the message fenced and the turn is marked as having read them.
  */
 
 /** The page is the app's own when the PORT matches, whatever the host is called. */
@@ -147,6 +166,40 @@ function ServerRow({
   );
 }
 
+/** The picture of the page, to click on. The point is sent in the page's own pixels, not the image's. */
+function PickSurface({
+  shot,
+  title,
+  busy,
+  onPoint,
+}: {
+  shot: PreviewCapture;
+  title: string;
+  busy: boolean;
+  onPoint: (x: number, y: number) => void;
+}) {
+  const img = useRef<HTMLImageElement | null>(null);
+  return (
+    <div className="min-h-0 flex-1 overflow-auto bg-surface-2" data-testid="preview-pick-surface">
+      <img
+        ref={img}
+        src={`data:image/jpeg;base64,${shot.image}`}
+        alt={title}
+        draggable={false}
+        className={cn("block w-full cursor-crosshair select-none", busy && "opacity-60")}
+        onClick={(e) => {
+          const box = img.current?.getBoundingClientRect();
+          if (!box || box.width === 0 || box.height === 0 || busy) return;
+          onPoint(
+            Math.round(((e.clientX - box.left) / box.width) * shot.width),
+            Math.round(((e.clientY - box.top) / box.height) * shot.height),
+          );
+        }}
+      />
+    </div>
+  );
+}
+
 export function PreviewPane({ workspace, onClose }: { workspace: string; onClose: () => void }) {
   const t = useT();
   const q = useQuery({
@@ -160,6 +213,78 @@ export function PreviewPane({ workspace, onClose }: { workspace: string; onClose
   const [opened, setOpened] = useState<string | null>(null);
   const showing = data?.servers.find(
     (s) => s.name === opened && s.state === "running" && s.url && !sharesAppOrigin(s.url),
+  );
+
+  // "Select element": a picture of the page to click on, until something is picked or it is cancelled.
+  const [selecting, setSelecting] = useState(false);
+  const [said, setSaid] = useState("");
+  const capture = useMutation({
+    mutationFn: (name: string) => capturePreview(workspace || null, name),
+  });
+  const pick = useMutation({
+    mutationFn: ({ name, x, y }: { name: string; x: number; y: number }) =>
+      pickPreviewElement(workspace || null, name, x, y),
+    onSuccess: (picked) => {
+      const chips = [{ ...picked.attachment, name: t("code.preview.elementChip", { label: picked.label }) }];
+      if (picked.crop) chips.push({ ...picked.crop, name: t("code.preview.cropChip", { label: picked.label }) });
+      if (requestAddAttachments(chips)) {
+        setSaid(t("code.preview.selectAdded", { label: picked.label }));
+      } else {
+        // No conversation is open to take it: say so, and do not leave the stored element behind.
+        setSaid(t("code.preview.selectNoTray", { label: picked.label }));
+        void discardPreviewAttachments(chips.map((chip) => chip.id)).catch(() => undefined);
+      }
+      stopSelecting();
+    },
+    // The page may have changed under the picture (the server refuses a pick on another document): take a
+    // new picture, so the next click is on what is there now, and keep the reason on screen.
+    onError: () => {
+      if (selectedName.current) capture.mutate(selectedName.current);
+    },
+  });
+  const selectedName = useRef<string | null>(null);
+  function stopSelecting() {
+    setSelecting(false);
+    // The server's browser is closed when nobody is picking; a failure to say so is not the person's.
+    void closePreviewSelect().catch(() => undefined);
+  }
+  function startSelecting(name: string) {
+    setSaid("");
+    pick.reset();
+    selectedName.current = name;
+    setSelecting(true);
+    capture.mutate(name);
+  }
+  const selectable = showing?.kind === "process" ? showing : undefined;
+  const selectableName = selectable?.name;
+  const selectingRef = useRef(selecting);
+  selectingRef.current = selecting;
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (selectingRef.current && e.key === "Escape") {
+        stopSelecting();
+        return;
+      }
+      if (!selectableName || !matchesShortcut(e, "selectElement")) return;
+      e.preventDefault();
+      if (selectingRef.current) stopSelecting();
+      else startSelecting(selectableName);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // The handlers only read refs and stable setters; re-installing per render would drop a keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectableName]);
+  // The server going away ends the mode, and leaving the panel ends the server's browser with it.
+  useEffect(() => {
+    if (selecting && !selectable) stopSelecting();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selecting, selectable]);
+  useEffect(
+    () => () => {
+      if (selectingRef.current) void closePreviewSelect().catch(() => undefined);
+    },
+    [],
   );
 
   return (
@@ -208,7 +333,35 @@ export function PreviewPane({ workspace, onClose }: { workspace: string; onClose
           </ul>
         ) : null}
       </div>
-      {showing?.url ? (
+      {showing?.url && selecting ? (
+        <>
+          <p className="border-b border-hairline px-3 py-1.5 text-xs text-muted-foreground" role="status">
+            {capture.isPending ? t("code.preview.selectLoading") : t("code.preview.selectHint")}
+          </p>
+          {capture.data ? (
+            <PickSurface
+              shot={capture.data}
+              title={t("code.preview.selectPicture", { name: showing.name })}
+              busy={pick.isPending}
+              onPoint={(x, y) => pick.mutate({ name: showing.name, x, y })}
+            />
+          ) : null}
+          {capture.error || pick.error ? (
+            <p className="px-3 py-1.5 text-xs text-bad-foreground" role="alert">
+              {t("code.preview.selectFailed", { reason: String(((capture.error ?? pick.error) as Error).message) })}
+            </p>
+          ) : null}
+          <div className="border-t border-hairline px-3 py-1.5">
+            <button
+              type="button"
+              onClick={stopSelecting}
+              className={cn("rounded-chip px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-surface-2 hover:text-foreground", focusRing)}
+            >
+              {t("code.preview.selectCancel")}
+            </button>
+          </div>
+        </>
+      ) : showing?.url ? (
         <>
           <iframe
             key={showing.url}
@@ -219,7 +372,19 @@ export function PreviewPane({ workspace, onClose }: { workspace: string; onClose
             src={showing.url}
             className="min-h-0 w-full flex-1 border-0 bg-white"
           />
-          <p className="border-t border-hairline px-3 py-1.5 text-xs text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-x-2 border-t border-hairline px-3 py-1.5 text-xs text-muted-foreground">
+            {selectable ? (
+              <button
+                type="button"
+                onClick={() => startSelecting(selectable.name)}
+                title={shortcutLabel("selectElement")}
+                className={cn("inline-flex items-center gap-1 rounded-chip px-1.5 py-0.5 hover:bg-surface-2 hover:text-foreground", focusRing)}
+              >
+                <MousePointerClick className="h-3 w-3" aria-hidden="true" />
+                {t("code.preview.select")}
+              </button>
+            ) : null}
+            {said ? <span role="status">{said}</span> : null}
             {t("code.devserver.sandboxNote")}{" "}
             <a href={showing.url} target="_blank" rel="noopener noreferrer" className={cn("underline", focusRing)}>
               {t("code.devserver.openOutside")}

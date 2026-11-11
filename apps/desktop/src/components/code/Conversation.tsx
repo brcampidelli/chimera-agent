@@ -59,6 +59,7 @@ import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
 import { SideChat, useSideChatKey } from "@/components/code/SideChat";
+import { useAddAttachmentRequest } from "@/lib/attach-request";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { RewindTimeline } from "@/components/code/RewindTimeline";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
@@ -1509,6 +1510,10 @@ export function Conversation({
   // is reported.
   const { upload, failed: uploadFailed } = useAttachmentUpload((a) =>
     setAttached((prev) => [...prev, a]),
+  );
+  // An element picked in the Preview panel arrives as attachments, one chip each.
+  useAddAttachmentRequest((items) =>
+    setAttached((prev) => [...prev, ...items.filter((item) => !prev.some((a) => a.id === item.id))]),
   );
   const [dragging, setDragging] = useState(false);
   /** Off by default: an app that starts sending desktop notifications without being asked is one

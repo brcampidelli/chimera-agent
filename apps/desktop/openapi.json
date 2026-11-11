@@ -14801,6 +14801,67 @@
         "title": "PresenceOut",
         "type": "object"
       },
+      "PreviewAttachmentOut": {
+        "properties": {
+          "chars": {
+            "default": 0,
+            "title": "Chars",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "title": "PreviewAttachmentOut",
+        "type": "object"
+      },
+      "PreviewCaptureOut": {
+        "properties": {
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "image": {
+            "title": "Image",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "image",
+          "width",
+          "height",
+          "url"
+        ],
+        "title": "PreviewCaptureOut",
+        "type": "object"
+      },
       "PreviewCfgOut": {
         "description": "``CHIMERA_PREVIEW_AUTO_VERIFY`` \u2014 whether a front-end turn is checked against the dev server.",
         "properties": {
@@ -14811,6 +14872,23 @@
           }
         },
         "title": "PreviewCfgOut",
+        "type": "object"
+      },
+      "PreviewDiscardIn": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "PreviewDiscardIn",
         "type": "object"
       },
       "PreviewItem": {
@@ -14890,6 +14968,104 @@
           "ok"
         ],
         "title": "PreviewOkOut",
+        "type": "object"
+      },
+      "PreviewPickOut": {
+        "properties": {
+          "attachment": {
+            "$ref": "#/components/schemas/PreviewAttachmentOut"
+          },
+          "attrs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Attrs",
+            "type": "object"
+          },
+          "box": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Box",
+            "type": "array"
+          },
+          "crop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreviewAttachmentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "selector": {
+            "title": "Selector",
+            "type": "string"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "selector",
+          "tag",
+          "text",
+          "attrs",
+          "box",
+          "attachment"
+        ],
+        "title": "PreviewPickOut",
+        "type": "object"
+      },
+      "PreviewPointIn": {
+        "properties": {
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          },
+          "x": {
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "maximum": 20000.0,
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "x",
+          "y"
+        ],
+        "title": "PreviewPointIn",
         "type": "object"
       },
       "PreviewServerOut": {
@@ -29082,6 +29258,141 @@
           }
         },
         "summary": "Apply Plugin Update"
+      }
+    },
+    "/api/preview/select/capture": {
+      "post": {
+        "description": "Open the running server's page in Chimera's browser and return a picture of it to click on.",
+        "operationId": "preview_select_capture_api_preview_select_capture_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewCaptureOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Select Capture"
+      }
+    },
+    "/api/preview/select/close": {
+      "post": {
+        "operationId": "preview_select_close_api_preview_select_close_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Preview Select Close"
+      }
+    },
+    "/api/preview/select/discard": {
+      "post": {
+        "description": "Delete picked-element attachments nobody received (no conversation was open to take them).\n\nOnly an attachment that is marked as page content can be deleted here: this is not a way to remove\nthe owner's other files.",
+        "operationId": "preview_select_discard_api_preview_select_discard_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewDiscardIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Select Discard"
+      }
+    },
+    "/api/preview/select/pick": {
+      "post": {
+        "description": "The element at a point of the captured page, stored as attachments for the next message.",
+        "operationId": "preview_select_pick_api_preview_select_pick_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewPointIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewPickOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Select Pick"
       }
     },
     "/api/preview/servers": {
