@@ -95,6 +95,13 @@ function AgentRow({ agent, t }: { agent: MarkdownAgent; t: TFunc }) {
         <Badge tone={agent.source.startsWith("plugin:") ? "warn" : "muted"} title={agent.file}>
           {definitionSourceLabel(t, agent.source)}
         </Badge>
+        {agent.origin === "claude" ? <Badge tone="muted">.claude</Badge> : null}
+        {agent.origin === "chimera" ? <Badge tone="muted">.chimera</Badge> : null}
+        {agent.model_role ? (
+          <Badge tone="muted">{t("mdAgents.role", { role: agent.model_role })}</Badge>
+        ) : null}
+        {agent.memory ? <Badge tone="muted">{t("mdAgents.memory", { scope: agent.memory })}</Badge> : null}
+        {agent.plan_only ? <Badge tone="warn">{t("mdAgents.planOnly")}</Badge> : null}
         {agent.model_ignored ? (
           <Badge tone="muted">{t("mdAgents.modelIgnored")}</Badge>
         ) : (
@@ -104,9 +111,13 @@ function AgentRow({ agent, t }: { agent: MarkdownAgent; t: TFunc }) {
       </div>
       {agent.description ? <p className="text-sm">{agent.description}</p> : null}
       <p className="text-xs text-muted-foreground">
-        {agent.effective_tools.length
-          ? t("mdAgents.tools", { tools: agent.effective_tools.join(", ") })
-          : t("mdAgents.noTools")}
+        {agent.inherits_tools && !agent.effective_tools.length
+          ? t("mdAgents.noTools")
+          : agent.inherits_tools
+            ? t("mdAgents.inherits")
+            : agent.effective_tools.length
+              ? t("mdAgents.tools", { tools: agent.effective_tools.join(", ") })
+              : t("mdAgents.noTools")}
       </p>
       {dropped.length ? (
         <p className="text-xs text-muted-foreground">

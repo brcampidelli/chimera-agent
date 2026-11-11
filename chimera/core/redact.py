@@ -180,9 +180,13 @@ def known_secrets() -> list[str]:
     with a suffix), replacing the short one first would leave the tail of the long one in the file,
     which looks redacted and is not.
     """
+    # Names, then `get`: `os.environ.items()` looks each value up while iterating, so a name another
+    # thread removes mid-loop (a test's env teardown beside a turn still finishing) raised KeyError and
+    # failed the save that was redacting. Iterating names copies them first; `get` of a gone name is None.
+    pairs = ((name, os.environ.get(name)) for name in os.environ)
     found = [
         value
-        for name, value in os.environ.items()
+        for name, value in pairs
         if value
         and len(value) >= _MIN_SECRET_LEN
         and any(marker in name.upper() for marker in _SECRET_MARKERS)

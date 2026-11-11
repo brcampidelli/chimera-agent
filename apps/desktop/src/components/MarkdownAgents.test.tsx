@@ -37,6 +37,9 @@ const LISTING: Listing = {
       declared_tools: ["read_file", "not_a_tool"],
       effective_tools: ["read_file"],
       steps: 4,
+      origin: "chimera",
+      plan_only: false,
+      inherits_tools: false,
     },
     {
       id: "my-plugin:reviewer",
@@ -48,6 +51,25 @@ const LISTING: Listing = {
       declared_tools: ["read_file", "grep"],
       effective_tools: ["read_file", "grep"],
       steps: 12,
+      origin: "plugin",
+      plan_only: false,
+      inherits_tools: false,
+    },
+    {
+      id: "code-reviewer",
+      description: "Reviews code for quality",
+      source: "project",
+      file: "project:.claude/agents/code-reviewer.md",
+      model: "openrouter/mid-model",
+      model_ignored: false,
+      model_role: "mid",
+      memory: "project",
+      declared_tools: [],
+      effective_tools: ["read_file", "grep"],
+      steps: 8,
+      origin: "claude",
+      plan_only: true,
+      inherits_tools: true,
     },
   ],
   issues: [
@@ -77,6 +99,19 @@ describe("the Markdown agents section", () => {
     expect(within(reviewer).getByText("plugin my-plugin")).toBeInTheDocument();
     expect(within(reviewer).getByText("model ignored")).toBeInTheDocument();
     expect(within(reviewer).queryByText(/Named but not available/)).not.toBeInTheDocument();
+  });
+
+  it("shows where a Claude Code agent came from, its model role, memory and read-only mode", async () => {
+    renderWithProviders(<MarkdownAgents />);
+    const agent = (await screen.findByText("code-reviewer")).closest("li") as HTMLElement;
+    expect(within(agent).getByText(".claude")).toBeInTheDocument();
+    expect(within(agent).getByText("model role: mid")).toBeInTheDocument();
+    expect(within(agent).getByText("openrouter/mid-model")).toBeInTheDocument();
+    expect(within(agent).getByText("memory: project")).toBeInTheDocument();
+    expect(within(agent).getByText("narrower: read-only tools")).toBeInTheDocument();
+    expect(within(agent).getByText("uses the session's tools")).toBeInTheDocument();
+    const planner = screen.getByText("planner").closest("li") as HTMLElement;
+    expect(within(planner).getByText(".chimera")).toBeInTheDocument();
   });
 
   it("keeps a refused file on screen with its reason", async () => {
