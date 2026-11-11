@@ -313,10 +313,10 @@ follow_imports_for_stubs = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 # A hang dumps every thread's stack after 15 min instead of waiting silently; it does not fail the test.
-faulthandler_timeout = 240
+faulthandler_timeout = 900
 # The default run is hermetic (no network). Integration tests hit a real
 # provider and are opt-in via `-m integration`.
-addopts = "-m 'not integration' -vv"
+addopts = "-m 'not integration'"
 markers = [
     "product_default: the test asserts the product default, so the suite-wide deferral pin is skipped",
     "integration: live test that calls a real provider API (needs OPENROUTER_API_KEY)",

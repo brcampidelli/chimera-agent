@@ -411,13 +411,19 @@ class DevServerManager:
         left its worker holding the port is the case this exists for.
         """
         with self._lock:
-            servers = list(self._servers.values())
-        for server in servers:
+            servers = list(self._servers.items())
+        for key, server in servers:
             if server.config.attach_only:
                 continue
             server.stopped = True
             with contextlib.suppress(Exception):
                 _kill_tree(server)
+            # Forget it, as `stop` does. Kept, every later close_all killed the whole dead list again:
+            # the manager is one per process, each app's shutdown calls this, and in the test suite
+            # that grew to seconds per app (#1218's shard 1 went from 16 to over 30 minutes).
+            with self._lock:
+                if self._servers.get(key) is server:
+                    del self._servers[key]
 
 
 _MANAGER: DevServerManager | None = None

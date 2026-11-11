@@ -137,6 +137,24 @@ def test_closing_the_app_kills_the_tree_even_when_the_direct_child_is_already_de
     assert _wait(lambda: not psutil.pid_exists(kid), 10), "close_all left the grandchild alive"
 
 
+def test_closing_forgets_the_servers_so_the_next_close_does_not_kill_them_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import chimera.core.dev_servers as ds
+
+    mgr = DevServerManager()
+    server = mgr.start(tmp_path, _config(tmp_path), started_by="owner")
+    assert _wait(lambda: server.state() == "running")
+    killed: list[object] = []
+    real = ds._kill_tree
+    monkeypatch.setattr(ds, "_kill_tree", lambda s: (killed.append(s), real(s)))
+    mgr.close_all()
+    assert killed == [server]
+    assert mgr.get(tmp_path, "web") is None
+    mgr.close_all()  # the manager is one per process; each app's shutdown calls this
+    assert killed == [server], "a second close killed the dead server again"
+
+
 @pytest.mark.skipif(os.name != "nt", reason="the job object is Windows-only")
 def test_on_windows_no_job_object_means_no_server(
     mgr: DevServerManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
