@@ -3510,6 +3510,48 @@
         "title": "ClassifiedOut",
         "type": "object"
       },
+      "ClaudeAgentRolesOut": {
+        "description": "Which tier (weak, mid, top) each Claude Code model alias means for a subagent.",
+        "properties": {
+          "fable": {
+            "default": "top",
+            "title": "Fable",
+            "type": "string"
+          },
+          "haiku": {
+            "default": "weak",
+            "title": "Haiku",
+            "type": "string"
+          },
+          "opus": {
+            "default": "top",
+            "title": "Opus",
+            "type": "string"
+          },
+          "sonnet": {
+            "default": "mid",
+            "title": "Sonnet",
+            "type": "string"
+          }
+        },
+        "title": "ClaudeAgentRolesOut",
+        "type": "object"
+      },
+      "ClaudeAgentsCfgOut": {
+        "description": "``CHIMERA_CLAUDE_AGENTS`` \u2014 whether agents written for Claude Code are read, and the role map.\n\nOn by default (the owner's decision); a server that predates the block reads as on, which is what\nit does.",
+        "properties": {
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/ClaudeAgentRolesOut"
+          }
+        },
+        "title": "ClaudeAgentsCfgOut",
+        "type": "object"
+      },
       "ClaudeHookOut": {
         "properties": {
           "command": {
@@ -5806,6 +5848,9 @@
           },
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
+          },
+          "claude_agents": {
+            "$ref": "#/components/schemas/ClaudeAgentsCfgOut"
           },
           "conversations": {
             "$ref": "#/components/schemas/ConversationsCfgOut"
@@ -11816,6 +11861,17 @@
       "MarkdownAgentOut": {
         "description": "One Markdown subagent, as the session would see it.",
         "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
           "declared_tools": {
             "items": {
               "type": "string"
@@ -11842,6 +11898,22 @@
             "title": "Id",
             "type": "string"
           },
+          "inherits_tools": {
+            "default": false,
+            "title": "Inherits Tools",
+            "type": "boolean"
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory"
+          },
           "model": {
             "anyOf": [
               {
@@ -11855,6 +11927,27 @@
           },
           "model_ignored": {
             "title": "Model Ignored",
+            "type": "boolean"
+          },
+          "model_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Role"
+          },
+          "origin": {
+            "default": "chimera",
+            "title": "Origin",
+            "type": "string"
+          },
+          "plan_only": {
+            "default": false,
+            "title": "Plan Only",
             "type": "boolean"
           },
           "source": {
