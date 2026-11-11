@@ -382,6 +382,29 @@ def test_an_idle_browser_is_closed_by_its_own_timer(tmp_path: Path) -> None:
     picker.shutdown()
 
 
+def test_a_timer_that_fires_early_waits_the_rest_instead_of_leaving_the_browser_open(tmp_path: Path) -> None:
+    made: list[FakeBrowser] = []
+    now = [100.0]
+
+    def factory(root: Path, settings: Any, ports: Any) -> FakeBrowser:
+        made.append(FakeBrowser(dict(BUTTON)))
+        return made[-1]
+
+    _client, entry, root = _server_for(tmp_path)
+    picker = ElementPicker(
+        manager(), home=lambda: tmp_path / "home", browser_factory=factory, idle_seconds=60.0, clock=lambda: now[0]
+    )
+    picker.capture(root, entry, "web")
+    now[0] += 59.98  # the timer fires 20 ms before the idle time is up, as a Windows wait can
+    picker._expire()
+    assert made[0].closed is False
+    assert picker._timer is not None and picker._timer.interval < 0.1  # re-armed for what is left
+    now[0] += 0.05
+    picker._expire()
+    assert made[0].closed is True
+    picker.shutdown()
+
+
 def _capture_outcome(picker: ElementPicker, root: Path, entry: Any) -> Any:
     try:
         return picker.capture(root, entry, "web")
