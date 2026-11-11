@@ -172,6 +172,7 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`skills bundle-enable`](#skills-bundle-enable) | Switch an installed bundle on, so the agent may use it. |
 | [`skills bundles`](#skills-bundles) | List the skill bundles installed on this machine, and where each came from. |
 | [`skills catalog`](#skills-catalog) | Browse the installable skills from the wider Agent Skills ecosystem. |
+| [`skills doctor`](#skills-doctor) | What the skills a run is told about cost in context, and which of them are unused. |
 | [`skills evolve`](#skills-evolve) | Reflectively evolve a skill's prompt template against graded instances (GEPA). |
 | [`skills export`](#skills-export) | Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem). |
 | [`skills import`](#skills-import) | Import a SKILL.md into the store. A file imported by path is held pending for review. |
@@ -2765,6 +2766,22 @@ chimera skills catalog [QUERY]
 | Option | | Default |
 | --- | --- | --- |
 | `--topic` | Only this topic. |  |
+
+## skills doctor
+
+What the skills a run is told about cost in context, and which of them are unused.
+
+Deterministic: no model is called. Bundles carry a usage count of "no record" because nothing
+records which one a run read; only a learned card with a measured zero is suggested for switching off.
+
+```bash
+chimera skills doctor
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--project`, `-p` | The folder a run would start in (its accepted pack narrows the skills). | `''` |
+| `--json` | Print the report as JSON. |  |
 
 ## skills evolve
 
