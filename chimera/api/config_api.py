@@ -283,6 +283,10 @@ _EDITABLE_SETTINGS = {
     # APPLIES_WHEN entry. The bridge may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`): on,
     # it only narrows, and off is the direction that widens again.
     "CHIMERA_PROJECT_PACK",
+    # Auto-verify of a front-end turn against the project's dev server (`chimera/tools/preview.py`).
+    # Read per turn, so it needs no APPLIES_WHEN entry. Turning it off removes a check, so the bridge
+    # may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`).
+    "CHIMERA_PREVIEW_AUTO_VERIFY",
     # The desktop bridge's two switches (`chimera/api/desktop_bridge.py`). The owner's, and only the
     # owner's: the bridge refuses to write either one on Claude's behalf, even with full control on,
     # so a client can never widen its own access.
@@ -775,6 +779,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
         # Whether a project's `.chimera/pack.json` may narrow a run. What one pack does is
         # `GET /api/code/pack`, per folder.
         "project_pack": {"enabled": settings.project_pack},
+        "preview": {"auto_verify": settings.preview_auto_verify},
         # Study 30's opt-in governance rules and audit record, every one off as shipped. The band's
         # state is reported beside its deadline because the deadline does nothing while it is off.
         "governance_audit": _governance_audit_block(settings),
@@ -1236,6 +1241,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DEFER_TOOLS": _check_boolean("CHIMERA_DEFER_TOOLS"),
     "CHIMERA_MCP_DEFER": _check_boolean("CHIMERA_MCP_DEFER"),
     "CHIMERA_PROJECT_PACK": _check_boolean("CHIMERA_PROJECT_PACK"),
+    "CHIMERA_PREVIEW_AUTO_VERIFY": _check_boolean("CHIMERA_PREVIEW_AUTO_VERIFY"),
     "CHIMERA_EXFIL_HOST_PATH": _check_boolean("CHIMERA_EXFIL_HOST_PATH"),
     "CHIMERA_SHELL_FETCH_GUARD": _check_boolean("CHIMERA_SHELL_FETCH_GUARD"),
     "CHIMERA_TAINT_ROPE_LITE": _check_boolean("CHIMERA_TAINT_ROPE_LITE"),

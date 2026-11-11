@@ -558,6 +558,11 @@ class Settings(BaseSettings):
     #: run it. Even on, a pack applies only after the owner accepted that file for that folder, and
     #: it can only remove — never install, activate, launch or allow anything.
     project_pack: bool = Field(default=False, validation_alias="CHIMERA_PROJECT_PACK")
+    #: Auto-verify of a Code turn that changed front-end files in a project whose `launch.json` names a
+    #: dev server: before the answer, the page is opened, a screenshot taken and the console read
+    #: (`chimera/tools/preview.py`). ON, the way Claude Code's desktop app ships it; the project's own
+    #: `"autoVerify": false` and this switch each turn it off.
+    preview_auto_verify: bool = Field(default=True, validation_alias="CHIMERA_PREVIEW_AUTO_VERIFY")
 
     # --- The task list the agent keeps for itself (chimera/tools/todo.py).
     # On, and the reasoning differs from the two flags above it, so it is written down rather than

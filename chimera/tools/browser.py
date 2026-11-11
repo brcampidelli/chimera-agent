@@ -1181,6 +1181,34 @@ class BrowserTool(Tool):
         except Exception as exc:  # noqa: BLE001 — a page/driver failure is a tool error, not a crash
             return f"error: browser action failed: {exc}"
 
+    def observe_page(self, url: str, png_path: str) -> dict[str, Any]:
+        """Open ``url``, save a full-page PNG at ``png_path`` and report what the page said in its console.
+
+        The dev-server preview's way in (`chimera/tools/preview.py`). It is the tool's own ``navigate``
+        underneath, so the reach, the turn's local ports and the SSRF floor judge the address exactly as
+        they judge the agent's own navigation; the PNG goes where the caller chose (the app's folder, not
+        the project's, so the turn's diff does not list it). ``error`` is set, and nothing else is
+        meaningful, when the page could not be opened. ``console`` is empty for a driver that does not
+        report one (the paired Chrome): the caller says so rather than reading that as "no errors".
+        """
+        opened = self.run(action="navigate", url=url)
+        if opened.startswith("error:") or opened.startswith(_INSTALL_HINT[:20]):
+            return {"error": opened.splitlines()[0][:300], "text": "", "console": [], "console_known": False, "path": ""}
+        driver = self._driver
+        if driver is None:
+            return {"error": "error: the browser is not running", "text": "", "console": [], "console_known": False, "path": ""}
+        report = getattr(driver, "console_messages", None)
+        try:
+            driver.screenshot(png_path)
+            text = driver.page_text()[:800]
+        except Exception as exc:  # noqa: BLE001 — a failed capture is the tool's answer, not a crash
+            return {"error": f"error: capture failed: {exc}", "text": "", "console": [], "console_known": False, "path": ""}
+        self._announce("screenshot")
+        messages = list(report()) if callable(report) else []
+        return {
+            "error": None, "text": text, "console": messages, "console_known": callable(report), "path": png_path,
+        }
+
     def _set_local_only(self, fallback_url: str, driver: BrowserDriver, start: int) -> None:
         self.last_local_only = False
         try:

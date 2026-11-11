@@ -19,7 +19,11 @@ describe("the page's frame-src", () => {
   it("names exactly the sources the frames in the app use", () => {
     // Inventory (apps/desktop/src): two srcdoc iframes, HtmlPreview and HtmlArtboardFrame. Neither
     // has a URL, so `about:` is what admits them; `'self'`, `blob:` and `data:` are the page's own.
-    expect(frameSrcTokens()).toEqual(["'self'", "about:", "blob:", "data:"]);
+    // The third frame is PreviewPane's: the project's own dev server, on this computer, so the two
+    // loopback names (never a wildcard host) are what admits it.
+    expect(frameSrcTokens()).toEqual([
+      "'self'", "about:", "blob:", "data:", "http://localhost:*", "http://127.0.0.1:*",
+    ]);
   });
 
   it("never admits every host or any remote scheme", () => {
@@ -27,6 +31,9 @@ describe("the page's frame-src", () => {
     expect(tokens).not.toContain("*");
     expect(tokens).not.toContain("https:");
     expect(tokens).not.toContain("http:");
-    expect(tokens.some((token) => /^[a-z]+:\/\//.test(token))).toBe(false);
+    // A source with a host is allowed only when that host is loopback, spelled out.
+    expect(
+      tokens.filter((token) => /^[a-z]+:\/\//.test(token) && !/^http:\/\/(localhost|127\.0\.0\.1):\*$/.test(token)),
+    ).toEqual([]);
   });
 });

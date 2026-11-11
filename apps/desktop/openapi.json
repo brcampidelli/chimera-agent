@@ -5654,6 +5654,9 @@
             "title": "Pools",
             "type": "array"
           },
+          "preview": {
+            "$ref": "#/components/schemas/PreviewCfgOut"
+          },
           "privacy": {
             "$ref": "#/components/schemas/PrivacyCfgOut"
           },
@@ -14700,6 +14703,18 @@
         "title": "PresenceOut",
         "type": "object"
       },
+      "PreviewCfgOut": {
+        "description": "``CHIMERA_PREVIEW_AUTO_VERIFY`` \u2014 whether a front-end turn is checked against the dev server.",
+        "properties": {
+          "auto_verify": {
+            "default": true,
+            "title": "Auto Verify",
+            "type": "boolean"
+          }
+        },
+        "title": "PreviewCfgOut",
+        "type": "object"
+      },
       "PreviewItem": {
         "description": "A single labeled value shown on an approval card before a browser action is allowed.",
         "properties": {
@@ -14717,6 +14732,214 @@
           "value"
         ],
         "title": "PreviewItem",
+        "type": "object"
+      },
+      "PreviewLogOut": {
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "title": "PreviewLogOut",
+        "type": "object"
+      },
+      "PreviewNameIn": {
+        "properties": {
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PreviewNameIn",
+        "type": "object"
+      },
+      "PreviewOkOut": {
+        "properties": {
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "PreviewOkOut",
+        "type": "object"
+      },
+      "PreviewServerOut": {
+        "properties": {
+          "command": {
+            "default": "",
+            "title": "Command",
+            "type": "string"
+          },
+          "cwd": {
+            "default": ".",
+            "title": "Cwd",
+            "type": "string"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Hours"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "name",
+          "state",
+          "port",
+          "kind"
+        ],
+        "title": "PreviewServerOut",
+        "type": "object"
+      },
+      "PreviewServersOut": {
+        "properties": {
+          "auto_verify": {
+            "default": true,
+            "title": "Auto Verify",
+            "type": "boolean"
+          },
+          "auto_verify_setting": {
+            "default": true,
+            "title": "Auto Verify Setting",
+            "type": "boolean"
+          },
+          "can_start": {
+            "default": false,
+            "title": "Can Start",
+            "type": "boolean"
+          },
+          "cannot_start_reason": {
+            "default": "",
+            "title": "Cannot Start Reason",
+            "type": "string"
+          },
+          "config_changed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Config Changed",
+            "type": "array"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "found": {
+            "title": "Found",
+            "type": "boolean"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewServerOut"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "found"
+        ],
+        "title": "PreviewServersOut",
         "type": "object"
       },
       "PrivacyCfgOut": {
@@ -28761,6 +28984,193 @@
           }
         },
         "summary": "Apply Plugin Update"
+      }
+    },
+    "/api/preview/servers": {
+      "get": {
+        "operationId": "preview_servers_api_preview_servers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewServersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Servers"
+      }
+    },
+    "/api/preview/servers/log": {
+      "get": {
+        "operationId": "preview_log_api_preview_servers_log_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lines",
+            "required": false,
+            "schema": {
+              "default": 80,
+              "title": "Lines",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewLogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Log"
+      }
+    },
+    "/api/preview/servers/start": {
+      "post": {
+        "operationId": "preview_start_api_preview_servers_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Start"
+      }
+    },
+    "/api/preview/servers/stop": {
+      "post": {
+        "operationId": "preview_stop_api_preview_servers_stop_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Stop"
       }
     },
     "/api/projects": {

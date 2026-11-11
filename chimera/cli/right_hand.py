@@ -268,7 +268,7 @@ def build_right_hand(
     # tools take it — `RunShellTool(..., confirm=confirm)`. A surface with a modal has to say so
     # before its tools exist; there is no later moment. Left unpassed, `default_registry` resolves
     # it from settings exactly as it always has, so `chat` and `assist` are byte-for-byte unchanged.
-    gate = (
+    gate: dict[str, Any] = (
         {}
         if ask is None
         else {"host_exec_confirm": resolve_host_exec_confirm(settings, ask=ask.host_exec)}

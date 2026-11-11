@@ -67,6 +67,9 @@ CORE = frozenset(
 #: own output through `tool_call` into a sink the proxy does not carry, so these stay declared.
 TURN_BOUND = frozenset({
     "render_chart", "design", "browser", "ask_user", "execute_code", "code_interpreter",
+    # `preview` looks through the turn's own browser and its servers are the turn's: its screenshot
+    # reaches the screen as a browser frame, so it is never moved behind `tool_call`.
+    "preview",
     # The task cards: each is built over the turn's own tray (`TaskSuggestionTray`), which streams the
     # card to the screen. Routed through `tool_call` they would reach a tray the proxy does not carry.
     "suggest_task", "dismiss_task",
@@ -82,7 +85,7 @@ SHIPPED_BUILTINS: frozenset[str] = frozenset({
     "apply_patch", "arxiv_search", "ask_user", "browser", "calendar_events", "code_interpreter", "crawl",
     "create_document", "decide", "design", "download_media", "edit_batch", "edit_file", "execute_code",
     "extract", "generate_audio", "generate_image", "generate_video", "glob", "grep", "http_get", "job_cancel",
-    "job_status", "list_dir", "map", "open_pull_request", "read_document", "read_email", "read_file",
+    "job_status", "list_dir", "map", "open_pull_request", "preview", "read_document", "read_email", "read_file",
     "recall_history", "render_chart", "report_defect", "run_shell", "schedule_once", "scrape", "send_email",
     "text_to_speech", "todo_write", "transcribe_audio", "view_image", "web_search", "write_file",
     "youtube_transcript",

@@ -53,9 +53,12 @@ NOT stop the TCP TURN connection, so it would narrow the channel, not close it; 
 `<link rel=dns-prefetch>` is outside CSP (unmeasured here). The preview's note says this rather than
 claiming the frame is sealed.
 
-**`frame-src 'none'`** does not block the preview (a srcdoc frame is not a fetch), and it is what
-stops the previewed page from navigating *its own frame* to `https://host/?d=…` — measured: with no
-policy that navigation reached the outside host; with this one the parent refused it.
+**`frame-src` is loopback only.** A srcdoc frame is not a fetch, so the HTML preview needs nothing here;
+what stops the previewed page from navigating *its own frame* to `https://host/?d=…` — measured: with no
+policy that navigation reached the outside host; with `'none'` the parent refused it — is that the only
+hosts admitted are `localhost` and `127.0.0.1`. They are admitted for the dev-server preview, which frames
+the project's own server. The cost, said: a previewed srcdoc page can now navigate its frame to a page on
+THIS computer (a GET, with no credentials of the app's: its token is not in a URL), which `'none'` refused.
 """
 
 from __future__ import annotations
@@ -79,6 +82,10 @@ _REMOTE_SERVER_SOURCES = ("https:", "http://127.0.0.1:*", "http://localhost:*")
 # CDN and 'unsafe-eval' that `render_chart`'s pages needed are gone: the app draws charts itself.
 _PREVIEW_SCRIPT_SOURCES = ("'unsafe-inline'",)
 
+# The only frame sources: the project's own dev server on this computer (preview pane). Plain http,
+# because that is what a dev server speaks; the host is a literal loopback name, never a wildcard.
+_LOOPBACK_FRAME_SOURCES = ("http://127.0.0.1:*", "http://localhost:*")
+
 APP_PAGE_CSP = "; ".join(
     (
         "default-src 'self'",
@@ -91,7 +98,10 @@ APP_PAGE_CSP = "; ".join(
         "media-src 'self' data: blob:",
         "connect-src " + " ".join(("'self'", *_REMOTE_SERVER_SOURCES)),
         "worker-src 'self'",
-        "frame-src 'none'",
+        # Loopback only: the dev-server preview of the Code screen frames the project's own server
+        # (`launch.json`, `components/code/PreviewPane.tsx`). A srcdoc frame is still not a fetch; what
+        # this admits is a frame NAVIGATED to a page on this computer, never to another host.
+        "frame-src " + " ".join(_LOOPBACK_FRAME_SOURCES),
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",

@@ -424,6 +424,8 @@ _NEVER = (
     # (`terminal_api.owner_refusal`); this is the second lock, because a stream is a GET and a GET
     # reaches everything not named here.
     "/api/terminal",
+    # The dev servers: starting one is running a command (`preview_api`, same two locks).
+    "/api/preview",
     # Answers that ARE a door: a messaging bot's pending pairing code makes whoever sends it the
     # bot's owner; the memory export, the diagnostics and the troubleshooting report carry the
     # machine's paths, logs and settings wholesale.

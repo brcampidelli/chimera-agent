@@ -1274,14 +1274,45 @@ def assemble_registry(
             host_exec_confirm, lambda: server_grants_shell(settings, grant_folder)
         )
     browser_write_region = build_write_region(seams.write_region, ws)
+    # The project's dev servers (`.chimera/launch.json`): only the owner's own Code turn, never a bot's or
+    # a guest's, and only for a folder that has a recipe. The turn's browser is told these servers'
+    # ports are the turn's own (`extra_turn_ports`), which is the whole of what it may reach on loopback.
+    from chimera.core.dev_servers import DevServerTurn
+    from chimera.core.launch_config import load_launch_config
+
+    dev_turn: DevServerTurn | None = None
+    preview_tool: Any = None
+    if surface == "api:turn" and not guest and not bot_floor and (
+        (recipe := load_launch_config(ws)).config is not None and recipe.config.configurations
+    ):
+        dev_turn = DevServerTurn(ws)
     registry = default_registry(
         ws,
         write_region=browser_write_region,
         host_exec_confirm=host_exec_confirm,
+        extra_turn_ports=dev_turn.ports if dev_turn is not None else None,
     )
     # In-process Python can import and mutate the service's governance state. The subprocess
     # execute_code tool remains available behind the host-execution gate.
     registry = restrict_registry(registry, deny={"code_interpreter"})
+    if dev_turn is not None:
+        from chimera.tools.defer import _unwrapped
+        from chimera.tools.preview import PreviewTool
+
+        def turn_browser() -> Any:
+            # Whatever browser the turn holds at the moment of the call (the paired Chrome replaces the
+            # default one below), and none when a denial list took it away.
+            return _unwrapped(registry.get("browser")) if "browser" in registry else None
+
+        def turn_shell() -> Any:
+            # The turn's own `run_shell` AFTER the wrappers (this name is rebound below): a server start
+            # is a command, so it is judged by the kernel, the taint ledger and the host-exec gate.
+            return registry.get("run_shell") if "run_shell" in registry else None
+
+        preview_tool = PreviewTool(
+            ws, dev_turn, home=Path(settings.home), shell=turn_shell, browser=turn_browser,
+        )
+        registry.register(preview_tool)
     # The paired Chrome is the browser for the owner's attended desktop turn only. Guests, linked
     # bots, cron, workers and all other surfaces retain the ordinary Playwright instance.
     if (
@@ -1593,6 +1624,10 @@ def assemble_registry(
     # names to REMOVE, and nothing reads one into `allowed`, so a pack naming a tool cannot grant it.
     if pack is not None:
         denied = sorted({*denied, *denied_tools(pack)})
+    # Starting a dev server is running a command: wherever `run_shell` is not allowed, `preview` is not
+    # either. One rule here, so the two can never disagree about whether commands are on.
+    if "run_shell" in denied and "preview" not in denied:
+        denied = sorted({*denied, "preview"})
 
     # Where this run's MCP binary payloads are written: its workspace's mcp-output folder, under the
     # run's write region, or the app folder. The pool is shared by every run, so each run binds its
@@ -1636,6 +1671,8 @@ def assemble_registry(
     if not guest and not bot_floor:
         with_connectors(registry, settings, ask=owner if approval_sink is not None else None)
     allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
+    if allowed is not None and "run_shell" not in allowed and "preview" not in denied:
+        denied = sorted({*denied, "preview"})  # an allowlist that leaves commands out leaves servers out
     # The Explorer builds its own registry, so it must receive this turn's restrictions too.
     # Chimera Design, on the turns that ask for it, registered here so every list above reaches it.
     # Writes follow the posture: a reach that removes the write tools (`read_only`) leaves the tool
@@ -1747,6 +1784,9 @@ def assemble_registry(
         shell_fetch_guard=settings.shell_fetch_guard,
         rope_lite=settings.taint_rope_lite,
     )
+    if preview_tool is not None:
+        # The end-of-turn check reads this: a tainted run never has a server started for it.
+        preview_tool._tainted = ledger.run_tainted
     # Each MCP payload this run writes goes on the same record as its other writes: the ledger (its
     # events, and `untrusted_writes`, which the turn receipt reads) and the audit trail. Attached here
     # because the ledger is made here, after the sink was bound to the tools above; the sink's copies
@@ -2209,6 +2249,29 @@ def _self_check_of_turn(
     except Exception as exc:  # noqa: BLE001 — record-only, see above
         _log.warning("diff self-check failed: %s", exc)
         return SelfCheck(measured=False, measured_reason="the check itself failed")
+
+
+def _preview_check_of_turn(agent: Any, settings: Settings, guard: Any, before: Any, *, tainted: bool) -> Any:
+    """The end-of-turn look at the project's dev server page, or None when there is nothing to look at.
+
+    The tool is in the turn's registry only when the folder has a `launch.json` and commands are on, so
+    its absence is the answer for every other turn. Record-only on failure of the check itself: a page
+    that cannot be checked is reported as such by the tool; an exception here is logged and the turn ships.
+    """
+    try:
+        if "preview" not in agent.tools:
+            return None
+        from chimera.tools.defer import _unwrapped
+        from chimera.tools.preview import PreviewTool
+
+        tool = _unwrapped(agent.tools.get("preview"))
+        if not isinstance(tool, PreviewTool):
+            return None
+        paths, _ = _measured_turn(guard, before)
+        return tool.auto_verify(paths, switch_on=bool(settings.preview_auto_verify), tainted=tainted)
+    except Exception as exc:  # noqa: BLE001 — record-only, see above
+        _log.warning("preview auto-verify failed: %s", exc)
+        return None
 
 
 def _measured_turn(guard: Any, before: Any) -> tuple[list[str], str]:
@@ -5443,6 +5506,19 @@ def register_code_api(
                         raw_answer = str(payload.get("answer") or "")
                         if self_check_note is not None and raw_answer.strip():
                             payload["answer"] = raw_answer.rstrip() + "\n\n" + self_check_note
+                    # The page, looked at, for a turn that changed front-end files in a project whose
+                    # `launch.json` names a dev server (`chimera/tools/preview.py`). A console error
+                    # means the turn is not given as verified: it says so in the answer and the close
+                    # loop below does not read the turn as verified either.
+                    preview_check = _preview_check_of_turn(
+                        agent, live(), guard, before, tainted=bool(ledger.run_tainted()),
+                    )
+                    if preview_check is not None:
+                        payload["preview_verify"] = preview_check.to_payload()
+                        preview_note = preview_check.note()
+                        raw_answer = str(payload.get("answer") or "")
+                        if preview_note is not None and raw_answer.strip():
+                            payload["answer"] = raw_answer.rstrip() + "\n\n" + preview_note
                     # `answer` is left out — it is already in the message list, and a receipt is
                     # about the turn, not a second copy of it. `revert_token` is left out
                     # deliberately: the undo offer is single-use and in-memory, so persisting one
@@ -5466,7 +5542,8 @@ def register_code_api(
                             fused=bool(req.fuse),
                         ),
                         message=req.message, measure=lambda: _measured_turn(guard, before),
-                        verified=bool(verdict is not None and verdict.get("state") == "passed"),
+                        verified=bool(verdict is not None and verdict.get("state") == "passed")
+                        and (preview_check is None or preview_check.ok),
                         self_check_clean=self_check is None or self_check.clean,
                         follow=req.close_loop_follow,
                     )

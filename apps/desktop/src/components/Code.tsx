@@ -13,6 +13,7 @@ import {
   Save,
   Shapes,
   Terminal,
+  MonitorPlay,
   TerminalSquare,
   WrapText,
   X,
@@ -62,6 +63,7 @@ import { MaximizeButton } from "@/components/shell/Maximize";
 import { ComposerSettings } from "@/components/code/ComposerSettings";
 import { AgentBatchSlot, useStartAgentBatch } from "@/components/code/AgentBatchSlot";
 import { HtmlPreview } from "@/components/code/HtmlPreview";
+import { PreviewPane } from "@/components/code/PreviewPane";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { ProjectPackCard } from "@/components/code/ProjectPackCard";
 import { TerminalPanel } from "@/components/code/TerminalPanel";
@@ -535,7 +537,9 @@ export function Code() {
   // Below `lg` the viewer replaces the conversation. With a design there is a switch between the two,
   // and both stay mounted (hidden by CSS), so a draft in the composer and the canvas's undo survive it.
   const [stacked, setStacked] = useState<"conversation" | "viewer">("viewer");
-  const viewerOn = openFile !== null || design !== null;
+  // The project's dev servers and the page they serve (`PreviewPane`): another thing for the same slot.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const viewerOn = openFile !== null || design !== null || previewOpen;
   // A maximised viewer with no file is a blank screen: closing the file restores the layout, so the next
   // file does not open maximised without anyone asking.
   useEffect(() => {
@@ -548,7 +552,7 @@ export function Code() {
   // an empty pane.
   const viewerMode = layout.panels.viewer.mode;
   const viewerClosed = viewerOn && viewerMode === "closed";
-  const viewerMin = openFile !== null && design === null && viewerMode === "minimized";
+  const viewerMin = openFile !== null && design === null && !previewOpen && viewerMode === "minimized";
   // The viewer as a pane with a body. Only that one takes the conversation's place while stacked:
   // minimised it is a header under the conversation, closed it is nothing.
   const viewerShown = viewerOn && viewerMode !== "closed" && !viewerMin;
@@ -570,6 +574,7 @@ export function Code() {
     (path: string) => {
       setOpenFile(path);
       setDesign(null);
+      setPreviewOpen(false);
       layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
     },
     [layoutDispatch],
@@ -578,6 +583,7 @@ export function Code() {
   const openDesign = useCallback(
     (id: string | null, brief?: string) => {
       setOpenFile(null);
+      setPreviewOpen(false);
       setDesign((current) => ({ id, brief: brief ?? (current?.id === id ? current?.brief : undefined), key: (current?.key ?? 0) + 1 }));
       setStacked("viewer");
       layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
@@ -1096,6 +1102,23 @@ export function Code() {
             </button>
           </Tooltip>
         ) : null}
+        {/* The project's dev servers (launch.json) and the page they serve, in the viewer's slot. */}
+        {workspace ? (
+          <Button
+            size="sm"
+            type="button"
+            variant="ghost"
+            aria-pressed={previewOpen}
+            onClick={() => {
+              setPreviewOpen((open) => !open);
+              setOpenFile(null);
+              setDesign(null);
+              layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
+            }}
+          >
+            <MonitorPlay className="h-4 w-4" /> {t("code.devserver.button")}
+          </Button>
+        ) : null}
         {/* A real terminal in this conversation's folder (Ctrl+`). Where commands are off it still
             opens, and says why it cannot start a shell, instead of being a button that vanishes. */}
         <Tooltip label={t("terminal.hint")}>
@@ -1425,7 +1448,9 @@ export function Code() {
             className={cn("flex min-h-0 min-w-0 flex-1 flex-col border-hairline", viewerMax ? "lg:w-auto" : "lg:w-(--viewer-w) lg:flex-none lg:shrink-0 lg:border-l", viewerMin && "max-lg:flex-none max-lg:border-t lg:w-72 lg:self-start lg:border-b", design && stacked === "conversation" && "max-lg:hidden")}
             style={{ "--viewer-w": `${layout.regions.viewer.size ?? (design ? DESIGN_VIEWER_WIDTH : FILE_VIEWER_WIDTH)}px` } as CSSProperties}
           >
-            {design ? (
+            {previewOpen && !design ? (
+              <PreviewPane workspace={workspace} onClose={() => setPreviewOpen(false)} />
+            ) : design ? (
               <Suspense fallback={<Spinner />}>
                 <DesignPane
                   target={design}

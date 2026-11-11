@@ -127,7 +127,9 @@ _log = get_logger("tools.write_region")
 #: are the ones whose loss is not recoverable from inside the system that lost them. Codex CLI
 #: reaches the same conclusion about `.git` from the other direction — it marks it read-only inside
 #: the writable root — which is some evidence the boundary is in the right place.
-ALWAYS_DENIED: tuple[str, ...] = (".git", ".chimera", ".env")
+# `.claude/launch.json` is the second place the dev-server recipe lives (`core/launch_config.py`): what it
+# names is run as a command, so the file tools may not write it any more than they may write `.chimera`.
+ALWAYS_DENIED: tuple[str, ...] = (".git", ".chimera", ".env", ".claude/launch.json")
 
 
 def _under(rel: str, directory: str) -> bool:
