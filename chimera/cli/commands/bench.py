@@ -616,7 +616,7 @@ def sandbox_bench(
     gateway = LLMGateway()
 
     def factory(ws: Path) -> StatefulRunner:
-        return Agent(gateway, default_registry(ws), AgentConfig(model=model, max_steps=max_steps))
+        return Agent(gateway, default_registry(ws), AgentConfig(model=model, max_steps=max_steps, claude_compat=False))
 
     report = run_stateful(factory, demo_stateful_tasks(), Path(workspace))
     table = Table(title="sandbox bench (final-state grading + side effects)")

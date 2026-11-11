@@ -50,14 +50,14 @@ def assembled_examples() -> dict[str, str]:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         (root / "AGENTS.md").write_text(EXAMPLE_AGENTS_MD, encoding="utf-8")
-        bare = Agent(backend, ToolRegistry(), AgentConfig(inject_skill_context=False, prefix_nonce=""))
+        bare = Agent(backend, ToolRegistry(), AgentConfig(inject_skill_context=False, prefix_nonce="", claude_compat=False))
         tools = ToolRegistry()
         tools.register(TodoWriteTool())
         full = Agent(
             backend,
             tools,
             AgentConfig(
-                inject_skill_context=False, prefix_nonce="", project_root=root, instructions=owner
+                inject_skill_context=False, prefix_nonce="", claude_compat=False, project_root=root, instructions=owner
             ),
         )
         from chimera.orchestration.hierarchy import WORKER_SYSTEM
@@ -66,7 +66,7 @@ def assembled_examples() -> dict[str, str]:
         worker = Agent(
             backend,
             ToolRegistry(),
-            AgentConfig(inject_skill_context=False, prefix_nonce="", system_prompt=WORKER_SYSTEM),
+            AgentConfig(inject_skill_context=False, prefix_nonce="", claude_compat=False, system_prompt=WORKER_SYSTEM),
         )
         from chimera.tools.browser import BrowserTool
 
@@ -78,7 +78,7 @@ def assembled_examples() -> dict[str, str]:
             backend,
             browsing,
             AgentConfig(
-                inject_skill_context=False, prefix_nonce="", project_root=root, instructions=owner,
+                inject_skill_context=False, prefix_nonce="", claude_compat=False, project_root=root, instructions=owner,
                 browser_situation=True,
             ),
         )

@@ -72,6 +72,9 @@ if TYPE_CHECKING:
     from chimera.tools.browser_situation import Wall
 
 _log = get_logger("core.agent")
+#: Source labels that name the owner's own files, not the repository's: CHIMERA_HOME's AGENTS.md and the
+#: user's ~/.claude/CLAUDE.md. A nested read skips them, because they were delivered in the system prompt.
+_OWNER_SOURCE_PREFIXES = ("CHIMERA_HOME/", "~/.claude/")
 
 # Bound on a single live per-edit unified diff (chars), so a huge write can't flood the event stream.
 _MAX_EDIT_DIFF_CHARS = 4000
@@ -670,6 +673,15 @@ class AgentConfig:
     #: already obey, and that is what every surface passes; a bench or a test names it. False fences
     #: the file and takes it into the run's taint ledger (study 30, S30-26).
     trust_workspace: bool | None = None
+    #: Whether the project's instructions include Claude Code's files (CLAUDE.md and friends) and the
+    #: owner's ~/.claude/CLAUDE.md, and follow ``@path`` imports. None follows ``CHIMERA_CLAUDE_COMPAT``
+    #: (on by default); a bench or a test names it. False reads AGENTS.md alone, as before the switch.
+    claude_compat: bool | None = None
+    #: Whether the OWNER'S personal ``~/.claude/CLAUDE.md`` joins the prompt. Off by default: a run that
+    #: a bot, a webhook, a job or a subagent starts must never carry the owner's personal file, because
+    #: whoever talks to that run could read it back. Only the owner's own surfaces (the CLI chat and
+    #: code, and the desktop Code turn) set it, and they say so where they build their AgentConfig.
+    user_claude_md: bool = False
     #: The owner's own instructions, already rendered (see chimera.core.instructions).
     #:
     #: Passed in rather than read from disk here, unlike ``project_root``: an AGENTS.md is workspace
@@ -1096,6 +1108,9 @@ class Agent:
         owner_block = self._owner_agent_context()
         if owner_block:
             system_prompt = f"{system_prompt}\n\n{owner_block}"
+        user_claude_block = self._user_claude_context()
+        if user_claude_block:
+            system_prompt = f"{system_prompt}\n\n{user_claude_block}"
         # After the skills, so the project's own conventions outrank a generic skill card that
         # happens to have been retrieved — a repository that says "never use bare except" should
         # win over one. Not last any more: see the owner's instructions below.
@@ -1209,6 +1224,32 @@ class Agent:
             return ""
         return f"\n\n{block}" if block else ""
 
+    def _claude_compat(self) -> bool:
+        """Whether Claude Code's instruction files are read: the config's value, else the setting."""
+        if self.config.claude_compat is not None:
+            return bool(self.config.claude_compat)
+        from chimera.config import get_settings
+
+        return bool(get_settings().claude_compat)
+
+    def _user_claude_context(self) -> str:
+        """The owner's ``~/.claude/CLAUDE.md``, as owner instruction ("" when off or absent).
+
+        Read per run, like the rest of the owner's files. It is the one instruction file that does not
+        come from a repository, so it is recorded under its own label and never fenced as project text.
+        """
+        if not (self.config.user_claude_md and self._claude_compat()):
+            return ""
+        try:
+            from chimera.core.agents_md import load_user_claude_instructions
+
+            found = load_user_claude_instructions()
+            self._record_instruction_sources(found.provenance)
+            return found.text
+        except Exception as exc:  # noqa: BLE001 -- optional owner context cannot break a run
+            _log.debug("user CLAUDE.md skipped: %s", exc)
+            return ""
+
     def _owner_agent_context(self) -> str:
         """Read the owner's global AGENTS.md from the same home as the active tool bundle."""
         try:
@@ -1261,7 +1302,7 @@ class Agent:
             already_shown.update(
                 (path, digest)
                 for path, digest, _ in getattr(self._local, "instruction_sources", ())
-                if not path.startswith("CHIMERA_HOME/")
+                if not path.startswith(_OWNER_SOURCE_PREFIXES)
             )
             found = load_agent_instructions(
                 self.config.project_root,
@@ -1271,6 +1312,7 @@ class Agent:
                 nested_only=True,
                 closest_first=True,
                 seen=already_shown,
+                claude_compat=self._claude_compat(),
             )
             if not found:
                 return ""
@@ -1324,7 +1366,10 @@ class Agent:
                 trusted = get_settings().trust_workspace
             focus = [self.run_state.open_file[0]] if self.run_state.open_file else []
             found = load_agent_instructions(
-                self.config.project_root, focus=focus, untrusted=not trusted
+                self.config.project_root,
+                focus=focus,
+                untrusted=not trusted,
+                claude_compat=self._claude_compat(),
             )
             if found and not trusted:
                 # The operator said this workspace holds code they do not control, so its AGENTS.md
@@ -1500,7 +1545,7 @@ class Agent:
             self._instruction_displayed.update(
                 (path, digest)
                 for path, digest, _ in source_rows
-                if not path.startswith("CHIMERA_HOME/")
+                if not path.startswith(_OWNER_SOURCE_PREFIXES)
             )
         changed = False
         with self._instruction_provenance_lock:

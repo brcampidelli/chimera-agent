@@ -57,6 +57,9 @@ export interface ConversationSide {
   plan: PlanFacts | null;
   /** Whether an approval question is on screen for this conversation (the card in the transcript). */
   approvalWaiting: boolean;
+  /** The instruction files the newest turn with a receipt was given (AGENTS.md, CLAUDE.md, ...), in
+   *  load order. Empty when none was read or the receipt predates the field. Paths only, never text. */
+  instructions: string[];
 }
 
 const EMPTY: ConversationSide = {
@@ -69,6 +72,7 @@ const EMPTY: ConversationSide = {
   worksActive: 0,
   plan: null,
   approvalWaiting: false,
+  instructions: [],
 };
 
 interface SideApi {
@@ -122,7 +126,11 @@ export function contextPercent(used: number, windowTokens: number | null): numbe
 /** The shape of a turn this reads; the conversation's own `Exchange` is wider. */
 export interface TurnContextFacts {
   context?: { used: number; window: number | null };
-  done: { context_peak_tokens: number | null } | null;
+  done: {
+    context_peak_tokens: number | null;
+    /** The instruction files the turn was given (`code_api` receipt); absent on older receipts. */
+    instruction_sources?: { path: string; truncated: boolean }[];
+  } | null;
   failed?: boolean;
   abandoned?: boolean;
 }
@@ -134,6 +142,14 @@ export interface TurnContextFacts {
  * turn whose receipt carries a peak, with the window its own context frame reported (a reopened
  * conversation has no frames, so its window is unknown and the card shows tokens without a percent).
  */
+export function readInstructions(turns: readonly TurnContextFacts[]): string[] {
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    const sources = turns[i].done?.instruction_sources;
+    if (Array.isArray(sources)) return sources.map((source) => source.path);
+  }
+  return [];
+}
+
 export function readContext(turns: readonly TurnContextFacts[]): { live: ContextReading | null; peak: ContextReading | null } {
   // Indexed rather than `.at(-1)`: the project targets ES2020.
   const last = turns.length > 0 ? turns[turns.length - 1] : undefined;

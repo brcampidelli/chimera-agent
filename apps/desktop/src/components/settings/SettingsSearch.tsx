@@ -82,6 +82,13 @@ const ENTRIES: readonly SearchEntry[] = [
   },
   {
     tab: "general",
+    label: "settings.row.claudeCompat",
+    hint: "settings.hint.claudeCompat",
+    anchor: "settings-claude-compat",
+    terms: "settings.search.terms.claudeCompat",
+  },
+  {
+    tab: "general",
     label: "settings.row.closeLoopMerge",
     hint: "settings.hint.closeLoopMerge",
     anchor: "settings-close-loop-merge",

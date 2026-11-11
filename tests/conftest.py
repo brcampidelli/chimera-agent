@@ -290,6 +290,9 @@ def _no_dotenv(
     # it would have taken the developer's own app's lock, or failed because that app held it. A test
     # that needs a particular home still sets its own; this is only the default under it.
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path_factory.mktemp("home")))
+    # Claude Code's own folder (`~/.claude`) is the developer's real one too: the instruction files in it
+    # reach every composed prompt when `CHIMERA_CLAUDE_COMPAT` is on. Private here, so no test reads them.
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("claude-config")))
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

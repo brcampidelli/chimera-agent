@@ -354,6 +354,19 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_ARCHIVE_ON_PR_MERGE: String(v) })}
         />
       </Row>
+      {/* Claude Code's instruction files, read beside AGENTS.md (`chimera/core/agents_md.py`). On by default:
+          the same fence and budget apply, and it reads only what the project and the owner already keep. */}
+      <Row
+        label={t("settings.row.claudeCompat")}
+        hint={t("settings.hint.claudeCompat")}
+        env="CHIMERA_CLAUDE_COMPAT"
+      >
+        <Toggle
+          id="settings-claude-compat"
+          on={c.autonomy.claude_compat ?? true}
+          onChange={(v) => save({ CHIMERA_CLAUDE_COMPAT: String(v) })}
+        />
+      </Row>
       {/* The merge is its own switch, off, and owner-only like the one above. A merge puts the change on
           the default branch, so opening a pull request never implies merging one. Billing, a destructive
           migration, row-level security and a secret are never merged, whatever this says. */}

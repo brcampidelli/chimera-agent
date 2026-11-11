@@ -27,6 +27,11 @@ export function ContextCard({ alone = false }: { alone?: boolean } = {}) {
     percent === null ? t("code.chat.contextTokens", { n: num(reading.used) }) : t("code.chat.contextPercent", { n: percent });
   return (
     <div className="space-y-1.5" data-testid="side-context">
+      {side.instructions.length === 0 ? null : (
+        <p className="text-xs text-muted-foreground" data-testid="side-context-instructions">
+          {t("side.context.instructions", { files: side.instructions.join(", ") })}
+        </p>
+      )}
       <div className="flex items-baseline justify-between gap-2 text-sm">
         <span className="tabular-nums">{label}</span>
         <span className="text-xs text-muted-foreground">{source}</span>

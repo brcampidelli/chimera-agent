@@ -394,6 +394,9 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
         # Whether a conversation leaves the list once its PR is merged or closed. ON by default, the
         # owner's decision: nothing set it, so the default is what the screen shows.
         "archive_on_pr_merge": True,
+        # Whether a run reads Claude Code's instruction files (CLAUDE.md) too — on, the default, since
+        # nothing set it.
+        "claude_compat": True,
         # The owner's lifecycle hooks and their host switch (2026-10-05) — off, since nothing set
         # them.
         "hooks": False,

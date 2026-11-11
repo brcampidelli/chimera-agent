@@ -214,7 +214,11 @@ def test_chimeras_own_agents_md_reaches_the_composed_prompt_whole() -> None:
 
     found = load_agent_instructions(ROOT)
     assert found.truncated == () and found.omitted == ()
-    prompt = Agent(_NoBackend(), ToolRegistry(), AgentConfig(project_root=ROOT)).compose_system_prompt(
+    # Pinned off: this test is about AGENTS.md alone. With the Claude switch on (its default), the
+    # developer's own ~/.claude/CLAUDE.md is read into the prompt too, and it is not this repository's.
+    prompt = Agent(
+        _NoBackend(), ToolRegistry(), AgentConfig(project_root=ROOT, claude_compat=False)
+    ).compose_system_prompt(
         "do a thing"
     )
     for rule in rules:

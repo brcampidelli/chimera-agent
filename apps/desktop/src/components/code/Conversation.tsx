@@ -141,7 +141,7 @@ import { Elapsed, formatElapsed } from "@/components/code/Elapsed";
 
 export { formatElapsed };
 import { useAgent, type AgentState } from "@/lib/agent-context";
-import { contextPercent, readContext, useConversationSidePublisher, type PlanFacts } from "@/lib/conversation-side";
+import { contextPercent, readContext, readInstructions, useConversationSidePublisher, type PlanFacts } from "@/lib/conversation-side";
 import { clearIfStillAsked } from "@/lib/plan-awaiting";
 import {
   buildLineCommentsMessage,
@@ -1265,14 +1265,17 @@ export function Conversation({
   const liveWindow = sideContext.live?.window ?? null;
   const peakUsed = sideContext.peak?.used ?? null;
   const peakWindow = sideContext.peak?.window ?? null;
+  // Joined to a string so the effect's dependency is a value, not a fresh array on every render.
+  const instructionsKey = readInstructions(exchanges).join("\n");
   useEffect(() => {
     publishSide({
       sessionId,
       live: liveUsed === null ? null : { used: liveUsed, window: liveWindow },
       peak: peakUsed === null ? null : { used: peakUsed, window: peakWindow },
       worksActive: worksOpen,
+      instructions: instructionsKey === "" ? [] : instructionsKey.split("\n"),
     });
-  }, [publishSide, sessionId, liveUsed, liveWindow, peakUsed, peakWindow, worksOpen]);
+  }, [publishSide, sessionId, liveUsed, liveWindow, peakUsed, peakWindow, worksOpen, instructionsKey]);
 
   // The plan of the MOST RECENT turn only (an older turn's plan is not this one's). It is "awaiting"
   // while the approval card on screen is the question that plan raised: the gate's question carries the

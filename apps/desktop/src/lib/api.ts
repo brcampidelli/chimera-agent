@@ -1781,6 +1781,9 @@ export interface CodeTurnDone {
   // The largest prompt this turn built. The number that says whether raising max_steps is safe —
   // shown rather than hidden, because a ceiling raised without seeing its cost is a trap.
   context_peak_tokens: number | null;
+  /** The instruction files this turn was given (AGENTS.md, CLAUDE.md, the owner's ~/.claude/CLAUDE.md),
+   *  in load order, each with whether it was cut to fit. Paths only. Absent on older receipts. */
+  instruction_sources?: { path: string; truncated: boolean }[];
   /** The turn's wall time, measured by the server from the clock the opening frame announced.
    *  Absent on receipts written before it was recorded. */
   elapsed_seconds?: number;

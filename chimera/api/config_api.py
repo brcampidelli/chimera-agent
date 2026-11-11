@@ -127,6 +127,11 @@ _EDITABLE_SETTINGS = {
     # entry. Bridge-writable like the switch above: it archives and deletes nothing, and the sweep
     # only reads GitHub's state with the owner's own `gh` login, as the PR card already does.
     "CHIMERA_ARCHIVE_ON_PR_MERGE",
+    # Whether a run reads Claude Code's instruction files (CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md,
+    # and the owner's ~/.claude/CLAUDE.md) beside AGENTS.md (`chimera/core/agents_md.py`). On by default.
+    # It widens what a run reads from the owner's machine, so it is owner-only and written from the
+    # owner's screen (`bridge_routes.GUARD_SETTINGS`, `SCREEN_WRITE_SETTINGS`). Read per run: no APPLIES_WHEN entry.
+    "CHIMERA_CLAUDE_COMPAT",
     # NOT here, by design: CHIMERA_APPROVE_VIA_CHAT. Answering a pending approval from a chat bot
     # widens who can approve to whoever holds that channel, so turning it on stays a deliberate
     # edit of `.env` by the owner — never a switch a screen (or the desktop bridge) can flip.
@@ -333,6 +338,8 @@ SCREEN_WRITE_SETTINGS = frozenset({
     "CHIMERA_PULL_REQUESTS",
     "CHIMERA_CODE_CLOSE_LOOP",
     "CHIMERA_CLOSE_LOOP_MERGE",
+    # Which instruction files a run reads from the owner's machine (`chimera/core/agents_md.py`).
+    "CHIMERA_CLAUDE_COMPAT",
     # A base URL decides where prompts are sent, and the key env name decides which credential goes
     # with them. Adding or removing one is the owner's screen's act, not the server token's (#1133).
     "CHIMERA_ENDPOINTS",
@@ -831,6 +838,8 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             # Whether a conversation leaves the list once its pull request is merged or closed
             # (`chimera/core/pr_auto_archive.py`). On by default; archiving touches nothing.
             "archive_on_pr_merge": settings.archive_on_pr_merge,
+            # Whether a run reads Claude Code's instruction files too (`chimera/core/agents_md.py`). On by default.
+            "claude_compat": settings.claude_compat,
             # Whether that loop may merge a green pull request. Off by default; owner-only.
             "close_loop_merge": settings.close_loop_merge,
             # The owner's lifecycle hooks and whether a shell hook may run on the host
@@ -1261,6 +1270,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
     "CHIMERA_CODE_CLOSE_LOOP": _check_boolean("CHIMERA_CODE_CLOSE_LOOP"),
     "CHIMERA_ARCHIVE_ON_PR_MERGE": _check_boolean("CHIMERA_ARCHIVE_ON_PR_MERGE"),
+    "CHIMERA_CLAUDE_COMPAT": _check_boolean("CHIMERA_CLAUDE_COMPAT"),
     "CHIMERA_CLOSE_LOOP_MERGE": _check_boolean("CHIMERA_CLOSE_LOOP_MERGE"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }
