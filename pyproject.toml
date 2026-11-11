@@ -316,7 +316,7 @@ testpaths = ["tests"]
 faulthandler_timeout = 240
 # The default run is hermetic (no network). Integration tests hit a real
 # provider and are opt-in via `-m integration`.
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration' -vv"
 markers = [
     "product_default: the test asserts the product default, so the suite-wide deferral pin is skipped",
     "integration: live test that calls a real provider API (needs OPENROUTER_API_KEY)",
