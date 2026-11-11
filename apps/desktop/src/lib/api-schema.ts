@@ -6547,6 +6547,11 @@ export interface components {
             action: string;
             /** Age Seconds */
             age_seconds: number;
+            /**
+             * Allow Scope
+             * @default
+             */
+            allow_scope: string;
             /** Asked At */
             asked_at: number;
             /**
@@ -12871,6 +12876,12 @@ export interface components {
              * @enum {string}
              */
             commands: "granted" | "asks";
+            /**
+             * Edits
+             * @default granted
+             * @enum {string}
+             */
+            edits: "granted" | "asks";
             /**
              * Reach
              * @default workspace

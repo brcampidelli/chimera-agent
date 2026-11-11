@@ -26,9 +26,11 @@ export interface ModeBase {
 
 /**
  * The posture one turn runs under, for a mode. Every answer is one of the two axes the server knows,
- * plus `commands`, the one fact the server needed to express "edit freely, ask before commands".
+ * plus `commands` and `edits`, the facts the server needed to express "edit freely, ask before commands".
  *
- * - **Manual**: the configured reach with approval `always`. On a Code turn that value changes nothing yet (only `suspicious` narrows on taint); Manual adds no question of its own.
+ * - **Manual**: the configured reach, with approval `always`, and both `commands` and `edits` set to
+ *   `asks`: every file edit and every command stops on the turn's own card before it happens. The
+ *   server asks about what the reach and the grants already allow; it never widens them.
  * - **Accept edits**: the workspace may be edited without asking (`never`), and every command asks
  *   first (`commands: "asks"`). The reach is `workspace_shell` so commands exist at all; the server
  *   still removes them unless the project granted commands, and never raises a `read_only` owner's
@@ -43,31 +45,32 @@ export interface ModeBase {
 export function modeTurn(mode: Exclude<PermissionMode, "bypass">, base: ModeBase): ModeTurn {
   switch (mode) {
     case "manual":
-      return { posture: { reach: base.reach, approval: "always", commands: "granted" }, planGate: false };
+      return { posture: { reach: base.reach, approval: "always", commands: "asks", edits: "asks" }, planGate: false };
     case "accept_edits":
       return {
         posture: {
           reach: base.reach === "read_only" ? "read_only" : "workspace_shell",
           approval: "never",
           commands: "asks",
+          edits: "granted",
         },
         planGate: false,
       };
     case "plan":
       return {
-        posture: { reach: base.reach, approval: base.approval === "never" ? "suspicious" : base.approval, commands: "granted" },
+        posture: { reach: base.reach, approval: base.approval === "never" ? "suspicious" : base.approval, commands: "granted", edits: "granted" },
         planGate: true,
       };
     case "auto":
-      return { posture: { reach: base.reach, approval: "suspicious", commands: "granted" }, planGate: false };
+      return { posture: { reach: base.reach, approval: "suspicious", commands: "granted", edits: "granted" }, planGate: false };
     case "dont_ask":
-      return { posture: { reach: base.reach, approval: "never", commands: "granted" }, planGate: false };
+      return { posture: { reach: base.reach, approval: "never", commands: "granted", edits: "granted" }, planGate: false };
   }
 }
 
 /** The posture a turn runs under when the mode is bypass: the configured one, unchanged. */
 export function bypassTurn(base: ModeBase): ModeTurn {
-  return { posture: { reach: base.reach, approval: base.approval, commands: "granted" }, planGate: false };
+  return { posture: { reach: base.reach, approval: base.approval, commands: "granted", edits: "granted" }, planGate: false };
 }
 
 /**

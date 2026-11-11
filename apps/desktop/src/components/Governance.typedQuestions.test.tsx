@@ -76,7 +76,7 @@ describe("Governance — typed questions are part of what is waiting", () => {
       {
         id: "q1", action: "run_shell: ls", reason: "outside the folder", asked_at: 0, age_seconds: 10,
         decision: "review", p: null, band: "", decider_model: "", decision_id: "", run_id: "",
-        kind: "", host: "", irreversible: false, preview: [], typed_text: "", session_id: "",
+        kind: "", host: "", irreversible: false, allow_scope: "", preview: [], typed_text: "", session_id: "",
         workspace: "", work: "", suggestion: null,
       } as unknown as Awaited<ReturnType<typeof getApprovals>>[number],
     ]);

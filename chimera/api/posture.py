@@ -50,9 +50,16 @@ Approval = Literal["always", "suspicious", "never"]
 #: the existing host-exec confirm, exposed on the posture so a turn can ask for it. It only narrows.
 Commands = Literal["granted", "asks"]
 
+#: Whether a file edit in the workspace (write, edit, patch) goes ahead when the reach allows it
+#: ("granted"), or stops for the owner on the turn's own card before it happens ("asks"). The same
+#: kind of axis as :data:`Commands`, for the same reason: "edit freely" and "ask before each edit" are
+#: both reachable by a mode and neither is a value of reach or of approval. It only narrows.
+Edits = Literal["granted", "asks"]
+
 DEFAULT_REACH: Reach = "workspace"
 DEFAULT_APPROVAL: Approval = "suspicious"
 DEFAULT_COMMANDS: Commands = "granted"
+DEFAULT_EDITS: Edits = "granted"
 
 
 class Posture(BaseModel):
@@ -61,6 +68,7 @@ class Posture(BaseModel):
     reach: Reach = DEFAULT_REACH
     approval: Approval = DEFAULT_APPROVAL
     commands: Commands = DEFAULT_COMMANDS
+    edits: Edits = DEFAULT_EDITS
 
 
 def commands_run_without_asking(posture: Posture | None, allow_host_exec: bool) -> bool:
@@ -418,7 +426,7 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
 PermissionMode = Literal["manual", "accept_edits", "plan", "auto", "dont_ask", "bypass"]
 
 #: Every mode, in the order the selector lists them. Restrictiveness is NOT a rank over this list: a
-#: mode is not "above" another, it sets four things (reach, approval, commands, the plan gate), and
+#: mode is not "above" another, it sets five things (reach, approval, commands, edits, the plan gate), and
 #: ``Accept edits`` is narrower than ``Auto`` on two of them and WIDER on reach (it mounts the shell).
 #: What a paired device may choose is decided axis by axis in :func:`widens`.
 ALL_MODES: tuple[str, ...] = ("manual", "accept_edits", "plan", "auto", "dont_ask", "bypass")
@@ -429,6 +437,7 @@ STORABLE_MODES: frozenset[str] = frozenset(ALL_MODES) - {"bypass"}
 _REACH_RANK: dict[str, int] = {"read_only": 0, "workspace": 1, "workspace_shell": 2}
 _APPROVAL_RANK: dict[str, int] = {"always": 0, "suspicious": 1, "never": 2}
 _COMMANDS_RANK: dict[str, int] = {"asks": 0, "granted": 1}
+_EDITS_RANK: dict[str, int] = {"asks": 0, "granted": 1}
 
 
 class ModeTurn(BaseModel):
@@ -459,7 +468,11 @@ def mode_turn(mode: PermissionMode, base_reach: Reach, base_approval: Approval) 
     server, so the bridge cannot pick a posture the table does not give.
     """
     if mode == "manual":
-        return ModeTurn(posture=Posture(reach=base_reach, approval="always", commands="granted"))
+        # Manual asks before every file edit and every command, on the turn's own card. Reach is the
+        # configured one: Manual asks about what the reach and the grants already allow, never more.
+        return ModeTurn(
+            posture=Posture(reach=base_reach, approval="always", commands="asks", edits="asks")
+        )
     if mode == "accept_edits":
         reach: Reach = "read_only" if base_reach == "read_only" else "workspace_shell"
         return ModeTurn(posture=Posture(reach=reach, approval="never", commands="asks"))
@@ -478,20 +491,21 @@ def mode_turn(mode: PermissionMode, base_reach: Reach, base_approval: Approval) 
 def narrow_posture(a: Posture, b: Posture) -> Posture:
     """The posture that is the more restrictive of the two on every axis, axis by axis.
 
-    Reach: the lower; approval: the one that stops sooner; commands: ``asks`` wins. Never wider than
+    Reach: the lower; approval: the one that stops sooner; commands and edits: ``asks`` wins. Never wider than
     either argument, so a posture a device sent can only take something away from the mode's.
     """
     return Posture(
         reach=min(a.reach, b.reach, key=_REACH_RANK.__getitem__),
         approval=min(a.approval, b.approval, key=_APPROVAL_RANK.__getitem__),
         commands=min(a.commands, b.commands, key=_COMMANDS_RANK.__getitem__),
+        edits=min(a.edits, b.edits, key=_EDITS_RANK.__getitem__),
     )
 
 
 def widens(candidate: ModeTurn, reference: ModeTurn) -> bool:
     """Whether ``candidate`` lets the agent do more than ``reference`` on ANY axis.
 
-    Four axes: reach, approval, commands and the plan gate (a gate the reference forces and the
+    Five axes: reach, approval, commands, edits and the plan gate (a gate the reference forces and the
     candidate drops is wider). One axis wider is enough: a mode is not wider because it is narrower
     somewhere else.
     """
@@ -500,6 +514,7 @@ def widens(candidate: ModeTurn, reference: ModeTurn) -> bool:
         _REACH_RANK[c.reach] > _REACH_RANK[r.reach]
         or _APPROVAL_RANK[c.approval] > _APPROVAL_RANK[r.approval]
         or _COMMANDS_RANK[c.commands] > _COMMANDS_RANK[r.commands]
+        or _EDITS_RANK[c.edits] > _EDITS_RANK[r.edits]
         or (reference.plan_gate and not candidate.plan_gate)
     )
 

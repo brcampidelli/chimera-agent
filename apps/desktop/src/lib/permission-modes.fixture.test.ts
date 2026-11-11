@@ -13,7 +13,7 @@ const FIXTURE = join(__dirname, "../../../../tests/fixtures/permission_modes.jso
 interface Row {
   mode: Exclude<PermissionMode, "bypass">;
   base: { reach: "read_only" | "workspace" | "workspace_shell"; approval: "always" | "suspicious" | "never" };
-  posture: { reach: string; approval: string; commands: string };
+  posture: { reach: string; approval: string; commands: string; edits: string };
   planGate: boolean;
 }
 
@@ -42,6 +42,7 @@ describe("the default each Settings approval reads as", () => {
       reach: "workspace_shell",
       approval: "never",
       commands: "granted",
+      edits: "granted",
     });
   });
 });

@@ -2877,6 +2877,12 @@ class ApprovalOut(BaseModel):
     typed_text: str = ""
     """Text typed into a browser field, shown only on the approval card."""
 
+    allow_scope: str = ""
+    """What "Allow in this conversation" would grant (Manual mode): ``<tool>:<path>`` for a write,
+    ``run_shell:<command>`` for a command; empty when the card offers none. The card reads it only to
+    name the file; the server keeps its own copy with the question, and the answer names only
+    ``remember: "conversation"``."""
+
     kind: str = ""
     """Empty for a question a tool call is parked on; ``settings_suggestion`` for a settings change
     waiting for the owner, whose ``suggestion`` says exactly what would change."""
@@ -2965,7 +2971,7 @@ class UserQuestionAnswerOut(BaseModel):
 class ApprovalAnswerIn(BaseModel):
     approved: bool
     digest: str | None = None
-    remember: str | None = Field(default=None, pattern="^project$")
+    remember: str | None = Field(default=None, pattern="^(project|conversation)$")
     """For a settings suggestion: the ``suggestion.digest`` the card was drawn from. A yes without
     it, or with one the card no longer matches, is ``changed`` and writes nothing."""
 

@@ -54,6 +54,10 @@ export interface ApprovalQuestionLike {
   decision?: string;
   host?: string;
   irreversible?: boolean;
+  /** What "Allow in this conversation" would grant (Manual mode): `<tool>:<path>` for a write,
+   *  `run_shell:<command>` for a command; empty or absent when the card offers none. The server keeps
+   *  its own copy; the card reads this only to name the file on the button. */
+  allow_scope?: string;
   preview?: { label: string; value: string }[];
   typed_text?: string;
   preview_status?: "unreadable" | "";
@@ -123,6 +127,11 @@ function useSecondsLeft(question: ApprovalQuestionLike): number | null {
   }, [id, wait, askedAt]);
 
   return left;
+}
+
+/** The destination in an allow scope: what follows the first colon of `<tool>:<path>`. */
+function allowedFile(scope: string): string {
+  return scope.slice(scope.indexOf(":") + 1);
 }
 
 /** The three levels a verdict can carry, and the tone each is drawn in.
@@ -296,7 +305,7 @@ export function ApprovalCard({
       setRemembering(false);
     }
   };
-  const answer = async (approved: boolean) => {
+  const answer = async (approved: boolean, remember?: "conversation") => {
     setBusy(true);
     // Whether the card stays: a question refused for want of a screen while the app restarts the
     // service is still waiting, and this card is where the two ways not to wait are.
@@ -306,7 +315,9 @@ export function ApprovalCard({
       try {
         answered = suggestion
           ? await answerApproval(question.id, approved, suggestion.digest)
-          : await answerApproval(question.id, approved);
+          : remember
+            ? await answerApproval(question.id, approved, undefined, remember)
+            : await answerApproval(question.id, approved);
       } catch (error) {
         // The answer never got a reply: the app answered 500, or the connection dropped. Before
         // this the rejection went nowhere, the next poll drew the same card again, and a person
@@ -427,7 +438,7 @@ export function ApprovalCard({
       {suggestion ? (
         <SuggestedChanges suggestion={suggestion} />
       ) : question.action ? (
-        <p className="mt-1 whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+        <p className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
           {question.action}
         </p>
       ) : null}
@@ -484,6 +495,13 @@ export function ApprovalCard({
           <Button size="sm" variant="outline" disabled={busy} onClick={() => void answer(true)}>
             {t("code.approval.approve")}
           </Button>
+          {question.allow_scope ? (
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void answer(true, "conversation")}>
+              {question.allow_scope.startsWith("run_shell:")
+                ? t("code.approval.allowConversation")
+                : t("code.approval.allowEditConversation", { file: allowedFile(question.allow_scope) })}
+            </Button>
+          ) : null}
           {siteHost ? (
             <Button size="sm" variant="ghost" disabled={busy || remembering} onClick={() => void rememberSite()}>
               {t("code.approval.alwaysThisSite")}

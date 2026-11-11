@@ -329,6 +329,11 @@ class PendingApproval:
     preview_status: str = ""
     """A UI-only status code for an unreadable browser send preview."""
 
+    allow_key: str = ""
+    """What a yes "in this conversation" would grant (Manual mode): a tool name for an edit, the exact
+    command for a shell call. Empty when the card offers no such answer. Read by the answer route
+    from the question file, never from the client."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -422,6 +427,7 @@ def pending(home: Path, *, now: float | None = None) -> list[PendingApproval]:
                 preview=_safe_approval_preview(data.get("preview")),
                 typed_text=(str(data.get("typed_text") or "")[:500]),
                 preview_status=str(data.get("preview_status") or "") if data.get("preview_status") == "unreadable" else "",
+                allow_key=str(data.get("allow_key") or "")[:2000],
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -1116,6 +1122,7 @@ def ask_durably(
                     **({"preview": _safe_approval_preview(preview)} if preview else {}),
                     **({"typed_text": str(typed_text)[:500]} if typed_text else {}),
                     **({"preview_status": "unreadable"} if preview_status == "unreadable" else {}),
+                    **({"allow_key": str(named["allow_key"])[:2000]} if named.get("allow_key") else {}),
 
                     # Where the owner was shown the code — a place, never the code. Advisory only:
                     # the agent can rewrite this file, and nothing here approves anything.
@@ -1199,6 +1206,7 @@ def ask_durably(
                     preview=_safe_approval_preview(preview),
                     typed_text=str(typed_text)[:500],
                     preview_status="unreadable" if preview_status == "unreadable" else "",
+                    allow_key=str(named.get("allow_key") or "")[:2000],
                 )
             )
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy

@@ -91,6 +91,7 @@ describe("Code — reach & approval", () => {
       reach: "workspace",
       approval: "suspicious",
       commands: "granted",
+      edits: "granted",
     });
   });
 

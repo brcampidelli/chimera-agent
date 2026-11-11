@@ -506,7 +506,12 @@ export interface UserQuestionEvent {
 /** The screen credential rides on this call only: it is what makes a click a yes without a code,
  *  and no other route needs it. Absent (a remote server, an older shell), a yes comes back
  *  `needs_code` with `reason: "not_the_screen"`. */
-export const answerApproval = (id: string, approved: boolean, digest?: string) => {
+export const answerApproval = (
+  id: string,
+  approved: boolean,
+  digest?: string,
+  remember?: "conversation",
+) => {
   const screen = screenToken();
   return json<ApprovalAnswer>(`/api/approvals/${encodeURIComponent(id)}`, {
     method: "POST",
@@ -515,7 +520,13 @@ export const answerApproval = (id: string, approved: boolean, digest?: string) =
       : { "Content-Type": "application/json" },
     // `digest` only for a settings suggestion: the card that was drawn, so a yes cannot land on a
     // card whose file changed after it was shown.
-    body: JSON.stringify(digest === undefined ? { approved } : { approved, digest }),
+    // `remember: "conversation"` is Manual's "Allow in this conversation": the server keeps what the
+    // question asked for, and only for that conversation.
+    body: JSON.stringify({
+      approved,
+      ...(digest === undefined ? {} : { digest }),
+      ...(remember === undefined ? {} : { remember }),
+    }),
   });
 };
 /** The card's second question — was the action dangerous? — as the label of the decision that raised
@@ -2372,8 +2383,11 @@ export type Reach = "read_only" | "workspace" | "workspace_shell";
 export type Approval = "always" | "suspicious" | "never";
 /** Whether a command asks first ("asks") or runs as the project's grant says ("granted", the default). */
 export type Commands = "granted" | "asks";
-/** The posture a turn is sent with. `commands` is optional: an absent value is "granted". */
-export type PostureAxes = { reach: Reach; approval: Approval; commands?: Commands };
+/** Whether a file edit (write, edit, patch) asks first ("asks", Manual) or goes ahead as the reach
+ *  allows ("granted", the default). */
+export type Edits = "granted" | "asks";
+/** The posture a turn is sent with. `commands` and `edits` are optional: an absent value is "granted". */
+export type PostureAxes = { reach: Reach; approval: Approval; commands?: Commands; edits?: Edits };
 
 /** What the chosen posture means on THIS machine, right now. Structured rather than prose so the
  *  sentence can be rendered in every language — a server that returned English would make this the

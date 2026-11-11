@@ -107,7 +107,51 @@ PUBLIC_FETCH_TOOLS = FETCH_TOOLS - {"read_email", "calendar_events"}
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
 # `create_document` writes a file into the workspace exactly as `write_file` does, so it is one: a
 # read-only posture denies it (`api/posture.py` reads this set) and the ledger records the write.
-WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch", "create_document"})
+
+
+@dataclass(frozen=True)
+class WriterSpec:
+    """How one tool writes into the workspace, as the three readers of the table need it."""
+
+    #: Argument names that hold the destination, first non-empty wins; ``default`` is shown when the
+    #: call names none (the tool picks its own file name).
+    target: tuple[str, ...] = ("path",)
+    default: str = ""
+    #: Whether the change can be shown as a diff (a text edit), or only its destination can.
+    diff: bool = False
+    #: ``action`` values that write, for a tool that only writes on some of them (None: every call).
+    actions: frozenset[str] | None = None
+    #: The whole tool writes, so a read-only reach removes it. False for a tool that also reads and
+    #: proposes (``design``): it stays, and refuses its own writing action itself.
+    whole: bool = True
+
+
+#: THE table of tools that write in the workspace. Three readers, one list, so a tool added here is
+#: covered by all three the day it lands: the taint ledger (``WRITE_TOOLS``), the read-only reach
+#: (``api/posture.py`` denies ``WRITE_TOOLS``) and Manual's gate (``api/manual_gate.py``, which asks
+#: before every entry). The MCP payload sink writes in the workspace too, but is not a tool: it asks
+#: through the same gate under the name ``mcp_payload`` (``manual_gate.MCP_PAYLOAD``).
+WORKSPACE_WRITERS: dict[str, WriterSpec] = {
+    "write_file": WriterSpec(diff=True),
+    "edit_file": WriterSpec(diff=True),
+    "apply_patch": WriterSpec(diff=True),
+    "edit_batch": WriterSpec(target=("edits",), diff=True),
+    # `create_document` writes a file into the workspace exactly as `write_file` does.
+    "create_document": WriterSpec(diff=False),
+    "render_chart": WriterSpec(target=("out",), default="chart.<format>"),
+    "generate_image": WriterSpec(target=("out",), default="generated_image.png"),
+    "text_to_speech": WriterSpec(target=("out",), default="speech.mp3"),
+    "generate_audio": WriterSpec(target=("out",), default="generated_audio.mp3"),
+    "generate_video": WriterSpec(target=("out",), default="generated_video.mp4"),
+    "download_media": WriterSpec(target=("out_dir",), default="downloads"),
+    # A screenshot is a file in the workspace; every other action of the browser only reads a page.
+    "browser": WriterSpec(target=("path",), actions=frozenset({"screenshot"}), whole=False),
+    "design": WriterSpec(
+        target=("filename",), default="design-exports/",
+        actions=frozenset({"export", "export_html"}), whole=False,
+    ),
+}
+WRITE_TOOLS = frozenset(name for name, spec in WORKSPACE_WRITERS.items() if spec.whole)
 READ_TOOLS = frozenset({"read_file", "read_document", "transcribe_audio"})
 # Non-idempotent external side effects: firing the SAME call twice does real double harm
 # (a duplicate email/message/payment). A retry loop must not re-execute these — see the
