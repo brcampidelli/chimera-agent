@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **A plan panel on the Code screen.** When a turn proposes a plan, the panel lists its steps and, while the plan waits for you, offers Approve and Ask for changes through the same approval the card uses, so answering in one place answers in both. It shows only the latest turn's plan, says when the turn is waiting on the card even after a reload, and announces the decision you sent until the turn finishes. (#1213)
 
+### Changed
+
+- **Manual mode now asks before every edit and every command.** Each file write — editing, patching, charts, downloads, generated media, design exports — and each command shows a card first (with the proposed diff for text edits): allow once, allow editing that file or running that exact command for this conversation, or refuse. Reading never asks; a turn with no screen (bots, schedules, background work, the bridge) is refused at once instead of waiting; Manual ignores old project-wide "always allow" rules and the allow approval mode; and only the owner's screen can grant "for this conversation". One table now names every tool that writes to the workspace, read by the ledger, the read-only posture and Manual alike. (#1215)
+
 ## [0.86.0] - 2026-11-10
 ### Added
 
