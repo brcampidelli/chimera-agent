@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { Approval, Reach } from "@/lib/api";
+import type { TodoEntry } from "@/components/code/TodoPanel";
 
 /**
  * What the side cards of the Code screen know about the conversation on screen (C5).
@@ -20,6 +21,21 @@ export interface ContextReading {
   window: number | null;
 }
 
+/** The plan the open conversation's last turn proposed (`chimera/api/plan_gate.py`), as the Plan card
+ *  reads it. The steps are the planner's text; the todos are the agent's own claim about progress.
+ *  `awaitingId` is the approval question that holds the turn on this plan, or null once it is decided. */
+export interface PlanFacts {
+  steps: string[];
+  todos: TodoEntry[];
+  awaitingId: string | null;
+  /** `awaiting`: the turn is parked on it. `refused`: the person refused it and the turn ended. Any
+   *  other plan the turn ran past is `approved`. */
+  status: "awaiting" | "approved" | "refused";
+  /** Clears the approval card when it still holds question `id`, and records the decision sent so the
+   *  panel can show it until the turn's `done` says how the turn ended. */
+  clearAwaiting: (id: string, decision: "approved" | "refused") => void;
+}
+
 export interface ConversationSide {
   /** The folder the conversation works in; "" for a conversation with no folder. */
   workspace: string;
@@ -36,6 +52,11 @@ export interface ConversationSide {
   peak: ContextReading | null;
   /** Background works of this conversation that have not ended. */
   worksActive: number;
+  /** The plan of the last turn that proposed one, or null. Only the most recent turn counts: an older
+   *  plan is not this turn's plan, and the panel does not show it. */
+  plan: PlanFacts | null;
+  /** Whether an approval question is on screen for this conversation (the card in the transcript). */
+  approvalWaiting: boolean;
 }
 
 const EMPTY: ConversationSide = {
@@ -46,6 +67,8 @@ const EMPTY: ConversationSide = {
   live: null,
   peak: null,
   worksActive: 0,
+  plan: null,
+  approvalWaiting: false,
 };
 
 interface SideApi {
