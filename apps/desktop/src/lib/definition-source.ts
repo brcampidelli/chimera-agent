@@ -6,6 +6,7 @@ import type { TFunc } from "@/lib/i18n";
 export function definitionSourceLabel(t: TFunc, source: string): string {
   if (source === "project") return t("definitions.source.project");
   if (source === "owner") return t("definitions.source.owner");
+  if (source === "builtin") return t("code.review.title");
   if (source.startsWith("plugin:")) {
     return t("definitions.source.plugin", { name: source.slice("plugin:".length) });
   }

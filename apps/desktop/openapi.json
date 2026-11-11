@@ -4151,6 +4151,185 @@
         "title": "CodePythonOut",
         "type": "object"
       },
+      "CodeReviewFileOut": {
+        "properties": {
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/CodeReviewFindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "patch": {
+            "title": "Patch",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "patch",
+          "findings"
+        ],
+        "title": "CodeReviewFileOut",
+        "type": "object"
+      },
+      "CodeReviewFindingOut": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "consequence": {
+            "title": "Consequence",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unverified": {
+            "default": false,
+            "title": "Unverified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "priority",
+          "severity",
+          "file",
+          "line",
+          "title",
+          "consequence",
+          "evidence",
+          "confidence"
+        ],
+        "title": "CodeReviewFindingOut",
+        "type": "object"
+      },
+      "CodeReviewOut": {
+        "properties": {
+          "base": {
+            "default": "",
+            "title": "Base",
+            "type": "string"
+          },
+          "dropped": {
+            "default": 0,
+            "title": "Dropped",
+            "type": "integer"
+          },
+          "files": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CodeReviewFileOut"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "omitted": {
+            "default": 0,
+            "title": "Omitted",
+            "type": "integer"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "shown": {
+            "default": 0,
+            "title": "Shown",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tainted": {
+            "default": false,
+            "title": "Tainted",
+            "type": "boolean"
+          },
+          "untested_paths": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Untested Paths",
+            "type": "array"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "CodeReviewOut",
+        "type": "object"
+      },
       "CodeSessionArchiveOut": {
         "description": "A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.\n\nArchiving touches no file, folder or worktree \u2014 it is a timestamp beside the transcripts. A\nrefusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.",
         "properties": {
@@ -21005,6 +21184,25 @@
           }
         },
         "summary": "Revert Turn"
+      }
+    },
+    "/api/code/review": {
+      "post": {
+        "description": "``/code-review``. The body is size-checked before it is parsed, then the review runs off the event loop.",
+        "operationId": "code_review_api_code_review_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Code Review"
       }
     },
     "/api/code/roles": {
