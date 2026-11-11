@@ -181,9 +181,13 @@ def reserved_command_names() -> frozenset[str]:
     turn ``/undo`` into prompt text here while it undoes in the terminal — one name, one meaning."""
     from chimera.interface.render import session_commands
 
-    # `code-review` belongs to the Code screen's built-in review card: a file of that name must not
-    # turn the command into prompt text here.
-    return frozenset({*(command.name.lstrip("/") for command in session_commands()), "code-review"})
+    # `code-review` and `skill-doctor` belong to the Code screen's built-in cards: a file of either
+    # name must not turn the command into prompt text here.
+    return frozenset({
+        *(command.name.lstrip("/") for command in session_commands()),
+        "code-review",
+        "skill-doctor",
+    })
 
 
 @dataclass(frozen=True)

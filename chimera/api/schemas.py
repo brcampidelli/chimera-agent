@@ -2142,6 +2142,34 @@ class SkillStatOut(BaseModel):
     rate: float | None
 
 
+class SkillCostOut(BaseModel):
+    """One skill's share of a run's context (``/skill-doctor``). Estimated, not counted by a tokenizer."""
+
+    name: str
+    kind: str
+    """``bundle`` (carried in every turn) or ``card`` (retrieved per task)."""
+    origin: str
+    """``project``, ``user``, ``plugin``, ``catalog`` or ``learned`` — codes the screen translates."""
+    tokens: int
+    injected_runs: int | None
+    """Runs this card was injected into and credited, or null when nothing recorded it — never a guessed zero."""
+    suggestion: str
+    """``disable``, ``keep``, ``no_record``, ``reading_off`` or ``probation``. A suggestion, never an action."""
+    every_turn: bool
+
+
+class SkillDoctorOut(BaseModel):
+    skills: list[SkillCostOut]
+    """Largest first; ties by name."""
+    tokens_per_turn: int
+    """What the bundle block adds to every turn, measured on the prompt's own text."""
+    cards_tokens_per_task_max: int
+    cards_read: bool
+    cards_k: int
+    usage_days: int | None = None
+    """Always null: the usage counters are totals, not a window of days."""
+
+
 class SkillsOut(BaseModel):
     stats: list[SkillStatOut]
     retirement_candidates: list[str]
