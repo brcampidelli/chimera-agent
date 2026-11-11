@@ -1736,6 +1736,11 @@
             "default": "",
             "title": "Reach",
             "type": "string"
+          },
+          "worktree_cleanup": {
+            "default": true,
+            "title": "Worktree Cleanup",
+            "type": "boolean"
           }
         },
         "title": "AutonomyCfgOut",
@@ -4352,6 +4357,11 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "worktree_removed": {
+            "default": false,
+            "title": "Worktree Removed",
+            "type": "boolean"
           }
         },
         "required": [
@@ -4537,6 +4547,16 @@
           "workspace": {
             "title": "Workspace",
             "type": "string"
+          },
+          "worktree_removal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeWorktreeRemovalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -5496,6 +5516,25 @@
           "stopping"
         ],
         "title": "CodeTurnStopOut",
+        "type": "object"
+      },
+      "CodeWorktreeRemovalOut": {
+        "description": "When an archived conversation's worktree is removed, and what the last look kept it for.",
+        "properties": {
+          "due_at": {
+            "title": "Due At",
+            "type": "number"
+          },
+          "kept": {
+            "default": "",
+            "title": "Kept",
+            "type": "string"
+          }
+        },
+        "required": [
+          "due_at"
+        ],
+        "title": "CodeWorktreeRemovalOut",
         "type": "object"
       },
       "CompletionOut": {
@@ -19970,6 +20009,76 @@
         "title": "WorksOut",
         "type": "object"
       },
+      "WorktreeIncludeConsentIn": {
+        "description": "The owner's answer, naming the version of the file it was shown (``digest``).",
+        "properties": {
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "digest"
+        ],
+        "title": "WorktreeIncludeConsentIn",
+        "type": "object"
+      },
+      "WorktreeIncludePendingListOut": {
+        "properties": {
+          "pending": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WorktreeIncludePendingOut"
+            },
+            "title": "Pending",
+            "type": "array"
+          }
+        },
+        "title": "WorktreeIncludePendingListOut",
+        "type": "object"
+      },
+      "WorktreeIncludePendingOut": {
+        "description": "A project whose `.worktreeinclude` a new conversation worktree wanted to use and could not,\nbecause the owner has not agreed to this version of it. ``files`` are the first names it would copy,\n``more`` how many are not listed.",
+        "properties": {
+          "bytes": {
+            "default": 0,
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "files": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "more": {
+            "default": 0,
+            "title": "More",
+            "type": "integer"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "digest"
+        ],
+        "title": "WorktreeIncludePendingOut",
+        "type": "object"
+      },
       "WorktreePruneOut": {
         "properties": {
           "bytes_freed": {
@@ -23635,6 +23744,62 @@
           }
         },
         "summary": "Set Code Workspace Model"
+      }
+    },
+    "/api/code/worktree-include/consent": {
+      "post": {
+        "operationId": "worktree_include_consent_api_code_worktree_include_consent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorktreeIncludeConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorktreeIncludePendingListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Worktree Include Consent"
+      }
+    },
+    "/api/code/worktree-include/pending": {
+      "get": {
+        "operationId": "worktree_include_pending_api_code_worktree_include_pending_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorktreeIncludePendingListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Worktree Include Pending"
       }
     },
     "/api/code/worth": {

@@ -2563,6 +2563,9 @@ export interface CodeSessionMeta {
   archived_at?: number | null;
   /** Why it was archived ("owner", "inactive", "pr_merged", "pr_closed"); "" or absent otherwise. */
   archive_reason?: string;
+  /** When an archived conversation's worktree goes (`due_at`, epoch seconds) and why the last look
+   *  kept it (`kept`, "" when nothing did yet). Absent or null when there is nothing to say. */
+  worktree_removal?: { due_at: number; kept: string } | null;
   /** The repository `workspace` is a checkout of — its main working tree, the same for every linked
    *  worktree — or the folder itself outside git. "" when unknown (and for the server's own folder):
    *  the sidebar then groups by `workspace`. Absent from a server older than #965. */
@@ -2640,12 +2643,33 @@ export const archiveCodeSession = (sessionId: string) =>
     { method: "POST" },
   );
 
-/** Bring an archived conversation back into the list. */
+/** Bring an archived conversation back into the list. `worktree_removed` is true when the 30-day
+ *  cleanup already removed its folder: the conversation is back, the folder is not. */
 export const unarchiveCodeSession = (sessionId: string) =>
-  json<{ id: string; archived_at: number | null }>(
+  json<{ id: string; archived_at: number | null; worktree_removed?: boolean }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/unarchive`,
     { method: "POST" },
   );
+
+/** A project whose `.worktreeinclude` is waiting for the owner's yes (it names ignored files to copy
+ *  into new conversation worktrees, and comes from the repository). */
+export interface WorktreeIncludePending {
+  project: string;
+  digest: string;
+  files: string[];
+  more: number;
+  bytes: number;
+}
+
+export const getWorktreeIncludePending = () =>
+  json<{ pending: WorktreeIncludePending[] }>("/api/code/worktree-include/pending");
+
+/** The owner's yes, for the version of the file that was shown. Only the app's own screen is heard. */
+export const allowWorktreeInclude = (project: string, digest: string) =>
+  json<{ pending: WorktreeIncludePending[] }>("/api/code/worktree-include/consent", {
+    method: "POST",
+    body: JSON.stringify({ project, digest }),
+  });
 
 /** The owner calls a conversation done, or takes it back. The next turn that ends clears it; a 409
  *  means a turn, a background work or a question of it is still live. */

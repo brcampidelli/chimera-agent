@@ -22,6 +22,9 @@ refusal leaves the disk exactly as it was. A worktree is removable only when NON
   ``desktop_send(worktree="new")``) is judged by the caller's answer alone — its maker is just the
   app process that opened it, and outliving that process is what it was made for.
 * **Its HEAD is detached**, or its branch is the one the main checkout has out.
+* **An ignored file would be lost** (the unattended cleanup only, ``protect_ignored``): ``git status``
+  does not list ignored files, so a ``.env.local`` or a local database a conversation made reads as
+  "clean". Any ignored file that is not exactly what `.worktreeinclude` copied keeps the worktree.
 * **Something would be lost**: ``git status --porcelain`` is not empty (untracked files count), or
   the branch is NOT merged into the default branch and has no upstream or commits not pushed to it.
 
@@ -65,6 +68,9 @@ _GIT = ("git", "--no-optional-locks", "-c", "core.fsmonitor=false")
 MISSING = "missing"
 LOCKED = "locked"
 IN_USE = "in_use"
+#: The AUTOMATIC cleanup only (``protect_ignored``): a file git ignores that `.worktreeinclude` did not
+#: put there — a ``.env.local`` or a database the conversation made. ``git status`` does not list it.
+IGNORED_FILES = "ignored_files"
 
 Busy = Callable[[Path], bool]
 
@@ -84,6 +90,9 @@ class WorktreeRow:
     merged: bool = False
     clean: bool = True
     untracked: tuple[str, ...] = ()
+    #: Ignored files that are not what `.worktreeinclude` copied (only read when asked, see
+    #: :func:`_ignored_extras`); ``("?",)`` when they could not be listed.
+    ignored: tuple[str, ...] = ()
     upstream: str = ""
     ahead: int | None = None
     status_failed: bool = False
@@ -222,6 +231,44 @@ def _default_refs(main: Path, runner: Runner) -> list[str]:
     return refs
 
 
+def _ignored_extras(path: Path, runner: Runner) -> tuple[str, ...]:
+    """The files git ignores in ``path`` that are not, byte for byte, what `.worktreeinclude` copied
+    there (`worktree_include.read_manifest`). ``git status --porcelain`` never lists ignored files, so
+    a ``.env.local`` or a SQLite file the conversation made reads as a clean tree, and removing the
+    worktree would erase it. An ignored folder is one entry (``--directory``): a ``node_modules`` is
+    not walked, it simply is not the project's copy. When the listing fails the answer is "unknown",
+    which keeps the worktree."""
+    from chimera.core.worktree_include import _sha256, read_manifest
+
+    base = ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]
+    code, out = _run(runner, [*base, "--directory"], path)
+    if code != 0:
+        return ("?",)
+    manifest = read_manifest(path)
+    entries = [e for e in out.split("\x00") if e]
+    expanded: list[str] = []
+    for entry in entries:
+        if entry.endswith("/") and any(known.startswith(entry) for known in manifest):
+            code, inner = _run(runner, [*base, "--", entry], path)
+            if code != 0:
+                return ("?",)
+            expanded.extend(e for e in inner.split("\x00") if e)
+        else:
+            expanded.append(entry)
+    extras: list[str] = []
+    for entry in expanded:
+        expected = manifest.get(entry)
+        if expected is None:
+            extras.append(entry)
+            continue
+        try:
+            if _sha256(path / entry) != expected:
+                extras.append(entry)  # edited since it was copied: the conversation's now
+        except OSError:
+            extras.append(entry)
+    return tuple(extras[:50])
+
+
 def _describe(
     block: dict[str, str],
     *,
@@ -231,6 +278,7 @@ def _describe(
     roots: Sequence[Path] | None,
     runner: Runner,
     busy: Busy,
+    protect_ignored: bool = False,
 ) -> WorktreeRow:
     """Everything the refusals read, gathered by reading only."""
     path = Path(block["worktree"])
@@ -266,10 +314,12 @@ def _describe(
             for d in defaults
             if d != f"refs/heads/{branch}"
         )
+    ignored = _ignored_extras(path, runner) if protect_ignored else ()
     return replace(
         row,
         owned=owned,
         in_use=in_use,
+        ignored=ignored,
         merged=merged,
         clean=code == 0 and not tracked,
         untracked=untracked,
@@ -318,6 +368,10 @@ def _refuse_dirty(row: WorktreeRow) -> str:
     return DIRTY if not row.clean or row.untracked else ""
 
 
+def _refuse_ignored(row: WorktreeRow) -> str:
+    return IGNORED_FILES if row.ignored else ""
+
+
 def _refuse_unpushed(row: WorktreeRow) -> str:
     """Not merged anywhere AND not safely on its upstream. "I cannot tell whether this was sent" is
     not "this was sent", so no upstream counts as unpushed."""
@@ -339,6 +393,7 @@ REFUSALS: list[tuple[str, Callable[[WorktreeRow], str]]] = [
     ("detached", _refuse_detached),
     ("current_branch", _refuse_current_branch),
     ("dirty", _refuse_dirty),
+    ("ignored", _refuse_ignored),
     ("unpushed", _refuse_unpushed),
 ]
 
@@ -356,7 +411,12 @@ def _never_busy(_path: Path) -> bool:
 
 
 def _listing(
-    project: Path, *, roots: Sequence[Path] | None, runner: Runner, busy: Busy
+    project: Path,
+    *,
+    roots: Sequence[Path] | None,
+    runner: Runner,
+    busy: Busy,
+    protect_ignored: bool = False,
 ) -> _Listing | None:
     main = main_checkout(project, runner)
     if main is None:
@@ -381,6 +441,7 @@ def _listing(
             roots=roots,
             runner=runner,
             busy=busy,
+            protect_ignored=protect_ignored,
         )
         listing.rows.append(_verdict(described))
     return listing
@@ -407,13 +468,20 @@ def prune_worktrees(
     roots: Sequence[Path] | None = None,
     runner: Runner = run_quiet,
     busy: Busy = _never_busy,
+    protect_ignored: bool = False,
 ) -> list[PruneResult] | None:
     """Remove the requested worktrees that every refusal allows. ``dry_run`` (the default) reads
     only and says what WOULD go. None when ``project`` is not in a git repository.
 
+    ``protect_ignored`` adds the :data:`IGNORED_FILES` refusal. The owner's dialog leaves it off: the
+    owner sees the list and picks, and its behaviour is unchanged. The unattended cleanup
+    (`worktree_expiry.py`) turns it on, because nobody looks at what it deletes.
+
     The listing is read again here, immediately before acting, so a verdict the screen showed a
     minute ago is never what is acted on."""
-    listing = _listing(Path(project), roots=roots, runner=runner, busy=busy)
+    listing = _listing(
+        Path(project), roots=roots, runner=runner, busy=busy, protect_ignored=protect_ignored
+    )
     if listing is None:
         return None
     by_path = {_norm(row.path): row for row in listing.rows}
@@ -435,7 +503,11 @@ def prune_worktrees(
             results.append(PruneResult(path=row.path, kept=GIT_FAILED, branch=row.branch))
             continue
         removed_any = True
-        deleted = _run(runner, ["branch", "-d", row.branch], listing.main)[0] == 0
+        # Never `-D`, never forced. The unattended cleanup also leaves a branch that has no upstream
+        # alone: the folder goes, the branch (and whatever only it holds) stays.
+        deleted = False
+        if row.upstream or not protect_ignored:
+            deleted = _run(runner, ["branch", "-d", row.branch], listing.main)[0] == 0
         results.append(
             PruneResult(path=row.path, branch=row.branch, removed=True, branch_deleted=deleted)
         )

@@ -1757,6 +1757,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/worktree-include/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Worktree Include Consent */
+        post: operations["worktree_include_consent_api_code_worktree_include_consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/worktree-include/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Worktree Include Pending */
+        get: operations["worktree_include_pending_api_code_worktree_include_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/worth": {
         parameters: {
             query?: never;
@@ -6934,6 +6968,11 @@ export interface components {
              * @default
              */
             reach: string;
+            /**
+             * Worktree Cleanup
+             * @default true
+             */
+            worktree_cleanup: boolean;
         };
         /** BatchCancelOut */
         BatchCancelOut: {
@@ -8322,6 +8361,11 @@ export interface components {
             archived_at?: number | null;
             /** Id */
             id: string;
+            /**
+             * Worktree Removed
+             * @default false
+             */
+            worktree_removed: boolean;
         };
         /**
          * CodeSessionDoneIn
@@ -8428,6 +8472,7 @@ export interface components {
             updated_at: number;
             /** Workspace */
             workspace: string;
+            worktree_removal?: components["schemas"]["CodeWorktreeRemovalOut"] | null;
         };
         /** CodeSessionOut */
         CodeSessionOut: {
@@ -8812,6 +8857,19 @@ export interface components {
             stopping: boolean;
             /** Turn Id */
             turn_id: string;
+        };
+        /**
+         * CodeWorktreeRemovalOut
+         * @description When an archived conversation's worktree is removed, and what the last look kept it for.
+         */
+        CodeWorktreeRemovalOut: {
+            /** Due At */
+            due_at: number;
+            /**
+             * Kept
+             * @default
+             */
+            kept: string;
         };
         /**
          * CompletionOut
@@ -15695,6 +15753,51 @@ export interface components {
             /** Works */
             works: components["schemas"]["WorkOut"][];
         };
+        /**
+         * WorktreeIncludeConsentIn
+         * @description The owner's answer, naming the version of the file it was shown (``digest``).
+         */
+        WorktreeIncludeConsentIn: {
+            /** Digest */
+            digest: string;
+            /** Project */
+            project: string;
+        };
+        /** WorktreeIncludePendingListOut */
+        WorktreeIncludePendingListOut: {
+            /**
+             * Pending
+             * @default []
+             */
+            pending: components["schemas"]["WorktreeIncludePendingOut"][];
+        };
+        /**
+         * WorktreeIncludePendingOut
+         * @description A project whose `.worktreeinclude` a new conversation worktree wanted to use and could not,
+         *     because the owner has not agreed to this version of it. ``files`` are the first names it would copy,
+         *     ``more`` how many are not listed.
+         */
+        WorktreeIncludePendingOut: {
+            /**
+             * Bytes
+             * @default 0
+             */
+            bytes: number;
+            /** Digest */
+            digest: string;
+            /**
+             * Files
+             * @default []
+             */
+            files: string[];
+            /**
+             * More
+             * @default 0
+             */
+            more: number;
+            /** Project */
+            project: string;
+        };
         /** WorktreePruneOut */
         WorktreePruneOut: {
             /** Bytes Freed */
@@ -18462,6 +18565,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    worktree_include_consent_api_code_worktree_include_consent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorktreeIncludeConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorktreeIncludePendingListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    worktree_include_pending_api_code_worktree_include_pending_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorktreeIncludePendingListOut"];
                 };
             };
         };

@@ -35,11 +35,17 @@ import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from chimera.config import get_settings
 from chimera.core.checkout import checkout_of
 from chimera.core.code_projects import RegisteredProject, app_worktree_registry_path
 from chimera.core.worktree import GitWorktree, _git, branch_prefix, is_inside
+from chimera.core.worktree_include import copy_included
+from chimera.core.worktree_include_consent import IncludeConsent, consent_path
+from chimera.telemetry import get_logger
+
+_log = get_logger("core.project_place")
 
 #: The one value ``worktree`` takes.
 WORKTREE_NEW = "new"
@@ -81,6 +87,9 @@ class Place:
     base: str | None = None
     base_source: str | None = None
     base_warning: str | None = None
+    #: What `.worktreeinclude` copied into a new worktree (`chimera/core/worktree_include.py`), or None
+    #: when the turn did not make one.
+    included: dict[str, Any] | None = None
 
 
 def _key(path: Path | str) -> str:
@@ -286,7 +295,29 @@ def _new_worktree(
     return Place(
         workspace=str(made.path), project=main, branch=name, created=True,
         base=base, base_source=base_source, base_warning=warning,
+        included=_included_payload(
+            repo, made.path, home=home if home is not None else get_settings().home
+        ),
     )
+
+
+def _included_payload(repo: Path, worktree: Path, *, home: Path | str) -> dict[str, Any] | None:
+    """What `.worktreeinclude` copied, or the consent it is waiting for. A failure here costs the
+    copy, never the worktree."""
+    consent = IncludeConsent(consent_path(home))
+
+    def agreed(digest: str, preview: dict[str, Any]) -> bool:
+        if consent.granted(repo, digest):
+            return True
+        consent.request(repo, digest, preview)
+        return False
+
+    try:
+        report = copy_included(repo, worktree, consent=agreed)
+    except Exception:  # noqa: BLE001 - the worktree exists; a broken copy must not undo it
+        _log.warning("worktreeinclude failed in %s", worktree, exc_info=True)
+        return {"copied": [], "skipped": [], "invalid": [], "bytes": 0, "error": True}
+    return None if report.empty else report.as_payload()
 
 
 def resolve_place(
