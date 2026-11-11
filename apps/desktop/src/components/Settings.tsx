@@ -2726,6 +2726,41 @@ export function Settings({
                       onChange={(v) => save({ CHIMERA_PROJECT_PACK: String(v) })}
                     />
                   </Row>
+                  {/* Agents written for Claude Code (`.claude/agents`, `~/.claude/agents`). On by the
+                owner's decision; a file only narrows, and the four model aliases mean one of the
+                owner's own tiers, chosen here. The bridge cannot write any of these. */}
+                  <Row
+                    label={t("settings.row.claudeAgents")}
+                    hint={t("settings.hint.claudeAgents")}
+                    env="CHIMERA_CLAUDE_AGENTS"
+                  >
+                    <Toggle
+                      on={c.claude_agents?.enabled ?? true}
+                      onChange={(v) => save({ CHIMERA_CLAUDE_AGENTS: String(v) })}
+                    />
+                  </Row>
+                  {(
+                    [
+                      ["opus", "CHIMERA_CLAUDE_AGENT_OPUS", "top"],
+                      ["sonnet", "CHIMERA_CLAUDE_AGENT_SONNET", "mid"],
+                      ["haiku", "CHIMERA_CLAUDE_AGENT_HAIKU", "weak"],
+                      ["fable", "CHIMERA_CLAUDE_AGENT_FABLE", "top"],
+                    ] as const
+                  ).map(([alias, env, fallback]) => (
+                    <Row
+                      key={alias}
+                      label={t("settings.row.claudeAgentRole", { alias })}
+                      hint={t("settings.hint.claudeAgentRole", { alias })}
+                      env={env}
+                    >
+                      <Select
+                        value={c.claude_agents?.roles?.[alias] ?? fallback}
+                        options={["weak", "mid", "top"]}
+                        render={(v) => v}
+                        onChange={(v) => save({ [env]: v })}
+                      />
+                    </Row>
+                  ))}
                   {/* Whether a turn that changed front-end files is checked against the project's dev
                 server (`.chimera/launch.json`): page opened, screenshot, console read. On unless the
                 owner (or the project's own `autoVerify: false`) turns it off. */}

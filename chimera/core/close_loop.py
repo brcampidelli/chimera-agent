@@ -470,6 +470,11 @@ def _stage_and_read(root: Path, specs: Sequence[str]) -> tuple[str, str]:
     return staged.stdout, ""
 
 
+def _is_agent_memory(path: str) -> bool:
+    parts = path.replace("\\", "/").casefold().split("/")
+    return any(part in ("agent-memory", "agent-memory-local") for part in parts) and ".claude" in parts
+
+
 def _commit_turn_checked(
     root: Path, paths: Sequence[str], subject: str, body: str, state: CloseLoop,
 ) -> bool:
@@ -480,6 +485,13 @@ def _commit_turn_checked(
     the commit (the owner may still want the change on a branch); it is written into the state now as a
     reason the pull request will not be merged, and the merge check repeats it on the whole PR diff.
     """
+    # An agent's own memory (`memory:` in a Claude-format subagent) is notes about the owner's
+    # projects, not part of the change under review: the loop never stages it.
+    kept = [p for p in paths if not _is_agent_memory(p)]
+    if paths and not kept:
+        state.error = "nothing to commit: the turn only wrote agent memory, which the loop never commits"
+        return False
+    paths = kept
     specs = _literal(paths)
     if specs is None:
         state.error = "a changed path is outside the workspace; nothing was committed"

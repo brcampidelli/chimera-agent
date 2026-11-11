@@ -262,6 +262,8 @@ def markdown_agents(home: Path, scope: Collection[str] | None = None) -> tuple[l
                 source=source,
                 from_project=True,
                 qualified_id=qualified,
+                origin="plugin",
+                layer="plugin",
             ))
     return agents, issues
 
