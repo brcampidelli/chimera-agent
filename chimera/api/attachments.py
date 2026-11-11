@@ -58,6 +58,44 @@ def store_dir(home: Path) -> Path:
     return home / "attachments"
 
 
+#: Under the home folder, beside the store and not in it (`load` globs ``<id>*`` there): one empty-ish
+#: file per attachment whose content came from a web page, so a turn that carries it can be tainted
+#: whatever its kind. An image cannot hold a text mark the way a document does.
+ORIGIN_DIRNAME = "attachment-origin"
+
+
+def _safe_id(ident: str) -> bool:
+    return bool(ident) and "/" not in ident and "\\" not in ident and "." not in ident
+
+
+def mark_page_origin(home: Path, ident: str) -> None:
+    """Record that attachment ``ident`` holds content of a page the project's server served."""
+    if not _safe_id(ident):
+        return
+    directory = home / ORIGIN_DIRNAME
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / ident).write_text("page", encoding="utf-8")
+
+
+def is_page_origin(home: Path, ident: str) -> bool:
+    return _safe_id(ident) and (home / ORIGIN_DIRNAME / ident).is_file()
+
+
+def discard(home: Path, ident: str) -> bool:
+    """Delete a stored attachment and its origin mark; True when anything was removed."""
+    if not _safe_id(ident):
+        return False
+    removed = False
+    for path in [*store_dir(home).glob(f"{ident}*"), home / ORIGIN_DIRNAME / ident]:
+        try:
+            path.unlink()
+            removed = True
+        except OSError:
+            continue
+    return removed
+
+
+
 def save(home: Path, name: str, data: bytes) -> Attachment:
     """Store one uploaded file and, if it is a document, extract its text now.
 

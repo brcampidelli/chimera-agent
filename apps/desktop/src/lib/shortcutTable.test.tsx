@@ -121,6 +121,8 @@ describe("the shortcut table", () => {
     // useComposerHotkeys on the Code screen, and tested there (hotkeys.test.tsx).
     // The side question (Mod+;) is answered by the Code conversation's own listener (useSideChatKey),
     // and tested there (SideChat.test.tsx), because it opens a panel that only that screen has.
+    // The element picker (Mod+Shift+S) is answered by the Preview panel while it is open, and tested there
+    // (PreviewPane.test.tsx).
     const elsewhere = new Set([
       "findClose",
       "dictate",
@@ -131,6 +133,7 @@ describe("the shortcut table", () => {
       "model",
       "effort",
       "sideChat",
+      "selectElement",
     ]);
     expect(SHORTCUTS.map((s) => s.id).filter((id) => !elsewhere.has(id)).sort()).toEqual(Object.keys(expected).sort());
     for (const row of SHORTCUTS) {

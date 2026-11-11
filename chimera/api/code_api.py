@@ -165,6 +165,7 @@ from chimera.core.diff_self_check import (
     locate_in,
     named_paths_of,
 )
+from chimera.core.element_pick import record_page_elements, record_page_origin
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.pr_auto_archive import Sweeper
 from chimera.core.pr_auto_archive import has_work as pr_has_work
@@ -4645,6 +4646,11 @@ def register_code_api(
             # A plugin's command is somebody else's text the owner chose to send: the turn reads as
             # tainted, by the same call the terminal chat and the TUI make after expanding one.
             taint_for_plugin_command(ledger, req.expanded_command, req.message)
+            # An element the owner picked from the dev server's page is page content (`element_pick`).
+            record_page_elements(ledger, doc_texts)
+            # ...and so is the crop of it, which is pixels and carries no text mark: recorded by the origin
+            # mark the pick stored with it.
+            record_page_origin(ledger, Path(settings.home), list(req.attachments))
             # A file the person mentioned is in this turn's message: recorded as the agent's own
             # `read_file` of it would be, before any tool runs, so inlining it changes no verdict.
             if mentioned is not None:
