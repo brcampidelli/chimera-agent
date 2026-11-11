@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **Select an element in the preview and send it to the agent.** "Select element" in the Preview panel (or Ctrl/Cmd+Shift+S) shows a picture of the dev server's page; a click on it puts the element in the composer as chips, its tag and text plus a crop. It runs in Chimera's own browser with a throwaway cookie profile, injects no script into the project's page, only reaches the conversation's own dev server, and refuses the pick if the page changed since the picture. What comes from the page is outside content: the text and the crop both taint the turn. (#1218)
+
+- **Claude Code subagents work in Chimera.** Agents written for Claude Code in `.claude/agents` (up to the repository root), `~/.claude/agents` and plugins are listed beside `.chimera/agents`, with their origin, role and memory shown on the Agents screen. A file can only narrow what it gets: its tools are intersected with the session's governed tools, `permissionMode` can only restrict, `bypassPermissions` is ignored with a warning, and a model name such as `opus` maps to a role the owner sets in Settings. An agent with memory keeps fenced notes through scoped Read/Write/Edit, and notes that come from the repository are treated as untrusted when the workspace isn't trusted. (#1219)
 
 - **Dev-server preview with auto-verify on the Code screen.** `.chimera/launch.json` (or `.claude/launch.json`) names the project's dev servers; the preview panel starts and stops them, shows their log and frames the page, and the agent's `preview` tool can start one, take a screenshot and read the console. Starting a server is running a command, so it goes through the same `run_shell` path — sandbox, governance, deny list, taint, the Manual card — and the panel's own button is checked against the hard blocks too. Before answering, a turn that changed front-end files checks the page and is not reported verified while the console shows errors; it never starts a server after reading outside content or after the launch file, `package.json` or a config file changed in that turn. Only ports a server of the turn actually listens on are reachable, the app's own ports never are, and the frame runs without same-origin access. (#1217)
 
