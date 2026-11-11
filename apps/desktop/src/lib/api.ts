@@ -3934,6 +3934,56 @@ export const stopDevServer = (workspace: string | null, name: string) =>
     body: JSON.stringify({ workspace, name }),
   });
 
+/** The page of a running server as a picture to click on: base64 JPEG and the viewport's size in CSS px. */
+export interface PreviewCapture {
+  image: string;
+  width: number;
+  height: number;
+  url: string;
+}
+
+/** An element picked from that page: stored as attachments for the next message. */
+export interface PreviewPick {
+  /** `<button.primary> 'Salvar'`, what the chip says. */
+  label: string;
+  selector: string;
+  tag: string;
+  text: string;
+  attrs: Record<string, string>;
+  box: number[];
+  attachment: Attachment;
+  crop: Attachment | null;
+}
+
+export const capturePreview = (workspace: string | null, name: string) =>
+  json<PreviewCapture>("/api/preview/select/capture", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ workspace, name }),
+  });
+
+export const pickPreviewElement = (workspace: string | null, name: string, x: number, y: number) =>
+  json<PreviewPick>("/api/preview/select/pick", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ workspace, name, x, y }),
+  });
+
+/** Delete picked-element attachments no conversation received. */
+export const discardPreviewAttachments = (ids: string[]) =>
+  json<{ ok: boolean; message: string }>("/api/preview/select/discard", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ ids }),
+  });
+
+export const closePreviewSelect = () =>
+  json<{ ok: boolean; message: string }>("/api/preview/select/close", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: "{}",
+  });
+
 export const getDevServerLog = (workspace: string | null, name: string, lines = 80) =>
   json<{ lines: string[] }>(
     `/api/preview/servers/log${devServerQuery(workspace, { name, lines: String(lines) })}`,

@@ -33,6 +33,7 @@ from chimera.api.terminal_api import (
 )
 from chimera.config import Settings
 from chimera.core.dev_servers import DevServerError, DevServerManager, manager, state_payload
+from chimera.core.element_pick import ElementPicker, PickRefused
 from chimera.core.launch_config import LaunchConfig, ServerConfig, load_launch_config, resolve_cwd
 from chimera.telemetry import get_logger
 from chimera.tools.browser_reach import chimera_ports
@@ -88,6 +89,48 @@ class PreviewLogOut(BaseModel):
 class PreviewOkOut(BaseModel):
     ok: bool
     message: str = ""
+
+
+class PreviewCaptureOut(BaseModel):
+    #: The viewport as a base64 JPEG: the picture the owner clicks on.
+    image: str
+    #: The viewport's size in CSS pixels; a click is sent in these units.
+    width: int
+    height: int
+    url: str
+
+
+class PreviewPointIn(BaseModel):
+    workspace: str | None = None
+    name: str = Field(min_length=1, max_length=60)
+    x: float = Field(ge=0, le=20000)
+    y: float = Field(ge=0, le=20000)
+
+
+class PreviewDiscardIn(BaseModel):
+    ids: list[str] = Field(max_length=4)
+
+
+class PreviewAttachmentOut(BaseModel):
+    id: str
+    name: str
+    kind: str
+    chars: int = 0
+    note: str = ""
+
+
+class PreviewPickOut(BaseModel):
+    #: ``<button.primary> 'Salvar'``: what the composer's chip says.
+    label: str
+    selector: str
+    tag: str
+    text: str
+    attrs: dict[str, str]
+    box: list[int]
+    #: The element as text, stored as an attachment (sanitized and data-fenced like any attached file).
+    attachment: PreviewAttachmentOut
+    #: The element's own pixels, when it has any on screen.
+    crop: PreviewAttachmentOut | None = None
 
 
 def _full_command(entry: ServerConfig, port: int) -> str:
@@ -149,6 +192,8 @@ def register_preview_api(
             raise HTTPException(status_code=403, detail=why)
 
     app.router.add_event_handler("shutdown", manager().close_all)
+    picker = ElementPicker(manager(), home=lambda: Path(live().home), settings=live)
+    app.router.add_event_handler("shutdown", picker.shutdown)
 
     @app.get("/api/preview/servers", dependencies=[guard], response_model=PreviewServersOut)
     def preview_servers(request: Request, workspace: str | None = None) -> dict[str, Any]:
@@ -224,3 +269,62 @@ def register_preview_api(
         owner_only(request)
         root = resolve_workspace(workspace)
         return {"lines": manager().tail(root, name, lines)}
+
+    def picked_server(root: Path, name: str) -> ServerConfig | None:
+        found = load_launch_config(root)
+        return None if found.config is None else found.config.get(name)
+
+    @app.post("/api/preview/select/capture", dependencies=[guard], response_model=PreviewCaptureOut)
+    def preview_select_capture(body: PreviewNameIn, request: Request) -> dict[str, Any]:
+        """Open the running server's page in Chimera's browser and return a picture of it to click on."""
+        owner_only(request)
+        root = resolve_workspace(body.workspace)
+        try:
+            return picker.capture(root, picked_server(root, body.name), body.name)
+        except PickRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+    @app.post("/api/preview/select/pick", dependencies=[guard], response_model=PreviewPickOut)
+    def preview_select_pick(body: PreviewPointIn, request: Request) -> dict[str, Any]:
+        """The element at a point of the captured page, stored as attachments for the next message."""
+        owner_only(request)
+        root = resolve_workspace(body.workspace)
+        try:
+            picked = picker.pick(root, picked_server(root, body.name), body.name, body.x, body.y)
+        except PickRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+        from chimera.api.attachments import mark_page_origin, save
+
+        home = Path(live().home)
+        text = save(home, "element.md", picked.document().encode("utf-8"))
+        crop = save(home, "element.png", picked.crop) if picked.crop else None
+        # The crop is pixels of the page and carries no text mark: this is what lets the turn that sends it
+        # be tainted (`record_page_origin`), whichever of the two is attached.
+        for stored in (text, crop):
+            if stored is not None:
+                mark_page_origin(home, stored.id)
+        return {
+            "label": picked.label, "selector": picked.selector, "tag": picked.tag, "text": picked.text,
+            "attrs": picked.attrs, "box": list(picked.box),
+            "attachment": {"id": text.id, "name": text.name, "kind": text.kind, "chars": len(text.text), "note": text.note},
+            "crop": None if crop is None else {"id": crop.id, "name": crop.name, "kind": crop.kind},
+        }
+
+    @app.post("/api/preview/select/discard", dependencies=[guard], response_model=PreviewOkOut)
+    def preview_select_discard(body: PreviewDiscardIn, request: Request) -> dict[str, Any]:
+        """Delete picked-element attachments nobody received (no conversation was open to take them).
+
+        Only an attachment that is marked as page content can be deleted here: this is not a way to remove
+        the owner's other files."""
+        owner_only(request)
+        from chimera.api.attachments import discard, is_page_origin
+
+        home = Path(live().home)
+        gone = sum(1 for ident in body.ids if is_page_origin(home, ident) and discard(home, ident))
+        return {"ok": True, "message": f"{gone} removed"}
+
+    @app.post("/api/preview/select/close", dependencies=[guard], response_model=PreviewOkOut)
+    def preview_select_close(request: Request) -> dict[str, Any]:
+        owner_only(request)
+        picker.close()
+        return {"ok": True, "message": "closed"}
