@@ -90,6 +90,13 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_BRANCH_PREFIX": ("chimera", "feature"),
     # The project pack narrows (P7.6): switching it off hands back what the pack took away.
     "CHIMERA_PROJECT_PACK": ("true", "false"),
+    # Claude Code agents: the switch decides whether a repository's `.claude/agents` is read, and the
+    # roles decide which of the owner's models a file's `model:` reaches.
+    "CHIMERA_CLAUDE_AGENTS": ("true", "false"),
+    "CHIMERA_CLAUDE_AGENT_OPUS": ("top", "weak"),
+    "CHIMERA_CLAUDE_AGENT_SONNET": ("mid", "weak"),
+    "CHIMERA_CLAUDE_AGENT_HAIKU": ("weak", "top"),
+    "CHIMERA_CLAUDE_AGENT_FABLE": ("top", "weak"),
     "CHIMERA_PREVIEW_AUTO_VERIFY": ("true", "false"),
     # Study 30, S30-27 and S30-28: each only adds questions, so off is the widening direction.
     "CHIMERA_EXFIL_HOST_PATH": ("true", "false"),
