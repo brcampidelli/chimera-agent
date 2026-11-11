@@ -137,7 +137,8 @@ import { Elapsed, formatElapsed } from "@/components/code/Elapsed";
 
 export { formatElapsed };
 import { useAgent, type AgentState } from "@/lib/agent-context";
-import { contextPercent, readContext, useConversationSidePublisher } from "@/lib/conversation-side";
+import { contextPercent, readContext, useConversationSidePublisher, type PlanFacts } from "@/lib/conversation-side";
+import { clearIfStillAsked } from "@/lib/plan-awaiting";
 import {
   buildLineCommentsMessage,
   clearLineComments,
@@ -234,6 +235,8 @@ interface Exchange {
   answer: string;
   tools: CodeToolEvent[];
   edits: { path: string; patch: string }[];
+  /** The plan this turn proposed before it ran anything (`chimera/api/plan_gate.py`), or none. */
+  plan?: { steps: string[]; raw: string };
   /** The agent's own task list for this turn — its claim about its progress, not a verdict.
    *  Replaced wholesale on every frame, because the frame carries the whole list: merging
    *  would build a list out of two snapshots and show one that never existed. */
@@ -972,6 +975,13 @@ export function Conversation({
       mode: rightPanelOpen ? "closed" : "open",
     });
   };
+  // The Plan panel is a side card of the right region: open it there, and show the region if it is
+  // hidden, so the item does what its label says from any layout.
+  const openPlanPanel = () => {
+    if (sideDrawer?.drawer && !sideDrawer.open) sideDrawer.toggle();
+    if (!layout.regions.right.visible) dispatchLayout({ type: "set-region", region: "right", visible: true });
+    dispatchLayout({ type: "set-mode", panel: "conversation.plan", mode: "open" });
+  };
   const [showRewind, setShowRewind] = useState(false);
   // The turn the header describes: its metrics, and whether it edited files (which makes undo the
   // one contextual action).
@@ -1221,6 +1231,44 @@ export function Conversation({
     });
   }, [publishSide, sessionId, liveUsed, liveWindow, peakUsed, peakWindow, worksOpen]);
 
+  // The plan of the MOST RECENT turn only (an older turn's plan is not this one's). It is "awaiting"
+  // while the approval card on screen is the question that plan raised: the gate's question carries the
+  // plan's own steps as its text. That match is by text, a known fragility: the frame carries no id
+  // (see the PR notes). A decision sent here is shown until the turn's `done` says how it ended.
+  const [planDecision, setPlanDecision] = useState<{ steps: string; decision: "approved" | "refused" } | null>(null);
+  const planView = useMemo(() => {
+    const latest = exchanges.length > 0 ? exchanges[exchanges.length - 1] : undefined;
+    if (!latest?.plan) return null;
+    const steps = latest.plan.steps;
+    const stepsKey = JSON.stringify(steps);
+    const awaitingId =
+      pendingApproval && steps.length > 0 && pendingApproval.action.includes(steps.map((s, i) => `${i + 1}. ${s}`).join("\n"))
+        ? pendingApproval.id
+        : null;
+    let status: "awaiting" | "approved" | "refused";
+    if (awaitingId) status = "awaiting";
+    else if (latest.done) status = latest.done.stopped_reason === "plan_gate:refused" ? "refused" : "approved";
+    else if (planDecision?.steps === stepsKey) status = planDecision.decision;
+    else status = "approved";
+    return { steps, todos: latest.todos, awaitingId, status };
+  }, [exchanges, pendingApproval, planDecision]);
+  const planKey = planView ? JSON.stringify(planView) : "";
+  const planStepsRef = useRef<string>("");
+  planStepsRef.current = planView ? JSON.stringify(planView.steps) : "";
+  const clearPlanAwaiting = useCallback((id: string, decision: "approved" | "refused") => {
+    setPendingApproval((cur) => clearIfStillAsked(cur, id));
+    setPlanDecision({ steps: planStepsRef.current, decision });
+  }, []);
+  useEffect(() => {
+    // Published as the JSON it was keyed by: the facts change a few times a turn, not per token.
+    const view = planKey ? (JSON.parse(planKey) as Omit<PlanFacts, "clearAwaiting">) : null;
+    publishSide({ plan: view ? { ...view, clearAwaiting: clearPlanAwaiting } : null });
+  }, [publishSide, planKey, clearPlanAwaiting]);
+  const approvalWaiting = pendingApproval !== null;
+  useEffect(() => {
+    publishSide({ approvalWaiting });
+  }, [publishSide, approvalWaiting]);
+
   /** One frame of the conversation's live stream, folded into the exchanges.
    *
    *  A turn this screen started is ignored: its own stream already drew it. A turn someone else
@@ -1314,6 +1362,9 @@ export function Conversation({
         break;
       case "todo":
         patch((e) => ({ ...e, todos: ((data.items ?? []) as TodoEntry[]) }));
+        break;
+      case "plan":
+        patch((e) => ({ ...e, plan: { steps: (data.steps ?? []) as string[], raw: String(data.raw ?? "") } }));
         break;
       case "chart":
         patch((e) => ({ ...e, charts: [...(e.charts ?? []), data as unknown as CodeChartFrame] }));
@@ -2099,6 +2150,9 @@ export function Conversation({
           // Replaced, not appended. Unlike `edits`, each frame is the complete list.
           if (activeRequestRef.current === requestId && !abandoningRef.current) patchLast((e) => ({ ...e, todos: items }));
         },
+        onPlan: (plan) => {
+          if (activeRequestRef.current === requestId && !abandoningRef.current) patchLast((e) => ({ ...e, plan }));
+        },
         onNotice: (n) => {
           if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           // One line per code: a repeat replaces, it does not stack.
@@ -2529,6 +2583,13 @@ export function Conversation({
               <PanelRight aria-hidden className="h-3.5 w-3.5" />
               {t(rightPanelOpen ? "code.chat.side.hide" : "code.chat.side.show")}
             </ConversationMenuItem>
+            {/* Only when there is a plan to show: the Plan panel has nothing to say otherwise, and an item
+                that opens an empty panel is the kind of control this menu should not offer. */}
+            {planView ? (
+              <ConversationMenuItem testId="plan-panel-open" onSelect={openPlanPanel}>
+                <ListChecks aria-hidden className="h-3.5 w-3.5" /> {t("code.plan.menu")}
+              </ConversationMenuItem>
+            ) : null}
             {exchanges.length > 0 || sessionId ? (
               <ConversationMenuItem onSelect={() => void clear()}>
                 <Eraser aria-hidden className="h-3.5 w-3.5" /> {t("code.chat.clear")}

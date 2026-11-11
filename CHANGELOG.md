@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **A plan panel on the Code screen.** When a turn proposes a plan, the panel lists its steps and, while the plan waits for you, offers Approve and Ask for changes through the same approval the card uses, so answering in one place answers in both. It shows only the latest turn's plan, says when the turn is waiting on the card even after a reload, and announces the decision you sent until the turn finishes. (#1213)
+
 ## [0.86.0] - 2026-11-10
 ### Added
 
