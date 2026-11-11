@@ -78,7 +78,10 @@ def test_an_image_in_an_answer_can_only_come_from_this_origin_or_be_inline(tmp_p
     assert csp["object-src"] == ["'none'"]
     assert csp["form-action"] == ["'self'"]
     assert csp["base-uri"] == ["'self'"]
-    assert csp["frame-src"] == ["'none'"]
+    # A frame may be a page on THIS computer (the dev-server preview) and nothing else: no wildcard
+    # host, no scheme source, no other host. It was `'none'` until the preview pane framed the
+    # project's own server; the loosening is exactly these two literal loopback names.
+    assert csp["frame-src"] == ["http://127.0.0.1:*", "http://localhost:*"]
 
 
 def test_connections_reach_this_origin_and_only_the_remotes_the_servers_screen_accepts(tmp_path: Path) -> None:

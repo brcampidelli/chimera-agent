@@ -40,6 +40,10 @@ EXCLUDED: dict[str, str] = {
     "tests/test_background_jobs_stay_inside_the_fences_run_shell_has.py": "~25s of real processes",
     "tests/test_pr_watch_reads_and_never_acts.py": "~20s; drives the scheduler end to end",
     "tests/test_a_conversation_says_what_it_needs_from_facts.py": "~13s of whole-session runs",
+    "tests/test_preview_tool.py": (
+        "~60s of real dev servers and background jobs; it reaches governance/ledger_tool.py only through the "
+        "DANGEROUS_WHEN_TAINTED constant, which the taint tests cover"
+    ),
     # Consumers through a bench runner (see _bench_files_it_loads):
     "tests/test_a_decision_has_a_contract.py": (
         "reads only the JUDGE_SYSTEM string from bench/governance_judge/run.py; the policy.py names "

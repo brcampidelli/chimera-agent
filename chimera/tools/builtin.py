@@ -6,6 +6,7 @@ on. Higher-level, *learned* procedures live in :mod:`chimera.skills`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -154,8 +155,13 @@ def default_registry(
     *,
     write_region: WriteRegion | None = None,
     host_exec_confirm: HostExecConfirm | None | _Unset = _UNSET,
+    extra_turn_ports: Callable[[], frozenset[int]] | None = None,
 ) -> ToolRegistry:
     """Build a registry pre-populated with the built-in native tools.
+
+    ``extra_turn_ports`` adds to the loopback ports the browser may reach as THIS turn's own: the dev
+    servers the turn started or asked for by name (`chimera.core.dev_servers.DevServerTurn`). The
+    browser's rule is unchanged: a port that is not the turn's, or that Chimera itself serves, is refused.
 
     File and shell tools are rooted at ``workspace`` (default: current directory). When
     ``write_region`` is given, the file-writing tools refuse a write outside its declared globs
@@ -231,9 +237,10 @@ def default_registry(
     def turn_ports() -> frozenset[int]:
         from chimera.tools.jobs import process_tree_listening_ports
 
-        return process_tree_listening_ports(
+        ports = process_tree_listening_ports(
             jobs, turn_root, current_job_ids=shell.turn_job_ids
         )
+        return ports | extra_turn_ports() if extra_turn_ports is not None else ports
     registry.register(shell)
     registry.register(JobStatusTool(jobs, shell.workspace, output_like=shell))
     registry.register(JobCancelTool(jobs, shell.workspace))

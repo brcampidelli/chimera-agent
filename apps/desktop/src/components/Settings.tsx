@@ -2713,6 +2713,19 @@ export function Settings({
                       onChange={(v) => save({ CHIMERA_PROJECT_PACK: String(v) })}
                     />
                   </Row>
+                  {/* Whether a turn that changed front-end files is checked against the project's dev
+                server (`.chimera/launch.json`): page opened, screenshot, console read. On unless the
+                owner (or the project's own `autoVerify: false`) turns it off. */}
+                  <Row
+                    label={t("settings.row.previewAutoVerify")}
+                    hint={t("settings.hint.previewAutoVerify")}
+                    env="CHIMERA_PREVIEW_AUTO_VERIFY"
+                  >
+                    <Toggle
+                      on={c.preview?.auto_verify ?? true}
+                      onChange={(v) => save({ CHIMERA_PREVIEW_AUTO_VERIFY: String(v) })}
+                    />
+                  </Row>
                 </Card>
 
                 {/* Which instrument answers a typed decision. A server without the `decisions` block

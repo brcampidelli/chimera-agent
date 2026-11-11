@@ -472,6 +472,9 @@ class PlaywrightDriver:
         )
         self._sessions: list[Any] = []
         self._mains: list[tuple[Any, str | None]] = []
+        #: What the page said in its console since the last `console_messages()`: errors, warnings and
+        #: uncaught exceptions, bounded. Read by the dev-server preview (`chimera/tools/preview.py`).
+        self._console: list[tuple[str, str]] = []
         # Every page of the context gets the guard: the driver's own page before its first request;
         # a popup the page opens as soon as the context reports it (its first request may race it,
         # and a popup is never read by this driver).
@@ -486,9 +489,26 @@ class PlaywrightDriver:
                 with contextlib.suppress(Exception):
                     page.close()
 
+    def _listen_console(self, page: Any) -> None:
+        def keep(kind: str, text: str) -> None:
+            if len(self._console) < 200:
+                self._console.append((kind, text[:600]))
+
+        with contextlib.suppress(Exception):
+            page.on("console", lambda msg: keep(str(msg.type), str(msg.text)) if msg.type in ("error", "warning") else None)
+            page.on("pageerror", lambda exc: keep("pageerror", str(exc)))
+
+    def console_messages(self, *, clear: bool = True) -> list[tuple[str, str]]:
+        """``(kind, text)`` of what the page logged as error/warning or threw, oldest first."""
+        out = list(self._console)
+        if clear:
+            self._console.clear()
+        return out
+
     def _attach_guard(self, page: Any) -> None:
         if any(owner is page for owner, _ in self._sessions):
             return
+        self._listen_console(page)
         session = self._context.new_cdp_session(page)
         # The main frame's id, so the site list judges top-level navigations and not a listed page's
         # own frames. Unknown (None) makes the guard judge every document, the narrower reading.
