@@ -201,6 +201,9 @@ class PayloadSink:
     budget: RunBudget | None = None
     recorders: list[Recorder] = field(default_factory=list)
     source: str = "mcp"
+    #: Asked before a file is written here (Manual mode): ``(shown path, bytes, source) -> allowed``.
+    #: A "no" is a refusal like any other, so the payload goes to ``fallback`` and nothing lands here.
+    ask: Callable[[str, int, str], bool] | None = None
 
     def store(self, data: bytes, extension: str) -> Stored:
         """Write ``data`` and say where it is. Raises :class:`PayloadRefused` when it is not stored."""
@@ -219,6 +222,10 @@ class PayloadSink:
     def _store(self, data: bytes, extension: str, digest: str) -> Stored:
         path = self.root / f"{digest}{extension}"
         try:
+            if self.ask is not None and not path.exists() and not self.ask(
+                self._shown(path), len(data), self.source
+            ):
+                raise PayloadRefused("declined")
             self._place(path, data)
         except PayloadRefused:
             if self.fallback is None:

@@ -130,6 +130,11 @@ def _facts_of(*args: Any) -> dict[str, Any]:
     irreversible = getattr(head, "irreversible", False)
     if irreversible is True:
         facts["irreversible"] = True
+    # What "Allow in this conversation" would grant for this question (Manual mode); empty when the
+    # card offers no such answer. Never a client's word: the key is the asker's own.
+    allow_key = getattr(head, "allow_key", "")
+    if isinstance(allow_key, str) and allow_key:
+        facts["allow_key"] = allow_key
     rule = getattr(head, "rule", None)
     if isinstance(rule, str) and rule:
         facts["rule"] = rule

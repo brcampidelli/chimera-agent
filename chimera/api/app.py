@@ -2096,6 +2096,7 @@ def build_api_app(
                 "kind": q.kind,
                 "host": q.host,
                 "irreversible": q.irreversible,
+                "allow_scope": q.allow_key,
                 **({"preview": q.preview} if not _bridged_without_full_control(request) else {}),
                 **({"typed_text": q.typed_text} if not _bridged_without_full_control(request) and q.typed_text else {}),
                 **origin(q.run_id),
@@ -2297,6 +2298,15 @@ def build_api_app(
                     detail="an irreversible action or a Google search in your Chrome is approved "
                     "on the app's screen, never through the desktop bridge",
                 )
+        if req.remember == "conversation" and req.approved and (
+            not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY)
+        ):
+            # A lasting yes for a conversation is the owner's, from the screen itself. The bridge,
+            # even on full control, may answer a card once; it never widens what a conversation allows.
+            raise HTTPException(
+                status_code=403,
+                detail="allowing for a conversation is done on the owner's screen, never through the bridge",
+            )
         if req.approved and not (asked_here and vouched):
             # Asked by ANOTHER process (a terminal run, a separate scheduler): only that process
             # holds the code an approval must carry (study 30, S30-30), and this one cannot vouch
@@ -2325,6 +2335,33 @@ def build_api_app(
                     "restart_pending": True if restarting else None,
                 }
             return {"ok": False}
+        if req.remember == "conversation" and req.approved:
+            if _bridged_without_full_control(request):
+                raise HTTPException(status_code=403, detail="only the owner may allow for a conversation")
+            question = next((q for q in pending(home) if q.id == request_id), None)
+            if question is None:
+                return {"ok": False}
+            origin_of = getattr(app.state, "approval_origin", None)
+            allowances = getattr(app.state, "manual_allowances", None)
+            origin = origin_of(question.run_id) if origin_of is not None and question.run_id else {}
+            session_id = str(origin.get("session_id") or "")
+            if not (question.allow_key and session_id and allowances is not None):
+                # Nothing to remember it under: this is a yes for this one call, said as such.
+                return {"ok": answer(home, request_id, True, via="app"), "outcome": "once"}
+            # The allowance first, so a call that is waiting cannot run on the yes and then find no
+            # allowance; undone if the answer does not land (a stale click, a failed write).
+            fresh = allowances.allow(session_id, question.allow_key)
+            try:
+                answered = answer(home, request_id, True, via="app")
+            except Exception:
+                if fresh:
+                    allowances.revoke(session_id, question.allow_key)
+                raise
+            if not answered:
+                if fresh:
+                    allowances.revoke(session_id, question.allow_key)
+                return {"ok": False}
+            return {"ok": True, "outcome": "allowed_in_conversation"}
         if req.remember == "project" and req.approved:
             if _bridged_without_full_control(request):
                 raise HTTPException(status_code=403, detail="only the owner may remember approvals")

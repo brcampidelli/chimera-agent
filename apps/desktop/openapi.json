@@ -1116,7 +1116,7 @@
           "remember": {
             "anyOf": [
               {
-                "pattern": "^project$",
+                "pattern": "^(project|conversation)$",
                 "type": "string"
               },
               {
@@ -1204,6 +1204,11 @@
           "age_seconds": {
             "title": "Age Seconds",
             "type": "number"
+          },
+          "allow_scope": {
+            "default": "",
+            "title": "Allow Scope",
+            "type": "string"
           },
           "asked_at": {
             "title": "Asked At",
@@ -14530,6 +14535,15 @@
               "asks"
             ],
             "title": "Commands",
+            "type": "string"
+          },
+          "edits": {
+            "default": "granted",
+            "enum": [
+              "granted",
+              "asks"
+            ],
+            "title": "Edits",
             "type": "string"
           },
           "reach": {

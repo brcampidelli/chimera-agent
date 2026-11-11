@@ -224,9 +224,7 @@ def hold_after_failed_send() -> bool:
 #: adds for them is a card on every edit after the run read anything external. The owner decided on
 #: 2026-09-27 that this is a warning: a card is for untrusted content reaching a shell, a write
 #: outside the workspace, or a send over the network (all of which stay gated below).
-WORKSPACE_WRITE_TOOLS = frozenset(
-    {"write_file", "edit_file", "apply_patch", "edit_batch", "create_document"}
-)
+WORKSPACE_WRITE_TOOLS = WRITE_TOOLS  # one table: `ledger.WORKSPACE_WRITERS`
 
 _RECIPIENT_KEYS = ("to", "recipient", "recipients", "cc", "bcc", "email")
 

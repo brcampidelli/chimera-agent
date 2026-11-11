@@ -70,6 +70,7 @@ function question(id = "q1") {
     decider_model: "",
     host: "",
     irreversible: false,
+    allow_scope: "",
     decision_id: "",
     typed_text: "",
     run_id: "",

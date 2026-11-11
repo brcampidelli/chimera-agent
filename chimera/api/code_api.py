@@ -66,6 +66,13 @@ from chimera.api.code_session_queue import (
 )
 from chimera.api.durable_undo import DurableUndo
 from chimera.api.folder_locks import FolderLocks
+from chimera.api.manual_gate import (
+    NEEDS_SCREEN,
+    ManualAllowances,
+    ManualScope,
+    command_key,
+    install_manual_edit_gate,
+)
 from chimera.api.posture import (
     DEFAULT_APPROVAL,
     DEFAULT_REACH,
@@ -82,6 +89,7 @@ from chimera.api.posture import (
     deployment_posture,
     describe,
     mode_for_approval,
+    narrow_posture,
 )
 from chimera.api.posture import resolve as _resolve_posture
 from chimera.api.proposed_change import change_note, proposal_target
@@ -1143,6 +1151,9 @@ def assemble_registry(
     browser_allowed: bool = True,
     bypass_permissions: bool | Callable[[], bool] = False,
     wait_forever: bool = False,
+    manual_allowances: ManualAllowances | None = None,
+    manual_session: Callable[[], str] | None = None,
+    manual_screen: bool = False,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -1234,7 +1245,21 @@ def assemble_registry(
     # approver once it exists (below), and until then a question is refused, as it always was.
     command_approver: list[Any] = [None]
     asks_each_command = posture_in is not None and posture_in.commands == "asks"
-    card_ask = _ask_command_on_card(command_approver) if asks_each_command else None
+    asks_each_edit = posture_in is not None and posture_in.edits == "asks"
+    # Manual: a question needs a screen that can answer it. Only the owner's own screen turn, with
+    # its stream bound, is one; every other turn (bot, cron, background, a bridge that cannot approve,
+    # a run with no announcer) refuses at once, in a sentence, instead of waiting for nobody.
+    manual_scope: ManualScope | None = None
+    if asks_each_edit:
+        manual_scope = ManualScope(
+            manual_allowances or ManualAllowances(),
+            manual_session or (lambda: ""),
+            lambda: bool(
+                manual_screen and approval_sink is not None
+                and getattr(approval_sink, "emit", None) is not None
+            ),
+        )
+    card_ask = _ask_command_on_card(command_approver, manual_scope) if asks_each_command else None
     host_exec_confirm = None if ungated else resolve_host_exec_confirm(settings, ask=card_ask)
     if card_ask is not None and host_exec_confirm is None and not ungated:
         # `CHIMERA_HOST_EXEC=allow` makes the resolver return None before it looks at `ask`, which
@@ -1294,6 +1319,12 @@ def assemble_registry(
         shell = registry.get("run_shell")
         if isinstance(shell, RunShellTool):
             shell.declined_message = COMMANDS_OFF_REFUSAL
+    if manual_scope is not None and not manual_screen and "run_shell" in registry:
+        from chimera.tools.shell import RunShellTool
+
+        shell_tool = registry.get("run_shell")
+        if isinstance(shell_tool, RunShellTool):
+            shell_tool.declined_message = NEEDS_SCREEN
     # Installed plugins (`chimera.plugins.mapping`): the owner's own turn gets every plugin they
     # switched on. A turn answered from a linked chat gets what a bot gets — only the plugins in
     # CHIMERA_UNATTENDED_PLUGINS — and a guest's turn gets none: the share link is not the owner.
@@ -1343,6 +1374,28 @@ def assemble_registry(
             run_id=run_id,
         )
     command_approver[0] = owner
+    # Manual's own approver: `always_ask`, like `open_pull_request`. `CHIMERA_APPROVAL_MODE=allow` is
+    # read as `ask` and no remembered "always allow in this project" rule is consulted, so neither
+    # a deployment's standing yes nor an old rule answers a question Manual exists to put to a person.
+    manual_ask: Callable[..., bool] | None = None
+    if manual_scope is not None:
+        from chimera.governance.approval import always_ask as _manual_always_ask
+        from chimera.governance.approval import deliverer_for as _manual_deliverer
+
+        def _wait_for_manual_screen() -> float | None:
+            bound = approval_sink is not None and getattr(approval_sink, "emit", None) is not None
+            return None if bound else 0.0
+
+        manual_ask = _manual_always_ask(
+            settings.home,
+            mode=settings.approval_mode,
+            deliver=_manual_deliverer(settings),
+            on_asked=approval_sink,
+            wait_seconds=_wait_for_manual_screen,
+            facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
+            audit=audit,
+        )
+        command_approver[0] = manual_ask
     # The browser's Google searches are written to this turn's audit. General browser navigation
     # keeps `owner` (including its site-boundary questions); Google search gets an explicit card
     # approver below, so `approval_mode=allow` cannot turn this owner-only action into a standing yes.
@@ -1561,6 +1614,14 @@ def assemble_registry(
         payload_sink = sink_for_run(
             ws, build_write_region(seams.write_region, ws), home=settings.home
         )
+        if manual_scope is not None and manual_ask is not None:
+            # Manual: a payload an MCP tool returns asks before it is saved in the project; a "no"
+            # (or no screen) sends it to the app folder, so the call still answers.
+            from dataclasses import replace as replace_sink
+
+            from chimera.api.manual_gate import payload_asker
+
+            payload_sink = replace_sink(payload_sink, ask=payload_asker(ws, manual_scope, manual_ask))
     if pool is not None and not settings.mcp_defer:
         pool.into_tool_registry(registry, bind=partial(bind_payloads, sink=payload_sink))
     # The OpenAPI connectors the owner added and switched on (study 29, P7.5), here for the reason
@@ -1609,6 +1670,10 @@ def assemble_registry(
     # MCP proxies are registered after the filter for their own reasons. Running it second would
     # sweep `mcp_list`/`mcp_describe`/`mcp_call` into the deferred set — a proxy behind a proxy,
     # costing a round trip to reach a round trip.
+    if manual_scope is not None:
+        # Inside the kernel and the ledger (they wrap this registry below), so a call they refuse
+        # never becomes a question, and before deferral, so a deferred write tool is the gated one.
+        install_manual_edit_gate(registry, ws, manual_scope, manual_ask or owner)
     if settings.defer_tools:
         from chimera.tools.defer import defer_builtins
 
@@ -1896,21 +1961,37 @@ def turn_bypass_switch(
     return switch
 
 
-def _ask_command_on_card(holder: list[Any]) -> Callable[[str], bool]:
+def _ask_command_on_card(holder: list[Any], scope: ManualScope | None = None) -> Callable[[str], bool]:
     """A host-command confirm that puts the command on the turn's approval card.
 
     The card's first line is ``run_shell: <command>``, the same shape the approval rules match, so
     "always allow this command" on the card works for a command as it does for any other tool. The
     approver is read from ``holder`` at each question: until the turn binds one, and when nothing is
     bound, the command is refused, which is what an unanswered question is.
+
+    ``scope`` is Manual's: with it, a turn that has no screen is refused at once (nothing is written
+    for nobody), a command the owner allowed for this conversation goes through, and the card offers
+    "allow in this conversation" for exactly that command.
     """
 
     def ask(command: str) -> bool:
+        key = ""
+        if scope is not None:
+            if not scope.attended():
+                return False
+            key = command_key(command)
+            if scope.is_allowed(key):
+                return True
         approve = holder[0]
         if approve is None:
             return False
         action = f"run_shell: {command}"
-        question = SimpleNamespace(action=action, reason="a command on this machine, in a conversation that asks before each one", decision=None)
+        question = SimpleNamespace(
+            action=action,
+            reason="a command on this machine, in a conversation that asks before each one",
+            decision=None,
+            allow_key=key,
+        )
         return bool(approve(question, action))
 
     return ask
@@ -3022,6 +3103,10 @@ def register_code_api(
             else:
                 held_turns.pop(session_id, None)
 
+    #: What "Allow in this conversation" granted in Manual, per conversation, in memory only. Dropped
+    #: when the conversation leaves Manual (a turn in another mode, or the mode being changed).
+    manual_allowances = ManualAllowances()
+
     def build_agent(
         req: CodeTurnRequest,
         ws: Path,
@@ -3040,6 +3125,8 @@ def register_code_api(
         browser_allowed: bool = True,
         bypass_permissions: bool | Callable[[], bool] = False,
         wait_forever: bool = False,
+        manual_session: Callable[[], str] | None = None,
+        manual_screen: bool = False,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it. ``guest``: a share link's turn.
 
@@ -3072,6 +3159,9 @@ def register_code_api(
             guest=guest,
             bypass_permissions=bypass_permissions,
             wait_forever=wait_forever,
+            manual_allowances=manual_allowances,
+            manual_session=manual_session,
+            manual_screen=manual_screen,
 
             on_pull_request=(
                 (lambda url: _remember_pull_request(run_id, url)) if run_id is not None else None
@@ -3334,6 +3424,7 @@ def register_code_api(
         req.bypass_permissions = False
         if from_bridge:
             _bridge_turn_mode(req)
+        _hold_manual(req)
         req.close_loop_follow = None
         turn_browser_link = browser_link if browser_allowed else None
         card_claim = _claim_card_for_here(req, from_bridge=from_bridge or via_bridge, screen=browser_allowed)
@@ -3552,6 +3643,25 @@ def register_code_api(
     def _configured_reach() -> Reach:
         """The reach Settings state, or the default when they state none."""
         return cast(Reach, (live().reach or "").strip() or DEFAULT_REACH)
+
+    def _hold_manual(req: CodeTurnRequest) -> None:
+        """A conversation stored in Manual keeps asking, whatever its request body says.
+
+        The server derives the two axes from the STORED mode, so a client that leaves ``edits`` out
+        of the posture (an older screen, a script) gets the questions the owner chose, never fewer.
+        It only narrows (:func:`narrow_posture`); the owner's "Ignore permissions" switch, which
+        stands for the mode "bypass" on the screen, is the one thing that lifts it.
+        """
+        session_id = req.session_id
+        if not session_id or store.stored_permission_mode(session_id) != "manual":
+            return
+        if store.stored_bypass_permissions(session_id):
+            return
+        sent = req.posture or Posture(reach=_configured_reach(), approval=_approval_setting())
+        req.posture = narrow_posture(
+            sent, Posture(reach=sent.reach, approval="always", commands="asks", edits="asks")
+        )
+        req.allow_host_exec = False
 
     def _bridge_turn_mode(req: CodeTurnRequest) -> None:
         """A paired device's turn runs under the mode the server gives it, never a wider one.
@@ -3891,6 +4001,8 @@ def register_code_api(
 
     app.state.code_channel_turn = channel_turn
     app.state.code_channel_sessions = store.list_meta
+
+    app.state.manual_allowances = manual_allowances
 
     def approval_origin(run_id: str) -> dict[str, str]:
         """The conversation and folder of the turn that asked a question, while it waits.
@@ -4383,6 +4495,12 @@ def register_code_api(
         )
         if seeded:
             bypass_switch = lambda: False  # noqa: E731 - a tainted conversation never gets the bypass
+        # The conversation's id as the turn's gates read it. A continuing conversation is known now; a
+        # first turn learns it below, once the session exists (nothing could be allowed before then).
+        manual_session_id = [req.session_id or ""]
+        if req.session_id and not (req.posture is not None and req.posture.edits == "asks"):
+            # A turn in any mode but Manual: whatever "Allow in this conversation" granted is gone.
+            manual_allowances.clear(req.session_id)
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
             extra_tools=extra_tools or None, run_id=turn_id, notice_sink=notice_sink,
@@ -4400,6 +4518,10 @@ def register_code_api(
             # Read at each question, not once: the owner can switch it on while this turn runs.
             bypass_permissions=bypass_switch,
             wait_forever=(via_screen and approval_sink is not None and getattr(approval_sink, "emit", None) is not None),
+            manual_session=lambda: manual_session_id[0],
+            # Whether this turn is the owner's own screen turn: the only kind Manual can ask on. The
+            # stream's `emit` binds later, so the gate also reads it at each question.
+            manual_screen=bool(via_screen),
         )
         if seeded:
             seed_taint(ledger)
@@ -4414,6 +4536,7 @@ def register_code_api(
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
             session.bypass_permissions = bool(bypass_switch())
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        manual_session_id[0] = session.session_id
         if task_tray is not None:
             task_tray.session_id = session.session_id
         if card_origin is not None:
@@ -4604,6 +4727,7 @@ def register_code_api(
                 "reason": question.reason,
                 "host": getattr(question, "host", None),
                 "irreversible": bool(getattr(question, "irreversible", False)),
+                "allow_scope": str(getattr(question, "allow_key", "") or ""),
                 "preview": getattr(question, "preview", []),
                 "preview_status": getattr(question, "preview_status", ""),
                 **({"typed_text": getattr(question, "typed_text", "")} if getattr(question, "typed_text", "") else {}),
@@ -6899,6 +7023,8 @@ def register_code_api(
             store.set_stored_permission_mode(session_id, mode)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail="the conversation file is unreadable; the mode was not changed") from exc
+        if mode != "manual":
+            manual_allowances.clear(session_id)
         return {"id": session_id, "permission_mode": mode}
 
     @app.patch(

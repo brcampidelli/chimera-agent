@@ -9,16 +9,16 @@ describe("the permission modes map onto the posture axes", () => {
     expect(PERMISSION_MODES).toEqual(["manual", "accept_edits", "plan", "auto", "dont_ask", "bypass"]);
   });
 
-  it("Manual is the configured reach with approval always", () => {
+  it("Manual is the configured reach, asking before every edit and every command", () => {
     expect(modeTurn("manual", BASE)).toEqual({
-      posture: { reach: "workspace", approval: "always", commands: "granted" },
+      posture: { reach: "workspace", approval: "always", commands: "asks", edits: "asks" },
       planGate: false,
     });
   });
 
   it("Accept edits edits without asking and asks before every command", () => {
     expect(modeTurn("accept_edits", BASE)).toEqual({
-      posture: { reach: "workspace_shell", approval: "never", commands: "asks" },
+      posture: { reach: "workspace_shell", approval: "never", commands: "asks", edits: "granted" },
       planGate: false,
     });
   });
@@ -33,21 +33,21 @@ describe("the permission modes map onto the posture axes", () => {
 
   it("Plan forces the plan gate and keeps the configured posture", () => {
     expect(modeTurn("plan", { reach: "workspace_shell", approval: "always" })).toEqual({
-      posture: { reach: "workspace_shell", approval: "always", commands: "granted" },
+      posture: { reach: "workspace_shell", approval: "always", commands: "granted", edits: "granted" },
       planGate: true,
     });
   });
 
   it("Auto pauses only when the run read something suspicious", () => {
     expect(modeTurn("auto", { reach: "workspace", approval: "always" })).toEqual({
-      posture: { reach: "workspace", approval: "suspicious", commands: "granted" },
+      posture: { reach: "workspace", approval: "suspicious", commands: "granted", edits: "granted" },
       planGate: false,
     });
   });
 
   it("Bypass is the configured posture, the switch answers the questions", () => {
     expect(bypassTurn({ reach: "workspace", approval: "never" })).toEqual({
-      posture: { reach: "workspace", approval: "never", commands: "granted" },
+      posture: { reach: "workspace", approval: "never", commands: "granted", edits: "granted" },
       planGate: false,
     });
   });

@@ -108,7 +108,7 @@ def test_a_paired_device_turn_runs_under_the_chosen_posture_not_its_own() -> Non
     # Manual's posture (approval always), and nothing it sent survives.
     mode, turn = bridge_turn("dont_ask", "manual", "workspace", "suspicious")
     assert mode == "manual"
-    assert turn.posture == Posture(reach="workspace", approval="always", commands="granted")
+    assert turn.posture == Posture(reach="workspace", approval="always", commands="asks", edits="asks")
     assert turn.plan_gate is False
 
 
@@ -128,7 +128,7 @@ def test_a_sent_posture_can_only_narrow_the_modes() -> None:
     assert turn.posture == Posture(reach="workspace", approval="always", commands="asks")
     wide = Posture(reach="workspace_shell", approval="never", commands="granted")
     _, turn = bridge_turn(None, "manual", "workspace", "suspicious", wide)
-    assert turn.posture == Posture(reach="workspace", approval="always", commands="granted")
+    assert turn.posture == Posture(reach="workspace", approval="always", commands="asks", edits="asks")
 
 
 def test_narrow_posture_is_the_more_restrictive_axis_by_axis() -> None:
@@ -164,6 +164,7 @@ def test_the_widening_matrix_axis_by_axis() -> None:
                 reaches.index(c.posture.reach) > reaches.index(r.posture.reach)
                 or approvals.index(c.posture.approval) > approvals.index(r.posture.approval)
                 or (c.posture.commands == "granted" and r.posture.commands == "asks")
+                or (c.posture.edits == "granted" and r.posture.edits == "asks")
                 or (r.plan_gate and not c.plan_gate)
             )
             assert widens(c, r) is expected, (requested, current)

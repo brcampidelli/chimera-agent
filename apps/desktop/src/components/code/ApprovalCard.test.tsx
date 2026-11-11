@@ -637,3 +637,35 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
     });
   });
 });
+
+describe("ApprovalCard - Manual's three answers", () => {
+  const edit: ApprovalQuestionLike = {
+    id: "m1",
+    action: "edit_file: src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n-old line\n+new line",
+    reason: "a file edit, in a conversation that asks before each one (Manual)",
+    wait_seconds: 300,
+    allow_scope: "edit_file:src/a.ts",
+  };
+
+  it("shows the proposed diff and offers allow once, in this conversation, and refuse", () => {
+    mount(() => {}, edit);
+    expect(screen.getByText(/\+new line/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /allow this once/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Allow editing src/a.ts in this conversation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^refuse$/i })).toBeInTheDocument();
+  });
+
+  it("allowing in this conversation answers yes and says which scope", async () => {
+    answerApproval.mockClear();
+    const onAnswered = vi.fn();
+    mount(onAnswered, edit);
+    await userEvent.click(screen.getByRole("button", { name: "Allow editing src/a.ts in this conversation" }));
+    await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("m1", true, undefined, "conversation"));
+    expect(onAnswered).toHaveBeenCalledTimes(1);
+  });
+
+  it("a question that does not offer it shows no such button", () => {
+    mount();
+    expect(screen.queryByRole("button", { name: /allow in this conversation/i })).not.toBeInTheDocument();
+  });
+});

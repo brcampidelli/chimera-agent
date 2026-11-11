@@ -9,7 +9,8 @@
       "posture": {
         "reach": "workspace",
         "approval": "always",
-        "commands": "granted"
+        "commands": "asks",
+        "edits": "asks"
       },
       "planGate": false
     },
@@ -22,7 +23,8 @@
       "posture": {
         "reach": "workspace_shell",
         "approval": "never",
-        "commands": "asks"
+        "commands": "asks",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -35,7 +37,8 @@
       "posture": {
         "reach": "workspace",
         "approval": "suspicious",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": true
     },
@@ -48,7 +51,8 @@
       "posture": {
         "reach": "workspace",
         "approval": "suspicious",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -61,7 +65,8 @@
       "posture": {
         "reach": "workspace",
         "approval": "never",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -74,7 +79,8 @@
       "posture": {
         "reach": "read_only",
         "approval": "always",
-        "commands": "granted"
+        "commands": "asks",
+        "edits": "asks"
       },
       "planGate": false
     },
@@ -87,7 +93,8 @@
       "posture": {
         "reach": "read_only",
         "approval": "never",
-        "commands": "asks"
+        "commands": "asks",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -100,7 +107,8 @@
       "posture": {
         "reach": "read_only",
         "approval": "always",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": true
     },
@@ -113,7 +121,8 @@
       "posture": {
         "reach": "read_only",
         "approval": "suspicious",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -126,7 +135,8 @@
       "posture": {
         "reach": "read_only",
         "approval": "never",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -139,7 +149,8 @@
       "posture": {
         "reach": "workspace_shell",
         "approval": "always",
-        "commands": "granted"
+        "commands": "asks",
+        "edits": "asks"
       },
       "planGate": false
     },
@@ -152,7 +163,8 @@
       "posture": {
         "reach": "workspace_shell",
         "approval": "never",
-        "commands": "asks"
+        "commands": "asks",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -165,7 +177,8 @@
       "posture": {
         "reach": "workspace_shell",
         "approval": "suspicious",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": true
     },
@@ -178,7 +191,8 @@
       "posture": {
         "reach": "workspace_shell",
         "approval": "suspicious",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": false
     },
@@ -191,7 +205,8 @@
       "posture": {
         "reach": "workspace_shell",
         "approval": "never",
-        "commands": "granted"
+        "commands": "granted",
+        "edits": "granted"
       },
       "planGate": false
     }
