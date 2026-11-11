@@ -88,12 +88,21 @@ def _build(home: Path, ws: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     _reset()
+    before = set(threading.enumerate())
     home = tmp_path / "home"
     ws = tmp_path / "ws"
     ws.mkdir()
     yield _build(home, ws, monkeypatch), ws, home, monkeypatch
     _Held.release.set()
     _Held.gate.set()
+    # Turns and queue drains run on daemon threads that outlive the test body. One still finishing
+    # after teardown built a gateway, which exports OLLAMA_API_BASE / LM_STUDIO_API_BASE into
+    # os.environ, and the env guard blamed the NEXT test for it (CI on #1219). Wait for this test's
+    # own threads before its monkeypatch undoes the environment.
+    deadline = time.monotonic() + TIMEOUT
+    for thread in set(threading.enumerate()) - before:
+        if thread is not threading.current_thread():
+            thread.join(max(0.0, deadline - time.monotonic()))
 
 
 def _until(predicate: Any) -> bool:

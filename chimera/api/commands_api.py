@@ -99,6 +99,18 @@ class MarkdownAgentOut(BaseModel):
     #: What it would actually get here: the declared names this install has, minus the owner's floor.
     effective_tools: list[str]
     steps: int
+    #: ``claude`` (a Claude Code folder), ``chimera`` (``.chimera/agents`` or the owner's ``agents``)
+    #: or ``plugin``. With ``source`` it says where the file is: project/owner/plugin and which folder.
+    origin: str = "chimera"
+    #: opus/sonnet/haiku/fable resolved to weak, mid or top by the owner's mapping.
+    model_role: str | None = None
+    color: str | None = None
+    #: ``user``, ``project`` or ``local``: the memory scope the file asked for.
+    memory: str | None = None
+    #: ``permissionMode: plan`` narrowed it to read-only tools.
+    plan_only: bool = False
+    #: The file lists no ``tools``, so it gets what the session offers (after its own denials).
+    inherits_tools: bool = False
 
 
 class AgentIssueOut(BaseModel):
@@ -248,7 +260,7 @@ def list_markdown_agents(workspace: Path, settings: Settings) -> dict[str, Any]:
     from chimera.core.registry import load as load_saved_agents
 
     home = Path(settings.home)
-    catalog = discover_agents(workspace, home, saved_agents=load_saved_agents(home))
+    catalog = discover_agents(workspace, home, saved_agents=load_saved_agents(home), settings=settings)
     available = available_tools(workspace, settings)
     agents = []
     for agent in catalog.agents:
@@ -259,8 +271,14 @@ def list_markdown_agents(workspace: Path, settings: Settings) -> dict[str, Any]:
                 description=agent.description,
                 source=_agent_source(agent.source),
                 file=agent.source,
-                model=None if agent.from_project else (agent.model or None),
-                model_ignored=agent.from_project,
+                model=agent.model or None,
+                model_ignored=agent.from_project if agent.model_ignored is None else agent.model_ignored,
+                model_role=agent.model_role or None,
+                origin=agent.origin,
+                color=agent.color or None,
+                memory=agent.memory_scope or None,
+                plan_only=agent.plan_only,
+                inherits_tools=agent.inherit_tools,
                 declared_tools=list(agent.definition.allowed_tools),
                 effective_tools=list(bound.effective_tools),
                 steps=agent.steps,

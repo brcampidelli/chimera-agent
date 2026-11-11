@@ -820,6 +820,13 @@ GUARD_SETTINGS = frozenset(
         # The project-pack switch narrows: on, an accepted pack takes skills, servers and tools
         # away; switching it off hands them back (study 29, P7.6).
         "CHIMERA_PROJECT_PACK",
+        # Whether a repository's `.claude/agents` is read, and which of the owner's models a file's
+        # `model: opus|sonnet|haiku|fable` reaches. The owner's choices, not a client's.
+        "CHIMERA_CLAUDE_AGENTS",
+        "CHIMERA_CLAUDE_AGENT_OPUS",
+        "CHIMERA_CLAUDE_AGENT_SONNET",
+        "CHIMERA_CLAUDE_AGENT_HAIKU",
+        "CHIMERA_CLAUDE_AGENT_FABLE",
         # Auto-verify of a front-end turn against the dev server: off takes a check away.
         "CHIMERA_PREVIEW_AUTO_VERIFY",
         # Two rules that only add questions (study 30, S30-27 and S30-28): a client that could

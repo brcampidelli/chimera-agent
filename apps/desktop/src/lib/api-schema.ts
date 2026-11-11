@@ -7868,6 +7868,47 @@ export interface components {
              */
             sources: number;
         };
+        /**
+         * ClaudeAgentRolesOut
+         * @description Which tier (weak, mid, top) each Claude Code model alias means for a subagent.
+         */
+        ClaudeAgentRolesOut: {
+            /**
+             * Fable
+             * @default top
+             */
+            fable: string;
+            /**
+             * Haiku
+             * @default weak
+             */
+            haiku: string;
+            /**
+             * Opus
+             * @default top
+             */
+            opus: string;
+            /**
+             * Sonnet
+             * @default mid
+             */
+            sonnet: string;
+        };
+        /**
+         * ClaudeAgentsCfgOut
+         * @description ``CHIMERA_CLAUDE_AGENTS`` — whether agents written for Claude Code are read, and the role map.
+         *
+         *     On by default (the owner's decision); a server that predates the block reads as on, which is what
+         *     it does.
+         */
+        ClaudeAgentsCfgOut: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            roles?: components["schemas"]["ClaudeAgentRolesOut"];
+        };
         /** ClaudeImportApplyIn */
         ClaudeImportApplyIn: {
             /** Contents */
@@ -8902,6 +8943,7 @@ export interface components {
             bridge?: components["schemas"]["BridgeCfgOut"];
             browser?: components["schemas"]["BrowserCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
+            claude_agents?: components["schemas"]["ClaudeAgentsCfgOut"];
             conversations?: components["schemas"]["ConversationsCfgOut"];
             decisions?: components["schemas"]["DecisionsCfgOut"];
             defer?: components["schemas"]["DeferCfgOut"];
@@ -11701,6 +11743,8 @@ export interface components {
          * @description One Markdown subagent, as the session would see it.
          */
         MarkdownAgentOut: {
+            /** Color */
+            color?: string | null;
             /** Declared Tools */
             declared_tools: string[];
             /** Description */
@@ -11711,10 +11755,29 @@ export interface components {
             file: string;
             /** Id */
             id: string;
+            /**
+             * Inherits Tools
+             * @default false
+             */
+            inherits_tools: boolean;
+            /** Memory */
+            memory?: string | null;
             /** Model */
             model: string | null;
             /** Model Ignored */
             model_ignored: boolean;
+            /** Model Role */
+            model_role?: string | null;
+            /**
+             * Origin
+             * @default chimera
+             */
+            origin: string;
+            /**
+             * Plan Only
+             * @default false
+             */
+            plan_only: boolean;
             /** Source */
             source: string;
             /** Steps */
