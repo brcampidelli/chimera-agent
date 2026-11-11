@@ -114,6 +114,10 @@ import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeil
 import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
 import { TurnSuggestions } from "@/components/code/TurnSuggestions";
 import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
+import { CodeReviewCard } from "@/components/code/CodeReviewCard";
+import { parseReviewCommand } from "@/components/code/codeReview";
+import { runCodeReview } from "@/lib/api";
+import type { CodeReview, PromptCommand } from "@/lib/types";
 import { MentionChips, MentionMenu, useMentionMenu } from "@/components/code/MentionMenu";
 import {
   addEntry,
@@ -863,8 +867,47 @@ export function Conversation({
     enabled: wantsCommands,
     staleTime: 30_000,
   });
-  const slash = useSlashMenu(draft, commandList.data?.commands, setDraft);
+  // `/code-review` is built in: it is listed first, and answered by the screen rather than sent as a turn.
+  const reviewCommand = useMemo<PromptCommand>(
+    () => ({
+      name: "code-review",
+      description: t("code.review.command"),
+      source: "builtin",
+      argument_hint: "[--max-findings N|all]",
+      error: null,
+    }),
+    [t],
+  );
+  const slashCommands = useMemo(
+    () => [reviewCommand, ...(commandList.data?.commands ?? [])],
+    [reviewCommand, commandList.data],
+  );
+  const slash = useSlashMenu(draft, slashCommands, setDraft);
   const slashListId = useId();
+  // The `/code-review` cards of this conversation. A card is not a turn: nothing is sent to the agent
+  // until the person picks findings and asks for their fixes.
+  type ReviewEntry = { id: number; sessionId: string | null; review: CodeReview | null; error: string | null };
+  const [reviews, setReviews] = useState<ReviewEntry[]>([]);
+  async function runReview(maxFindings: string) {
+    const id = Date.now();
+    const owner = sessionId ?? null;
+    setReviews((list) => [...list, { id, sessionId: owner, review: null, error: null }]);
+    try {
+      // The conversation's own edits, in the order made: the change a folder with no git diff is reviewed by.
+      const edits = exchanges.flatMap((exchange) =>
+        exchange.edits.map((edit) => ({ path: edit.path, patch: edit.patch })),
+      );
+      const review = await runCodeReview({
+        workspace,
+        session_id: owner ?? undefined,
+        max_findings: maxFindings || undefined,
+        edits,
+      });
+      setReviews((list) => list.map((e) => (e.id === id ? { ...e, review } : e)));
+    } catch {
+      setReviews((list) => list.map((e) => (e.id === id ? { ...e, error: t("code.review.failed") } : e)));
+    }
+  }
   // The `@` mentions of the next message (`lib/context-items.ts`): chips above the box, sent as
   // `context` with the turn. The caret is tracked because a mention is the word UNDER it, which is
   // not always the end of the box.
@@ -1825,6 +1868,23 @@ export function Conversation({
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
     // the wrong text.
     const message = (override ?? draft).trim();
+    if (override === undefined) {
+      const command = parseReviewCommand(message);
+      if (command) {
+        if (command.ok) {
+          setDraft("");
+          void runReview(command.maxFindings);
+        } else {
+          // The draft stays as typed, so the person can correct the line the error is about.
+          const id = Date.now();
+          setReviews((list) => [
+            ...list,
+            { id, sessionId: sessionId ?? null, review: null, error: t("code.review.badArg") },
+          ]);
+        }
+        return true;
+      }
+    }
     if (busyElsewhere) return false;
     // A message the user typed is a new instruction, not a continuation of the old one: whatever
     // automatic budget the previous task had left belongs to that task, so it is spent back to
@@ -2994,6 +3054,26 @@ export function Conversation({
           }}
           t={t}
         />
+        {reviews
+          .filter((e) => e.sessionId === (sessionId ?? null))
+          .map((e) => (
+            <div key={e.id} className="mb-1.5">
+              {e.review ? (
+                <CodeReviewCard
+                  sessionId={sessionId ?? ""}
+                  review={e.review}
+                  busy={busy || busyElsewhere}
+                  onApply={(message) => {
+                    void send(true, message, false, false, undefined, undefined, true);
+                  }}
+                />
+              ) : e.error ? (
+                <p className="text-sm text-bad-foreground">{e.error}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t("code.review.loading")}</p>
+              )}
+            </div>
+          ))}
         <SlashMenu id={slashListId} state={slash} t={t} />
         <MentionMenu id={mentionListId} state={mention} t={t} />
         {/* Announced, never the list itself: how many matches there are while it is open, and what

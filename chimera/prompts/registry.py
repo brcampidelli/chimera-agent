@@ -563,6 +563,14 @@ NOT_PROMPTS: dict[str, str] = {
         "loopback check looks for; no model reads it"
     ),
     "chimera.migration.base:_MEMORY_NOTE": "a CLI message printed by `chimera migrate`",
+    "chimera.review.pipeline:BUDGET_REASON": (
+        "the reason a /code-review card gives for a part of the change left out by its budget; "
+        "shown to the person on the card, and no model reads it"
+    ),
+    "chimera.review.pipeline:VERIFY_BUDGET_REASON": (
+        "the verdict label of a /code-review finding the verifier had no call left to check; "
+        "shown to the person on the card, and no model reads it"
+    ),
     "chimera.api.browser_screen:NEEDS_SCREEN_HEADER": (
         "an HTTP response header name (X-Chimera-Needs-Screen) the browser frontend reads to offer the "
         "pairing-code prompt; no model reads it"

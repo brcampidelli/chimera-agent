@@ -10,6 +10,7 @@ import type {
   AgentBatchNote,
   AgentDef,
   MarkdownAgents,
+  CodeReview,
   PromptCommands,
   AgentIdentity,
   AgentsBatch,
@@ -355,6 +356,15 @@ export const listCodeCommands = (workspace: string) =>
   json<PromptCommands>(
     `/api/code/commands${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`,
   );
+/** `/code-review`: review the working tree now. Spends a model call, so it runs only on the person's command. */
+export const runCodeReview = (body: {
+  workspace: string;
+  session_id?: string;
+  max_findings?: string;
+  /** The conversation's edits, reviewed only when the folder has no git diff to review. */
+  edits?: { path: string; patch: string }[];
+}) =>
+  json<CodeReview>("/api/code/review", { method: "POST", body: JSON.stringify(body) });
 export const putAgent = (agent: AgentDef) =>
   json<AgentDef[]>("/api/agents/registry", { method: "PUT", body: JSON.stringify(agent) });
 export const deleteAgent = (id: string) =>

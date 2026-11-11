@@ -80,14 +80,16 @@ describe("the composer's slash list", () => {
     await userEvent.type(box, "/");
     const list = await screen.findByRole("listbox", { name: "Commands" });
     const options = within(list).getAllByRole("option");
-    expect(options).toHaveLength(4);
-    expect(within(options[0]).getByText("/review")).toBeInTheDocument();
-    expect(within(options[0]).getByText("<path>")).toBeInTheDocument();
-    expect(within(options[0]).getByText("Review a file")).toBeInTheDocument();
-    expect(within(options[0]).getByText("project")).toBeInTheDocument();
-    expect(within(options[1]).getByText("yours")).toBeInTheDocument();
-    expect(within(options[2]).getByText("plugin my-plugin")).toBeInTheDocument();
-    expect(within(options[3]).getByText("Broken: invalid frontmatter")).toBeInTheDocument();
+    // The built-in `/code-review` is listed first; the folder's own commands follow it.
+    expect(options).toHaveLength(5);
+    expect(within(options[0]).getByText("/code-review")).toBeInTheDocument();
+    expect(within(options[1]).getByText("/review")).toBeInTheDocument();
+    expect(within(options[1]).getByText("<path>")).toBeInTheDocument();
+    expect(within(options[1]).getByText("Review a file")).toBeInTheDocument();
+    expect(within(options[1]).getByText("project")).toBeInTheDocument();
+    expect(within(options[2]).getByText("yours")).toBeInTheDocument();
+    expect(within(options[3]).getByText("plugin my-plugin")).toBeInTheDocument();
+    expect(within(options[4]).getByText("Broken: invalid frontmatter")).toBeInTheDocument();
     expect(box).toHaveAttribute("aria-expanded", "true");
   });
 
@@ -110,11 +112,19 @@ describe("the composer's slash list", () => {
     expect(options()[1]).toHaveAttribute("aria-selected", "true");
     expect(box).toHaveAttribute("aria-activedescendant", options()[1].id);
     await userEvent.keyboard("{ArrowUp}{ArrowUp}");
-    expect(options()[3]).toHaveAttribute("aria-selected", "true"); // wraps
-    await userEvent.keyboard("{ArrowDown}{Enter}");
+    expect(options()[4]).toHaveAttribute("aria-selected", "true"); // wraps
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
     expect(box).toHaveValue("/review ");
     expect(streamCodeTurn).not.toHaveBeenCalled();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("a /code-review line with an argument it cannot read keeps the draft and says why", async () => {
+    const box = await mount();
+    await userEvent.type(box, "/code-review please{Enter}");
+    expect(box).toHaveValue("/code-review please");
+    expect(await screen.findByText("Use /code-review, or /code-review --max-findings N or all")).toBeInTheDocument();
+    expect(streamCodeTurn).not.toHaveBeenCalled();
   });
 
   it("sends the line as typed once the name is chosen — expansion is the server's", async () => {
