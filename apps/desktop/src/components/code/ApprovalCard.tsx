@@ -235,6 +235,16 @@ function SuggestedChanges({ suggestion }: { suggestion: SettingsSuggestion }) {
   );
 }
 
+/** The sentence for a question another process holds the code of, by why this screen cannot answer
+ *  it. Shared with the Plan card, so the two surfaces say the same thing about the same refusal. */
+export function needsCodeKey(reason: string | null | undefined): "code.approval.needsScreen" | "code.approval.noScreenHere" | "code.approval.needsCode" {
+  return reason === "not_the_screen"
+    ? "code.approval.needsScreen"
+    : reason === "no_screen_here"
+      ? "code.approval.noScreenHere"
+      : "code.approval.needsCode";
+}
+
 export function ApprovalCard({
   question,
   onAnswered,
@@ -348,13 +358,7 @@ export function ApprovalCard({
           stays = true;
           setRestartPending(answered.detail ?? "");
         } else {
-          const key =
-            answered.reason === "not_the_screen"
-              ? "code.approval.needsScreen"
-              : answered.reason === "no_screen_here"
-                ? "code.approval.noScreenHere"
-                : "code.approval.needsCode";
-          toast(t(key, { command: answered.detail ?? "" }), "bad");
+          toast(t(needsCodeKey(answered.reason), { command: answered.detail ?? "" }), "bad");
         }
       }
     } finally {
