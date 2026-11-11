@@ -411,6 +411,74 @@ def _origin(url: str) -> str:
     return f"{parsed.scheme}://{parsed.hostname or ''}:{port}"
 
 
+#: What is at a point of the viewport, read in the page. The page's own script can replace any function
+#: this one calls, so nothing it returns is trusted: `chimera.core.element_pick` re-validates every field
+#: and keeps only what it allows. Form values are never read (only text and an allowlist of attributes).
+_ELEMENT_AT_SCRIPT = r"""
+([px, py]) => {
+  const clip = (s, n) => {
+    s = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    return s.length > n ? s.slice(0, n) + '...' : s;
+  };
+  const el = document.elementFromPoint(px, py);
+  if (!el) return null;
+  const esc = (s) => (window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&'));
+  const unique = (sel) => { try { return document.querySelectorAll(sel).length === 1; } catch (e) { return false; } };
+  const stableClass = (c) => c.length <= 32 && !/\d{3,}/.test(c) && !/^(css|sc|jsx|emotion|svelte)-/.test(c)
+    && !/__[A-Za-z0-9_-]{4,}$/.test(c);
+  const one = (e) => {
+    const tag = e.tagName.toLowerCase();
+    if (e.id && !/\d{4,}/.test(e.id) && e.id.indexOf(':') < 0 && e.id.length <= 40) return '#' + esc(e.id);
+    const tid = e.getAttribute('data-testid');
+    if (tid && tid.length <= 40) return tag + '[data-testid="' + tid.replace(/["\\]/g, '') + '"]';
+    const cls = Array.from(e.classList || []).filter(stableClass).slice(0, 2);
+    return tag + cls.map((c) => '.' + esc(c)).join('');
+  };
+  const nth = (e, part) => {
+    const parent = e.parentElement;
+    if (!parent || part.charAt(0) === '#') return part;
+    const same = Array.from(parent.children).filter((c) => c.tagName === e.tagName);
+    return same.length > 1 ? part + ':nth-of-type(' + (same.indexOf(e) + 1) + ')' : part;
+  };
+  let cur = el;
+  const parts = [one(el)];
+  const join = () => parts.join(' > ');
+  if (!unique(join())) parts[0] = nth(el, parts[0]);
+  let depth = 0;
+  while (!unique(join()) && cur.parentElement && cur.parentElement !== document.documentElement
+         && cur.parentElement !== document.body && depth < 5 && parts[0].charAt(0) !== '#') {
+    cur = cur.parentElement;
+    depth += 1;
+    parts.unshift(nth(cur, one(cur)));
+  }
+  const tag = el.tagName.toLowerCase();
+  const valueBearing = tag === 'input' || tag === 'textarea' || tag === 'select';
+  const text = valueBearing ? '' : clip(el.innerText || el.textContent, 400);
+  const keep = ['id', 'class', 'role', 'aria-label', 'name', 'type', 'href', 'src', 'alt', 'title', 'placeholder', 'data-testid'];
+  const attrs = {};
+  for (const name of keep) {
+    const raw = el.getAttribute(name);
+    if (raw == null) continue;
+    let value = raw;
+    if (name === 'href' || name === 'src') {
+      try {
+        const u = new URL(raw, location.href);
+        value = (u.protocol === 'http:' || u.protocol === 'https:')
+          ? (u.origin === location.origin ? u.pathname : u.origin + u.pathname)
+          : u.protocol;
+      } catch (e) { value = ''; }
+    }
+    attrs[name] = clip(value, 160);
+  }
+  const r = el.getBoundingClientRect();
+  return {
+    tag, selector: join(), unique: unique(join()), text, attrs,
+    box: { x: r.x, y: r.y, w: r.width, h: r.height },
+  };
+}
+"""
+
+
 class PlaywrightDriver:
     """A persistent Chromium page driven through the accessibility tree."""
 
@@ -720,6 +788,39 @@ class PlaywrightDriver:
 
     def screenshot(self, path: str) -> None:
         self._page.screenshot(path=path, full_page=True)  # a real full-page PNG of the current page
+
+    def revision(self) -> str:
+        """Which document is loaded: its address and the moment it began loading. A reload or a navigation
+        changes it; the page redrawing itself does not."""
+        origin = self._page.evaluate("performance.timeOrigin")
+        return f"{self._page.url}|{origin}"
+
+    def element_at(self, x: float, y: float) -> dict[str, Any] | None:
+        """The element at viewport point ``(x, y)`` of the page that is loaded, and a crop of it.
+
+        ``None`` when nothing is there. The dict is the PAGE's answer (`_ELEMENT_AT_SCRIPT` runs in the
+        page, where its own script can lie), plus ``crop``: a PNG of the element's box clipped to the
+        viewport, or ``None`` when it has no visible area or the capture failed. The caller validates.
+        """
+        info = self._page.evaluate(_ELEMENT_AT_SCRIPT, [float(x), float(y)])
+        if not isinstance(info, dict):
+            return None
+        crop: bytes | None = None
+        try:
+            size = self._page.viewport_size or {"width": 0, "height": 0}
+            box = info.get("box") or {}
+            left = max(0.0, float(box.get("x", 0)))
+            top = max(0.0, float(box.get("y", 0)))
+            right = min(float(size["width"]), float(box.get("x", 0)) + float(box.get("w", 0)))
+            bottom = min(float(size["height"]), float(box.get("y", 0)) + float(box.get("h", 0)))
+            if right - left >= 1 and bottom - top >= 1:
+                crop = self._page.screenshot(
+                    type="png", clip={"x": left, "y": top, "width": right - left, "height": bottom - top}
+                )
+        except Exception:  # noqa: BLE001 — the crop is a courtesy; the element is still named
+            crop = None
+        info["crop"] = crop
+        return info
 
     def frame(self) -> BrowserFrame | None:
         """The viewport as a JPEG at quality 55 — the size/time trade `BrowserFrame` measured."""

@@ -1209,6 +1209,72 @@ class BrowserTool(Tool):
             "error": None, "text": text, "console": messages, "console_known": callable(report), "path": png_path,
         }
 
+    def capture_view(self, url: str) -> dict[str, Any]:
+        """Open ``url`` and return the viewport as a JPEG with its size: the picture the owner clicks on.
+
+        The element picker's way in (`chimera/core/element_pick.py`). The tool's own ``navigate``
+        underneath, so the reach, the turn's local ports and the SSRF floor judge the address exactly as
+        they judge the agent's own navigation. ``error`` is set, and nothing else is meaningful, when the
+        page could not be opened or this driver cannot take a frame.
+        """
+        opened = self.run(action="navigate", url=url)
+        if opened.startswith("error:") or opened.startswith(_INSTALL_HINT[:20]):
+            return {"error": opened.splitlines()[0][:300]}
+        driver = self._driver
+        if driver is None:
+            return {"error": "error: the browser is not running"}
+        try:
+            frame = driver.frame()
+        except Exception as exc:  # noqa: BLE001 — a failed capture is the answer, not a crash
+            return {"error": f"error: capture failed: {exc}"}
+        if frame is None:
+            return {"error": "error: this browser cannot capture the page"}
+        reader = getattr(driver, "revision", None)
+        try:
+            revision = str(reader()) if callable(reader) else frame.url
+        except Exception:  # noqa: BLE001 — without a revision the address is all there is to compare
+            revision = frame.url
+        return {
+            "error": None, "jpeg": frame.jpeg, "width": frame.width, "height": frame.height,
+            "url": frame.url, "revision": revision,
+        }
+
+    def element_at(self, x: float, y: float, *, only_port: int, revision: str = "") -> dict[str, Any]:
+        """What is at viewport point ``(x, y)`` of the page ``capture_view`` opened, or ``{"error": ...}``.
+
+        Refused unless the driver is still on ``localhost``/``127.0.0.1``/``::1`` at ``only_port``: a page
+        that redirected itself elsewhere is not the server the owner was shown. With ``revision`` (what
+        ``capture_view`` returned), also refused when the loaded document is no longer that one.
+        """
+        driver = self._driver
+        finder = getattr(driver, "element_at", None)
+        if driver is None or not callable(finder):
+            return {"error": "error: no page is open in this browser"}
+        from urllib.parse import urlparse
+
+        parsed = urlparse(str(getattr(driver, "url", "") or ""))
+        try:
+            port = parsed.port
+        except ValueError:
+            port = None
+        if (parsed.hostname or "") not in {"localhost", "127.0.0.1", "::1"} or port != only_port:
+            return {"error": "error: the page is no longer the dev server's; capture it again"}
+        reader = getattr(driver, "revision", None)
+        if revision and callable(reader):
+            try:
+                current = str(reader())
+            except Exception:  # noqa: BLE001
+                current = ""
+            if current != revision:
+                return {"error": "error: the page changed since the picture was taken; capture it again"}
+        try:
+            found = finder(x, y)
+        except Exception as exc:  # noqa: BLE001 — a page that cannot be read is the answer, not a crash
+            return {"error": f"error: could not read the element: {exc}"}
+        if not isinstance(found, dict):
+            return {"error": "error: nothing is at that point"}
+        return {"error": None, **found}
+
     def _set_local_only(self, fallback_url: str, driver: BrowserDriver, start: int) -> None:
         self.last_local_only = False
         try:
