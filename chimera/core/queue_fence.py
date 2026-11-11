@@ -276,7 +276,12 @@ def _names(tokens: list[str], target: _Queue, cwd: Path) -> bool:
 #: The owner's hooks file, by the name `chimera/governance/hooks.py` gives it. Kept as a literal
 #: rather than imported, so this fence loads nothing from the module it protects.
 _HOOKS_FILE = "chimera-hooks.json"
-_HOOKS_NAME = re.compile(r"chimera-hooks\.json\b", re.IGNORECASE)
+_HOOKS_NAME = re.compile(
+    # The owner's hooks file, and the Claude Code settings files that now carry hooks too
+    # (`chimera/governance/claude_hooks.py`): `.claude/settings.json` and `.claude/settings.local.json`,
+    # in the project or in `~`. A command or program that names one is refused, read or write.
+    r"chimera-hooks\.json\b|\.claude[\\/]+settings(?:\.local)?\.json\b", re.IGNORECASE
+)
 #: The hooks module's own code, imported — `code_interpreter` runs in the server's process, where a
 #: loader is one import away. A mention (`rg chimera.governance.hooks`) is how the agent works on
 #: Chimera's own repository, so only an import refuses.
@@ -311,7 +316,7 @@ def reaches_hooks_file(text: str, *, home: Path | None, cwd: Path) -> str | None
     """
     variants = _as_shells_read_it(text)
     if any(_HOOKS_NAME.search(v) for v in variants):
-        return "it names the owner's hooks file"
+        return "it names the owner's hooks file or a Claude Code settings file (hooks)"
     if any(_HOOKS_CODE.search(v) for v in variants):
         return "it imports the hooks module"
     if home is None:
@@ -339,9 +344,13 @@ _GOVERNANCE_FILES = (
     "task_cards.json",
     "task_cards.key",
     "task_cards.seen",
+    # Which projects' Claude-format hooks the owner confirmed (`governance/claude_hooks.py`): a file the
+    # shell could write would confirm a repository's hooks without the owner's screen.
+    "claude_hooks_trust.json",
 )
 _GOVERNANCE_NAME = re.compile(
-    r"\b(?:(?:code_projects|code_bypass_switches|app_worktrees|prepared_setups|browser-screen|task_cards)\.json"
+    r"\b(?:(?:code_projects|code_bypass_switches|app_worktrees|prepared_setups|browser-screen|task_cards"
+    r"|claude_hooks_trust)\.json"
     r"|task_cards\.(?:key|seen))\b",
     re.IGNORECASE,
 )

@@ -177,6 +177,19 @@ def _every_test_leaves_the_environment_as_it_found_it(
 
 
 @pytest.fixture(autouse=True)
+def _the_developers_claude_settings_are_not_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Point ``CLAUDE_CONFIG_DIR`` at an empty folder.
+
+    Claude Code compatibility is on by default (`chimera/governance/claude_hooks.py`), so a stock
+    ``Settings`` reads ``~/.claude/settings.json``; a maintainer whose own settings carry hooks would
+    otherwise see "no hooks, same registry" tests fail on their machine and pass in CI.
+    """
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("claude-config")))
+
+
+@pytest.fixture(autouse=True)
 def _nobody_has_declared_the_terminal_dead() -> Iterator[None]:
     """Clear the process-wide "no human here" flag between tests.
 

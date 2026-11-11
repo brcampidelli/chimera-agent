@@ -709,10 +709,10 @@ def solve(
                 # shell hook says still taints this run, as it does inside `govern_step`.
                 return ledger.record_fetch(source, text) if ledger is not None else None
 
-            # The owner's hooks: a solve outside a conversation never reached `govern_step`, so a
-            # `pre_tool` deny the owner wrote did not stop it.
+            # Owner hooks: without this, a solve outside a conversation ignored a `pre_tool` deny.
             registry = owner_hooks(
-                registry, settings=settings, audit=solve_audit, approve=approve, taint=hook_taint
+                registry, settings=settings, audit=solve_audit, approve=approve, taint=hook_taint,
+                workspace=ws,
             )
         ledger = None
         if taint:
@@ -1258,7 +1258,7 @@ def solve_batch(
             registry = ledger_registry(
                 owner_hooks(
                     default_registry(ws), settings=settings, audit=hooks_audit,
-                    approve=worker_approve, taint=ledger.record_fetch,
+                    approve=worker_approve, taint=ledger.record_fetch, workspace=ws,
                 ),
                 ledger,
                 narrow_on_taint=taint,
@@ -1411,7 +1411,7 @@ def crew_isolated(
             return ledger_registry(
                 owner_hooks(
                     default_registry(ws), settings=settings, audit=hooks_audit,
-                    approve=shared_approve, taint=ledger.record_fetch,
+                    approve=shared_approve, taint=ledger.record_fetch, workspace=ws,
                 ),
                 ledger,
                 approve=shared_approve, narrow_on_taint=taint,

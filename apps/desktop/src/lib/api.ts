@@ -15,6 +15,7 @@ import type {
   AgentIdentity,
   AgentsBatch,
   AppConfig,
+  ClaudeHooks,
   DelegationSummary,
   HierarchyPreview,
   ConfigTest,
@@ -246,6 +247,17 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
+export const getClaudeHooks = (project?: string) =>
+  json<ClaudeHooks>(`/api/config/hooks${project ? `?project=${encodeURIComponent(project)}` : ""}`);
+// Confirms a repository's hooks (their current bytes): the owner's screen writes it, never the token alone.
+// `fingerprint` is the one the screen showed beside the hooks: the server answers 409 if the files
+// changed since, so what is confirmed is what was read.
+export const trustClaudeHooks = (project: string | undefined, fingerprint: string) =>
+  json<{ trust: string }>("/api/config/hooks/trust", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ project: project ?? "", fingerprint }),
+  });
 export const getBrowserTrustedSites = () => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites");
 export const getBrowserLink = () => json<{ paired: boolean; connected: boolean; key_store: string }>("/api/browser/link");
 export const issueBrowserPairCode = () =>

@@ -825,6 +825,20 @@ class Settings(BaseSettings):
     # bubblewrap, Docker with the daemon down). Off by default: there, a shell hook is refused and
     # the tool call with it, because a hook the owner configured that cannot run is a missing guard.
     hooks_host_exec: bool = Field(default=False, validation_alias="CHIMERA_HOOKS_HOST_EXEC")
+    # Claude Code compatibility, hooks included (owner's decision, 2026-11-11): ON by default. Hooks
+    # in the Claude format are read from the project's `.claude/settings.json` and
+    # `settings.local.json` (origin `repo`: third-party code) and from `~/.claude/settings.json`
+    # (origin `user`), one owner-only switch per origin. They keep the owner's guarantees — a hook
+    # only tightens, and runs in the sandbox unless `CHIMERA_HOOKS_HOST_EXEC` (`chimera/governance/
+    # claude_hooks.py`, `docs/hooks-threat-model.md`). Read when a run's tools are assembled.
+    claude_hooks_repo: bool = Field(default=True, validation_alias="CHIMERA_CLAUDE_HOOKS_REPO")
+    claude_hooks_user: bool = Field(default=True, validation_alias="CHIMERA_CLAUDE_HOOKS_USER")
+    # Whether the USER's own Claude-format hooks (`~/.claude/settings.json`) may run on the host where
+    # no sandbox isolates. Off by default and owner-only. A repository's hooks never run on the host,
+    # whatever this and `CHIMERA_HOOKS_HOST_EXEC` say; the latter keeps meaning the owner's own file.
+    claude_user_hooks_host_exec: bool = Field(
+        default=False, validation_alias="CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC"
+    )
 
     # `CHIMERA_REVIEW_MODEL` names the model `chimera review` reviews with. Empty (the default) lets
     # the command pick the first model measured as a reviewer whose family differs from the

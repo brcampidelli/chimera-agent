@@ -365,6 +365,7 @@ only_mutate = [
 # that way) — is neither listed here nor excluded there with a reason (the slow ones are).
 pytest_add_cli_args_test_selection = [
   "tests/test_a_finished_turn_closes_its_own_loop.py",
+  "tests/test_claude_format_hooks.py",
   "tests/test_code_permission_screen_security.py",
   "tests/test_manual_mode_one_table_and_answers.py",
   "tests/test_bypass_releases_waiting_cards.py",
@@ -561,6 +562,8 @@ pytest_add_cli_args_test_selection = [
     # Tests that `chdir` cannot run under mutmut 3.6: its hit recorder resolves `source_paths`
     # against the CURRENT directory, so after a chdir every call into a mutated function raises
     # FileNotFoundError and the stats run aborts. They still run in the normal suite.
+    "--deselect=tests/test_claude_format_hooks.py::test_owner_hooks_reads_the_runs_workspace_and_carries_the_taint_sink",
+    "--deselect=tests/test_claude_format_hooks.py::test_the_trust_route_answers_409_when_the_files_changed_after_they_were_shown",
     "--deselect=tests/test_a_late_decision_fails_toward_review.py::test_the_deadline_is_off_by_default_and_read_from_the_settings",
     "--deselect=tests/test_a_pack_that_cannot_be_trusted_keeps_the_owners_narrowing.py::test_a_blank_or_relative_folder_changes_no_acceptance",
     "--deselect=tests/test_an_answered_question_knows_which_run_asked_it.py::test_the_desktop_s_approver_names_the_turn",

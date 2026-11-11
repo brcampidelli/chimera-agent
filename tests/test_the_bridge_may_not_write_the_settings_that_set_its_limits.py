@@ -127,6 +127,11 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     # companion lets a shell hook run outside the sandbox.
     "CHIMERA_HOOKS": ("true", "false"),
     "CHIMERA_HOOKS_HOST_EXEC": ("false", "true"),
+    # Claude Code compatibility (2026-11-11): on by default, one switch per origin. A client that
+    # could switch an origin off would remove the guards the owner's repository or user file declare.
+    "CHIMERA_CLAUDE_HOOKS_REPO": ("true", "false"),
+    "CHIMERA_CLAUDE_HOOKS_USER": ("true", "false"),
+    "CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC": ("false", "true"),
     # Which repositories' issues may start a code-writing job (S30-69): empty is none.
     "CHIMERA_GITHUB_ISSUE_REPOSITORIES": ("", "acme/widget"),
 }

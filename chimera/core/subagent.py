@@ -126,6 +126,8 @@ class SubAgentTool(Tool):
         """Exactly ``names`` from the late-bound (governed) registry; empty means no tools."""
         source = self._current()
         sub = ToolRegistry.like(source)  # the parent's skill scope comes along with its tools
+        if sub.lifecycle is not None:  # its own Stop event, and no prompt/session events
+            sub.lifecycle = sub.lifecycle.as_subagent()
         for name in sorted(names):
             if name in source:
                 sub.register(source.get(name))
