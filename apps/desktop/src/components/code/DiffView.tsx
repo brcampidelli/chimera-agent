@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { LineCommentEditor, LineCommentNote } from "@/components/code/LineComments";
 import { diffLineClass, parseDiffRows, type DiffRow } from "@/components/code/diffRows";
@@ -28,8 +28,19 @@ export interface DiffCommentScope {
  *  nothing here that could invent a change that did not happen.
  *
  *  With `commentable`, every body line gets a `+` beside its number; a comment written there is drawn
- *  under its line until it is sent with the conversation's other comments. */
-export function DiffView({ patch, commentable }: { patch: string; commentable?: DiffCommentScope }) {
+ *  under its line until it is sent with the conversation's other comments.
+ *
+ *  `focusLine` (with `commentable`) brings that new-version line into view and puts focus on its `+`,
+ *  so a finding that names a line opens where the line is. */
+export function DiffView({
+  patch,
+  commentable,
+  focusLine,
+}: {
+  patch: string;
+  commentable?: DiffCommentScope;
+  focusLine?: number;
+}) {
   const rows = useMemo(() => parseDiffRows(patch), [patch]);
   if (!commentable) {
     return (
@@ -42,7 +53,7 @@ export function DiffView({ patch, commentable }: { patch: string; commentable?: 
       </pre>
     );
   }
-  return <CommentableDiff rows={rows} scope={commentable} />;
+  return <CommentableDiff rows={rows} scope={commentable} focusLine={focusLine} />;
 }
 
 function rowRef(scope: DiffCommentScope, row: DiffRow): LineRef | null {
@@ -52,12 +63,40 @@ function rowRef(scope: DiffCommentScope, row: DiffRow): LineRef | null {
 
 /** The lines take focus as one group: a single `+` is in the tab order, and the arrow keys move
  *  between the others. Pressing a `+` opens its box; closing the box puts focus back on that `+`. */
-function CommentableDiff({ rows, scope }: { rows: DiffRow[]; scope: DiffCommentScope }) {
+function CommentableDiff({
+  rows,
+  scope,
+  focusLine: lineToFocus,
+}: {
+  rows: DiffRow[];
+  scope: DiffCommentScope;
+  focusLine?: number;
+}) {
   const t = useT();
   const comments = useLineComments(scope.sessionId);
   const [open, setOpen] = useState<string | null>(null);
   const [stop, setStop] = useState<string | null>(null);
   const plusButtons = useRef(new Map<string, HTMLButtonElement>());
+
+  // Once per request for a line: the `+` of the new-version line takes focus (an old-side line only when
+  // no new-side line carries that number), and it is scrolled into view. The scope is memoised by the
+  // caller, so a re-render does not pull focus back.
+  useEffect(() => {
+    if (lineToFocus === undefined) return;
+    const refs = rows
+      .map((row) => rowRef(scope, row))
+      .filter((ref): ref is LineRef => ref !== null);
+    const target =
+      refs.find((ref) => ref.line === lineToFocus && ref.side === "new") ??
+      refs.find((ref) => ref.line === lineToFocus);
+    if (!target) return;
+    const id = lineCommentId(target);
+    setStop(id);
+    const button = plusButtons.current.get(id);
+    button?.scrollIntoView?.({ block: "center" });
+    button?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the request for a line moves focus
+  }, [lineToFocus, rows]);
 
   const ids = useMemo(
     () => rows.flatMap((row) => {

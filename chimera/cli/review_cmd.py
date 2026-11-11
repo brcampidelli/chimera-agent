@@ -33,29 +33,9 @@ def _backend() -> SupportsComplete:
 
 
 def _reviewer(author: str, explicit: str) -> ReviewerChoice:
-    from chimera.config import get_settings
-    from chimera.providers.catalog import CATALOG, resolve_tiers
-    from chimera.providers.discovery import is_local_model
-    from chimera.review.family import MEASURED_REVIEWERS, choose_reviewer
+    from chimera.review.reviewer_for import reviewer_for
 
-    settings = get_settings()
-    measured = list(MEASURED_REVIEWERS)
-    ladder = resolve_tiers(settings)
-    rungs = [ladder.top, ladder.mid, ladder.weak]
-    panel = list(settings.fusion_panel)
-    catalogue = [e.slug for tier in ("top", "mid") for e in CATALOG if e.tier == tier]
-    providers = settings.configured_providers()
-    reachable = None
-    if providers:
-        # Only a slug the configured keys can call; the same test the tier resolver applies.
-        reachable = {
-            m for m in (*measured, *rungs, *panel, *catalogue)
-            if m.split("/", 1)[0] in providers or is_local_model(m)
-        }
-    return choose_reviewer(
-        author, explicit=explicit, setting=settings.review_model, measured=measured,
-        ladder=rungs, panel=panel, catalogue=catalogue, reachable=reachable,
-    )
+    return reviewer_for(author, explicit)
 
 
 def _effort(effort: str | None, no_verify: bool) -> Effort:

@@ -45,6 +45,10 @@ MAX_BATCH_CHARS = 48_000
 #: review of the first half of a file reads as a review of the file.
 MAX_FILE_CHARS = 120_000
 VERIFY_WORKERS = 4
+#: The reason a part of the change was left out by the batch budget (not a failure).
+BUDGET_REASON = "outside this review's budget"
+#: The verdict of a finding the verifier had no call left to check.
+VERIFY_BUDGET_REASON = "over this review's verification budget"
 
 _TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*$|_test\.|\.(test|spec)\.")
 _CODE_SUFFIX = re.compile(
@@ -102,6 +106,8 @@ def review(
     untracked_skipped: int = 0,
     confidence_cut: float | None = None,
     effort: Effort | None = None,
+    max_batches: int | None = None,
+    max_verifications: int | None = None,
 ) -> ReviewReport:
     """Run every stage over ``diff`` and return the report.
 
@@ -120,6 +126,10 @@ def review(
     )
     report.notes += _reviewer_notes(reviewer)
     batches, report.not_reviewed = _batches(diff)
+    if max_batches is not None and len(batches) > max_batches:
+        for batch in batches[max_batches:]:
+            report.not_reviewed += [NotReviewed(file=f.path, reason=BUDGET_REASON) for f in batch]
+        batches = batches[:max_batches]
     if not batches and not report.not_reviewed:
         return report
 
@@ -153,12 +163,23 @@ def review(
     if confidence_cut is not None:
         located = _cut(located, confidence_cut, report)
 
+    skipped_checks: list[Finding] = []
+    if max_verifications is not None and len(located) > max_verifications:
+        skipped_checks = [finding for finding, _ in located[max_verifications:]]
+        located = located[:max_verifications]
     with ThreadPoolExecutor(max_workers=VERIFY_WORKERS) as pool:
         verdicts = list(pool.map(lambda pair: verifier.check(*pair), located))
     kept: list[Finding] = []
     for (finding, _), verdict in zip(located, verdicts, strict=True):
         checked = finding.model_copy(update={"verdict": verdict})
         (report.dropped if verdict.state == "dropped" else kept).append(checked)
+    for finding in skipped_checks:
+        unverified = Verdict(
+            state="unverified", label="not verified", reason=VERIFY_BUDGET_REASON, stage="none"
+        )
+        kept.append(finding.model_copy(update={"verdict": unverified}))
+    if skipped_checks:
+        report.notes.append(f"{len(skipped_checks)} finding(s) were not verified: over the review's budget")
 
     calls, failed, prompt, completion = verifier.usage()
     usage.calls += calls

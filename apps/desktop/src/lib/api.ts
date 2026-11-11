@@ -10,6 +10,7 @@ import type {
   AgentBatchNote,
   AgentDef,
   MarkdownAgents,
+  CodeReview,
   PromptCommands,
   AgentIdentity,
   AgentsBatch,
@@ -355,6 +356,15 @@ export const listCodeCommands = (workspace: string) =>
   json<PromptCommands>(
     `/api/code/commands${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`,
   );
+/** `/code-review`: review the working tree now. Spends a model call, so it runs only on the person's command. */
+export const runCodeReview = (body: {
+  workspace: string;
+  session_id?: string;
+  max_findings?: string;
+  /** The conversation's edits, reviewed only when the folder has no git diff to review. */
+  edits?: { path: string; patch: string }[];
+}) =>
+  json<CodeReview>("/api/code/review", { method: "POST", body: JSON.stringify(body) });
 export const putAgent = (agent: AgentDef) =>
   json<AgentDef[]>("/api/agents/registry", { method: "PUT", body: JSON.stringify(agent) });
 export const deleteAgent = (id: string) =>
@@ -1940,6 +1950,9 @@ export interface CodeTurnHandlers {
   onContext?: (used: number, window: number | null) => void;
   onEdit?: (path: string, patch: string) => void;
   onTodo?: (items: { task: string; status: string }[]) => void;
+  /** The plan the turn proposed before running anything (`chimera/api/plan_gate.py`): its steps,
+   *  in order, as the planner wrote them. Sent once per turn, before the approval question it raises. */
+  onPlan?: (plan: { steps: string[]; raw: string }) => void;
   onNotice?: (n: { code: string; text: string; data?: Record<string, unknown> }) => void;
   onVerified?: (v: CodeVerified) => void;
   onApproval?: (q: CodeApprovalEvent) => void;
@@ -2319,6 +2332,11 @@ function applyCodeTurnFrame(
         : null,
     );
   else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
+  else if (event === "plan")
+    h.onPlan?.({
+      steps: Array.isArray(payload.steps) ? (payload.steps as unknown[]).map(String) : [],
+      raw: String(payload.raw ?? ""),
+    });
   else if (event === "todo")
     h.onTodo?.((payload.items ?? []) as { task: string; status: string }[]);
   else if (event === "notice")

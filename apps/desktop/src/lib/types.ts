@@ -162,6 +162,9 @@ export type AgentDef = Schemas["AgentDefOut"];
 /** A Markdown prompt command the composer can offer (`.chimera/commands`, the owner's, a plugin's). */
 export type PromptCommand = Schemas["PromptCommandOut"];
 export type PromptCommands = Schemas["PromptCommandsOut"];
+/** The `/code-review` card: the review of the working tree, grouped by file. */
+export type CodeReview = Schemas["CodeReviewOut"];
+export type CodeReviewFinding = Schemas["CodeReviewFindingOut"];
 /** A Markdown or plugin subagent, read only, with the tools it would really get. */
 export type MarkdownAgent = Schemas["MarkdownAgentOut"];
 export type MarkdownAgents = Schemas["MarkdownAgentsOut"];

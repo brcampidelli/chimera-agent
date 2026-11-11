@@ -247,3 +247,12 @@ def untracked(repo: Path) -> list[str]:
     except DiffError:
         return []
     return [line for line in text.splitlines() if line.strip()]
+
+
+def file_patch(repo: Path, base: str, path: str) -> str:
+    """The raw unified diff of one file against ``base``: what the Code screen's diff view reads.
+
+    ``render()`` numbers the lines for a model; this keeps git's own ``+``/``-`` form, which the
+    diff view colours and comments on.
+    """
+    return _run(repo, ["diff", "--no-color", "--no-ext-diff", "-M", "--unified=3", base, "--", path])

@@ -736,6 +736,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Code Review
+         * @description ``/code-review``. The body is size-checked before it is parsed, then the review runs off the event loop.
+         */
+        post: operations["code_review_api_code_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/roles": {
         parameters: {
             query?: never;
@@ -8187,6 +8207,103 @@ export interface components {
              * @enum {string}
              */
             source: "interpreter" | "path" | "missing";
+        };
+        /** CodeReviewFileOut */
+        CodeReviewFileOut: {
+            /** File */
+            file: string;
+            /** Findings */
+            findings: components["schemas"]["CodeReviewFindingOut"][];
+            /** Patch */
+            patch: string;
+        };
+        /** CodeReviewFindingOut */
+        CodeReviewFindingOut: {
+            /** Confidence */
+            confidence: number | null;
+            /** Consequence */
+            consequence: string;
+            /** Evidence */
+            evidence: string;
+            /** File */
+            file: string;
+            /** Id */
+            id: string;
+            /** Line */
+            line: number;
+            /** Priority */
+            priority: string;
+            /** Severity */
+            severity: string;
+            /** Title */
+            title: string;
+            /**
+             * Unverified
+             * @default false
+             */
+            unverified: boolean;
+        };
+        /** CodeReviewOut */
+        CodeReviewOut: {
+            /**
+             * Base
+             * @default
+             */
+            base: string;
+            /**
+             * Dropped
+             * @default 0
+             */
+            dropped: number;
+            /**
+             * Files
+             * @default []
+             */
+            files: components["schemas"]["CodeReviewFileOut"][];
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
+            /**
+             * Omitted
+             * @default 0
+             */
+            omitted: number;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Shown
+             * @default 0
+             */
+            shown: number;
+            /** Status */
+            status: string;
+            /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
+            /**
+             * Untested Paths
+             * @default []
+             */
+            untested_paths: string[];
+            /** Usd */
+            usd?: number | null;
         };
         /**
          * CodeSessionArchiveOut
@@ -16727,6 +16844,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_review_api_code_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeReviewOut"];
                 };
             };
         };

@@ -254,7 +254,7 @@ describe("what a dock draws", () => {
     expect(second.map((u) => u.members)).toEqual([["activity.tools", "activity.tokens"]]);
     expect(first.map((u) => u.key)).toEqual([
       "conversation.changes", "activity.jobs", "conversation.context", "conversation.connectors",
-      "activity.memory", "activity.fusion", "activity.machine", "conversation.environment",
+      "activity.memory", "activity.fusion", "activity.machine", "conversation.environment", "conversation.plan",
     ]);
   });
 });
