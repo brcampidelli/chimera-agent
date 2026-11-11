@@ -107,6 +107,9 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   // ⌘/ is the help sheet, as in the Claude app. ⌘; moved to the side question, and no other chord
   // was ever bound to ⌘/, so the sheet keeps its key without a second binding for it.
   { id: "help", labelKey: "hotkeys.help", keys: "Mod+/" },
+  // Answered by the Preview panel while it is open, and allowed while typing: it only switches the
+  // panel into "pick an element" mode and writes nothing into the draft.
+  { id: "selectElement", labelKey: "hotkeys.selectElement", keys: "Mod+Shift+S" },
 ];
 
 function isMac(): boolean {
