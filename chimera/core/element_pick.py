@@ -324,19 +324,26 @@ class ElementPicker:
 
     # --- idle expiry ---------------------------------------------------------------------------
 
-    def _arm(self) -> None:
+    def _arm(self, delay: float | None = None) -> None:
         """(Re)start the idle timer: a real one, so an owner who walks away still has the browser closed."""
         with self._lock:
             if self._timer is not None:
                 self._timer.cancel()
-            timer = threading.Timer(self._idle, self._expire)
+            timer = threading.Timer(self._idle if delay is None else delay, self._expire)
             timer.daemon = True
             self._timer = timer
         timer.start()
 
     def _expire(self) -> None:
         session = self._session
-        if session is None or self._clock() - session.touched < self._idle - 0.001:
+        if session is None:
+            return
+        left = self._idle - (self._clock() - session.touched)
+        if left > 0.001:
+            # Early: on Windows a timer wait can return ~15 ms before its timeout. Returning here without
+            # re-arming left the browser open for good (seen on CI). A use since the last arm lands
+            # here too, and waits the time that is left.
+            self._arm(left)
             return
         try:
             self.close()
