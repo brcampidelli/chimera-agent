@@ -236,6 +236,10 @@ def _no_dotenv(
     config = dict(Settings.model_config)
     config["env_file"] = None
     monkeypatch.setattr(Settings, "model_config", config)
+    # Claude Code's owner folder (`~/.claude`) is read for subagents (`claude_agent_format.claude_home`).
+    # A developer who uses Claude Code has agents there, and a discovery test that lists "every agent"
+    # would see them. An empty folder per test keeps the suite the same on every machine.
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("claude-config")))
     # A gateway can export a configured single provider key into ``os.environ`` for LiteLLM.
     # Own the names before removing them so that export is undone after each test, including when
     # the test process started with a key in its shell. The first-class names also cover keys

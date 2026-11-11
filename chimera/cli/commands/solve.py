@@ -632,9 +632,7 @@ def solve(
             # Definitions are discovered per workspace. App-saved definitions shadow Markdown
             # files; project Markdown can only narrow the governed registry resolved below.
             markdown_agents = discover_agents(
-                ws,
-                settings.home,
-                saved_agents=load_saved_agents(settings.home),
+                ws, settings.home, saved_agents=load_saved_agents(settings.home), settings=settings
             )
             named_agents = {entry.id: entry for entry in markdown_agents.agents}
             for issue in markdown_agents.issues:
@@ -651,6 +649,7 @@ def solve(
                     model=model,
                     max_turns=max_steps,
                     markdown_agents=named_agents,
+                    workspace=ws, trust_workspace=settings.trust_workspace,
                 )
             )
         # Someone on the other side of the gate. Both layers have accepted an approver since they

@@ -593,6 +593,17 @@ class Settings(BaseSettings):
     # its cited locations are checked against the workspace. OFF by default: today's explorer text
     # stays byte for byte, and the new one has no measurement of its own yet.
     explorer_contract: bool = Field(default=False, validation_alias="CHIMERA_EXPLORER_CONTRACT")
+    # --- Claude Code compatibility for subagents (`chimera/core/claude_agent_format.py`). On, agents
+    # written for Claude Code are read from `.claude/agents` (up to the repository root), the owner's
+    # `~/.claude/agents` and an active plugin's, beside `.chimera/agents`. A file can only NARROW what
+    # the session already has. The four aliases Claude Code puts in `model:` mean a ROLE here, because
+    # the models are the owner's: opus/sonnet/haiku/fable each name one of weak|mid|top, which the tier
+    # ladder turns into a slug. Owner-only on the bridge (`bridge_routes.GUARD_SETTINGS`). ---
+    claude_agents: bool = Field(default=True, validation_alias="CHIMERA_CLAUDE_AGENTS")
+    claude_agent_opus: str = Field(default="top", validation_alias="CHIMERA_CLAUDE_AGENT_OPUS")
+    claude_agent_sonnet: str = Field(default="mid", validation_alias="CHIMERA_CLAUDE_AGENT_SONNET")
+    claude_agent_haiku: str = Field(default="weak", validation_alias="CHIMERA_CLAUDE_AGENT_HAIKU")
+    claude_agent_fable: str = Field(default="top", validation_alias="CHIMERA_CLAUDE_AGENT_FABLE")
     # --- The web research sub-agent (study 25, S12; chimera/core/research.py). On, the Code screen
     # and `chimera solve` gain a `research_web` tool: a sub-agent with read-only web tools whose
     # answer carries a receipt saying which cited URLs it actually saw. OFF by default: it is a new

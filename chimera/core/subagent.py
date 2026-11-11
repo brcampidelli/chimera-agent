@@ -11,9 +11,11 @@ exceed the configured tool allowlist (so it can't escalate past what the caller 
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from chimera.core.agent import Agent, AgentConfig, AgentResult, run_nested
+from chimera.core import claude_agent_format as cf
+from chimera.core.agent import Agent, AgentConfig, AgentResult, _ledgers_of, run_nested
 from chimera.governance.sanitize import fence, sanitize_untrusted
 from chimera.orchestration.hierarchy import CUT_OFF_REASONS
 from chimera.providers.gateway import SupportsComplete
@@ -75,7 +77,14 @@ class SubAgentTool(Tool):
         model: str | None = None,
         max_turns: int = 8,
         markdown_agents: dict[str, MarkdownAgent] | None = None,
+        workspace: Path | None = None,
+        trust_workspace: bool = True,
     ) -> None:
+        self._workspace = Path(workspace) if workspace is not None else Path.cwd()
+        #: Whether the repository's own text (an agent file, its memory notes) is the owner's.
+        #: False, the checkout was declared untrusted (`CHIMERA_TRUST_WORKSPACE=0`) and what a named
+        #: agent takes from it is recorded on the run's taint ledger like any untrusted file.
+        self._trust_workspace = trust_workspace
         self._backend = backend
         #: The registry to draw the subagent's tools from — resolved LATE when it is a callable.
         #:
@@ -136,6 +145,58 @@ class SubAgentTool(Tool):
                 sub.register(source.deferred[name])
         return sub
 
+    def _memory_prompt(self, selected: MarkdownAgent, sub: ToolRegistry, granted: set[str]) -> str:
+        """The agent's memory section, with the scoped file tools it needs added to ``sub``.
+
+        Read/Write/Edit inside the memory directory come from the session's own governed tools, each
+        wrapped so it only accepts paths inside that directory: posture, denylist, reach, approval
+        and taint all still apply. A tool the agent already has in full is left as it is, and one
+        its ``disallowedTools`` or ``permissionMode: plan`` took away is not brought back.
+        """
+        if not selected.memory_scope or not selected.memory_path:
+            return ""
+        directory = Path(selected.memory_path)
+        problem = cf.memory_path_problem(directory, Path(selected.memory_base)) if selected.memory_base else "no base"
+        if problem:
+            # A link may have appeared since discovery: the agent runs without its memory.
+            return f"Persistent memory unavailable: {problem}."
+        source = self._current()
+        usable = set(self._allowed) & set(
+            cf.pool_for(
+                sorted(self._allowed),
+                allow=None,
+                deny=selected.deny_patterns,
+                plan=selected.plan_only,
+            )
+        )
+        wanted = [name for name in cf.MEMORY_TOOLS if name in usable and name not in granted]
+        wanted = [name for name in wanted if not selected.plan_only or name == "read_file"]
+        for tool in cf.scoped_memory_tools(
+            lambda name: source.get(name) if name in source else None, wanted, directory, self._workspace
+        ):
+            sub.register(tool)
+        may_write = bool({"write_file", "edit_file"} & (granted | set(wanted)))
+        return cf.memory_block(selected.memory_scope, directory, may_write=may_write)
+
+    def _record_repository_text(self, selected: MarkdownAgent, body: str, memory_text: str) -> None:
+        """Count a repository agent's body and project/local memory as untrusted when the owner said so.
+
+        Both are fenced either way. Recording them is what makes a poisoned checkout narrow the run
+        the way an untrusted ``read_file`` does; it is tied to ``CHIMERA_TRUST_WORKSPACE`` because
+        that is where the owner already says whether a checkout's text is theirs. User-scope memory
+        is the owner's own and is never recorded.
+        """
+        if self._trust_workspace:
+            return
+        pieces: list[tuple[str, str]] = []
+        if selected.from_project:
+            pieces.append((f"agent:{selected.source}", body))
+        if memory_text and selected.memory_scope in ("project", "local"):
+            pieces.append((f"agent-memory:{selected.id}", memory_text))
+        for ledger in _ledgers_of(self._current()):
+            for source, content in pieces:
+                ledger.record_project_instructions(source, content)
+
     def run(self, **kwargs: Any) -> str:
         task = str(kwargs.get("task", "")).strip()
         if not task:
@@ -164,7 +225,11 @@ class SubAgentTool(Tool):
             sub = self._registry_of(selected_tools & self._allowed)
             model = selected.model or self._model
             max_steps = min(selected.steps, self._max_turns)
-            system_prompt = f"{SUBAGENT_SYSTEM}\n\n{effective.instructions}"
+            system_prompt = SUBAGENT_SYSTEM + "\n\n" + effective.instructions
+            memory_text = self._memory_prompt(selected, sub, selected_tools)
+            if memory_text:
+                system_prompt = system_prompt + "\n\n" + memory_text
+            self._record_repository_text(selected, effective.instructions, memory_text)
         agent = Agent(
             self._backend,
             sub,

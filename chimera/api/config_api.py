@@ -283,6 +283,15 @@ _EDITABLE_SETTINGS = {
     # APPLIES_WHEN entry. The bridge may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`): on,
     # it only narrows, and off is the direction that widens again.
     "CHIMERA_PROJECT_PACK",
+    # Claude Code compatibility for subagents and the role each Claude model alias means
+    # (`chimera/core/claude_agent_format.py`). Read when agents are discovered, per request. Owner-only
+    # on the bridge: the switch decides whether a repository's `.claude/agents` is read at all, and the
+    # four roles decide which of the owner's models a file's `model:` reaches.
+    "CHIMERA_CLAUDE_AGENTS",
+    "CHIMERA_CLAUDE_AGENT_OPUS",
+    "CHIMERA_CLAUDE_AGENT_SONNET",
+    "CHIMERA_CLAUDE_AGENT_HAIKU",
+    "CHIMERA_CLAUDE_AGENT_FABLE",
     # Auto-verify of a front-end turn against the project's dev server (`chimera/tools/preview.py`).
     # Read per turn, so it needs no APPLIES_WHEN entry. Turning it off removes a check, so the bridge
     # may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`).
@@ -791,6 +800,15 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
         # Whether a project's `.chimera/pack.json` may narrow a run. What one pack does is
         # `GET /api/code/pack`, per folder.
         "project_pack": {"enabled": settings.project_pack},
+        "claude_agents": {
+            "enabled": settings.claude_agents,
+            "roles": {
+                "opus": settings.claude_agent_opus,
+                "sonnet": settings.claude_agent_sonnet,
+                "haiku": settings.claude_agent_haiku,
+                "fable": settings.claude_agent_fable,
+            },
+        },
         "preview": {"auto_verify": settings.preview_auto_verify},
         # Study 30's opt-in governance rules and audit record, every one off as shipped. The band's
         # state is reported beside its deadline because the deadline does nothing while it is off.
@@ -1205,6 +1223,16 @@ def _check_boolean(key: str) -> Callable[[str], None]:
     return check
 
 
+def _check_agent_role(key: str) -> Callable[[str], None]:
+    """A Claude model alias maps to weak, mid or top: refused here rather than read as the default."""
+
+    def check(value: str) -> None:
+        if value.strip().lower() not in ("weak", "mid", "top"):
+            raise ValueError(f"{key} must be weak, mid or top")
+
+    return check
+
+
 def _check_branch_prefix(value: str) -> None:
     """One ref segment, or empty for the default — the shape the setting's validator accepts.
 
@@ -1258,6 +1286,11 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DEFER_TOOLS": _check_boolean("CHIMERA_DEFER_TOOLS"),
     "CHIMERA_MCP_DEFER": _check_boolean("CHIMERA_MCP_DEFER"),
     "CHIMERA_PROJECT_PACK": _check_boolean("CHIMERA_PROJECT_PACK"),
+    "CHIMERA_CLAUDE_AGENTS": _check_boolean("CHIMERA_CLAUDE_AGENTS"),
+    "CHIMERA_CLAUDE_AGENT_OPUS": _check_agent_role("CHIMERA_CLAUDE_AGENT_OPUS"),
+    "CHIMERA_CLAUDE_AGENT_SONNET": _check_agent_role("CHIMERA_CLAUDE_AGENT_SONNET"),
+    "CHIMERA_CLAUDE_AGENT_HAIKU": _check_agent_role("CHIMERA_CLAUDE_AGENT_HAIKU"),
+    "CHIMERA_CLAUDE_AGENT_FABLE": _check_agent_role("CHIMERA_CLAUDE_AGENT_FABLE"),
     "CHIMERA_PREVIEW_AUTO_VERIFY": _check_boolean("CHIMERA_PREVIEW_AUTO_VERIFY"),
     "CHIMERA_EXFIL_HOST_PATH": _check_boolean("CHIMERA_EXFIL_HOST_PATH"),
     "CHIMERA_SHELL_FETCH_GUARD": _check_boolean("CHIMERA_SHELL_FETCH_GUARD"),

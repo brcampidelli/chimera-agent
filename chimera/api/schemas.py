@@ -1236,6 +1236,26 @@ class ProjectPackCfgOut(BaseModel):
     enabled: bool = False
 
 
+class ClaudeAgentRolesOut(BaseModel):
+    """Which tier (weak, mid, top) each Claude Code model alias means for a subagent."""
+
+    opus: str = "top"
+    sonnet: str = "mid"
+    haiku: str = "weak"
+    fable: str = "top"
+
+
+class ClaudeAgentsCfgOut(BaseModel):
+    """``CHIMERA_CLAUDE_AGENTS`` — whether agents written for Claude Code are read, and the role map.
+
+    On by default (the owner's decision); a server that predates the block reads as on, which is what
+    it does.
+    """
+
+    enabled: bool = True
+    roles: ClaudeAgentRolesOut = Field(default_factory=ClaudeAgentRolesOut)
+
+
 class PreviewCfgOut(BaseModel):
     """``CHIMERA_PREVIEW_AUTO_VERIFY`` — whether a front-end turn is checked against the dev server."""
 
@@ -1495,6 +1515,7 @@ class ConfigOut(BaseModel):
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
     defer: DeferCfgOut = Field(default_factory=DeferCfgOut)
     project_pack: ProjectPackCfgOut = Field(default_factory=ProjectPackCfgOut)
+    claude_agents: ClaudeAgentsCfgOut = Field(default_factory=ClaudeAgentsCfgOut)
     preview: PreviewCfgOut = Field(default_factory=PreviewCfgOut)
     governance_audit: GovernanceAuditCfgOut = Field(default_factory=GovernanceAuditCfgOut)
     bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
