@@ -95,7 +95,7 @@ class SharedTaint:
 # Tool-name → capability-kind classification. Overridable, but these are the built-ins.
 FETCH_TOOLS = frozenset(
     {"http_get", "fetch_url", "web_search", "arxiv_search", "youtube_transcript", "read_email",
-     "calendar_events", "browser", "scrape", "extract", "map", "crawl", "download_media"}
+     "calendar_events", "browser", "preview", "scrape", "extract", "map", "crawl", "download_media"}
 )
 # The fetch tools whose content is the public web: only what these returned can make a value
 # "seen" for the S30-27 host/path rule. A mailbox or a calendar is fetched content too — tainted,

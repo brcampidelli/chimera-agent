@@ -3818,3 +3818,68 @@ export async function streamTerminal(
   });
   if (cut && !signal?.aborted) handlers.onError(cut);
 }
+
+// --- Dev servers (the project's launch.json; /api/preview) ----------------------------------------
+//
+// The owner's desktop screen only, like the terminal: starting a server is running a command. Every
+// call carries the screen credential, and a start takes the NAME of an entry in the folder's own file.
+
+export interface DevServer {
+  name: string;
+  state: "stopped" | "starting" | "running" | "exited" | "failed" | "timed_out";
+  port: number;
+  kind: "process" | "attach";
+  pid: number | null;
+  url: string | null;
+  exit_code: number | null;
+  /** The whole command line a click would run: env as prefixes, executable, arguments. */
+  command: string;
+  /** The folder it runs in, relative to the project. */
+  cwd: string;
+  /** Set when the job registry's maximum runtime ended it. */
+  limit_hours: number | null;
+}
+
+export interface DevServers {
+  found: boolean;
+  source: string;
+  errors: string[];
+  warnings: string[];
+  auto_verify: boolean;
+  auto_verify_setting: boolean;
+  can_start: boolean;
+  cannot_start_reason: string;
+  /** Recipe or script files that changed since the newest agent turn in this folder began. */
+  config_changed: string[];
+  servers: DevServer[];
+}
+
+const devServerQuery = (workspace: string | null, extra: Record<string, string> = {}) => {
+  const q = new URLSearchParams(extra);
+  if (workspace) q.set("workspace", workspace);
+  const text = q.toString();
+  return text ? `?${text}` : "";
+};
+
+export const listDevServers = (workspace: string | null) =>
+  json<DevServers>(`/api/preview/servers${devServerQuery(workspace)}`, { headers: screenJsonHeaders() });
+
+export const startDevServer = (workspace: string | null, name: string) =>
+  json<{ ok: boolean; message: string }>("/api/preview/servers/start", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ workspace, name }),
+  });
+
+export const stopDevServer = (workspace: string | null, name: string) =>
+  json<{ ok: boolean; message: string }>("/api/preview/servers/stop", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ workspace, name }),
+  });
+
+export const getDevServerLog = (workspace: string | null, name: string, lines = 80) =>
+  json<{ lines: string[] }>(
+    `/api/preview/servers/log${devServerQuery(workspace, { name, lines: String(lines) })}`,
+    { headers: screenJsonHeaders() },
+  );

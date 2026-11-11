@@ -3539,6 +3539,11 @@ def build_api_app(
     from chimera.api.terminal_api import register_terminal_api
 
     register_terminal_api(app, guard, _resolve_fs_workspace, settings, live_settings=live_settings)
+    # /api/preview — the project's dev servers (`launch.json`), the owner's desktop screen only, with
+    # the terminal's commands-off rule (`chimera/api/preview_api.py`).
+    from chimera.api.preview_api import register_preview_api
+
+    register_preview_api(app, guard, _resolve_fs_workspace, settings, live_settings=live_settings)
     # /api/design — Chimera Design documents, versions, proposals and export (plan D2).
     # Unconditional, for the schema-dump reason above. A model proposes; only /ops changes a design.
     from chimera.api.design_api import register_design_api

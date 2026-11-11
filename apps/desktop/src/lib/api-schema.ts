@@ -4329,6 +4329,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/preview/servers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Servers */
+        get: operations["preview_servers_api_preview_servers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preview/servers/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Log */
+        get: operations["preview_log_api_preview_servers_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preview/servers/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Start */
+        post: operations["preview_start_api_preview_servers_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preview/servers/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Stop */
+        post: operations["preview_stop_api_preview_servers_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -8704,6 +8772,7 @@ export interface components {
             pinned?: string[];
             /** Pools */
             pools?: components["schemas"]["PoolOut"][];
+            preview?: components["schemas"]["PreviewCfgOut"];
             privacy?: components["schemas"]["PrivacyCfgOut"];
             project_pack?: components["schemas"]["ProjectPackCfgOut"];
             /** Providers */
@@ -12959,6 +13028,17 @@ export interface components {
             names: string[];
         };
         /**
+         * PreviewCfgOut
+         * @description ``CHIMERA_PREVIEW_AUTO_VERIFY`` — whether a front-end turn is checked against the dev server.
+         */
+        PreviewCfgOut: {
+            /**
+             * Auto Verify
+             * @default true
+             */
+            auto_verify: boolean;
+        };
+        /**
          * PreviewItem
          * @description A single labeled value shown on an approval card before a browser action is allowed.
          */
@@ -12967,6 +13047,95 @@ export interface components {
             label: string;
             /** Value */
             value: string;
+        };
+        /** PreviewLogOut */
+        PreviewLogOut: {
+            /** Lines */
+            lines: string[];
+        };
+        /** PreviewNameIn */
+        PreviewNameIn: {
+            /** Name */
+            name: string;
+            /** Workspace */
+            workspace?: string | null;
+        };
+        /** PreviewOkOut */
+        PreviewOkOut: {
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /** PreviewServerOut */
+        PreviewServerOut: {
+            /**
+             * Command
+             * @default
+             */
+            command: string;
+            /**
+             * Cwd
+             * @default .
+             */
+            cwd: string;
+            /** Exit Code */
+            exit_code?: number | null;
+            /** Kind */
+            kind: string;
+            /** Limit Hours */
+            limit_hours?: number | null;
+            /** Name */
+            name: string;
+            /** Pid */
+            pid?: number | null;
+            /** Port */
+            port: number;
+            /** State */
+            state: string;
+            /** Url */
+            url?: string | null;
+        };
+        /** PreviewServersOut */
+        PreviewServersOut: {
+            /**
+             * Auto Verify
+             * @default true
+             */
+            auto_verify: boolean;
+            /**
+             * Auto Verify Setting
+             * @default true
+             */
+            auto_verify_setting: boolean;
+            /**
+             * Can Start
+             * @default false
+             */
+            can_start: boolean;
+            /**
+             * Cannot Start Reason
+             * @default
+             */
+            cannot_start_reason: string;
+            /** Config Changed */
+            config_changed?: string[];
+            /** Errors */
+            errors?: string[];
+            /** Found */
+            found: boolean;
+            /** Servers */
+            servers?: components["schemas"]["PreviewServerOut"][];
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /** Warnings */
+            warnings?: string[];
         };
         /**
          * PrivacyCfgOut
@@ -22357,6 +22526,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginUpdateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_servers_api_preview_servers_get: {
+        parameters: {
+            query?: {
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewServersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_log_api_preview_servers_log_get: {
+        parameters: {
+            query: {
+                name: string;
+                workspace?: string | null;
+                lines?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewLogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_start_api_preview_servers_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewNameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_stop_api_preview_servers_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewNameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOkOut"];
                 };
             };
             /** @description Validation Error */

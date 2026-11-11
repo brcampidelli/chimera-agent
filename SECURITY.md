@@ -169,7 +169,7 @@ never quietly becomes "ran on the host".
 
 **Taint narrowing is armed on the API server.** Once a run consumes untrusted content, the tools in
 `DANGEROUS_WHEN_TAINTED` — execution, file writes, **and every outbound channel** (`send_email`,
-`send_message`, `send_sms`, `http_post`, `post_webhook`, `create_issue`, `browser`,
+`send_message`, `send_sms`, `http_post`, `post_webhook`, `create_issue`, `browser`, `preview`,
 `open_pull_request`) — require approval. For most of them the server has no tool-level approver
 yet, so this resolves to a refusal with an explanatory result: fail closed. `open_pull_request`
 (present only when `CHIMERA_PULL_REQUESTS` is on) is the exception that asks rather than refuses: it

@@ -191,7 +191,7 @@ DANGEROUS_WHEN_TAINTED = frozenset(
      "apply_patch", "edit_batch", "create_document",
      # exfiltration channels — everything in SIDE_EFFECT_TOOLS, plus the browser
      "send_email", "send_message", "send_sms", "http_post", "post_webhook", "create_issue",
-     "browser",
+     "browser", "preview",
      # Publishes a branch and a title and description the run wrote to a remote: an outbound
      # channel like the rest. It asks the owner on every call anyway (`tools/pull_request.py`);
      # what this adds, once the run is tainted, is the question that names WHERE the untrusted

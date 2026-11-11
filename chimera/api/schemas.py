@@ -1227,6 +1227,12 @@ class ProjectPackCfgOut(BaseModel):
     enabled: bool = False
 
 
+class PreviewCfgOut(BaseModel):
+    """``CHIMERA_PREVIEW_AUTO_VERIFY`` — whether a front-end turn is checked against the dev server."""
+
+    auto_verify: bool = True
+
+
 class BridgeCfgOut(BaseModel):
     """The desktop bridge's two switches (``chimera/api/desktop_bridge.py``), both off by default.
 
@@ -1427,6 +1433,7 @@ class ConfigOut(BaseModel):
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
     defer: DeferCfgOut = Field(default_factory=DeferCfgOut)
     project_pack: ProjectPackCfgOut = Field(default_factory=ProjectPackCfgOut)
+    preview: PreviewCfgOut = Field(default_factory=PreviewCfgOut)
     governance_audit: GovernanceAuditCfgOut = Field(default_factory=GovernanceAuditCfgOut)
     bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
     decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)

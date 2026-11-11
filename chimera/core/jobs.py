@@ -338,6 +338,16 @@ class JobRegistry:
 
     # --- reading ----------------------------------------------------------------------------
 
+    def is_contained(self, job_id: str) -> bool:
+        """Whether this process holds a Job Object around the job's tree (Windows; False elsewhere).
+
+        A question only: nothing in `start` or `run_shell` changes with it. The dev-server preview asks it
+        after a start and cancels the job when it is False on Windows, so ITS servers fail closed without a
+        Job Object while a general background command keeps the best-effort `taskkill /T` it always had.
+        """
+        with self._lock:
+            return job_id in self._contained
+
     def get(self, job_id: str) -> Job | None:
         """The job, with its state brought up to date. None when there is no such job."""
         with self._lock:
