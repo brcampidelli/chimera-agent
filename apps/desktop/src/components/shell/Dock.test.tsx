@@ -341,7 +341,7 @@ describe("where a drop lands", () => {
   it("lands before the panel it is dropped on, and at the end of a zone dropped on directly", () => {
     const layout = defaultLayout();
     expect(dropTarget(layout, "activity.memory")).toEqual({ zone: "right", index: 6 });
-    expect(dropTarget(layout, "zone:right")).toEqual({ zone: "right", index: 10 });
+    expect(dropTarget(layout, "zone:right")).toEqual({ zone: "right", index: 11 });
     expect(dropTarget(layout, "zone:bottom")).toEqual({ zone: "bottom", index: 0 });
   });
 

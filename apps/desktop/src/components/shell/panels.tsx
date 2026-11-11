@@ -6,6 +6,7 @@ import { Fusion } from "@/components/Fusion";
 import { ChangesCard, changesSilent, useChangesFacts } from "@/components/code/side/ChangesCard";
 import { ConnectorsCard, connectorsSilent, useConnectorServers } from "@/components/code/side/ConnectorsCard";
 import { ContextCard, contextSilent } from "@/components/code/side/ContextCard";
+import { PlanCard } from "@/components/code/side/PlanCard";
 import { EnvironmentCard } from "@/components/code/side/EnvironmentCard";
 import { JobsPanel, isBackgroundEmpty, useBackgroundWork } from "@/components/JobsPanel";
 import { MachinePanel, useMachineReading } from "@/components/MachinePanel";
@@ -133,6 +134,8 @@ export function useSilentPanels(): ReadonlySet<MovablePanel> {
   if (contextSilent(side)) silent.add("conversation.context");
   if (connectorsSilent(connectors)) silent.add("conversation.connectors");
   if (changesSilent(changes)) silent.add("conversation.changes");
+  // The plan card draws when this conversation has a plan, or a turn is parked on an approval it can point at.
+  if (side?.plan == null && !side?.approvalWaiting) silent.add("conversation.plan");
   return silent;
 }
 
@@ -149,6 +152,7 @@ export const DOCK_PANELS: Record<MovablePanel, () => ReactNode> = {
   "conversation.connectors": () => <ConnectorsCard />,
   "conversation.changes": () => <ChangesCard />,
   "agents.batch": () => <AgentBatchBoard />,
+  "conversation.plan": () => <PlanCard />,
 };
 
 /**

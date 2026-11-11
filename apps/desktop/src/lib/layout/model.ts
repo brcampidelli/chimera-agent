@@ -96,6 +96,10 @@ export const PANELS = {
   // Last in the list on purpose, for the reason the side cards above are after the six panels: it takes
   // the centre's next place (after the viewer), so a layout stored before it existed reads back unchanged.
   "agents.batch": { zone: "center", movable: true, closable: true, maximizable: false },
+  // The conversation's plan (the plan gate's proposal and the steps it approved). Last, for the same
+  // reason as the batch board: a stored layout reads back unchanged. A side card like the four above:
+  // it describes the open conversation, so it is not offered to a window of its own (`canFloatPanel`).
+  "conversation.plan": { zone: "right", movable: true, closable: true, maximizable: false },
 } as const satisfies Record<string, PanelSpec>;
 
 export type PanelId = keyof typeof PANELS;
