@@ -266,6 +266,13 @@ class CodeSessionPullRequestRef(BaseModel):
     url: str
 
 
+class CodeWorktreeRemovalOut(BaseModel):
+    """When an archived conversation's worktree is removed, and what the last look kept it for."""
+
+    due_at: float
+    kept: str = ""
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 
@@ -323,13 +330,6 @@ class CodeSessionMetaOut(BaseModel):
     permission_mode: str = ""
     #: Why it did not parse, when ``damaged`` (the parser's first words).
     damage: str = ""
-
-
-class CodeWorktreeRemovalOut(BaseModel):
-    """When an archived conversation's worktree is removed, and what the last look kept it for."""
-
-    due_at: float
-    kept: str = ""
 
 
 class CodeSessionArchiveOut(BaseModel):
