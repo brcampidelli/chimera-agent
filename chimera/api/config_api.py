@@ -135,6 +135,10 @@ _EDITABLE_SETTINGS = {
     # Remove an archived conversation's clean, pushed worktree after thirty days
     # (`chimera/core/worktree_expiry.py`). Screen-only (SCREEN_WRITE_SETTINGS): it deletes folders.
     "CHIMERA_WORKTREE_CLEANUP",
+    # Shorten a Code conversation's history after a pause longer than its cache lives
+    # (`CodeSession.compact_if_idle`). Read per turn, so no APPLIES_WHEN entry. It widens nothing,
+    # so the bridge may write it (BRIDGE_WRITABLE in its test).
+    "CHIMERA_IDLE_COMPACTION",
     # NOT here, by design: CHIMERA_APPROVE_VIA_CHAT. Answering a pending approval from a chat bot
     # widens who can approve to whoever holds that channel, so turning it on stays a deliberate
     # edit of `.env` by the owner — never a switch a screen (or the desktop bridge) can flip.
@@ -875,6 +879,8 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "archive_on_pr_merge": settings.archive_on_pr_merge,
             # Whether a run reads Claude Code's instruction files too (`chimera/core/agents_md.py`). On by default.
             "claude_compat": settings.claude_compat,
+            # Whether a Code conversation is shortened after a long pause (`CodeSession.compact_if_idle`). On.
+            "idle_compaction": settings.idle_compaction,
             # Whether an archived conversation's clean, pushed worktree is removed after thirty days.
             "worktree_cleanup": settings.worktree_cleanup,
             # Whether that loop may merge a green pull request. Off by default; owner-only.
@@ -1332,6 +1338,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_ARCHIVE_ON_PR_MERGE": _check_boolean("CHIMERA_ARCHIVE_ON_PR_MERGE"),
     "CHIMERA_CLAUDE_COMPAT": _check_boolean("CHIMERA_CLAUDE_COMPAT"),
     "CHIMERA_WORKTREE_CLEANUP": _check_boolean("CHIMERA_WORKTREE_CLEANUP"),
+    "CHIMERA_IDLE_COMPACTION": _check_boolean("CHIMERA_IDLE_COMPACTION"),
     "CHIMERA_CLOSE_LOOP_MERGE": _check_boolean("CHIMERA_CLOSE_LOOP_MERGE"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }

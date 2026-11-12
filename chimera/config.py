@@ -1282,6 +1282,12 @@ class Settings(BaseSettings):
     # a Settings switch turns it off, and off reads AGENTS.md alone, as before.
     claude_compat: bool = Field(default=True, validation_alias="CHIMERA_CLAUDE_COMPAT")
 
+    # Shorten a Code conversation's history before a turn that follows a pause longer than the
+    # provider's cache lifetime (`CodeSession.compact_if_idle`). On by default: the owner's decision
+    # (2026-11-10), reversible, and it changes only what is SENT after the cache has already gone:
+    # the stored conversation is never shortened.
+    idle_compaction: bool = Field(default=True, validation_alias="CHIMERA_IDLE_COMPACTION")
+
     # Should the CHAT agent be assembled with the same protections the coding turn gets — a posture
     # denylist and the taint ledger wrapped around every tool?
     #
