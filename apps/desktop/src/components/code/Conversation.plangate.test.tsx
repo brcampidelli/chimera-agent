@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Conversation } from "@/components/code/Conversation";
-import { streamCodeTurn } from "@/lib/api";
+import { getCodeSession, streamCodeTurn } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
@@ -17,10 +17,11 @@ vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCode
  * them. A default that quietly became Always would stop every turn for a plan nobody asked for; one
  * that became Never would switch off the stop a big task gets. Both are pinned below.
  */
-function mount() {
-  renderWithProviders(
+function mount(resumeSession?: string) {
+  return renderWithProviders(
     <Conversation
       workspace="/proj"
+      {...(resumeSession ? { resumeSession } : {})}
       openFile={null}
       posture={{ reach: "workspace" as never, approval: "ask" as never }}
       profile={"balanced" as never}
@@ -74,5 +75,44 @@ describe("the plan-first choice is the owner's, with the rule as the default", (
     const group = await planGroup();
     await userEvent.click(group.getByRole("button", { name: "Never" }));
     expect(await send()).toMatchObject({ plan_gate: false });
+  });
+
+  it("remembers Always across a remount of the same conversation", async () => {
+    vi.mocked(getCodeSession).mockResolvedValue({ id: "s1", workspace: "/proj", exchanges: [] } as never);
+    const first = mount("s1");
+    await userEvent.click((await planGroup()).getByRole("button", { name: "Always" }));
+    first.unmount();
+
+    mount("s1");
+    const group = await planGroup();
+    expect(group.getByRole("button", { name: "Always" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("starts a new conversation at the last choice, and leaves another conversation its own", async () => {
+    vi.mocked(getCodeSession).mockResolvedValue({ id: "other", workspace: "/proj", exchanges: [] } as never);
+    localStorage.setItem("chimera:code:plan-mode:id:other", "never");
+    localStorage.setItem("chimera:code:plan-mode:last", "always");
+
+    const fresh = mount();
+    expect((await planGroup()).getByRole("button", { name: "Always" })).toHaveAttribute("aria-pressed", "true");
+    fresh.unmount();
+
+    mount("other");
+    expect((await planGroup()).getByRole("button", { name: "Never" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("falls back to Auto when the store throws", async () => {
+    // Only the plan-mode keys fail: the rest of the screen has its own handling of a blocked store.
+    const real = Storage.prototype.getItem;
+    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (this: Storage, key: string) {
+      if (key.startsWith("chimera:code:plan-mode:")) throw new Error("blocked");
+      return real.call(this, key);
+    });
+    try {
+      mount();
+      expect((await planGroup()).getByRole("button", { name: "Auto" })).toHaveAttribute("aria-pressed", "true");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
