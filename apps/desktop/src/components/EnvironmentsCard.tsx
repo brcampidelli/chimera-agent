@@ -117,7 +117,7 @@ export function EnvironmentsCard() {
   const saved = (list.data?.environments ?? []).filter((e) => !e.builtin);
 
   return (
-    <section className="surface overflow-hidden" aria-labelledby={headingId} data-testid="environments-card">
+    <section id="settings-card-environments" className="surface overflow-hidden" aria-labelledby={headingId} data-testid="environments-card">
       <h2 id={headingId} className="border-b border-hairline px-4 py-2.5 text-sm font-semibold">
         {t("env.settings.title")}
       </h2>
@@ -247,7 +247,7 @@ export function EnvironmentsCard() {
           </form>
         ) : null}
         {sshCan ? (
-          <div className="px-4 py-3" data-testid="ssh-hosts">
+          <div id="settings-ssh-hosts" className="px-4 py-3" data-testid="ssh-hosts">
             <h3 className="text-sm font-semibold">{t("env.ssh.hosts.title")}</h3>
             <p className="mt-1 text-xs text-muted-foreground">{t("env.ssh.hosts.hint")}</p>
             {allowed.length === 0 ? (

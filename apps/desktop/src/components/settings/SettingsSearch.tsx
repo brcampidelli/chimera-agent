@@ -54,6 +54,14 @@ const ENTRIES: readonly SearchEntry[] = [
   { tab: "general", label: "settings.row.costMode", hint: "settings.hint.costMode" },
   {
     tab: "general",
+    label: "env.settings.title",
+    hint: "env.settings.hint",
+    anchor: "settings-card-environments",
+    terms: "settings.search.terms.environments",
+  },
+  { tab: "general", label: "env.ssh.hosts.title", hint: "env.ssh.hosts.hint", anchor: "settings-ssh-hosts" },
+  {
+    tab: "general",
     label: "settings.card.autonomy",
     anchor: "settings-card-autonomy",
     terms: "settings.search.terms.autonomy",
