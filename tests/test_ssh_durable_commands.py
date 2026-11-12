@@ -703,7 +703,11 @@ def test_a_stale_attempt_that_finishes_after_the_takeover_never_touches_the_new_
     assert new_claim.split()[0] != token
     # A wakes up: its link "recovers" and its `cat` finally ends.
     a.stdin.close()
-    a_out, _ = a.communicate(timeout=30)
+    # Not communicate(): on CPython 3.11/3.12 it flushes a stdin that is already closed and raises
+    # "flush of closed file". The output is a line or two, so waiting first cannot fill the pipe.
+    a.wait(timeout=30)
+    assert a.stdout is not None
+    a_out = a.stdout.read()
     assert b"arrived incomplete" in a_out or a_out.strip() == b""
     # The new run is untouched, and the command ran exactly once, as B.
     done = box._exec(ssh_module.remote_op("poll", run_id, 5, 0, 0), None, 30)
