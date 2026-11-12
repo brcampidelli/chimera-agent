@@ -1078,6 +1078,9 @@ class AutonomyCfgOut(BaseModel):
     """``CHIMERA_CLOSE_LOOP_MERGE``: whether the close loop may merge a green pull request (unless an
     exception applies). Off by default, and a server without the field is off."""
     archive_on_pr_merge: bool = True
+    idle_compaction: bool = True
+    """``CHIMERA_IDLE_COMPACTION``: whether a Code conversation's history is shortened before a turn that
+    follows a pause longer than its provider's cache lifetime. On by default; a server without the field is on."""
     claude_compat: bool = True
     """``CHIMERA_CLAUDE_COMPAT``: whether a run reads Claude Code's instruction files (CLAUDE.md,
     CLAUDE.local.md, .claude/CLAUDE.md) and the owner's ~/.claude/CLAUDE.md beside AGENTS.md. On by

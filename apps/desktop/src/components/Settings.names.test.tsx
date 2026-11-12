@@ -67,6 +67,7 @@ function config() {
     archive_on_pr_merge: true,
     claude_compat: true,
     worktree_cleanup: true,
+    idle_compaction: true,
     hooks: false,
     hooks_host_exec: false,
     claude_hooks_repo: true,

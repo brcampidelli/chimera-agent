@@ -370,6 +370,20 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_CLAUDE_COMPAT: String(v) })}
         />
       </Row>
+      {/* A Code conversation whose pause outlived its provider's cache is shortened before the next turn
+          (`CodeSession.compact_if_idle`). On by default: reversible, and it changes only what is sent after
+          the cache has already gone. */}
+      <Row
+        label={t("settings.row.idleCompaction")}
+        hint={t("settings.hint.idleCompaction")}
+        env="CHIMERA_IDLE_COMPACTION"
+      >
+        <Toggle
+          id="settings-idle-compaction"
+          on={c.autonomy.idle_compaction ?? true}
+          onChange={(v) => save({ CHIMERA_IDLE_COMPACTION: String(v) })}
+        />
+      </Row>
       {/* An archived conversation's clean, pushed worktree goes about thirty days later (`chimera/core/
           worktree_expiry.py`). The removal cannot be undone, so the switch says so and the sweep keeps
           anything dirty or unpushed; the archived row shows the date and why a worktree was kept. */}

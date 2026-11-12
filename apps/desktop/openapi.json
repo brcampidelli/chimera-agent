@@ -1747,6 +1747,11 @@
             "title": "Host Exec",
             "type": "string"
           },
+          "idle_compaction": {
+            "default": true,
+            "title": "Idle Compaction",
+            "type": "boolean"
+          },
           "pull_requests": {
             "default": false,
             "title": "Pull Requests",
