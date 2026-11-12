@@ -157,6 +157,11 @@ EXEMPT: dict[str, str] = {
         "a driver method; BrowserTool.run resolves the path and calls refuse_write before calling it"
     ),
     "chart.py:_render_static": "a helper; its only caller (RenderChartTool.run) holds the gate",
+    "ssh_files.py:put": (
+        "the remote file tools write on the SSH host through RemoteFiles.write_bytes (a fixed script, "
+        "content on stdin, path checked against the remote folder and the credential denylist); nothing "
+        "on THIS machine is written, so the local gate (workspace, write region) has no path to judge"
+    ),
     "code.py:run": "writes the script into the sandbox's own scratch dir, not the workspace",
     "references.py:save_references": (
         "the owner's references.json in CHIMERA_HOME, written only by the authenticated "

@@ -166,7 +166,7 @@ _QUERY_KEYS = ("query", "q", "search")
 _PATH_KEYS = ("path", "file", "filename", "filepath")
 # Content keys include patch/diff shapes: an apply_patch/edit_file carrying its payload under
 # ``patch``/``diff``/``new_text`` must not slip past taint detection with an empty ("") content.
-_CONTENT_KEYS = ("content", "text", "data", "body", "patch", "diff", "new_text", "new_str", "contents")
+_CONTENT_KEYS = ("content", "text", "data", "body", "patch", "diff", "new_text", "new_str", "contents", "new")
 _COMMAND_KEYS = ("command", "cmd", "code", "script")
 
 # Files whose tainted content means "self-modification based on untrusted input".
@@ -185,7 +185,20 @@ def _is_self_executing(path: str) -> bool:
     """True if a write to ``path`` is code the agent (or another system) will later run."""
     p = path.strip().lower()
     base = p.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
-    return p.endswith(_CODE_SUFFIXES) or p.endswith(_SELF_EXEC_SUFFIXES) or base in _SELF_EXEC_NAMES
+    return (
+        p.endswith(_CODE_SUFFIXES) or p.endswith(_SELF_EXEC_SUFFIXES) or base in _SELF_EXEC_NAMES
+        or _is_git_executable(p)
+    )
+
+
+def _is_git_executable(p: str) -> bool:
+    """``.git/hooks/*`` (run by git on commit, push, checkout...) and ``.git/config`` (``core.hooksPath``,
+    ``core.sshCommand``, aliases that start with ``!``): neither has a code suffix, both run code."""
+    parts = [part for part in p.replace("\\", "/").split("/") if part]
+    if ".git" not in parts:
+        return False
+    tail = parts[parts.index(".git") + 1:]
+    return "hooks" in tail[:-1] or tail[-1:] in (["config"], ["config.worktree"])
 
 # Below this length a tainted snippet is too generic to treat as a flow match (avoids
 # escalating on a stray shared word); above it, a verbatim reappearance is a real signal.
@@ -1281,10 +1294,18 @@ def assess_action(
                 proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
     if tool_name in write_tools:
-        path = _first(args, _PATH_KEYS)
-        content = _first(args, _CONTENT_KEYS)
-        tainted, refs, span = ledger._tainted_span(content)
-        if tainted and _is_self_executing(path):
+        # `edit_batch` carries `edits=[{path, old, new}, ...]` and no top-level path or content: each
+        # item is judged as the single-file tools' arguments are, or the batch would never be judged.
+        items = [e for e in (args.get("edits") or []) if isinstance(e, Mapping)] if isinstance(
+            args.get("edits"), list
+        ) else []
+        for path, content in (
+            [(_first(e, _PATH_KEYS), _first(e, _CONTENT_KEYS)) for e in items]
+            or [(_first(args, _PATH_KEYS), _first(args, _CONTENT_KEYS))]
+        ):
+            tainted, refs, span = ledger._tainted_span(content)
+            if not (tainted and _is_self_executing(path)):
+                continue
             sources = ledger.describe_refs(refs)
             return SequenceAssessment(
                 True, Decision.REVIEW,

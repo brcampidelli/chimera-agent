@@ -688,9 +688,9 @@ def test_the_shell_tool_says_where_it_runs_and_the_confirmation_names_the_host(t
 # -- the wrong machine is never edited --------------------------------------------------------
 
 
-LOCAL_FILE_TOOLS = (
-    "read_file", "write_file", "edit_file", "apply_patch", "list_dir", "grep", "glob", "execute_code",
-)
+#: The ones with no remote form. read_file, write_file, edit_file, list_dir, grep and glob act on the host
+#: (tests/test_ssh_remote_files.py), as do apply_patch and edit_batch; these refuse.
+LOCAL_FILE_TOOLS = ("execute_code", "read_document")
 
 
 def test_the_local_file_tools_refuse_in_an_ssh_conversation_and_touch_nothing(tmp_path: Path) -> None:

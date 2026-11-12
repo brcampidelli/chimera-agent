@@ -71,8 +71,12 @@ The fences that guard Chimera's own files by path (the approval queue, the audit
 ``.env``) protect THIS machine's files and keep reading the command as they always did; they do not,
 and cannot, protect a file on the remote machine, and nothing here loosens them. The file tools are
 the other half: the files are over there, so a conversation in this environment refuses the local
-read/write/edit tools (:mod:`chimera.tools.ssh_files`) instead of editing the wrong machine. A remote
-file layer is a separate piece of work.
+read/write/edit tools (:mod:`chimera.tools.ssh_files`) instead of editing the wrong machine. The core
+ones (``read_file``, ``write_file``, ``edit_file``, ``apply_patch``, ``edit_batch``, ``list_dir``, ``grep``,
+``glob``) are replaced there by remote forms that go through :meth:`SshSandbox.run_script`: the same
+argv, the same alias re-check and the same sanitizing as a command, but NOT the detached launcher (a
+file operation is short and checks itself: a write carries its byte count and sha256 and is dropped on a
+mismatch, so repeating one is safe); the rest of the file tools keep the refusal.
 
 ``Include`` in ``~/.ssh/config`` is followed only for files that resolve inside ``~/.ssh``; one that
 points elsewhere is not read, and its aliases are not offered.
@@ -97,7 +101,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -392,6 +396,8 @@ READ_RUN_SECONDS = 60
 #: After a call fails at the ssh level (exit 255, or it hung), wait this long before the next try; the
 #: number of entries is the number of consecutive failures tolerated before the run is given up on.
 #: A call that succeeds starts the count again, so a link that flaps all day still finishes the run.
+#: How many times a file operation (:meth:`SshSandbox.run_script`) is repeated after an ssh-level failure.
+FILE_OP_RETRIES = 2
 RECONNECT_BACKOFF: tuple[float, ...] = (1.5, 3.0, 6.0, 12.0, 15.0, 15.0)
 
 _LAUNCHER_TEMPLATE = r"""
@@ -757,6 +763,61 @@ class SshSandbox:
         if self._tainted is None or not self._tainted():
             return False
         return self._ask is None or not self._ask(command)
+
+    def confirm_when_tainted(self, what: str) -> bool:
+        """Whether ``what`` (a write the file tools are about to make) may go ahead: True when the turn
+        has read nothing from outside, or when the owner was asked, through the same question a command
+        uses, and said yes. False when it was declined or nobody could be asked."""
+        return not self._declined_for_taint(what)
+
+    def run_script(
+        self, script: str, args: Sequence[str] = (), *, stdin: bytes | None = None, timeout: int = 60
+    ) -> SandboxResult:
+        """Run a FIXED ``sh`` script on the remote host with ``args`` as its positional parameters.
+
+        For the remote file tools, and deliberately not :meth:`run`'s detached launcher: a file operation
+        is short, and it verifies itself (a write is checked against the byte count and sha256 it was
+        sent with before it is moved into place), so there is nothing to follow, poll or resume.
+
+        The script is a constant of this app, never built from anything the agent wrote; every variable
+        part (a path, a limit) is one ``shlex.quote``d argument, and a file's CONTENT travels on
+        ``stdin``, so nothing the agent chose is ever interpolated into the command line. The host is
+        re-validated first (and before each retry), the argv is :func:`ssh_argv`'s, and the result is
+        :func:`explained`: the remote command's own stderr, never the client's raw log.
+
+        The taint question (``bind_taint``) is NOT asked here: it is a question about a COMMAND, and
+        these are the file tools, whose names the governance ledger and the approval policy already
+        judge as they judge the local ones. Asking twice would put two cards up for one action.
+
+        A call that fails at the ssh level (exit 255, not a host-key or credential refusal) is repeated
+        a couple of times: every script here is safe to run again, because a read and a list change
+        nothing, and a write that arrived short is dropped by its own check.
+        """
+        from chimera.proc.decode import console_text
+
+        command = "sh -c " + shlex.quote(script) + " sh" + "".join(f" {shlex.quote(a)}" for a in args)
+        remote = remote_command(self.remote_path, command)
+        deadline = _now() + timeout
+        attempt = 0
+        while True:
+            if self._recheck is not None:
+                try:
+                    self._recheck()
+                except ValueError as exc:
+                    return SandboxResult(exit_code=1, stderr=f"error: not run: {exc}")
+            call = self._exec(remote, stdin, max(1.0, deadline - _now()))
+            if call is None:
+                return self._failure(None, "", False)
+            if call.timed_out:
+                return SandboxResult(exit_code=124, stderr=f"command timed out after {timeout}s", timed_out=True)
+            if call.code == 255 and not _fatal(call) and attempt < FILE_OP_RETRIES:
+                pause = RECONNECT_BACKOFF[attempt]
+                if deadline - _now() > pause + 1:
+                    attempt += 1
+                    _sleep(pause)
+                    continue
+            seen = SandboxResult(exit_code=call.code, stdout=console_text(call.out), stderr=console_text(call.err))
+            return explained(seen, self.host, call.client_log)
 
     # -- one ssh process --------------------------------------------------------------------
 
