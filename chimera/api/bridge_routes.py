@@ -686,6 +686,21 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
         "settings.environment_default is the owner's decision: a project's default environment is "
         "set by the owner in the app (the Code screen), never through the bridge."
     ),
+    # Which hosts of the owner's ~/.ssh/config an SSH environment may use. Naming a machine the agent
+    # may run commands on is reach, so the list is the owner's: read, extended and trimmed on the
+    # app's own screen, never through the bridge at any tier.
+    "settings.environment_ssh_hosts": (
+        "settings.environment_ssh_hosts is the owner's decision: the SSH hosts an environment may "
+        "use are listed by the owner in the app (Settings > Environments), never through the bridge."
+    ),
+    "settings.environment_ssh_host_allow": (
+        "settings.environment_ssh_host_allow is the owner's decision: an SSH host is allowed by the "
+        "owner in the app (Settings > Environments), never through the bridge."
+    ),
+    "settings.environment_ssh_host_forget": (
+        "settings.environment_ssh_host_forget is the owner's decision: an SSH host is removed from the "
+        "allowed list by the owner in the app (Settings > Environments), never through the bridge."
+    ),
     # A scheduled task runs with nobody watching, so the mode it runs under is reach handed out for
     # every later run: chosen on the owner's screen, never wider than Settings, and (see
     # FULL_CONTROL_NEVER) not through the bridge at any tier. `cron.create` carries the field too,
@@ -1255,7 +1270,7 @@ FULL_CONTROL_NEVER: dict[str, str] = {
     ),
 }
 # Where commands run is reach, and the environment list names the distros and hosts the agent could
-# be pointed at: the owner's own screen only, full control included. One sentence for all five, said
+# be pointed at: the owner's own screen only, full control included. One sentence for all eight, said
 # with the route's own name so a client reads which door it knocked on.
 for _route in (
     "settings.environments",
@@ -1263,6 +1278,9 @@ for _route in (
     "settings.environment_save",
     "settings.environment_remove",
     "settings.environment_default",
+    "settings.environment_ssh_hosts",
+    "settings.environment_ssh_host_allow",
+    "settings.environment_ssh_host_forget",
 ):
     FULL_CONTROL_NEVER[_route] = (
         f"{_route} stays the owner's even with full control: where a conversation's commands run is "

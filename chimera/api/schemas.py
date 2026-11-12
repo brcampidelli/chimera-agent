@@ -620,6 +620,26 @@ class CodeWslDistrosOut(BaseModel):
     distros: list[str]
 
 
+class CodeSshHostsOut(BaseModel):
+    """The SSH hosts an environment may use: what the owner's ``~/.ssh/config`` offers, and what is allowed.
+
+    Aliases only. Nothing about how a host is reached (user, address, key) is read or returned.
+    """
+
+    #: An ``ssh`` program is on the PATH.
+    supported: bool
+    #: The concrete ``Host`` aliases of ``~/.ssh/config`` (patterns such as ``*`` are not listed).
+    config_hosts: list[str]
+    #: The aliases the owner allowed; an SSH environment can use only these.
+    allowed: list[str]
+
+
+class CodeSshHostIn(BaseModel):
+    """One alias to allow. It must exist in the owner's ``~/.ssh/config``."""
+
+    host: str = Field(min_length=1, max_length=64)
+
+
 class ProjectPackAcceptIn(BaseModel):
     """Accept one folder's pack — the file whose SHA-256 the screen showed, and only that file."""
 

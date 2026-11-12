@@ -119,9 +119,12 @@ def test_stderr_that_is_not_a_terminal_is_never_shown_the_code(
     thread, _result, request_id = _ask(tmp_path)
 
     shown = pending.code_shown(tmp_path, request_id)
-    err = capsys.readouterr().err
     pending.answer(tmp_path, request_id, False)
     thread.join(WAIT)
+    # Read after the join: `_ask` returns once the question is on disk, and the announcement is
+    # printed by the asking thread a moment later, so a read before the join raced it (seen once in
+    # the full suite on a loaded WSL gate). The same three facts are checked, now without the race.
+    err = capsys.readouterr().err
 
     assert shown == "nowhere"
     assert request_id in err, "the question is still announced"

@@ -298,7 +298,14 @@ class ExecuteCodeTool(Tool):
         from chimera.sandbox import LocalSandbox
 
         code = str(kwargs["code"])
+        from chimera.sandbox.ssh import SshSandbox
         from chimera.sandbox.wsl import WslSandbox
+
+        if isinstance(self._sandbox, SshSandbox):
+            # The script is written to a local folder and then run: on another machine that file is not there.
+            from chimera.tools.ssh_files import refusal
+
+            return refusal(self._sandbox.host)
 
         in_wsl = isinstance(self._sandbox, WslSandbox)
         fenced = queue_refusal(self.name, code, self.workspace, wsl=in_wsl)

@@ -460,7 +460,7 @@ def test_the_owners_screen_creates_lists_and_removes_environments(rig: _Rig) -> 
     first = rig.screen.get("/api/code/environments").json()
     assert [e["id"] for e in first["environments"]] == ["local"]
     assert first["environments"][0]["builtin"] is True
-    assert {k["kind"] for k in first["kinds"]} == {"wsl"}
+    assert {k["kind"] for k in first["kinds"]} == {"wsl", "ssh"}
     env_id = rig.make_env()
     listed = rig.screen.get("/api/code/environments").json()["environments"]
     assert [e["name"] for e in listed] == ["Local", "Ubuntu"]

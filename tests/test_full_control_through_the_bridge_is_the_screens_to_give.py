@@ -125,6 +125,8 @@ def test_the_full_control_table_is_served_by_the_app_and_apart_from_the_others(
         "settings.exec", "settings.messaging_start", "cron.permission_mode",
         "settings.environments", "settings.environment_distros", "settings.environment_save",
         "settings.environment_remove", "settings.environment_default",
+        "settings.environment_ssh_hosts", "settings.environment_ssh_host_allow",
+        "settings.environment_ssh_host_forget",
     }
     assert left <= set(FULL_CONTROL_NEVER)
 

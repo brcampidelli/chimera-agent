@@ -89,6 +89,14 @@ CLOSED: dict[str, tuple[str, str, dict[str, Any], dict[str, Any]]] = {
     "settings.environment_default": (
         "PUT", "/api/code/environments/default", {}, {"project": "proj", "environment": ""},
     ),
+    # Which hosts of ~/.ssh/config an SSH environment may use (onda 4, item 18).
+    "settings.environment_ssh_hosts": ("GET", "/api/code/environments/ssh-hosts", {}, {}),
+    "settings.environment_ssh_host_allow": (
+        "POST", "/api/code/environments/ssh-hosts", {}, {"host": "web1"},
+    ),
+    "settings.environment_ssh_host_forget": (
+        "DELETE", "/api/code/environments/ssh-hosts/{host}", {"host": "web1"}, {},
+    ),
 }
 
 

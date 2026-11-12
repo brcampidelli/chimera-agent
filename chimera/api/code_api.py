@@ -125,6 +125,8 @@ from chimera.api.schemas import (
     CodeSessionRenameIn,
     CodeSessionRenameOut,
     CodeSessionSeenOut,
+    CodeSshHostIn,
+    CodeSshHostsOut,
     CodeTurnFramesOut,
     CodeTurnGuidanceIn,
     CodeTurnGuidanceOut,
@@ -1322,10 +1324,15 @@ def assemble_registry(
     # ports are the turn's own (`extra_turn_ports`), which is the whole of what it may reach on loopback.
     from chimera.core.dev_servers import DevServerTurn
     from chimera.core.launch_config import load_launch_config
+    from chimera.sandbox.ssh import SshSandbox
+    from chimera.tools.ssh_files import block_local_file_tools, is_remote
 
+    # A conversation whose commands run on another machine starts no dev server here and has no
+    # local explorer: both would work on this machine's folder while the work is over there.
+    remote_turn = is_remote(sandbox)
     dev_turn: DevServerTurn | None = None
     preview_tool: Any = None
-    if surface == "api:turn" and not guest and not bot_floor and (
+    if surface == "api:turn" and not guest and not bot_floor and not remote_turn and (
         (recipe := load_launch_config(ws)).config is not None and recipe.config.configurations
     ):
         dev_turn = DevServerTurn(ws)
@@ -1732,6 +1739,10 @@ def assemble_registry(
             ),
             replace=True,
         )
+        if remote_turn and isinstance(sandbox, SshSandbox):
+            # Registered after `default_registry` blocked the local file tools, and `export` writes into
+            # this machine's project folder: the same refusal applies.
+            block_local_file_tools(registry, sandbox.host)
     if allowed is not None or denied:
         registry = restrict_registry(registry, allow=allowed, deny=denied or None)
     if design is not None:
@@ -1788,7 +1799,7 @@ def assemble_registry(
     explorer_ok = ExploreRepositoryTool.name not in denied and (
         not settings.tool_allowlist or ExploreRepositoryTool.name in settings.tool_allowlist
     )
-    if seams.explorer and explorer_ok:
+    if seams.explorer and explorer_ok and not remote_turn:
         # A narrow localisation question does not need the worker's model, and answering it in a
         # sub-agent keeps the finding — not the search — in the main loop's context.
         # A cheap model for the explorer is the point of the role: a narrow localisation
@@ -1831,6 +1842,13 @@ def assemble_registry(
     if preview_tool is not None:
         # The end-of-turn check reads this: a tainted run never has a server started for it.
         preview_tool._tainted = ledger.run_tainted
+    if isinstance(sandbox, SshSandbox):
+        # A command on another machine, after this turn read something from outside, is the owner's
+        # to approve on the screen; with no screen to ask, it is refused (`SshSandbox.bind_taint`).
+        sandbox.bind_taint(
+            ledger.run_tainted,
+            _ask_ssh_command_on_card(owner, sandbox.host) if approval_sink is not None else None,
+        )
     # Each MCP payload this run writes goes on the same record as its other writes: the ledger (its
     # events, and `untrusted_writes`, which the turn receipt reads) and the audit trail. Attached here
     # because the ledger is made here, after the sink was bound to the tools above; the sink's copies
@@ -2076,6 +2094,33 @@ def _ask_command_on_card(holder: list[Any], scope: ManualScope | None = None) ->
             reason="a command on this machine, in a conversation that asks before each one",
             decision=None,
             allow_key=key,
+        )
+        return bool(approve(question, action))
+
+    return ask
+
+
+def _ask_ssh_command_on_card(approve: Callable[..., Any], host: str) -> Callable[[str], bool]:
+    """The turn's approval card for a command on ``host`` after the turn read content from outside.
+
+    Not the Manual / host-exec question (that one is asked, or not, by the posture): this one is put
+    whenever the turn is tainted, because the command runs where this app's own checks cannot see.
+    ``approve`` is the turn's owner approver, so it behaves as the local host does after a tainted
+    read, and no stricter: with the conversation's "Ignore permissions" on, the owner's decision of
+    26/10 holds here too and the command is released without a card (recorded in the audit and
+    announced as the other releases are), except where a rule, a block or a warn holds it; with
+    ``approval_mode=ask`` the card is shown; ``deny`` refuses. With no screen the caller passes no
+    ``ask`` at all and the command is refused.
+    """
+
+    def ask(command: str) -> bool:
+        # The question is the one the owner's approver already knows how to release or hold.
+        action = f"run_shell: [ssh {host}] {command}"
+        question = SimpleNamespace(
+            action=action,
+            reason=f"a command on {host}, after this turn read content from outside",
+            decision=None,
+            allow_key="",
         )
         return bool(approve(question, action))
 
@@ -7930,7 +7975,7 @@ def register_code_api(
         return {
             "environments": [
                 {**row.to_json(), "builtin": row.id == envs.LOCAL_ID,
-                 "available": envs.kind_available(row.kind)}
+                 "available": registry.usable(row)}
                 for row in rows
             ],
             "kinds": [
@@ -7963,6 +8008,45 @@ def register_code_api(
         from chimera.sandbox.wsl import wsl_supported
 
         return {"supported": wsl_supported(), "distros": await run_in_threadpool(installed)}
+
+    def _ssh_hosts_out() -> dict[str, Any]:
+        from chimera.sandbox.ssh import config_aliases, ssh_supported
+
+        return {
+            "supported": ssh_supported(),
+            "config_hosts": config_aliases(),
+            "allowed": envs.registry_for(live().home).ssh_hosts(),
+        }
+
+    @app.get(
+        "/api/code/environments/ssh-hosts", dependencies=[guard], response_model=CodeSshHostsOut
+    )
+    async def list_ssh_hosts(request: Request) -> dict[str, Any]:
+        """The ``Host`` aliases of the owner's ``~/.ssh/config`` and the ones allowed for an SSH environment."""
+        _environment_owner_only(request, change=False)
+        return await run_in_threadpool(_ssh_hosts_out)
+
+    @app.post(
+        "/api/code/environments/ssh-hosts", dependencies=[guard], response_model=CodeSshHostsOut
+    )
+    def allow_ssh_host(request: Request, body: CodeSshHostIn) -> dict[str, Any]:
+        """Allow one alias of ``~/.ssh/config``; an alias that is not there, or a pattern, is a 400."""
+        _environment_owner_only(request, change=True)
+        try:
+            envs.registry_for(live().home).allow_ssh_host(body.host)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _ssh_hosts_out()
+
+    @app.delete(
+        "/api/code/environments/ssh-hosts/{host}", dependencies=[guard], response_model=CodeSshHostsOut
+    )
+    def forget_ssh_host(request: Request, host: str) -> dict[str, Any]:
+        """Stop allowing an alias. Environments that name it stay listed and refuse commands."""
+        _environment_owner_only(request, change=True)
+        if not envs.registry_for(live().home).forget_ssh_host(host):
+            raise HTTPException(status_code=404, detail="that host is not on the allowed list")
+        return _ssh_hosts_out()
 
     @app.post(
         "/api/code/environments", dependencies=[guard], response_model=CodeEnvironmentsOut

@@ -5249,6 +5249,52 @@
         "title": "CodeSessionSeenOut",
         "type": "object"
       },
+      "CodeSshHostIn": {
+        "description": "One alias to allow. It must exist in the owner's ``~/.ssh/config``.",
+        "properties": {
+          "host": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Host",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "title": "CodeSshHostIn",
+        "type": "object"
+      },
+      "CodeSshHostsOut": {
+        "description": "The SSH hosts an environment may use: what the owner's ``~/.ssh/config`` offers, and what is allowed.\n\nAliases only. Nothing about how a host is reached (user, address, key) is read or returned.",
+        "properties": {
+          "allowed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed",
+            "type": "array"
+          },
+          "config_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Config Hosts",
+            "type": "array"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "supported",
+          "config_hosts",
+          "allowed"
+        ],
+        "title": "CodeSshHostsOut",
+        "type": "object"
+      },
       "CodeToolOut": {
         "properties": {
           "arguments": {
@@ -22256,6 +22302,102 @@
           }
         },
         "summary": "Set Code Environment Default"
+      }
+    },
+    "/api/code/environments/ssh-hosts": {
+      "get": {
+        "description": "The ``Host`` aliases of the owner's ``~/.ssh/config`` and the ones allowed for an SSH environment.",
+        "operationId": "list_ssh_hosts_api_code_environments_ssh_hosts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSshHostsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Ssh Hosts"
+      },
+      "post": {
+        "description": "Allow one alias of ``~/.ssh/config``; an alias that is not there, or a pattern, is a 400.",
+        "operationId": "allow_ssh_host_api_code_environments_ssh_hosts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSshHostIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSshHostsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Allow Ssh Host"
+      }
+    },
+    "/api/code/environments/ssh-hosts/{host}": {
+      "delete": {
+        "description": "Stop allowing an alias. Environments that name it stay listed and refuse commands.",
+        "operationId": "forget_ssh_host_api_code_environments_ssh_hosts__host__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host",
+            "required": true,
+            "schema": {
+              "title": "Host",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSshHostsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget Ssh Host"
       }
     },
     "/api/code/environments/wsl-distros": {

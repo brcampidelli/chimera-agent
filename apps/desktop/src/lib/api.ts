@@ -3087,6 +3087,24 @@ export const removeCodeEnvironment = (id: string) =>
     method: "DELETE",
     headers: screenJsonHeaders(),
   });
+/** The SSH hosts an environment may use: the aliases of `~/.ssh/config`, and the ones the owner allowed. */
+export interface SshHosts {
+  supported: boolean;
+  config_hosts: string[];
+  allowed: string[];
+}
+export const listSshHosts = () => json<SshHosts>("/api/code/environments/ssh-hosts");
+export const allowSshHost = (host: string) =>
+  json<SshHosts>("/api/code/environments/ssh-hosts", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ host }),
+  });
+export const forgetSshHost = (host: string) =>
+  json<SshHosts>(`/api/code/environments/ssh-hosts/${encodeURIComponent(host)}`, {
+    method: "DELETE",
+    headers: screenJsonHeaders(),
+  });
 /** Set a project's default environment; an empty `environment` clears it. */
 export const setCodeEnvironmentDefault = (project: string, environment: string) =>
   json<CodeEnvironments>("/api/code/environments/default", {
