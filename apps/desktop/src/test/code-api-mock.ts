@@ -38,6 +38,8 @@ class MockApiError extends Error {
 export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
+    // `/skill-doctor` reads the folder's skills. Empty by default; a test that needs a report sets its own.
+    getSkillDoctor: vi.fn(async () => ({ skills: [], tokens_per_turn: 0, cards_tokens_per_task_max: 0, cards_read: false, cards_k: 0, usage_days: null })),
     // A pick in the selector is written to the conversation (Code.tsx); the mock keeps it in memory.
     setCodeSessionPermissionMode: vi.fn(async (id: string, mode: string) => ({ id, permission_mode: mode })),
     // Browser screen pairing (`BrowserScreenPairing.tsx`, `BrowserScreenPrompt.tsx`): nothing paired and

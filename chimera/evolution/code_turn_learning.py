@@ -97,6 +97,19 @@ class CodeTurnRecall:
         self.cards = cards
         self.home = home
 
+    def record_turn_outcome(self, *, verdict: str, steps: int) -> None:
+        """Credit this turn's injected cards: a use per run that ran a loop, a success on a passed check.
+
+        Without this the Code screen injects cards that nothing ever counts, so the Skills screen and
+        `/skill-doctor` could only call them unmeasured. A turn a gate stopped before the model ran
+        (``steps == 0``) used nothing, so it credits nothing. Unverified runs count as uses, not successes.
+        """
+        if steps <= 0:
+            return
+        recorder = getattr(self.cards, "record_outcome", None)
+        if callable(recorder):
+            recorder(_outcome(verdict) == "success")
+
     def card_context(self, task: str) -> str:
         parts: list[str] = []
         if self.cards is not None:

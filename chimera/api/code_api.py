@@ -4941,6 +4941,10 @@ def register_code_api(
             awake_reason = "work" if background is not None else "turn"
             keep_awake.acquire(awake_reason)
             turn_succeeded = False
+            # What the finally that ends every turn needs to credit the cards it was told about: the
+            # loop's step count (set once the loop returns) and the verifier's outcome (set once minted),
+            # so a turn that failed or was stopped after its loop still counts.
+            turn_run: dict[str, Any] = {"steps": 0, "outcome": {}}
             try:
                 # Taken BEFORE the turn, so a turn that edits can be judged and undone like a run.
                 #
@@ -5004,6 +5008,7 @@ def register_code_api(
                 # What a background work's record keeps of the turn's end: the undo offer and the
                 # verifier's verdict, minted inside `_verify_and_finish` and read after it.
                 outcome: dict[str, str] = {}
+                turn_run["outcome"] = outcome
                 # The guidance the agent read and what arrived too late to be read, set the moment
                 # the loop returns — not after verification, which can take minutes, and text sent
                 # in those minutes must not be reported as delivered.
@@ -6002,6 +6007,7 @@ def register_code_api(
                         # work is not a live turn (nobody follows it here), so it takes none.
                         take_guidance=take_guidance if background is None else None,
                     )
+                    turn_run["steps"] = int(getattr(result, "steps", 0) or 0)
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
                     # Inside the lock and before the save: a declined or escalated answer replaces
@@ -6188,6 +6194,16 @@ def register_code_api(
                         _log.warning("could not remove temporary resized image: %s", exc)
                 if holds_folder:
                     folder.release()
+                # The learned cards this turn was told about are credited on every way out: background, guest,
+                # failed and stopped turns included, whenever the loop ran. Only the lesson keeps the owner filter.
+                try:
+                    recorder = getattr(getattr(agent, "cards", None), "record_turn_outcome", None)
+                    if callable(recorder):
+                        # Not `verdict`: that name is the plan gate's PlanVerdict earlier in this scope.
+                        verified_state = str((turn_run.get("outcome") or {}).get("verified", ""))
+                        recorder(verdict=verified_state, steps=int(turn_run.get("steps") or 0))
+                except Exception as exc:  # noqa: BLE001 -- the turn is over; a credit is extra
+                    _log.debug("could not credit the turn's cards: %s", type(exc).__name__)
                 # Every way out of a turn, so a turn that died still stops being "running".
                 live_turns.finish(turn_id)
                 keep_awake.release(awake_reason)

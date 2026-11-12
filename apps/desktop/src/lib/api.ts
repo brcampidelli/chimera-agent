@@ -117,6 +117,7 @@ import type {
   VaultMove,
   ProjectState,
   RunReceipt,
+  SkillDoctor,
   SkillsResponse,
   TaskCard,
   Tools,
@@ -960,6 +961,9 @@ export const applyConsolidation = (groups: string[][]) =>
 
 // --- Skills ---
 export const getSkills = () => json<SkillsResponse>("/api/skills");
+/** `/skill-doctor`: what the skills a run is told about cost, and which are unused. Reads only; no model call. */
+export const getSkillDoctor = (project: string) =>
+  json<SkillDoctor>(`/api/skills/doctor${project ? `?project=${encodeURIComponent(project)}` : ""}`);
 export const approveSkill = (name: string) =>
   json<{ approved: boolean }>(`/api/skills/${name}/approve`, { method: "POST" });
 export const retireSkill = (name: string) =>

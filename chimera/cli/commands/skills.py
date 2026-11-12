@@ -387,6 +387,65 @@ def skills_stats() -> None:
         )
 
 
+@skills_app.command("doctor")
+def skills_doctor(
+    project: str = typer.Option(
+        "", "--project", "-p", help="The folder a run would start in (its accepted pack narrows the skills)."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print the report as JSON."),
+) -> None:
+    """What the skills a run is told about cost in context, and which of them are unused.
+
+    Deterministic: no model is called. Bundles carry a usage count of "no record" because nothing
+    records which one a run read; only a learned card with a measured zero is suggested for switching off.
+    """
+    import json
+
+    from chimera.skills.doctor import report_for
+
+    folder: Path | None = None
+    if project.strip():
+        folder = Path(project.strip()).expanduser().resolve()
+        if not folder.is_dir():
+            console.print(f"[red]workspace not found: {folder}[/red]")
+            raise typer.Exit(code=1)
+    report = report_for(get_settings(), folder)
+    if as_json:
+        typer.echo(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+        return
+    if not report.skills:
+        console.print("[dim]No skills are switched on for this folder.[/dim]")
+        return
+    table = Table(title="Skills in context", header_style="bold")
+    for column in ("Skill", "Kind", "Origin", "Tokens", "Injected runs", "Suggestion"):
+        table.add_column(column)
+    labels = {
+        "disable": "switch off?",
+        "keep": "keep",
+        "no_record": "no record: decide yourself",
+        "reading_off": "card reading is off",
+        "probation": "on probation: the lifecycle decides",
+        "since_promotion": "no record since promotion",
+    }
+    for skill in report.skills:
+        table.add_row(
+            skill.name,
+            skill.kind,
+            skill.origin,
+            f"{skill.tokens:,}",
+            "no record" if skill.injected_runs is None else str(skill.injected_runs),
+            labels.get(skill.suggestion, skill.suggestion),
+        )
+    console.print(table)
+    console.print(f"Every turn carries {report.tokens_per_turn:,} tokens of installed skills.")
+    if report.cards_read:
+        console.print(
+            f"A task can add up to {report.cards_tokens_per_task_max:,} more from "
+            f"{report.cards_k} learned cards. Injected-run counts are totals, not a window of days."
+        )
+    console.print("[dim]Suggestions only. Switch skills off on the Skills screen.[/dim]")
+
+
 @skills_app.command("approve")
 @app.command("skills-approve", hidden=True)
 def skills_approve(

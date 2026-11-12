@@ -5404,6 +5404,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/skills/doctor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Skill Doctor
+         * @description ``/skill-doctor``: what the skills a run is told about cost, and which are unused.
+         *
+         *     Read-only and deterministic: no model is called. ``project`` is checked the way
+         *     `/api/code/commands` checks its folder (an existing directory, or 400), then narrows the
+         *     bundles by that folder's accepted pack. See `chimera.skills.doctor`.
+         */
+        get: operations["skill_doctor_api_skills_doctor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/skills/effective": {
         parameters: {
             query?: never;
@@ -14700,6 +14724,41 @@ export interface components {
             message: string;
             /** Model */
             model?: string | null;
+        };
+        /**
+         * SkillCostOut
+         * @description One skill's share of a run's context (``/skill-doctor``). Estimated, not counted by a tokenizer.
+         */
+        SkillCostOut: {
+            /** Every Turn */
+            every_turn: boolean;
+            /** Injected Runs */
+            injected_runs: number | null;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Origin */
+            origin: string;
+            /** Suggestion */
+            suggestion: string;
+            /** Tokens */
+            tokens: number;
+        };
+        /** SkillDoctorOut */
+        SkillDoctorOut: {
+            /** Cards K */
+            cards_k: number;
+            /** Cards Read */
+            cards_read: boolean;
+            /** Cards Tokens Per Task Max */
+            cards_tokens_per_task_max: number;
+            /** Skills */
+            skills: components["schemas"]["SkillCostOut"][];
+            /** Tokens Per Turn */
+            tokens_per_turn: number;
+            /** Usage Days */
+            usage_days?: number | null;
         };
         /** SkillStatOut */
         SkillStatOut: {
@@ -24613,6 +24672,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skill_doctor_api_skills_doctor_get: {
+        parameters: {
+            query?: {
+                project?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillDoctorOut"];
                 };
             };
             /** @description Validation Error */

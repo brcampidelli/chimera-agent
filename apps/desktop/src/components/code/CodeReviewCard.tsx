@@ -96,7 +96,7 @@ export function CodeReviewCard({
   };
 
   return (
-    <section aria-label={t("code.review.title")} className="floating space-y-2 p-3 text-sm">
+    <section aria-label={t("code.review.title")} className="surface space-y-2 p-3 text-sm">
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{t("code.review.title")}</h3>
         <span className="text-muted-foreground">{statusLine(t, review)}</span>

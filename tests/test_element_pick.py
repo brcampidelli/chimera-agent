@@ -331,6 +331,16 @@ def _server_for(tmp_path: Path) -> tuple[Any, Any, Path]:
     _running(client)
     root = tmp_path / "ws"
     entry = load_launch_config(root).config.get("web")  # type: ignore[union-attr]
+    # "running" is reported once the process started, which can be before it listens. The picker
+    # (rightly) refuses a port no process of the server listens on, so a capture that came too soon
+    # was a 409 and the pick after it carried no attachment (seen once on CI: KeyError 'attachment').
+    server = manager().get(root, "web")
+    for _ in range(150):
+        if server is not None and server.port in server.tree_ports():
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("the server never listened on its port")
     return client, entry, root
 
 
