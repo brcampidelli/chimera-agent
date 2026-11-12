@@ -266,6 +266,14 @@ class CodeSessionPullRequestRef(BaseModel):
     url: str
 
 
+class CodeEnvironmentRecordOut(BaseModel):
+    """What a conversation keeps of its environment: which one, by id, with the name it had."""
+
+    id: str
+    name: str
+    kind: str
+
+
 class CodeWorktreeRemovalOut(BaseModel):
     """When an archived conversation's worktree is removed, and what the last look kept it for."""
 
@@ -578,14 +586,6 @@ class CodeEnvironmentDefaultIn(BaseModel):
 
     project: str = Field(min_length=1, max_length=4096)
     environment: str = Field(default="", max_length=64)
-
-
-class CodeEnvironmentRecordOut(BaseModel):
-    """What a conversation keeps of its environment: which one, by id, with the name it had."""
-
-    id: str
-    name: str
-    kind: str
 
 
 class CodeEnvironmentOut(BaseModel):
