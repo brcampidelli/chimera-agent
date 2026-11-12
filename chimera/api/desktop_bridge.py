@@ -1205,6 +1205,15 @@ def register_bridge_api(
         params: dict[str, Any] | None = None,
     ) -> Any:
         """Refuse what no tier may do, or a widening; give a run that names no posture the owner's."""
+        if (
+            route_id == "cron.create"
+            and isinstance(body, dict)
+            and bool(body.get("permission_mode"))
+        ):
+            # The field rides on the create body, so closing the route that sets it alone would
+            # leave this door open: a task written through the bridge with a mode chosen by the
+            # client. No tier, full control included.
+            raise HTTPException(status_code=403, detail=OWNER_DECISION_ROUTES["cron.permission_mode"])
         if route_id == "settings.edit" and tier == "full_control":
             # Full control writes the owner's settings too, and writes the model and scheduling
             # ones instead of suggesting them. Never a credential, never the bridge's own switches,

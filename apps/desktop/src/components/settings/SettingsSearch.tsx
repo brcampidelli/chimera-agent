@@ -96,6 +96,42 @@ const ENTRIES: readonly SearchEntry[] = [
   },
   {
     tab: "general",
+    label: "settings.row.worktreeCleanup",
+    hint: "settings.hint.worktreeCleanup",
+    anchor: "settings-worktree-cleanup",
+  },
+  {
+    tab: "general",
+    label: "settings.row.hooks",
+    hint: "settings.hint.hooks",
+    anchor: "settings-hooks",
+  },
+  {
+    tab: "general",
+    label: "settings.row.hooksHostExec",
+    hint: "settings.hint.hooksHostExec",
+    anchor: "settings-hooks-host-exec",
+  },
+  {
+    tab: "general",
+    label: "settings.row.claudeHooksRepo",
+    hint: "settings.hint.claudeHooksRepo",
+    anchor: "settings-claude-hooks-repo",
+  },
+  {
+    tab: "general",
+    label: "settings.row.claudeHooksUser",
+    hint: "settings.hint.claudeHooksUser",
+    anchor: "settings-claude-hooks-user",
+  },
+  {
+    tab: "general",
+    label: "settings.row.claudeUserHostExec",
+    hint: "settings.hint.claudeUserHostExec",
+    anchor: "settings-claude-user-host-exec",
+  },
+  {
+    tab: "general",
     label: "settings.row.closeLoopMerge",
     hint: "settings.hint.closeLoopMerge",
     anchor: "settings-close-loop-merge",

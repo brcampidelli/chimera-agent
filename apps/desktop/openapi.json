@@ -7024,6 +7024,15 @@
             "title": "Action",
             "type": "string"
           },
+          "catch_up": {
+            "default": "once",
+            "enum": [
+              "once",
+              "skip"
+            ],
+            "title": "Catch Up",
+            "type": "string"
+          },
           "deliver_to": {
             "anyOf": [
               {
@@ -7052,6 +7061,19 @@
               "failures_only"
             ],
             "title": "Notify",
+            "type": "string"
+          },
+          "permission_mode": {
+            "default": "",
+            "enum": [
+              "",
+              "manual",
+              "accept_edits",
+              "plan",
+              "auto",
+              "dont_ask"
+            ],
+            "title": "Permission Mode",
             "type": "string"
           },
           "schedule": {
@@ -7087,6 +7109,11 @@
               }
             ],
             "title": "Workspace"
+          },
+          "worktree": {
+            "default": false,
+            "title": "Worktree",
+            "type": "boolean"
           }
         },
         "required": [
@@ -7178,10 +7205,84 @@
         "title": "CronFailingOut",
         "type": "object"
       },
+      "CronHistoryRowOut": {
+        "description": "One line of a task's history: a scheduled time that ran or did not, and why.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "number"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "ran",
+              "skipped",
+              "note"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "scheduled_for": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled For"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "worktree": {
+            "default": "",
+            "title": "Worktree",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "job_id",
+          "name",
+          "outcome",
+          "reason"
+        ],
+        "title": "CronHistoryRowOut",
+        "type": "object"
+      },
       "CronJobOut": {
         "properties": {
           "action": {
             "title": "Action",
+            "type": "string"
+          },
+          "catch_up": {
+            "default": "once",
+            "enum": [
+              "once",
+              "skip"
+            ],
+            "title": "Catch Up",
             "type": "string"
           },
           "consecutive_failures": {
@@ -7287,6 +7388,11 @@
             "title": "Notify",
             "type": "string"
           },
+          "permission_mode": {
+            "default": "",
+            "title": "Permission Mode",
+            "type": "string"
+          },
           "schedule": {
             "title": "Schedule",
             "type": "string"
@@ -7338,6 +7444,11 @@
             "default": false,
             "title": "Workspace Unverifiable",
             "type": "boolean"
+          },
+          "worktree": {
+            "default": false,
+            "title": "Worktree",
+            "type": "boolean"
           }
         },
         "required": [
@@ -7387,6 +7498,26 @@
           "behind_seconds"
         ],
         "title": "CronLateOut",
+        "type": "object"
+      },
+      "CronPermissionModeIn": {
+        "description": "The owner's choice of a task's permission mode. Empty clears it.",
+        "properties": {
+          "permission_mode": {
+            "default": "",
+            "enum": [
+              "",
+              "manual",
+              "accept_edits",
+              "plan",
+              "auto",
+              "dont_ask"
+            ],
+            "title": "Permission Mode",
+            "type": "string"
+          }
+        },
+        "title": "CronPermissionModeIn",
         "type": "object"
       },
       "CronResultOut": {
@@ -25365,6 +25496,110 @@
           }
         },
         "summary": "Enable Cron"
+      }
+    },
+    "/api/cron/{job_id}/history": {
+      "get": {
+        "description": "One task's history, newest first: every scheduled time that ran or did not, and why.\n\n`/api/cron/results` holds the answers, so a time that produced none (the app was closed,\nthe task was off, the day's money was spent) was invisible there. This is the record of\nthose, read from the tail of `cron_history.jsonl`. A task that does not exist is a 404; one\nthat exists and has no history yet is an empty list.",
+        "operationId": "cron_history_api_cron__job_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CronHistoryRowOut"
+                  },
+                  "title": "Response Cron History Api Cron  Job Id  History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cron History"
+      }
+    },
+    "/api/cron/{job_id}/permission-mode": {
+      "put": {
+        "description": "The owner's choice of the mode a task runs under (`cron.permission_mode`).\n\nThe owner's decision and the screen's alone: the route id is in\n`bridge_routes.OWNER_DECISION_ROUTES` and `FULL_CONTROL_NEVER`, so no bridge tier reaches\nit. Refused, with the reason, when the mode is wider than Settings on any axis. Switching to\na narrower mode, or clearing it, always works.",
+        "operationId": "set_cron_permission_mode_api_cron__job_id__permission_mode_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CronPermissionModeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CronJobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Cron Permission Mode"
       }
     },
     "/api/decide": {

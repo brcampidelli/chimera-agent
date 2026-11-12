@@ -426,6 +426,7 @@ function AutonomyCard({
         env="CHIMERA_HOOKS"
       >
         <Toggle
+          id="settings-hooks"
           on={c.autonomy.hooks ?? false}
           onChange={(v) => save({ CHIMERA_HOOKS: String(v) })}
         />
@@ -438,6 +439,7 @@ function AutonomyCard({
         env="CHIMERA_HOOKS_HOST_EXEC"
       >
         <Toggle
+          id="settings-hooks-host-exec"
           on={c.autonomy.hooks_host_exec ?? false}
           onChange={(v) => save({ CHIMERA_HOOKS_HOST_EXEC: String(v) })}
         />
@@ -451,6 +453,7 @@ function AutonomyCard({
         env="CHIMERA_CLAUDE_HOOKS_REPO"
       >
         <Toggle
+          id="settings-claude-hooks-repo"
           on={c.autonomy.claude_hooks_repo ?? true}
           onChange={(v) => save({ CHIMERA_CLAUDE_HOOKS_REPO: String(v) })}
         />
@@ -462,6 +465,7 @@ function AutonomyCard({
         env="CHIMERA_CLAUDE_HOOKS_USER"
       >
         <Toggle
+          id="settings-claude-hooks-user"
           on={c.autonomy.claude_hooks_user ?? true}
           onChange={(v) => save({ CHIMERA_CLAUDE_HOOKS_USER: String(v) })}
         />
@@ -474,6 +478,7 @@ function AutonomyCard({
         env="CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC"
       >
         <Toggle
+          id="settings-claude-user-host-exec"
           on={c.autonomy.claude_user_hooks_host_exec ?? false}
           onChange={(v) => save({ CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC: String(v) })}
         />

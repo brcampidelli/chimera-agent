@@ -67,6 +67,14 @@ CLOSED: dict[str, tuple[str, str, dict[str, Any], dict[str, Any]]] = {
         {},
         {"project": "proj", "paths": ["proj"], "dry_run": False},
     ),
+    # A scheduled task's permission mode (onda 4, item 20): the run has nobody watching, so the
+    # mode is the owner's, on the screen, and the bridge neither sets nor changes it.
+    "cron.permission_mode": (
+        "PUT",
+        "/api/cron/{job_id}/permission-mode",
+        {"job_id": "j1"},
+        {"permission_mode": "dont_ask"},
+    ),
     # Plugins (plan B5, 2026-10-17): switched on, they reach every prompt and start servers.
     "plugins.enable": ("POST", "/api/plugins/{name}/enable", {"name": "p"}, {}),
     "plugins.add_mcp": ("POST", "/api/plugins/{name}/enable", {"name": "p"}, {"add_mcp": ["s"]}),

@@ -663,6 +663,15 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
         "projects.worktrees_prune is the owner's decision: worktrees are removed by the owner in "
         "the app (the project's worktree cleanup on the Code screen), never through the bridge."
     ),
+    # A scheduled task runs with nobody watching, so the mode it runs under is reach handed out for
+    # every later run: chosen on the owner's screen, never wider than Settings, and (see
+    # FULL_CONTROL_NEVER) not through the bridge at any tier. `cron.create` carries the field too,
+    # and `police` refuses it there with this same sentence.
+    "cron.permission_mode": (
+        "cron.permission_mode is the owner's decision: the permission mode a scheduled task runs "
+        "under is chosen by the owner in the app (Automation > Schedules), never through the "
+        "bridge."
+    ),
 }
 
 #: Body fields that widen what a run may do: ``verify`` and ``provider_command`` are shell commands,
@@ -1215,6 +1224,11 @@ FULL_CONTROL_NEVER: dict[str, str] = {
     "access.server_token": (
         "the server token stays the owner's even with full control: it is a credential and it "
         "decides who can reach the app."
+    ),
+    "cron.permission_mode": (
+        "cron.permission_mode stays the owner's even with full control: the mode a scheduled task "
+        "runs under is chosen by the owner in the app (Automation > Schedules), because the run "
+        "has nobody watching to catch a mistake in it."
     ),
 }
 

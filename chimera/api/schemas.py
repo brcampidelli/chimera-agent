@@ -2401,6 +2401,13 @@ class CronJobOut(BaseModel):
     (`failures_only`). The result file records every answer whatever this says."""
     tools: list[str] | None = None
     """The only tools this job may use. None = every tool; an empty list = none."""
+    catch_up: Literal["once", "skip"] = "once"
+    """A time missed while nothing ran: `once` runs it one time (within seven days), `skip` only
+    records it."""
+    permission_mode: str = ""
+    """The permission mode the task runs under, or empty. Never wider than Settings."""
+    worktree: bool = False
+    """Runs in a new git worktree of its folder."""
 
 
 class CronResultOut(BaseModel):
@@ -2532,6 +2539,36 @@ class CronCreateIn(BaseModel):
     gets `always`, the previous behaviour."""
     tools: list[str] | None = None
     """The only tools this job may use. Omitted = every tool, the previous behaviour."""
+    catch_up: Literal["once", "skip"] = "once"
+    """What to do about a time missed while the app or service was off: run once when it is back
+    (`once`, the default and the previous behaviour) or only record it (`skip`)."""
+    permission_mode: Literal["", "manual", "accept_edits", "plan", "auto", "dont_ask"] = ""
+    """The permission mode the task runs under; empty = none chosen, the previous behaviour. Never
+    wider than Settings (the route answers 400), never `bypass`, and never set through the bridge."""
+    worktree: bool = False
+    """Run in a new git worktree of the task's folder; kept, with its path in the history, only
+    when the run left work behind."""
+
+
+class CronPermissionModeIn(BaseModel):
+    """The owner's choice of a task's permission mode. Empty clears it."""
+
+    permission_mode: Literal["", "manual", "accept_edits", "plan", "auto", "dont_ask"] = ""
+
+
+class CronHistoryRowOut(BaseModel):
+    """One line of a task's history: a scheduled time that ran or did not, and why."""
+
+    at: float
+    job_id: str
+    name: str
+    outcome: Literal["ran", "skipped", "note"]
+    reason: str
+    """A closed vocabulary (`chimera.scheduler.history.REASONS`): the screen puts each in words."""
+    status: str = ""
+    scheduled_for: float | None = None
+    detail: str = ""
+    worktree: str = ""
 
 
 # --- tasks (kanban + projects) --------------------------------------------------------------------

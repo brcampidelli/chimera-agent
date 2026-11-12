@@ -912,6 +912,8 @@ def _start_cron_daemon(
         # is set from the Usage screen. Read off the snapshot, a cap saved there braked nothing
         # until the next launch while the screen said it was set.
         daily_cap=lambda: get_settings().daily_usd_cap,
+        # The same for the job's permission mode: tightening the posture applies to the next run.
+        live_settings=get_settings,
     )
 
     def run_task(task: str) -> str:
