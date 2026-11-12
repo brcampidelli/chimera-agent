@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Settings search finds the hooks and worktree cleanup switches.** Typing "hook" or "worktree" in the Settings search now lists the lifecycle hooks, the Claude Code hook switches and the archived-worktree cleanup, and opening a result focuses its switch; before, these rows were on the General tab but the search could not find them. (#1229)
+
 ## [0.87.0] - 2026-11-12
 ### Added
 
