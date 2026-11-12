@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.87.0] - 2026-11-12
 ### Added
 
 - **Claude Code's instruction files reach the run.** Beside `AGENTS.md`, Chimera now reads `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`, with their `@file` imports (`CHIMERA_CLAUDE_COMPAT`, on by default), and the Context card names the files a turn was given. Your personal `~/.claude/CLAUDE.md` joins only your own surfaces, the CLI chat and code and the desktop Code turn, never a bot, webhook, scheduled job, subagent or shared-link guest, and it has its own budget. Imports stay inside the folder they belong to, are capped in size and count, and are re-read when their content changes. Prompt snapshots and benchmarks pin the switch off so they do not depend on the machine. (#1221)
