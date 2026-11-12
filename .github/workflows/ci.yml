@@ -40,7 +40,7 @@ jobs:
     # to 29 minutes against that 30, and three runs in one day were cancelled at the limit with
     # nothing failed — among them the 3.13 job on `main` at ae5eef5a and the 3.11 job on #975.
     #
-    # Each shard runs whole test FILES chosen by `tests/shards.py` from `CI_TEST_SHARD`; the two
+    # Each shard runs whole test FILES chosen by `tests/shards.py` from `CI_TEST_SHARD`; the three
     # together run every file once (`test_the_ci_shards_cover_every_test_file_once.py` pins that,
     # including the matrix and the "/3" below agreeing). The id stays `quality`, so `verdict` and
     # every job that `needs: quality` still wait for all nine legs.
