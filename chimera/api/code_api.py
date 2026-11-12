@@ -140,6 +140,8 @@ from chimera.api.schemas import (
     VisionOut,
     WorkActionOut,
     WorksOut,
+    WorktreeIncludeConsentIn,
+    WorktreeIncludePendingListOut,
 )
 from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
@@ -180,6 +182,13 @@ from chimera.core.task_cards import (
     open_store,
     seed_taint,
 )
+from chimera.core.worktree_expiry import (
+    ACTIVATION_FILE,
+    ActivationClock,
+    has_expiry_work,
+    removal_view,
+)
+from chimera.core.worktree_include_consent import IncludeConsent, consent_path
 from chimera.evolution.code_turn_learning import record_turn_lesson
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
@@ -3915,6 +3924,7 @@ def register_code_api(
                                 else {}
                             ),
                             **({"warning": place.base_warning} if place.base_warning else {}),
+                            **({"included": place.included} if place.included else {}),
                         }
                         if place is not None else {}
                     ),
@@ -6702,6 +6712,62 @@ def register_code_api(
         return TranscriberWarmOut(warmed=warmed, seconds=round(time.perf_counter() - began, 2))
 
     pr_sweeper = Sweeper()
+    # Ten minutes, not one: a removal is due in days and a kept worktree is looked at once a day.
+    expiry_sweeper = Sweeper(interval=600.0)
+    # The floor under the thirty days: the day the switch was first on. Read here, at registration,
+    # never in a route's window; written by the sweep's own thread.
+    worktree_activation = ActivationClock(Path(settings.home) / ACTIVATION_FILE)
+    worktree_activation.load()
+
+    def _sweep_worktrees(snapshot: Mapping[str, Any], workspaces: Mapping[str, str] | None = None) -> None:
+        """One pass of the worktree cleanup switch (`chimera/core/worktree_expiry.py`), on the background
+        thread the list starts. It reads the snapshot the list took and the folders the list already
+        read; a failure is logged and the next pass tries again."""
+        from chimera.api.conversation_state import archive_refusal
+        from chimera.core.worktree_expiry import sweep_expired
+
+        def folder_of(sid: str) -> Path | None:
+            stored = workspaces[sid] if workspaces and sid in workspaces else store.stored_workspace(sid)
+            return Path(stored).expanduser() if stored else None
+
+        def held(sid: str) -> bool:
+            # Decided per conversation at the moment it is removed, like the pull-request sweep.
+            return bool(
+                archive_refusal(
+                    running=live_turns.of_session(sid) is not None,
+                    waiting=sid in _waiting_sessions(),
+                    background=sid in work_store.active_parents(),
+                    shared=bool(shares.for_session(sid)),
+                )
+            )
+
+        def folder_users(folder: Path) -> list[str]:
+            import os
+
+            # Every conversation (any state) whose workspace is this folder.
+            def norm(p: str) -> str:
+                try:
+                    return os.path.normcase(str(Path(p).expanduser().resolve()))
+                except OSError:
+                    return os.path.normcase(str(Path(p).expanduser()))
+
+            want = norm(str(folder))
+            # Read at the moment of removal, on this thread, from every stored conversation: the list's
+            # rows leave out the archived ones, and an archived sibling that is not due keeps the folder.
+            rows = [(str(m["id"]), str(m.get("workspace") or "")) for m in store.list_meta()]
+            return [sid for sid, ws in rows if ws and norm(ws) == want]
+
+        try:
+            worktree_activation.persist()
+            removed = sweep_expired(
+                store.marks, snapshot=snapshot, folder_of=folder_of, held=held, now=time.time(),
+                folder_users=folder_users,
+                activated_at=worktree_activation.value(enabled=bool(live().worktree_cleanup)),
+            )
+            if removed:
+                _log.info("removed the worktree of %d archived conversation(s)", len(removed))
+        except Exception as exc:  # a background pass must not die silently; the next one retries
+            _log.warning("worktree cleanup pass failed: %s", exc)
 
     def _sweep_pull_requests(snapshot: Any = None, workspaces: Mapping[str, str] | None = None) -> None:
         """One pass of the pull-request switch, on the background thread the list starts. Never
@@ -6830,6 +6896,14 @@ def register_code_api(
             enabled=bool(live().archive_on_pr_merge),
             has_work=pr_has_work(marks),
         )
+        # The same snapshot, no git and no file read here: the pass decides which worktrees are due.
+        cleanup_on = bool(live().worktree_cleanup)
+        activated_at = worktree_activation.value(enabled=cleanup_on)
+        expiry_sweeper.kick(
+            lambda: _sweep_worktrees(marks, {str(r["id"]): str(r.get("workspace") or "") for r in rows}),
+            enabled=cleanup_on,
+            has_work=has_expiry_work(marks, now=now, activated_at=activated_at) or worktree_activation.dirty,
+        )
         for row in rows:
             sid = str(row["id"])
             mark = replace(
@@ -6860,6 +6934,11 @@ def register_code_api(
             row["archived_at"] = mark.archived_at
             # Why it is archived, shown on the archived row before the person brings it back.
             row["archive_reason"] = mark.archive_reason if mark.archived_at is not None else ""
+            # When an archived conversation's worktree goes, and what kept it so far (no file read here).
+            row["worktree_removal"] = removal_view(
+                mark, workspace=str(row.get("workspace") or ""), enabled=cleanup_on,
+                activated_at=activated_at,
+            )
         stored = {row["id"] for row in rows}
         unsaved: list[dict[str, Any]] = [
             apply_title({
@@ -6978,7 +7057,38 @@ def register_code_api(
         _stored_or_404(session_id)
         if store.marks.get(session_id).archived_at is not None:
             store.marks.unarchive(session_id, at=time.time())
-        return {"id": session_id, "archived_at": None}
+        # The folder the cleanup removed does not come back with the conversation: say so.
+        removed = store.marks.get(session_id).worktree_removed_at is not None
+        return {"id": session_id, "archived_at": None, "worktree_removed": removed}
+
+    # ---- the owner's agreement to a project's `.worktreeinclude` -----------------------------------
+    # The rules file comes from the repository, so reading it is not consent (`worktree_include_consent.py`).
+    # The list is the owner's to read; the answer needs the app's screen, like adding an endpoint.
+    # Not in the desktop bridge's table, and must not be.
+
+    @app.get(
+        "/api/code/worktree-include/pending",
+        dependencies=[guard],
+        response_model=WorktreeIncludePendingListOut,
+    )
+    def worktree_include_pending() -> dict[str, Any]:
+        return {"pending": IncludeConsent(consent_path(live().home)).pending()}
+
+    @app.post(
+        "/api/code/worktree-include/consent",
+        dependencies=[guard],
+        response_model=WorktreeIncludePendingListOut,
+    )
+    def worktree_include_consent(body: WorktreeIncludeConsentIn, request: Request) -> dict[str, Any]:
+        # The screen's own request: not a bridge client, not a paired device (`turn_origin`).
+        if not turn_origin(request.scope)[0]:
+            raise HTTPException(
+                status_code=403, detail="a project's .worktreeinclude is agreed to from the app's screen"
+            )
+        consent = IncludeConsent(consent_path(live().home))
+        if not consent.grant(body.project, body.digest):
+            raise HTTPException(status_code=409, detail="that version of the file is not waiting for an answer")
+        return {"pending": consent.pending()}
 
     # ---- the pull request a conversation opened (C1) -----------------------------------------
     # None of these is in the desktop bridge's table, and must not be: switching an option on is the
@@ -7208,6 +7318,7 @@ def register_code_api(
         reads conversations too, and an agent reading one is not the owner looking at its diff.
         Not in the bridge's table for the same reason.
         """
+        store.marks.opened(session_id, at=time.time())
         return {"changed": store.marks.seen(session_id)}
 
     @app.post(

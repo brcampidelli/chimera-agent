@@ -33,31 +33,34 @@ permissions:
 
 jobs:
   quality:
-    name: lint · type-check · test (py${{ matrix.python-version }} · ${{ matrix.shard }}/2)
+    name: lint · type-check · test (py${{ matrix.python-version }} · ${{ matrix.shard }}/3)
     # Two shards per Python version, for the reason `quality-windows` below gave first: raising the
     # limit only moves the edge. It already went 20 → 30 (on #913 pytest finished 12,067 passed in
     # 19:16 and was cancelled four seconds later). By 2026-10-16/17 the green runs on `main` took 18
     # to 29 minutes against that 30, and three runs in one day were cancelled at the limit with
     # nothing failed — among them the 3.13 job on `main` at ae5eef5a and the 3.11 job on #975.
     #
-    # Each shard runs whole test FILES chosen by `tests/shards.py` from `CI_TEST_SHARD`; the two
+    # Each shard runs whole test FILES chosen by `tests/shards.py` from `CI_TEST_SHARD`; the three
     # together run every file once (`test_the_ci_shards_cover_every_test_file_once.py` pins that,
-    # including the matrix and the "/2" below agreeing). The id stays `quality`, so `verdict` and
-    # every job that `needs: quality` still wait for all six legs.
+    # including the matrix and the "/3" below agreeing). The id stays `quality`, so `verdict` and
+    # every job that `needs: quality` still wait for all nine legs.
     #
     # Ruff and mypy run on shard 1 only — once per Python version, exactly as before the split, not
-    # six times. Shard 1 therefore carries a little more than half the work.
+    # nine times. Shard 1 therefore carries a little more than its share of the work.
     # 20 per shard was about half of 29 plus the install and the type-check. The room ran out: on
     # 2026-10-30 shard 1 finished its tests at 19:16 and was cancelled at the limit with nothing
     # failed (#1162). 30 gives the slack back; splitting into three shards is the next step if it
     # creeps up again.
+    #
+    # Three since 2026-11-12: the green runs on `main` went 21 -> 23-27 minutes with the Claude Code
+    # compatibility work, and shard 1 of #1221 was cancelled at 30:00 at 93% with nothing failed.
     timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -82,9 +85,9 @@ jobs:
         if: matrix.shard == 1
         run: uv run mypy chimera
 
-      - name: Pytest (shard ${{ matrix.shard }} of 2)
+      - name: Pytest (shard ${{ matrix.shard }} of 3)
         env:
-          CI_TEST_SHARD: ${{ matrix.shard }}/2
+          CI_TEST_SHARD: ${{ matrix.shard }}/3
         run: uv run pytest -q
 
   quality-windows:

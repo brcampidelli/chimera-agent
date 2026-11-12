@@ -118,7 +118,7 @@ def test_an_archived_conversation_leaves_the_list_and_nothing_on_disk_changes(
     assert (sessions / f"{sid}.json").stat().st_mtime == mtime
 
     back = app.client.post(f"/api/code/sessions/{sid}/unarchive")
-    assert back.json() == {"id": sid, "archived_at": None}
+    assert back.json() == {"id": sid, "archived_at": None, "worktree_removed": False}
     assert sid in app.rows() and sid not in app.rows(archived=1)
 
 

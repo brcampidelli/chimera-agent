@@ -1,5 +1,5 @@
 ---
-source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
+source_sha256: 278a01e5a149ebc25fc893fdd255f56769e2701bc0134bf7b6e8c0b87bf07e57
 ---
 
 # 安全与防护措施
@@ -223,6 +223,7 @@ export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorizatio
   只有所有者能创建或撤销；桥接不能（除非所有者开启了通过桥接的完全控制，见上文）。
 - **命名引用。** 所有者在 `<CHIMERA_HOME>/references.json` 中列出的文件夹，只能被读取工具（`read_file`、`list_dir`、`grep`、`glob`）以 `@alias/path` 访问；所有写入工具都拒绝别名。
   文件系统根目录、用户主目录或数据文件夹不能作为引用。只有有人值守的界面会获得它们——`chat`、`assist`、`tui`、有人值守的 `solve`、桌面的 Code 轮次（访客的除外）——所以机器人、cron 和 `scenarios` 都没有。
+- **`.worktreeinclude` 与已归档工作树的清理。** 仓库中的 `.worktreeinclude`(或 `.chimera/worktreeinclude`)列出要复制到每个新对话工作树中的被忽略文件——`.env`、本地数据库。除了仓库基线已有的内容之外,这是新工作树继承的唯一东西,而且它是仓库自己的文本,因此在所有者的屏幕同意之前不会复制任何内容:每个项目一次,文件每次变化再来一次。屏幕会显示将要复制的内容;桥接客户端或已配对设备只能让请求出现。符号链接或 junction 永远不会被跟随,复制上限为 50 MB 和 200 个文件,且每个副本都会在工作树内用 git 检查:git 在那里不会忽略的文件会被再次删除,因此 `git add -A` 无法暂存它。`CHIMERA_WORKTREE_CLEANUP` 在大约三十天后删除已归档对话的工作树,从归档、最近一次打开以及该开关首次被看到开启的日期中最晚者算起。开启它会删除文件夹,所以只属于所有者的屏幕,绝不属于桥接。无人值守时,它会保留所有者的清理对话框会保留的每个工作树(未提交的更改、未推送的提交、并非 Chimera 创建的工作树),也会保留含有 `.worktreeinclude` 未复制的被忽略文件的工作树,因为 `git status` 不会列出这些文件。
 - **Markdown 代理。** 仓库里的 `.chimera/agents/*.md` 是别人写的文本，所以只能收窄：它的工具与会话中受治理的工具取交集，步数受会话步数的上限约束，未知键被拒绝，它的 `model` 被忽略，
   正文作为不可信数据被围起来。只有 `<CHIMERA_HOME>/agents` 里所有者自己的文件可以固定目录中的模型。
 - **与对话关联的聊天。** 在 Discord 或 Telegram 中用 `/link` 可以让一个聊天接续某个 Code 对话，只有列在该机器人 allowlist 中的所有者才能关联——没有 allowlist 就谁都不能。

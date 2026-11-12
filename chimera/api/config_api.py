@@ -132,6 +132,9 @@ _EDITABLE_SETTINGS = {
     # It widens what a run reads from the owner's machine, so it is owner-only and written from the
     # owner's screen (`bridge_routes.GUARD_SETTINGS`, `SCREEN_WRITE_SETTINGS`). Read per run: no APPLIES_WHEN entry.
     "CHIMERA_CLAUDE_COMPAT",
+    # Remove an archived conversation's clean, pushed worktree after thirty days
+    # (`chimera/core/worktree_expiry.py`). Screen-only (SCREEN_WRITE_SETTINGS): it deletes folders.
+    "CHIMERA_WORKTREE_CLEANUP",
     # NOT here, by design: CHIMERA_APPROVE_VIA_CHAT. Answering a pending approval from a chat bot
     # widens who can approve to whoever holds that channel, so turning it on stays a deliberate
     # edit of `.env` by the owner — never a switch a screen (or the desktop bridge) can flip.
@@ -358,6 +361,8 @@ SCREEN_WRITE_SETTINGS = frozenset({
     "CHIMERA_CLOSE_LOOP_MERGE",
     # Which instruction files a run reads from the owner's machine (`chimera/core/agents_md.py`).
     "CHIMERA_CLAUDE_COMPAT",
+    # Removing a conversation's worktree deletes a folder: the owner's screen decides, not a token.
+    "CHIMERA_WORKTREE_CLEANUP",
     # A base URL decides where prompts are sent, and the key env name decides which credential goes
     # with them. Adding or removing one is the owner's screen's act, not the server token's (#1133).
     "CHIMERA_ENDPOINTS",
@@ -870,6 +875,8 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "archive_on_pr_merge": settings.archive_on_pr_merge,
             # Whether a run reads Claude Code's instruction files too (`chimera/core/agents_md.py`). On by default.
             "claude_compat": settings.claude_compat,
+            # Whether an archived conversation's clean, pushed worktree is removed after thirty days.
+            "worktree_cleanup": settings.worktree_cleanup,
             # Whether that loop may merge a green pull request. Off by default; owner-only.
             "close_loop_merge": settings.close_loop_merge,
             # The owner's lifecycle hooks and whether a shell hook may run on the host
@@ -1324,6 +1331,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_CODE_CLOSE_LOOP": _check_boolean("CHIMERA_CODE_CLOSE_LOOP"),
     "CHIMERA_ARCHIVE_ON_PR_MERGE": _check_boolean("CHIMERA_ARCHIVE_ON_PR_MERGE"),
     "CHIMERA_CLAUDE_COMPAT": _check_boolean("CHIMERA_CLAUDE_COMPAT"),
+    "CHIMERA_WORKTREE_CLEANUP": _check_boolean("CHIMERA_WORKTREE_CLEANUP"),
     "CHIMERA_CLOSE_LOOP_MERGE": _check_boolean("CHIMERA_CLOSE_LOOP_MERGE"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }

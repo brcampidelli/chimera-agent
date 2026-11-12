@@ -1,5 +1,5 @@
 ---
-source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
+source_sha256: 278a01e5a149ebc25fc893fdd255f56769e2701bc0134bf7b6e8c0b87bf07e57
 ---
 
 # Sécurité & garde-fous
@@ -336,6 +336,7 @@ du 2026-10-18, **Contrôle total par le pont**, dans Réglages > Sécurité.
   l'utilisateur ou le dossier de données sont refusés comme référence. Seules les surfaces
   accompagnées les reçoivent — `chat`, `assist`, `tui`, un `solve` accompagné, le tour Code du bureau
   (jamais celui d'un invité) —, si bien que les bots, le cron et `scenarios` n'en ont aucune.
+- **`.worktreeinclude` et le nettoyage des arbres de travail archivés.** Le `.worktreeinclude` d'un dépôt (ou `.chimera/worktreeinclude`) nomme des fichiers ignorés — `.env`, une base locale — à copier dans l'arbre de travail de chaque nouvelle conversation. Au-delà de ce que la base du dépôt contient déjà, c'est la seule chose qu'un nouvel arbre de travail hérite, et c'est le texte du dépôt lui-même : rien n'est copié avant que l'écran du propriétaire accepte, une fois par projet puis à chaque changement du fichier. L'écran montre ce qui serait copié ; un client du pont ou un appareil appairé ne peut que faire apparaître la demande. Un lien symbolique ou une jonction n'est jamais suivi, la copie est plafonnée à 50 Mo et 200 fichiers, et chaque copie est vérifiée avec git dans l'arbre de travail : un fichier que git n'y ignorerait pas est supprimé de nouveau, de sorte que `git add -A` ne peut pas l'indexer. `CHIMERA_WORKTREE_CLEANUP` supprime l'arbre de travail d'une conversation archivée environ trente jours plus tard, comptés depuis la plus tardive des dates entre l'archivage, la dernière ouverture et le jour où l'interrupteur a été vu activé pour la première fois. L'activer supprime des dossiers : il relève du seul écran du propriétaire, jamais du pont. Sans surveillance, il conserve tout arbre de travail que le dialogue de nettoyage du propriétaire conserverait (modifications non validées, commits non poussés, un arbre que Chimera n'a pas créé) ainsi que tout arbre contenant un fichier ignoré que `.worktreeinclude` n'a pas copié, car `git status` ne les liste pas.
 - **Agents en Markdown.** `.chimera/agents/*.md` dans un dépôt est le texte de quelqu'un d'autre, il
   ne peut donc que restreindre : ses outils sont intersectés avec les outils gouvernés de la session,
   ses étapes plafonnées par celles de la session, les clés inconnues refusées, son `model` ignoré, et

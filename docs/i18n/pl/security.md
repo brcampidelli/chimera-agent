@@ -1,5 +1,5 @@
 ---
-source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
+source_sha256: 278a01e5a149ebc25fc893fdd255f56769e2701bc0134bf7b6e8c0b87bf07e57
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -306,6 +306,7 @@ Most pulpitu (`chimera mcp desktop`) ma trzy przełączniki, każdy bez znaczeni
   danych nie mogą być referencją. Dostają je tylko powierzchnie z obecnym człowiekiem — `chat`,
   `assist`, `tui`, `solve` z obecnym człowiekiem, tura Code w desktopie (nigdy gościa) — więc boty,
   cron i `scenarios` nie mają żadnej.
+- **`.worktreeinclude` i czyszczenie zarchiwizowanych worktree.** Plik `.worktreeinclude` repozytorium (lub `.chimera/worktreeinclude`) wymienia ignorowane pliki — `.env`, lokalną bazę danych — kopiowane do worktree każdej nowej rozmowy. Poza tym, co baza repozytorium już zawiera, to jedyna rzecz, jaką nowy worktree dziedziczy, a jest to tekst samego repozytorium, więc nic nie jest kopiowane, dopóki ekran właściciela się nie zgodzi: raz na projekt i ponownie przy każdej zmianie pliku. Ekran pokazuje, co zostałoby skopiowane; klient mostu lub sparowane urządzenie może tylko sprawić, że prośba się pojawi. Dowiązanie symboliczne ani junction nigdy nie jest śledzone, kopia ma limit 50 MB i 200 plików, a każda kopia jest sprawdzana gitem wewnątrz worktree: plik, którego git tam nie ignoruje, jest usuwany ponownie, więc `git add -A` nie może go dodać. `CHIMERA_WORKTREE_CLEANUP` usuwa worktree zarchiwizowanej rozmowy po około trzydziestu dniach, liczonych od najpóźniejszego z: archiwizacji, ostatniego otwarcia i dnia, w którym po raz pierwszy zobaczono włączony przełącznik. Włączenie go usuwa foldery, więc należy wyłącznie do ekranu właściciela, nigdy do mostu. Bez nadzoru zachowuje każde worktree, które zachowałby dialog czyszczenia właściciela (niezatwierdzone zmiany, niewypchnięte commity, worktree nie utworzone przez Chimerę), a także każde worktree z ignorowanym plikiem, którego `.worktreeinclude` nie skopiował, bo `git status` ich nie wylicza.
 - **Agenci w Markdown.** `.chimera/agents/*.md` w repozytorium to cudzy tekst, więc może tylko
   zawężać: jego narzędzia są przecinane z nadzorowanymi narzędziami sesji, jego kroki ograniczone
   krokami sesji, nieznane klucze odrzucane, jego `model` ignorowany, a jego treść ogrodzona jako

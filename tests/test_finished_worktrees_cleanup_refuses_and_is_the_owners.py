@@ -324,6 +324,9 @@ def test_every_refusal_has_a_test_above() -> None:
         "detached",
         "current_branch",
         "dirty",
+        # Only the unattended cleanup asks for it (`protect_ignored`); tested in
+        # `tests/test_worktree_expiry.py` (an ignored file made in the conversation keeps the worktree).
+        "ignored",
         "unpushed",
     ]
 

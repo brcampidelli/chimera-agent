@@ -87,6 +87,8 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     # The close loop's merge (2026-11-10): a separate switch, because a merge puts the change on the
     # default branch. Owner-only like the two above.
     "CHIMERA_CLOSE_LOOP_MERGE": ("false", "true"),
+    # Switching it on makes the app delete an archived conversation's worktree folder (2026-11-11).
+    "CHIMERA_WORKTREE_CLEANUP": ("false", "true"),
     "CHIMERA_BRANCH_PREFIX": ("chimera", "feature"),
     # The project pack narrows (P7.6): switching it off hands back what the pack took away.
     "CHIMERA_PROJECT_PACK": ("true", "false"),
