@@ -243,8 +243,9 @@ interface Exchange {
   answer: string;
   tools: CodeToolEvent[];
   edits: { path: string; patch: string }[];
-  /** The plan this turn proposed before it ran anything (`chimera/api/plan_gate.py`), or none. */
-  plan?: { steps: string[]; raw: string };
+  /** The plan this turn proposed before it ran anything (`chimera/api/plan_gate.py`), or none.
+   *  `approvalId` is the question that holds the turn on it, once the server has asked it. */
+  plan?: { steps: string[]; raw: string; approvalId?: string };
   /** The agent's own task list for this turn — its claim about its progress, not a verdict.
    *  Replaced wholesale on every frame, because the frame carries the whole list: merging
    *  would build a list out of two snapshots and show one that never existed. */
@@ -1308,9 +1309,9 @@ export function Conversation({
   }, [publishSide, sessionId, liveUsed, liveWindow, peakUsed, peakWindow, worksOpen, instructionsKey]);
 
   // The plan of the MOST RECENT turn only (an older turn's plan is not this one's). It is "awaiting"
-  // while the approval card on screen is the question that plan raised: the gate's question carries the
-  // plan's own steps as its text. That match is by text, a known fragility: the frame carries no id
-  // (see the PR notes). A decision sent here is shown until the turn's `done` says how it ended.
+  // while the approval card on screen is the question that plan raised, matched by the id the server
+  // put on the plan frame (`approvalId`), not by the text of the question. A decision sent here is
+  // shown until the turn's `done` says how it ended.
   const [planDecision, setPlanDecision] = useState<{ steps: string; decision: "approved" | "refused" } | null>(null);
   const planView = useMemo(() => {
     const latest = exchanges.length > 0 ? exchanges[exchanges.length - 1] : undefined;
@@ -1318,13 +1319,14 @@ export function Conversation({
     const steps = latest.plan.steps;
     const stepsKey = JSON.stringify(steps);
     const awaitingId =
-      pendingApproval && steps.length > 0 && pendingApproval.action.includes(steps.map((s, i) => `${i + 1}. ${s}`).join("\n"))
-        ? pendingApproval.id
-        : null;
-    let status: "awaiting" | "approved" | "refused";
+      pendingApproval && latest.plan.approvalId === pendingApproval.id ? pendingApproval.id : null;
+    let status: "awaiting" | "approved" | "refused" | "on_card";
     if (awaitingId) status = "awaiting";
     else if (latest.done) status = latest.done.stopped_reason === "plan_gate:refused" ? "refused" : "approved";
     else if (planDecision?.steps === stepsKey) status = planDecision.decision;
+    // The turn is still going and a question is on the card, but it does not hold this plan (no id, or
+    // another one). Not "approved": nothing here says the plan was. The panel says where to answer.
+    else if (pendingApproval) status = "on_card";
     else status = "approved";
     return { steps, todos: latest.todos, awaitingId, status };
   }, [exchanges, pendingApproval, planDecision]);
@@ -1440,7 +1442,14 @@ export function Conversation({
         patch((e) => ({ ...e, todos: ((data.items ?? []) as TodoEntry[]) }));
         break;
       case "plan":
-        patch((e) => ({ ...e, plan: { steps: (data.steps ?? []) as string[], raw: String(data.raw ?? "") } }));
+        patch((e) => ({
+          ...e,
+          plan: {
+            steps: (data.steps ?? []) as string[],
+            raw: String(data.raw ?? ""),
+            ...(data.approval_id ? { approvalId: String(data.approval_id) } : {}),
+          },
+        }));
         break;
       case "chart":
         patch((e) => ({ ...e, charts: [...(e.charts ?? []), data as unknown as CodeChartFrame] }));

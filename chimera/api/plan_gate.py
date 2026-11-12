@@ -129,6 +129,7 @@ def gate(
     ask: Any = None,
     facts: dict[str, Any] | None = None,
     why: str = "",
+    on_plan_asked: Any = None,
 ) -> PlanVerdict:
     """Propose a plan, show it, and wait for a person. Returns what was decided.
 
@@ -157,12 +158,25 @@ def gate(
     # The card's first line says WHY the stop came, when the rule (not the person) asked for it, so
     # a person who did not expect a plan can see it was a deliberate rule and not a fault.
     shown = plan.as_text() if not why else f"{why}\n{plan.as_text()}"
+
+    def _asked(question: Any) -> None:
+        # The question's id is known only once `ask` has written it, so the plan is tied to it here,
+        # by the same call that announces the question. Nothing else pairs them.
+        if on_asked is not None:
+            on_asked(question)
+        if on_plan_asked is not None:
+            on_plan_asked(plan, str(getattr(question, "id", "") or ""))
+
     approved = bool(
         ask(
             home,
             shown,
             REASON,
-            on_asked=on_asked,
+            # Wrapped only when there is an `on_asked` to wrap. `ask_durably` reads whether `on_asked`
+            # is set to decide where the code is shown (`_where_the_code_goes`), so creating a callback
+            # where the caller gave none would change that answer. Without a screen to announce the
+            # question, the plan's question id is not reported: that is the price of not changing it.
+            on_asked=_asked if (on_asked is not None and on_plan_asked is not None) else on_asked,
             wait_seconds=wait_seconds,
             decision="review",
             # Only when the caller named any: the injected `ask` of the tests takes the same
@@ -173,6 +187,19 @@ def gate(
     return PlanVerdict(
         approved=approved, plan=plan, outcome="approved" if approved else "refused"
     )
+
+
+def plan_payload(plan: Plan, approval_id: str = "") -> dict[str, Any]:
+    """The `plan` frame's payload: the steps, and the id of the question that holds the turn on them.
+
+    The id is what lets a screen answer the plan with the question it is parked on, instead of
+    inferring the pairing from the text. Added to the frame, never renamed: a screen that reads only
+    `steps` and `raw` is unaffected. Absent when no question was asked (the plan was shown, not held).
+    """
+    payload: dict[str, Any] = {"steps": plan.steps, "raw": plan.raw}
+    if approval_id:
+        payload["approval_id"] = approval_id
+    return payload
 
 
 def as_system_note(plan: Plan) -> str:

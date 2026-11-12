@@ -40,7 +40,9 @@ export function PlanCard() {
       ? t("code.plan.status.awaiting")
       : plan.status === "refused"
         ? t("code.plan.status.refused")
-        : t("code.plan.status.approved");
+        : plan.status === "on_card"
+          ? t("code.plan.status.onCard")
+          : t("code.plan.status.approved");
   const statusTone = plan.status === "awaiting" ? "text-accent-ink" : "text-muted-foreground";
 
   const answer = async (approved: boolean) => {

@@ -28,9 +28,11 @@ export interface PlanFacts {
   steps: string[];
   todos: TodoEntry[];
   awaitingId: string | null;
-  /** `awaiting`: the turn is parked on it. `refused`: the person refused it and the turn ended. Any
-   *  other plan the turn ran past is `approved`. */
-  status: "awaiting" | "approved" | "refused";
+  /** `awaiting`: the turn is parked on it. `refused`: the person refused it and the turn ended.
+   *  `on_card`: the turn is still going and waits on a question on the approval card that does not
+   *  hold this plan, so the panel has nothing to answer and says where the answer is. Any other plan
+   *  the turn ran past is `approved`. */
+  status: "awaiting" | "approved" | "refused" | "on_card";
   /** Clears the approval card when it still holds question `id`, and records the decision sent so the
    *  panel can show it until the turn's `done` says how the turn ended. */
   clearAwaiting: (id: string, decision: "approved" | "refused") => void;

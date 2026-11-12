@@ -1981,8 +1981,9 @@ export interface CodeTurnHandlers {
   onEdit?: (path: string, patch: string) => void;
   onTodo?: (items: { task: string; status: string }[]) => void;
   /** The plan the turn proposed before running anything (`chimera/api/plan_gate.py`): its steps,
-   *  in order, as the planner wrote them. Sent once per turn, before the approval question it raises. */
-  onPlan?: (plan: { steps: string[]; raw: string }) => void;
+   *  in order, as the planner wrote them. Sent before the approval question it raises, and again
+   *  with `approvalId` once that question exists (the second frame is the one that holds the turn). */
+  onPlan?: (plan: { steps: string[]; raw: string; approvalId?: string }) => void;
   onNotice?: (n: { code: string; text: string; data?: Record<string, unknown> }) => void;
   onVerified?: (v: CodeVerified) => void;
   onApproval?: (q: CodeApprovalEvent) => void;
@@ -2366,6 +2367,7 @@ function applyCodeTurnFrame(
     h.onPlan?.({
       steps: Array.isArray(payload.steps) ? (payload.steps as unknown[]).map(String) : [],
       raw: String(payload.raw ?? ""),
+      ...(payload.approval_id ? { approvalId: String(payload.approval_id) } : {}),
     });
   else if (event === "todo")
     h.onTodo?.((payload.items ?? []) as { task: string; status: string }[]);

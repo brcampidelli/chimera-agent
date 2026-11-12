@@ -5814,6 +5814,12 @@ def register_code_api(
                         model=(req.roles.plan if req.roles else None) or req.model,
                         on_plan=lambda p: emit("plan", {"steps": p.steps, "raw": p.raw}),
                         on_asked=approval_sink.emit,
+                        # The same plan again, now with the id of the question that holds the turn on
+                        # it: the screen pairs the two by id, not by matching the text. Same frame name
+                        # and fields, plus `approval_id`; the screen's last `plan` frame wins.
+                        on_plan_asked=lambda p, question_id: emit(
+                            "plan", _plan_gate.plan_payload(p, question_id)
+                        ),
                         wait_seconds=float(settings.approval_wait),
                         facts={"run_id": turn_id, "surface": "api:turn", "tool": "plan"},
                         # Shown on the card only when the RULE stopped the turn: a person who asked
