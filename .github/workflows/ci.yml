@@ -91,7 +91,7 @@ jobs:
         run: uv run pytest -q
 
   quality-windows:
-    name: test (windows ${{ matrix.shard }}/4)
+    name: test (windows ${{ matrix.shard }}/5)
     # Three shards, because one runner can no longer hold the suite. The limit went 30 → 45 once
     # already (#778 and #780 finished at 29:58 and 29:14, #782 was cut at 30:14). By 2026-10-14/15
     # the green runs on `main` took 34 to 41 minutes, and on #903 pytest alone ran 44:35 — 11,816
@@ -101,6 +101,8 @@ jobs:
     # Four since 2026-11-11: with three, the green runs on `main` took 19 to 26 minutes and then
     # 25 to 30+, and shard 1/3 was cancelled at 30:00 having run every test (#1219, #1223) - the
     # same edge again. A fourth shard gives the room back without raising the limit.
+    # Five since 2026-11-12: with four, the shards of #1221 took 17, 21, 26 and 30+ minutes (shards
+    # balance by test count, not time) and 4/4 was cancelled at 30:00 with nothing failed.
     #
     # Each shard runs whole test FILES chosen by `tests/shards.py` from `CI_TEST_SHARD`; the three
     # together run every file once (`test_the_ci_shards_cover_every_test_file_once.py` pins that,
@@ -113,7 +115,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
     # The suite has never run on Windows, and the day it first did it failed three times — all from
     # the same family of Unix assumption:
     #
@@ -147,7 +149,7 @@ jobs:
 
       - name: Pytest (shard ${{ matrix.shard }} of 3)
         env:
-          CI_TEST_SHARD: ${{ matrix.shard }}/4
+          CI_TEST_SHARD: ${{ matrix.shard }}/5
         run: uv run pytest -q
 
   integration:
