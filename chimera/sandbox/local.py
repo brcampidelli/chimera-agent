@@ -104,6 +104,7 @@ class LocalSandbox:
         cwd: Path | None,
         use_shell: bool | None,
         on_timeout: Callable[[subprocess.Popen[bytes]], str | None] | None,
+        stdin_data: bytes | None = None,
     ) -> SandboxResult:
         """Run ``command``. ``on_timeout`` is offered the still-running process when the timeout
         passes, and returns the id of the background job that took it over, or None to decline; a
@@ -126,12 +127,17 @@ class LocalSandbox:
             # a console program writes. Worse than mangling: bytes the ANSI page leaves
             # undefined raise on subprocess's reader thread, and `communicate` then returns a
             # *successful* process whose stdout is `None` (`chimera/proc/decode.py`).
-            stdin=subprocess.DEVNULL,
+            # Closed unless the caller has bytes to feed it (the SSH file tools send a file's content
+            # here, so that it never rides on a command line).
+            stdin=subprocess.DEVNULL if stdin_data is None else subprocess.PIPE,
             env=_child_env(),
             start_new_session=posix,
          **no_window())
         try:
-            raw_out, raw_err = proc.communicate(timeout=timeout)
+            if stdin_data is None:
+                raw_out, raw_err = proc.communicate(timeout=timeout)
+            else:
+                raw_out, raw_err = proc.communicate(input=stdin_data, timeout=timeout)
             out, err = console_text(raw_out), console_text(raw_err)
         except subprocess.TimeoutExpired:
             if on_timeout is not None:

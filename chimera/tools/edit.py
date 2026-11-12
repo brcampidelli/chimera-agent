@@ -127,6 +127,39 @@ def _parse_hunks(patch: str) -> list[tuple[str, str]]:
     return hunks
 
 
+def apply_hunks(content: str, hunks: list[tuple[str, str]]) -> str:
+    """``content`` with every hunk applied, or ValueError naming the hunk that does not anchor.
+
+    All-or-nothing, and shared by ``apply_patch`` here and its form on a remote host.
+    """
+    # Anchor EVERY hunk against the ORIGINAL content (not a copy mutated by earlier hunks), so a
+    # later hunk can't accidentally match text an earlier hunk inserted. Collect each hunk's span,
+    # reject any overlap, then apply all edits by offset in one pass — genuinely all-or-nothing.
+    spans: list[tuple[int, int, str, int]] = []  # (start, end, replacement, hunk_number)
+    for index, (search, replace) in enumerate(hunks, start=1):
+        if search == "":
+            raise ValueError(f"hunk {index} has an empty SEARCH block (it anchors the edit)")
+        occurrences = content.count(search)
+        if occurrences == 0:
+            raise ValueError(f"hunk {index} SEARCH not found (must match exactly, incl. whitespace)")
+        if occurrences > 1:
+            raise ValueError(f"hunk {index} SEARCH is ambiguous ({occurrences} matches) — add context")
+        start = content.index(search)
+        spans.append((start, start + len(search), replace, index))
+    spans.sort()
+    for prev, curr in zip(spans, spans[1:], strict=False):
+        if curr[0] < prev[1]:
+            raise ValueError(f"hunks {prev[3]} and {curr[3]} target overlapping regions")
+    out: list[str] = []
+    cursor = 0
+    for start, end, replace, _ in spans:
+        out.append(content[cursor:start])
+        out.append(replace)
+        cursor = end
+    out.append(content[cursor:])
+    return "".join(out)
+
+
 class ApplyPatchTool(_WorkspaceTool):
     name = "apply_patch"
     description = (
@@ -161,32 +194,11 @@ class ApplyPatchTool(_WorkspaceTool):
             content, newline = read_text_for_edit(path)
         except UnicodeDecodeError:
             return f"error: {rel} is not a UTF-8 text file — cannot edit"
-        # Anchor EVERY hunk against the ORIGINAL content (not a copy mutated by earlier hunks), so a
-        # later hunk can't accidentally match text an earlier hunk inserted. Collect each hunk's span,
-        # reject any overlap, then apply all edits by offset in one pass — genuinely all-or-nothing.
-        spans: list[tuple[int, int, str, int]] = []  # (start, end, replacement, hunk_number)
-        for index, (search, replace) in enumerate(hunks, start=1):
-            if search == "":
-                return f"error: hunk {index} has an empty SEARCH block (it anchors the edit)"
-            occurrences = content.count(search)
-            if occurrences == 0:
-                return f"error: hunk {index} SEARCH not found (must match exactly, incl. whitespace)"
-            if occurrences > 1:
-                return f"error: hunk {index} SEARCH is ambiguous ({occurrences} matches) — add context"
-            start = content.index(search)
-            spans.append((start, start + len(search), replace, index))
-        spans.sort()
-        for prev, curr in zip(spans, spans[1:], strict=False):
-            if curr[0] < prev[1]:
-                return f"error: hunks {prev[3]} and {curr[3]} target overlapping regions"
-        out: list[str] = []
-        cursor = 0
-        for start, end, replace, _ in spans:
-            out.append(content[cursor:start])
-            out.append(replace)
-            cursor = end
-        out.append(content[cursor:])
-        atomic_write_text(path, "".join(out), newline=newline)  # preserve line endings; atomic
+        try:
+            updated = apply_hunks(content, hunks)
+        except ValueError as exc:
+            return f"error: {exc}"
+        atomic_write_text(path, updated, newline=newline)  # preserve line endings; atomic
         return append_format_observation(f"applied {len(hunks)} hunk(s) to {rel}", path, self.workspace)
 
 
@@ -264,7 +276,7 @@ class EditBatchTool(_WorkspaceTool):
                 return f"error: edit {index} has identical 'old' and 'new' — nothing to change"
             try:
                 expected = int(raw.get("count", 1))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 return f"error: edit {index} has a non-integer 'count'"
             if expected < 1:
                 return f"error: edit {index} expects {expected} occurrences — must be >= 1"

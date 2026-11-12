@@ -76,39 +76,49 @@ class ReadFileTool(_WorkspaceTool):
         if not path.is_file():
             return f"error: file not found: {kwargs['path']}"
         text = path.read_text(encoding="utf-8", errors="replace")
-        # A window, when one was asked for. Before this, a file over the ceiling was cut at 20,000
-        # characters with a notice that named the total and no way to reach the rest: measured on
-        # 2026-09-19 in the desktop agent's own transcript, a 137k-character module was the one it
-        # had to edit, and it spent the turn's steps on greps that could not see the region either.
-        # The notice now names the next window, so reading on is one call, not a guess.
-        start = int(kwargs["start_line"]) if kwargs.get("start_line") is not None else 1
-        max_lines = kwargs.get("max_lines")
-        lines = text.splitlines(keepends=True)
-        if start < 1:
-            return "error: start_line is 1-based"
-        if start > len(lines):
-            return f"error: start_line {start} is past the end ({len(lines)} lines)"
-        if max_lines is not None:
-            stop = start - 1 + max(1, int(max_lines))
-            window = "".join(lines[start - 1:stop])
-            if stop < len(lines):
-                window += f"\n... [truncated, lines {start}–{stop} of {len(lines)} shown; continue with start_line={stop + 1}]"
-            return window
-        if start > 1:
-            text = "".join(lines[start - 1:])
-        if len(text) > _MAX_READ_CHARS:
-            cut = text[:_MAX_READ_CHARS]
-            shown = cut.count("\n")
-            next_line = start + shown
-            # `[truncated,` stays the prefix: `chimera/eval/scenario_traps.py` matches it as the
-            # sign that a read came back short, and the daily suite's oracle keys its second look
-            # on the same six characters.
-            return (
-                cut
-                + f"\n... [truncated, lines {start}–{next_line - 1} of {len(lines)} shown, {len(text)} chars"
-                + f" from here; continue with start_line={next_line}]"
-            )
-        return text
+        return read_window(text, kwargs.get("start_line"), kwargs.get("max_lines"))
+
+
+def read_window(text: str, start_line: Any, max_lines: Any) -> str:
+    """What ``read_file`` answers for ``text``: the whole of it, or the window asked for, with the
+    truncation notice that names the next one. Shared with the SSH file tools, so a remote read looks
+    exactly like a local one."""
+    # A window, when one was asked for. Before this, a file over the ceiling was cut at 20,000
+    # characters with a notice that named the total and no way to reach the rest: measured on
+    # 2026-09-19 in the desktop agent's own transcript, a 137k-character module was the one it
+    # had to edit, and it spent the turn's steps on greps that could not see the region either.
+    # The notice now names the next window, so reading on is one call, not a guess.
+    try:
+        start = int(start_line) if start_line is not None else 1
+        span = max(1, int(max_lines)) if max_lines is not None else None
+    except (TypeError, ValueError, OverflowError):  # 1e999 is infinity, and int(inf) raises
+        return "error: start_line and max_lines must be whole numbers"
+    lines = text.splitlines(keepends=True)
+    if start < 1:
+        return "error: start_line is 1-based"
+    if start > len(lines):
+        return f"error: start_line {start} is past the end ({len(lines)} lines)"
+    if span is not None:
+        stop = start - 1 + span
+        piece = "".join(lines[start - 1:stop])
+        if stop < len(lines):
+            piece += f"\n... [truncated, lines {start}–{stop} of {len(lines)} shown; continue with start_line={stop + 1}]"
+        return piece
+    if start > 1:
+        text = "".join(lines[start - 1:])
+    if len(text) > _MAX_READ_CHARS:
+        cut = text[:_MAX_READ_CHARS]
+        shown = cut.count("\n")
+        next_line = start + shown
+        # `[truncated,` stays the prefix: `chimera/eval/scenario_traps.py` matches it as the
+        # sign that a read came back short, and the daily suite's oracle keys its second look
+        # on the same six characters.
+        return (
+            cut
+            + f"\n... [truncated, lines {start}–{next_line - 1} of {len(lines)} shown, {len(text)} chars"
+            + f" from here; continue with start_line={next_line}]"
+        )
+    return text
 
 
 def syntax_error(path: Path, content: str) -> str | None:

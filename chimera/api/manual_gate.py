@@ -209,6 +209,21 @@ def _targets_of(spec: WriterSpec, args: dict[str, Any]) -> list[str]:
     return found or ([spec.default] if spec.default else [])
 
 
+def _remote_of(tool: Any) -> Any:
+    """The remote file tool under ``tool`` (through wrappers), or None for an ordinary local one.
+
+    A tool of an SSH conversation writes on another machine: the diff of the workspace file of the same
+    relative path would be a different file's, and "a write in the workspace" would be false.
+    """
+    for _ in range(12):
+        if tool is None:
+            return None
+        if isinstance(getattr(tool, "remote_host", None), str):
+            return tool
+        tool = getattr(tool, "inner", None)
+    return None
+
+
 def _bounded(diff: str) -> str:
     if len(diff) <= MAX_DIFF_CHARS:
         return diff
@@ -249,6 +264,10 @@ class ManualEditGate(Tool):
         """``tool:path`` for exactly one destination, else "" (only "once" is offered)."""
         if len(targets) != 1:
             return ""
+        remote = _remote_of(self.inner)
+        if remote is not None:  # the path is the host's, not a workspace path: name the host in the key
+            key = f"{self.name}@{remote.remote_host}:{targets[0]}"
+            return key if len(key) <= MAX_KEY_CHARS else ""
         key = f"{self.name}:{_norm_target(self.workspace, targets[0])}"
         return key if len(key) <= MAX_KEY_CHARS else ""
 
@@ -263,11 +282,26 @@ class ManualEditGate(Tool):
         if key and self.scope.is_allowed(key):
             return self.inner.run(**kwargs)
         shown = ", ".join(targets) or "(the tool picks the file)"
-        diff = _bounded(proposed_diff(self.workspace, self.name, kwargs)) if spec.diff else ""
-        action = f"{self.name}: {shown}" + (f"\n{diff}" if diff else "")
+        remote = _remote_of(self.inner)
+        if remote is not None:
+            try:
+                preview = remote.remote_preview(kwargs) if spec.diff else ""
+            except Exception:  # noqa: BLE001 - a preview that fails must not stop the question being asked
+                preview = ""
+            diff = _bounded(preview)
+            where = f"{self.name} on {remote.remote_host}"
+            reason = (
+                f"a write on {remote.remote_host} over ssh (not in the workspace), in a conversation "
+                "that asks before each one (Manual)"
+            )
+        else:
+            diff = _bounded(proposed_diff(self.workspace, self.name, kwargs)) if spec.diff else ""
+            where = self.name
+            reason = "a write in the workspace, in a conversation that asks before each one (Manual)"
+        action = f"{where}: {shown}" + (f"\n{diff}" if diff else "")
         question = SimpleNamespace(
             action=action,
-            reason="a write in the workspace, in a conversation that asks before each one (Manual)",
+            reason=reason,
             decision=None,
             allow_key=key,
         )

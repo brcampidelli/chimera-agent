@@ -386,9 +386,19 @@ def read_text_for_edit(path: Path) -> tuple[str, str]:
     write step can restore the file's own convention exactly. Raises ``UnicodeDecodeError`` on a
     non-UTF-8 file so the caller can report it cleanly instead of corrupting binary content.
     """
-    raw = Path(path).read_bytes().decode("utf-8")
-    newline = "\r\n" if "\r\n" in raw else "\n"
-    return raw.replace("\r\n", "\n"), newline
+    return decode_for_edit(Path(path).read_bytes())
+
+
+def decode_for_edit(raw: bytes) -> tuple[str, str]:
+    """:func:`read_text_for_edit` on bytes already in hand (the remote file tools read over ssh)."""
+    text = raw.decode("utf-8")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    return text.replace("\r\n", "\n"), newline
+
+
+def encode_after_edit(text: str, *, newline: str = "\n") -> bytes:
+    """The bytes :func:`atomic_write_text` writes for ``text``: UTF-8, ``newline`` restored."""
+    return (text.replace("\n", "\r\n") if newline == "\r\n" else text).encode("utf-8")
 
 
 def atomic_write_text(path: Path, text: str, *, newline: str = "\n") -> None:
@@ -399,10 +409,9 @@ def atomic_write_text(path: Path, text: str, *, newline: str = "\n") -> None:
     back to CRLF (``text`` is ``\\n``-only after :func:`read_text_for_edit`, so there is no doubling).
     Temp+replace means a crash/error mid-write can't truncate the user's existing file.
     """
-    body = text.replace("\n", "\r\n") if newline == "\r\n" else text
     p = Path(path)
     tmp = p.with_suffix(p.suffix + ".chimera-tmp")
-    tmp.write_bytes(body.encode("utf-8"))
+    tmp.write_bytes(encode_after_edit(text, newline=newline))
     tmp.replace(p)
 
 

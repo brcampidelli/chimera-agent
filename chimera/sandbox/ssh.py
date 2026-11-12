@@ -44,8 +44,10 @@ The fences that guard Chimera's own files by path (the approval queue, the audit
 ``.env``) protect THIS machine's files and keep reading the command as they always did; they do not,
 and cannot, protect a file on the remote machine, and nothing here loosens them. The file tools are
 the other half: the files are over there, so a conversation in this environment refuses the local
-read/write/edit tools (:mod:`chimera.tools.ssh_files`) instead of editing the wrong machine. A remote
-file layer is a separate piece of work.
+read/write/edit tools (:mod:`chimera.tools.ssh_files`) instead of editing the wrong machine. The core
+ones (``read_file``, ``write_file``, ``edit_file``, ``list_dir``, ``grep``, ``glob``) are replaced there by
+remote forms that go through :meth:`SshSandbox.run_script`, i.e. through the same argv, the same alias
+re-check and the same sanitizing as a command; the rest of the file tools keep the refusal.
 
 ``Include`` in ``~/.ssh/config`` is followed only for files that resolve inside ``~/.ssh``; one that
 points elsewhere is not read, and its aliases are not offered.
@@ -67,7 +69,7 @@ import shlex
 import shutil
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -407,14 +409,18 @@ class SshSandbox:
             return False
         return self._ask is None or not self._ask(command)
 
-    def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
-        from chimera.sandbox.local import LocalSandbox
+    def confirm_when_tainted(self, what: str) -> bool:
+        """Whether ``what`` (a write the file tools are about to make) may go ahead: True when the turn
+        has read nothing from outside, or when the owner was asked, through the same question a command
+        uses, and said yes. False when it was declined or nobody could be asked."""
+        return not self._declined_for_taint(what)
 
-        if self._recheck is not None:
-            try:
-                self._recheck()
-            except ValueError as exc:
-                return SandboxResult(exit_code=1, stderr=f"error: not run: {exc}")
+    def run(
+        self, command: str, *, timeout: int = 60, cwd: Path | None = None, stdin: bytes | None = None
+    ) -> SandboxResult:
+        """Run ``command`` on the remote host; ``stdin`` (bytes), if given, is fed to it."""
+        if (refused := self._not_allowed()) is not None:
+            return refused
         try:
             where = self._remote_dir(cwd)
             remote = remote_command(where, command)
@@ -428,6 +434,42 @@ class SshSandbox:
                     "needs the owner's approval, and it was not given (or nobody could be asked here)."
                 ),
             )
+        return self._dispatch(remote, timeout, stdin)
+
+    def run_script(
+        self, script: str, args: Sequence[str] = (), *, stdin: bytes | None = None, timeout: int = 60
+    ) -> SandboxResult:
+        """Run a FIXED ``sh`` script on the remote host with ``args`` as its positional parameters.
+
+        For the remote file tools. The script is a constant of this app, never built from anything the
+        agent wrote; every variable part (a path, a limit) is one ``shlex.quote``d argument, and a
+        file's CONTENT travels on ``stdin``, so nothing the agent chose is ever interpolated into the
+        command line. It takes the same road as :meth:`run`: the host is re-validated first, the argv
+        is :func:`ssh_argv`'s, and the result is :func:`explained`.
+
+        The taint question (``bind_taint``) is deliberately NOT asked here: it is a question about a
+        COMMAND, and these are the file tools, whose names the governance ledger and the approval
+        policy already judge exactly as they judge the local ones. Asking twice would put two cards on
+        the screen for one action.
+        """
+        if (refused := self._not_allowed()) is not None:
+            return refused
+        command = "sh -c " + shlex.quote(script) + " sh" + "".join(f" {shlex.quote(a)}" for a in args)
+        return self._dispatch(remote_command(self.remote_path, command), timeout, stdin)
+
+    def _not_allowed(self) -> SandboxResult | None:
+        """The refusal when the host is no longer allowed (config AND allowed list), else None."""
+        if self._recheck is None:
+            return None
+        try:
+            self._recheck()
+        except ValueError as exc:
+            return SandboxResult(exit_code=1, stderr=f"error: not run: {exc}")
+        return None
+
+    def _dispatch(self, remote: str, timeout: int, stdin: bytes | None) -> SandboxResult:
+        from chimera.sandbox.local import LocalSandbox
+
         try:
             handle, log = tempfile.mkstemp(prefix="chimera-ssh-", suffix=".log")
             os.close(handle)
@@ -437,19 +479,24 @@ class SshSandbox:
             )
         try:
             argv = ssh_argv(self.host, remote, log_path=log)
-            return self._run_with_retries(LocalSandbox(), argv, log, timeout)
+            return self._run_with_retries(LocalSandbox(), argv, log, timeout, stdin)
         finally:
             with contextlib.suppress(OSError):
                 os.unlink(log)
 
-    def _run_with_retries(self, runner: Any, argv: list[str], log: str, timeout: int) -> SandboxResult:
+    def _run_with_retries(
+        self, runner: Any, argv: list[str], log: str, timeout: int, stdin: bytes | None = None
+    ) -> SandboxResult:
         deadline = time.monotonic() + timeout
         attempt = 0
         while True:
             with open(log, "wb"):  # the client's log starts empty for each attempt
                 pass
             left = max(1, int(deadline - time.monotonic()))
-            result = runner._run_process(argv, timeout=left, cwd=None, use_shell=False, on_timeout=None)
+            extra = {} if stdin is None else {"stdin_data": stdin}  # a retry re-sends it: nothing ran yet
+            result = runner._run_process(
+                argv, timeout=left, cwd=None, use_shell=False, on_timeout=None, **extra
+            )
             client = _read_client_log(log)
             if (
                 failed_before_connecting(result, client)

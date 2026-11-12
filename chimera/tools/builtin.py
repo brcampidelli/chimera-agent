@@ -370,14 +370,16 @@ def default_registry(
     if browser_tool is not None:
         registry.register(browser_tool)
     # A conversation whose commands run on another machine (the SSH environment): the shell says so,
-    # and the tools that would touch THIS machine's files refuse rather than edit the wrong one.
+    # the core file tools work on that machine, and the tools that would touch THIS machine's files
+    # refuse rather than edit the wrong one.
     from chimera.sandbox.ssh import SshSandbox
-    from chimera.tools.ssh_files import block_local_file_tools
+    from chimera.tools.ssh_files import use_remote_files
 
     if isinstance(box, SshSandbox):
         shell.description += (
             f" In this conversation commands run on {box.host} over ssh, in {box.remote_path}; the "
-            "remote shell interprets the command, and files there are read and edited with this tool."
+            "remote shell interprets the command. read_file, write_file, edit_file, list_dir, grep and "
+            "glob work on that folder too."
         )
-        block_local_file_tools(registry, box.host)
+        use_remote_files(registry, box)
     return registry
