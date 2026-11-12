@@ -991,6 +991,15 @@ class AutonomyCfgOut(BaseModel):
     hooks_host_exec: bool = False
     """``CHIMERA_HOOKS_HOST_EXEC``: whether a shell hook may run on the host where no sandbox
     isolates. Off by default: there, a shell hook is refused and the tool call with it."""
+    claude_hooks_repo: bool = True
+    """``CHIMERA_CLAUDE_HOOKS_REPO``: whether hooks in the project's ``.claude/settings*.json`` run.
+    On by default (Claude Code compatibility); the hooks only tighten and run in the sandbox. A
+    server without the field is on, the same default the settings carry."""
+    claude_hooks_user: bool = True
+    """``CHIMERA_CLAUDE_HOOKS_USER``: the same for ``~/.claude/settings.json``."""
+    claude_user_hooks_host_exec: bool = False
+    """``CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC``: whether the user's own Claude-format hooks may run on
+    the host where no sandbox isolates. Off by default; a repository's hooks never do."""
 
 
 class ServerCfgOut(BaseModel):
@@ -1441,6 +1450,59 @@ class EndpointIn(BaseModel):
     name: str
     base_url: str
     key_env: str
+
+
+class ClaudeHookSourceOut(BaseModel):
+    origin: str
+    path: str
+    exists: bool = False
+    enabled: bool = True
+    hooks: int = 0
+    error: str = ""
+    skipped: list[str] = []
+    trust: str = ""
+    """For a repository file: ``trusted``, ``new`` or ``changed``; not trusted means not loaded."""
+
+
+class ClaudeHookOut(BaseModel):
+    origin: str
+    event: str
+    matcher: str
+    command: str
+    timeout: int
+    on_failure: str
+    source: str
+
+
+class ClaudeHooksTrustIn(BaseModel):
+    project: str = ""
+    """A registered project's folder; empty is the server's own."""
+    fingerprint: str = ""
+    """The fingerprint the screen showed beside the hooks it asked to confirm. A different one on disk
+    now (the files changed since) is a 409 and nothing is stored."""
+
+
+class ClaudeHooksTrustOut(BaseModel):
+    trust: str
+
+
+class ClaudeHooksOut(BaseModel):
+    """The hooks loaded from Claude Code settings files, read-only (``GET /api/config/hooks``)."""
+
+    workspace: str
+    runnable_repo: bool | None = None
+    """Whether a repository's hooks can run here: they need an isolating sandbox (never the host).
+    ``None`` when that would need a Docker probe, which this route never makes."""
+    runnable_user: bool | None = None
+    """The same for the user's own hooks, which may also run on the host under their own switch."""
+    sources: list[ClaudeHookSourceOut] = []
+    hooks: list[ClaudeHookOut] = []
+    pending: list[ClaudeHookOut] = []
+    """A repository's hooks NOT loaded (new or changed), parsed for display so the owner sees what
+    they would confirm. Commands are masked and cut, as in ``hooks``."""
+    fingerprint: str = ""
+    """What confirming would trust (settings bytes plus the project files their commands name); empty
+    when nothing is pending. The confirm call must send it back."""
 
 
 class ConfigOut(BaseModel):

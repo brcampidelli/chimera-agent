@@ -1683,6 +1683,21 @@
             "title": "Archive On Pr Merge",
             "type": "boolean"
           },
+          "claude_hooks_repo": {
+            "default": true,
+            "title": "Claude Hooks Repo",
+            "type": "boolean"
+          },
+          "claude_hooks_user": {
+            "default": true,
+            "title": "Claude Hooks User",
+            "type": "boolean"
+          },
+          "claude_user_hooks_host_exec": {
+            "default": false,
+            "title": "Claude User Hooks Host Exec",
+            "type": "boolean"
+          },
           "close_loop": {
             "default": false,
             "title": "Close Loop",
@@ -3535,6 +3550,194 @@
           }
         },
         "title": "ClaudeAgentsCfgOut",
+        "type": "object"
+      },
+      "ClaudeHookOut": {
+        "properties": {
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "matcher": {
+            "title": "Matcher",
+            "type": "string"
+          },
+          "on_failure": {
+            "title": "On Failure",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "timeout": {
+            "title": "Timeout",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "origin",
+          "event",
+          "matcher",
+          "command",
+          "timeout",
+          "on_failure",
+          "source"
+        ],
+        "title": "ClaudeHookOut",
+        "type": "object"
+      },
+      "ClaudeHookSourceOut": {
+        "properties": {
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "exists": {
+            "default": false,
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "hooks": {
+            "default": 0,
+            "title": "Hooks",
+            "type": "integer"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "skipped": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "trust": {
+            "default": "",
+            "title": "Trust",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "path"
+        ],
+        "title": "ClaudeHookSourceOut",
+        "type": "object"
+      },
+      "ClaudeHooksOut": {
+        "description": "The hooks loaded from Claude Code settings files, read-only (``GET /api/config/hooks``).",
+        "properties": {
+          "fingerprint": {
+            "default": "",
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "hooks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ClaudeHookOut"
+            },
+            "title": "Hooks",
+            "type": "array"
+          },
+          "pending": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ClaudeHookOut"
+            },
+            "title": "Pending",
+            "type": "array"
+          },
+          "runnable_repo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runnable Repo"
+          },
+          "runnable_user": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runnable User"
+          },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ClaudeHookSourceOut"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace"
+        ],
+        "title": "ClaudeHooksOut",
+        "type": "object"
+      },
+      "ClaudeHooksTrustIn": {
+        "properties": {
+          "fingerprint": {
+            "default": "",
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "project": {
+            "default": "",
+            "title": "Project",
+            "type": "string"
+          }
+        },
+        "title": "ClaudeHooksTrustIn",
+        "type": "object"
+      },
+      "ClaudeHooksTrustOut": {
+        "properties": {
+          "trust": {
+            "title": "Trust",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trust"
+        ],
+        "title": "ClaudeHooksTrustOut",
         "type": "object"
       },
       "ClaudeImportApplyIn": {
@@ -24204,6 +24407,90 @@
           }
         },
         "summary": "Patch Config Endpoint"
+      }
+    },
+    "/api/config/hooks": {
+      "get": {
+        "operationId": "read_claude_hooks_endpoint_api_config_hooks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeHooksOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Claude Hooks Endpoint"
+      }
+    },
+    "/api/config/hooks/trust": {
+      "post": {
+        "operationId": "trust_claude_hooks_endpoint_api_config_hooks_trust_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaudeHooksTrustIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeHooksTrustOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trust Claude Hooks Endpoint"
       }
     },
     "/api/config/pool/{provider}": {

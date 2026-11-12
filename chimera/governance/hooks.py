@@ -34,6 +34,17 @@ from typing import Any
 
 from chimera.governance.approval import asks_nobody
 from chimera.governance.audit import AuditLog
+from chimera.governance.claude_hooks import (
+    CLAUDE,
+    ClaudeLifecycle,
+    claude_tool_name,
+    discover,
+    narrowed,
+    new_session_id,
+    run_batch,
+    tool_input,
+    trust_state,
+)
 from chimera.governance.governed_tool import elide_values, render_action
 from chimera.governance.ledger_tool import fence
 from chimera.governance.policy import Decision, Verdict
@@ -48,6 +59,7 @@ _log = get_logger("governance.hooks")
 #: The one file hooks are read from. Named, not just ``hooks.json``, so the shell fence can refuse a
 #: command that mentions it without refusing every repository that has a ``hooks.json`` of its own.
 HOOKS_FILE_NAME = "chimera-hooks.json"
+CLAUDE_PROTOCOL = CLAUDE
 
 PRE_TOOL = "pre_tool"
 POST_TOOL = "post_tool"
@@ -95,6 +107,14 @@ class Hook:
     command: str = ""
     timeout: int = DEFAULT_TIMEOUT
     on_error: str = "deny"
+    #: Where the hook came from: ``owner`` (chimera-hooks.json), or ``repo`` / ``user`` for a hook
+    #: read from a Claude Code settings file (`chimera/governance/claude_hooks.py`).
+    origin: str = "owner"
+    protocol: str = "chimera"  # "claude": JSON on stdin, exit 2 blocks, permissionDecision
+    matcher: re.Pattern[str] | None = None  # a Claude Code matcher over the tool's name
+    claude_event: str = ""  # PreToolUse, Stop, ... for a Claude-format hook
+    source: str = ""  # the settings file it was read from
+    source_sha256: str = ""
 
     @property
     def kind(self) -> str:
@@ -103,6 +123,11 @@ class Hook:
     def matches(self, tool: str, text: str) -> bool:
         if self.tools is not None and tool not in self.tools:
             return False
+        if self.matcher is not None:
+            from chimera.governance.claude_hooks import matcher_hits
+
+            if not matcher_hits(self.matcher, tool):
+                return False
         return self.pattern is None or bool(self.pattern.search(text))
 
 
@@ -114,6 +139,8 @@ class HookConfig:
     sha256: str = ""
     error: str = ""
     path: str = ""
+    #: Every Claude-format settings file looked at, switched on or not (the Settings screen lists them).
+    sources: tuple[Any, ...] = ()
 
 
 class HookConfigError(ValueError):
@@ -214,10 +241,20 @@ class HookOutcome:
     deciding_hook: str = ""
     reasons: list[_Said] = field(default_factory=list)
     notes: list[_Said] = field(default_factory=list)
+    #: A Claude-format PreToolUse hook's ``updatedInput``, kept only if it narrows the call.
+    updated_input: dict[str, Any] | None = None
+    updated_by: str = ""
+    #: Where the deciding hook came from (``owner`` / ``repo`` / ``user``) and its file, so the card
+    #: that puts an ``ask`` to a person can say whose question it is.
+    deciding_origin: str = "owner"
+    deciding_source: str = ""
 
-    def take(self, decision: str, hook: str) -> None:
+    def take(self, decision: str, hook: str, source: Any = None) -> None:
         if _STRENGTH[decision] > _STRENGTH[self.decision]:
             self.decision, self.deciding_hook = decision, hook
+            if source is not None:
+                self.deciding_origin = getattr(source, "origin", "owner")
+                self.deciding_source = getattr(source, "source", "")
 
 
 #: Starts a sandbox for one hook run. A seam for the tests; production passes ``get_sandbox``.
@@ -243,12 +280,20 @@ class HookRunner:
         host_exec: bool = False,
         audit: AuditLog | None = None,
         taint: TaintSink | None = None,
+        workspace: Path | None = None,
+        user_host_exec: bool = False,
     ) -> None:
         self.config = config
         self._sandbox = sandbox
         self.host_exec = host_exec
+        #: ``CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC``: the user's own Claude-format hooks on the host.
+        #: A repository's never run there, whatever either switch says.
+        self.user_host_exec = user_host_exec
         self.audit = audit
         self.taint = taint
+        #: The project a Claude-format hook is told about (payload ``cwd``, ``CLAUDE_PROJECT_DIR``).
+        self.workspace = Path(workspace) if workspace is not None else Path.cwd()
+        self.session_id = new_session_id()
         #: Every receipt this runner wrote, newest last — the same payloads the audit log received.
         self.receipts: list[dict[str, Any]] = []
 
@@ -258,15 +303,37 @@ class HookRunner:
         outcome = HookOutcome()
         command, document = render_action(tool, args)
         text = f"{command}\n{document}" if document else command
+        claude: list[Hook] = []
         for hook in self.config.hooks:
             if hook.event != event or not hook.matches(tool, text):
                 continue
-            if hook.command:
+            if hook.protocol == CLAUDE_PROTOCOL:
+                claude.append(hook)
+            elif hook.command:
                 self._run_shell(hook, event, tool, args, result, outcome)
             else:
                 self._run_static(hook, event, tool, outcome)
+        if claude:
+            payload: dict[str, Any] = {
+                "cwd": str(self.workspace), "tool_name": claude_tool_name(tool),
+                "tool_input": tool_input(args),
+            }
+            if result is not None:
+                # The size and whether it failed, never the text (A6), as for the owner's hooks.
+                payload["tool_response"] = {"chars": len(result), "failed": result.startswith("error:")}
+            run_batch(self, claude, event, outcome, payload, tool=tool)
         return outcome
 
+    def receipt_for(
+        self, hook: Hook, event: str, tool: str, done: Any, *, requested: str, applied: str,
+        refused: list[str], error: str,
+    ) -> None:
+        """The receipt of one Claude-format invocation (same shape as the owner's, plus the origin)."""
+        self._receipt(
+            hook, event, tool, ran=done.ran, requested=requested, applied=applied,
+            sandbox=done.sandbox, isolated=done.isolated, exit_code=done.exit_code,
+            duration_ms=done.duration_ms, refused=refused, error=error,
+        )
     def _run_static(self, hook: Hook, event: str, tool: str, outcome: HookOutcome) -> None:
         self._apply(hook, hook.decision, hook.reason, hook.note, outcome, from_command=False)
         self._receipt(
@@ -351,6 +418,20 @@ class HookRunner:
             error=error,
         )
 
+    def update_receipt(self, hook_id: str, tool: str, *, applied: bool) -> None:
+        """Whether a hook's ``updatedInput`` was applied (it narrowed the call) or ignored."""
+        receipt: dict[str, Any] = {
+            "hook": hook_id, "event": "updated_input", "tool": tool, "applied": applied,
+            "refused": [] if applied else ["updatedInput: not provably narrower; ignored"],
+            "config_sha256": self.config.sha256,
+        }
+        self.receipts.append(receipt)
+        if self.audit is not None:
+            try:
+                self.audit.record("hook", receipt)
+            except Exception:  # noqa: BLE001
+                _log.warning("could not write the updatedInput receipt for %s", hook_id, exc_info=True)
+
     def answered(self, hook_id: str, tool: str, *, approved: bool, approver: str) -> None:
         """The receipt for the ANSWER to a hook's ``ask``, written after the question was put.
 
@@ -395,6 +476,10 @@ class HookRunner:
             "error": error,
             "config_sha256": self.config.sha256,
         }
+        if hook.protocol == CLAUDE_PROTOCOL:
+            # Where a third-party hook came from, and the exact bytes of the file it was read from.
+            receipt.update(origin=hook.origin, claude_event=hook.claude_event, source=hook.source,
+                           source_sha256=hook.source_sha256)
         self.receipts.append(receipt)
         if self.audit is not None:
             try:
@@ -475,7 +560,7 @@ class HookedTool(Tool):
             action = render_action(judged, args)[0]
             verdict = Verdict(
                 Decision.REVIEW,
-                reason=f"the owner's hook {pre.deciding_hook} asks before this call",
+                reason=_ask_reason(pre),
                 rule=f"hook:{pre.deciding_hook}",
             )
             approved = False
@@ -504,8 +589,16 @@ class HookedTool(Tool):
             )
             if not approved:
                 return self._refused(pre, "asked, and nobody approved it")
-        # The model's own arguments, never anything a hook produced (A3).
-        result = self.inner.run(**kwargs)
+        # The model's own arguments (A3) — except a Claude-format hook's `updatedInput`, applied only
+        # when it provably narrows the call (a list cut down to some of its own items) and the call
+        # was not seen through a proxy. In any doubt it is ignored, and the receipt says which.
+        call = kwargs
+        if pre.updated_input is not None:
+            fit = narrowed(judged, kwargs, pre.updated_input) if judged == self.name else None
+            self.runner.update_receipt(pre.updated_by, judged, applied=fit is not None)
+            if fit is not None:
+                call = fit
+        result = self.inner.run(**call)
         if isinstance(result, Refusal):
             # The tool did not run; there is no output to look at after it.
             return result
@@ -532,6 +625,17 @@ class HookedTool(Tool):
         return refusal(f"{head}\n{said}" if said else head)
 
 
+def _ask_reason(outcome: HookOutcome) -> str:
+    """Whose question a hook's ``ask`` is, for the card: a repository's hook says so and names its file."""
+    if outcome.deciding_origin == "repo":
+        where = Path(outcome.deciding_source).name or "settings.json"
+        return (f"a project hook (.claude/{where}, third-party code) asks before this call: "
+                f"{outcome.deciding_hook}")
+    if outcome.deciding_origin == "user":
+        return f"your hook from ~/.claude/settings.json asks before this call: {outcome.deciding_hook}"
+    return f"the owner's hook {outcome.deciding_hook} asks before this call"
+
+
 def hook_registry(
     registry: ToolRegistry,
     runner: HookRunner,
@@ -543,7 +647,61 @@ def hook_registry(
     hooked = ToolRegistry.like(registry)
     for tool in registry.tools():
         hooked.register(HookedTool(tool, runner, approve=approve, approver_name=approver_name))
+    if any(h.protocol == CLAUDE_PROTOCOL for h in runner.config.hooks):
+        hooked.lifecycle = ClaudeLifecycle(runner)
     return hooked
+
+
+def hook_sandbox(settings: Any) -> Any:
+    """The sandbox a hook runs in: the agent's own, EXCEPT that Docker gets no network even where the
+    agent's sandbox is configured with one (``CHIMERA_SANDBOX_NETWORK=bridge``). The OS sandboxes
+    already have none. A hook sees every call, so a hook with a network is a tap (A6)."""
+    from chimera.sandbox import get_sandbox
+
+    box = get_sandbox(settings)
+    if hasattr(box, "network"):
+        box.network = False
+    return box
+
+
+def hooks_wanted(settings: Any) -> bool:
+    """Whether any hook source is switched on: the owner's file, or a Claude Code settings origin.
+
+    Claude Code compatibility is ON by default (owner's decision, 2026-11-11), so this is true on a
+    stock install; what it costs when no `.claude` file carries a hook is three failed file reads.
+    """
+    return bool(
+        getattr(settings, "hooks", False)
+        or getattr(settings, "claude_hooks_repo", True)
+        or getattr(settings, "claude_hooks_user", True)
+    )
+
+
+def hooks_present(settings: Any, workspace: Path | None = None) -> bool:
+    """Whether an assembly has anything to install: the owner's switch is on, or a Claude-format
+    hook (or a broken settings file's refusal) was loaded. Lets callers skip building an approver for
+    hooks that do not exist, which on a stock install (compatibility on) is the common case."""
+    if getattr(settings, "hooks", False):
+        return True
+    config = load_all(settings, workspace)
+    return bool(config.hooks or config.error)
+
+
+def load_all(settings: Any, workspace: Path | None = None) -> HookConfig:
+    """The owner's file (only while ``CHIMERA_HOOKS`` is on) plus the Claude-format hooks of every
+    origin that is switched on, in one :class:`HookConfig`."""
+    base = load_hooks(Path(settings.home)) if getattr(settings, "hooks", False) else HookConfig()
+    ws = workspace or Path.cwd()
+    hooks, sources = discover(
+        ws,
+        repo=bool(getattr(settings, "claude_hooks_repo", True)),
+        user=bool(getattr(settings, "claude_hooks_user", True)),
+        repo_trust=trust_state(Path(settings.home), ws),
+    )
+    return HookConfig(
+        hooks=(*base.hooks, *hooks), sha256=base.sha256, error=base.error, path=base.path,
+        sources=tuple(sources),
+    )
 
 
 def apply_hooks(
@@ -555,17 +713,19 @@ def apply_hooks(
     taint: TaintSink | None = None,
     sandbox: SandboxFactory | None = None,
     approver_name: str = "",
+    workspace: Path | None = None,
 ) -> ToolRegistry:
-    """The assembly's entry point: ``registry`` unchanged while hooks are off, wrapped when on.
+    """The assembly's entry point: ``registry`` unchanged while no hook is loaded, wrapped when one is.
 
-    Off returns the very same object — no wrapper, so the overhead of the feature nobody switched on
-    is zero by construction, not by measurement.
+    No hooks returns the very same object — no wrapper, so the overhead of a feature nothing uses is
+    zero by construction, not by measurement. ``workspace`` is the project whose ``.claude`` settings
+    are read (default: the working directory).
     """
-    if not bool(getattr(settings, "hooks", False)):
+    if not hooks_wanted(settings):
         return registry
-    config = load_hooks(Path(settings.home))
+    config = load_all(settings, workspace)
     if not config.hooks and not config.error:
-        if audit is not None:
+        if audit is not None and bool(getattr(settings, "hooks", False)):
             audit.record("hook", {"hook": "", "event": "load", "applied": NONE,
                                   "error": f"hooks are on and {config.path} has no hooks"})
         return registry
@@ -575,14 +735,21 @@ def apply_hooks(
         # while every cron job and bot run was being refused. One line per assembly, like `load`.
         audit.record("hook", {"hook": "", "event": "load", "applied": DENY,
                               "error": config.error, "config_sha256": config.sha256})
+    if audit is not None:
+        noisy = [(x.path, x.error or "; ".join(x.skipped)) for x in config.sources
+                 if x.error or x.skipped]
+        if noisy:
+            # A guard a settings file seems to promise and this loop dropped is said once per assembly.
+            audit.record("hook", {"hook": "", "event": "load", "applied": NONE,
+                                  "error": "; ".join(f"{p}: {m}" for p, m in noisy)})
     if sandbox is None:
-        from chimera.sandbox import get_sandbox
 
         def sandbox() -> Any:
-            return get_sandbox(settings)
+            return hook_sandbox(settings)
 
     runner = HookRunner(
         config, sandbox=sandbox, host_exec=bool(getattr(settings, "hooks_host_exec", False)),
-        audit=audit, taint=taint,
+        user_host_exec=bool(getattr(settings, "claude_user_hooks_host_exec", False)),
+        audit=audit, taint=taint, workspace=workspace,
     )
     return hook_registry(registry, runner, approve=approve, approver_name=approver_name)

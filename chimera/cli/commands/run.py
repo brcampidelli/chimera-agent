@@ -223,7 +223,9 @@ def agent(
             registry = govern_registry(registry, kernel)
             # The owner's hooks, which `govern_step` installs and this direct kernel used to skip:
             # a guarded run carries them like every other guarded surface.
-            registry = owner_hooks(registry, settings=get_settings(), audit=run_audit)
+            registry = owner_hooks(
+                registry, settings=get_settings(), audit=run_audit, workspace=Path(workspace)
+            )
         runner = Agent(
             backend, registry,
             attended(AgentConfig(

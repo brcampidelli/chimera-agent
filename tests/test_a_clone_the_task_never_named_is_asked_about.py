@@ -420,6 +420,11 @@ def test_the_assembly_looks_packages_up_only_where_a_person_reads_the_card(
         approval_mode = wanted
         approval_webhook = ""
         shell_fetch_guard = True
+        # Approver-wiring stub, not a hooks test: it has no `home`, which Claude-format hook
+        # discovery needs, so every hook origin is stated off.
+        hooks = False
+        claude_hooks_repo = False
+        claude_hooks_user = False
 
     class _Audit:
         def record(self, *_a: object, **_k: object) -> None:

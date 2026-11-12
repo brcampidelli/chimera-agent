@@ -42,6 +42,7 @@ import {
   UiFontSelect,
 } from "@/components/AppearanceControls";
 import { Tabs, TabPanel, type TabItem } from "@/components/ui/tabs";
+import { ClaudeHooksList } from "@/components/ClaudeHooksList";
 import { Connections } from "@/components/Connections";
 import { Connectors } from "@/components/Connectors";
 import { Skills } from "@/components/Skills";
@@ -396,6 +397,46 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_HOOKS_HOST_EXEC: String(v) })}
         />
       </Row>
+      {/* Claude Code compatibility, hooks included (owner's decision, 2026-11-11): on by default,
+          one switch per origin. A repository's hooks are third-party code; both only tighten. */}
+      <Row
+        label={t("settings.row.claudeHooksRepo")}
+        hint={t("settings.hint.claudeHooksRepo")}
+        applies={c.applies?.CHIMERA_CLAUDE_HOOKS_REPO}
+        env="CHIMERA_CLAUDE_HOOKS_REPO"
+      >
+        <Toggle
+          on={c.autonomy.claude_hooks_repo ?? true}
+          onChange={(v) => save({ CHIMERA_CLAUDE_HOOKS_REPO: String(v) })}
+        />
+      </Row>
+      <Row
+        label={t("settings.row.claudeHooksUser")}
+        hint={t("settings.hint.claudeHooksUser")}
+        applies={c.applies?.CHIMERA_CLAUDE_HOOKS_USER}
+        env="CHIMERA_CLAUDE_HOOKS_USER"
+      >
+        <Toggle
+          on={c.autonomy.claude_hooks_user ?? true}
+          onChange={(v) => save({ CHIMERA_CLAUDE_HOOKS_USER: String(v) })}
+        />
+      </Row>
+      <Row
+        label={t("settings.row.claudeUserHostExec")}
+        hint={t("settings.hint.claudeUserHostExec")}
+        warn
+        applies={c.applies?.CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC}
+        env="CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC"
+      >
+        <Toggle
+          on={c.autonomy.claude_user_hooks_host_exec ?? false}
+          onChange={(v) => save({ CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC: String(v) })}
+        />
+      </Row>
+      <ClaudeHooksList
+        repoOn={c.autonomy.claude_hooks_repo ?? true}
+        userOn={c.autonomy.claude_hooks_user ?? true}
+      />
       <Row
         label={t("settings.row.governance")}
         hint={t("settings.hint.governance")}
