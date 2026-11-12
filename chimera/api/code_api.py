@@ -3108,12 +3108,31 @@ def register_code_api(
         except Exception as exc:  # noqa: BLE001 - a notice must never cost the queue its state
             _log.warning("could not announce queue item %s: %s", item.id, exc)
 
+    # A command an SSH conversation had started keeps running on the remote host when Chimera stops
+    # (`chimera.sandbox.ssh`). Each run is announced to the conversation that started it and to no
+    # other: on its interrupted item's notice when it has one, otherwise as a notice of its own, so
+    # a run is not lost because the queue happened to have recovered nothing for that conversation.
+    from chimera.sandbox.ssh import interrupted_note, take_pending_runs
+
+    ssh_runs: dict[str, list[dict[str, Any]]] = {}
+    for pending in take_pending_runs():
+        if isinstance(pending.get("session"), str) and pending["session"]:
+            ssh_runs.setdefault(pending["session"], []).append(pending)
     for interrupted in durable_queue.recovered:
+        ssh_note = interrupted_note(ssh_runs.pop(interrupted.session_id, []))
         _queue_notice(
             interrupted.session_id, interrupted, "queue_item_interrupted",
             "A queued message was running when Chimera stopped. It was not run again; "
-            "send it again if it should run.",
+            "send it again if it should run." + (f" {ssh_note}" if ssh_note else ""),
         )
+    for run_session, run_entries in ssh_runs.items():
+        try:
+            bus.publish(
+                run_session, "notice",
+                {"code": "ssh_run_pending", "text": interrupted_note(run_entries)},
+            )
+        except Exception as exc:  # noqa: BLE001 - a notice must never cost startup
+            _log.warning("could not announce a pending ssh run for %s: %s", run_session, exc)
     # The turns running right now, so a screen that left a conversation mid-turn can find its way
     # back: the stored file holds nothing of a turn until the agent finishes.
     from chimera.api.live_turns import LiveTurns
@@ -5060,6 +5079,13 @@ def register_code_api(
             stop_signal = (
                 works.should_stop(background.id) if background is not None else live_turns.should_stop(turn_id)
             )
+            # A command on an SSH host stops, remotely, when this turn is cancelled (checked between its
+            # polls; `SshSandbox.bind_cancel`). The same signal the agent loop and job_status read.
+            from chimera.sandbox.ssh import SshSandbox as _SshSandbox
+
+            if isinstance(turn_sandbox, _SshSandbox):
+                turn_sandbox.bind_cancel(stop_signal)
+                turn_sandbox.bind_session(session.session_id)
             # The wait of a job_status stops when this turn is cancelled, checked in each slice.
             # Wiring Stop must never be able to kill the turn: this runs before the turn's own
             # try/except, so a raise here ends the thread with no `done` frame and the stream hangs.

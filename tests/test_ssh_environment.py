@@ -9,19 +9,22 @@ What these pin, in the order a mistake would cost most:
 * **The argv is a list with fixed security options.** No shell on this side, ``BatchMode`` and
   ``StrictHostKeyChecking=yes``, ``--`` before the alias, forwarding off, the folder quoted for the
   remote shell, and the command left exactly as the agent wrote it.
-* **A command is never run twice.** Only a connection that provably failed before the remote shell
-  started is retried; a host key that is not trusted is a refusal that says what to do.
+* **A command is never run twice.** The run id, not the connection, is the command's identity, so a
+  dropped connection is reconnected and read on (``test_ssh_durable_commands.py``); a host key that is
+  not trusted is a refusal that says what to do, and is not retried.
 * **SSH is the host.** Not isolated, so the host-exec gate, Manual and the "only reads" classifier
   treat it as the machine they guard; an install that isolates its commands refuses it.
 * **The wrong machine is never edited.** The local file tools refuse in an SSH conversation, and a
   turn that has read content from outside asks the owner before a command on the remote host.
 
-Nothing here needs ssh: the subprocess is a stub, and the config is a file in a temporary folder.
+Nothing here needs ssh: the remote is a fake that plays the launcher's part (``_Ssh``), and the
+config is a file in a temporary folder.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -62,6 +65,12 @@ host=box
 Match host nothing
     User x
 """
+
+
+@pytest.fixture(autouse=True)
+def _journal_in_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The run journal goes under the test's folder, never the real CHIMERA_HOME."""
+    monkeypatch.setattr(ssh_module, "_journal_dir", lambda: tmp_path / "ssh_runs")
 
 
 @pytest.fixture
@@ -182,64 +191,156 @@ def test_a_bad_alias_never_reaches_the_argv() -> None:
 
 
 class _Proc:
-    def __init__(self, code: int, out: bytes, err: bytes, hang: bool = False, log: bytes = b"") -> None:
-        self.returncode = code
-        self.pid = 4242
-        self._out, self._err, self._hang = out, err, hang
-        #: What the ssh CLIENT wrote to its own log (-E): never mixed with the command's stderr.
-        self.log = log
+    """What one command does on the fake remote: its exit code, stdout and stderr.
 
-    def communicate(self, timeout: float | None = None) -> tuple[bytes, bytes]:
-        if self._hang:
-            self._hang = False
-            raise subprocess.TimeoutExpired("ssh", timeout or 0)
-        return self._out, self._err
+    ``hang`` never ends on its own (only a stop does); ``step`` reveals that many bytes of stdout per
+    poll, so a test can drop the connection in the middle of the output.
+    """
 
-    def poll(self) -> int:
-        return self.returncode
+    def __init__(self, code: int, out: bytes, err: bytes, hang: bool = False, step: int | None = None) -> None:
+        self.code, self.out, self.err, self.hang, self.step = code, out, err, hang, step
+
+
+_REMOTE_OP = re.compile(r"chimera-run (launch|poll|stop|cleanup) ([0-9a-f]{16})((?: \d+)*)$")
 
 
 class _Ssh:
-    """A stand-in for ``subprocess.Popen`` that answers from a script and records every call."""
+    """A fake REMOTE behind ``SshSandbox._exec``: it answers the launcher's operations from a script.
+
+    The detached protocol is the thing under test, so the fake plays the launcher's part (start a run
+    under an id, hand out bytes from an offset, stop, clean up) and records every operation. ``calls``
+    holds one entry per command that was STARTED, which is what "the command ran once" means. A fake
+    clock replaces the real one so that waiting costs nothing.
+    """
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch, script: list[_Proc]) -> None:
-        self.calls: list[dict[str, Any]] = []
         self.script = script
+        self.calls: list[dict[str, Any]] = []
+        self.ops: list[tuple[str, str, list[int]]] = []
+        self.remotes: list[str] = []
+        self.stopped: list[str] = []
+        self.cleaned: list[str] = []
         self.waits: list[float] = []
-        self.killed: list[Any] = []
-        monkeypatch.setattr(subprocess, "Popen", self._popen)
-        monkeypatch.setattr(ssh_module, "_sleep", self.waits.append)
-        monkeypatch.setattr("chimera.sandbox.local.kill_tree", self.killed.append)
+        self.runs: dict[str, dict[str, Any]] = {}
+        self.clock = 1000.0
+        self.n_exec = 0
+        #: Call numbers (1-based, over every ssh call) that fail at the ssh level, with the client's log.
+        self.fail_at: dict[int, bytes] = {}
+        #: Call numbers whose effect HAPPENS on the remote but whose reply is lost on the way back.
+        self.lose_reply: set[int] = set()
+        self.cancel_at: dict[int, BaseException] = {}
+        #: Calls whose reply is replaced by these raw bytes (a forged or cut reply, shell noise).
+        self.raw_at: dict[int, bytes] = {}
+        self.stop_reply = b"chimera-stopped ok\n"
+        monkeypatch.setattr(SshSandbox, "_exec", lambda _s, remote, stdin, timeout: self._exec(remote, stdin, timeout))
+        monkeypatch.setattr(ssh_module, "_sleep", self._sleep)
+        monkeypatch.setattr(ssh_module, "_now", lambda: self.clock)
 
-    def _popen(self, target: Any, **kwargs: Any) -> _Proc:
-        self.calls.append({"target": target, **kwargs})
-        proc = self.script.pop(0) if len(self.script) > 1 else self.script[0]
-        Path(target[target.index("-E") + 1]).write_bytes(proc.log)
-        return proc
+    def _sleep(self, seconds: float) -> None:
+        self.waits.append(seconds)
+        self.clock += seconds
+
+    def fail_calls(self, first: int, last: int, log: bytes = b"") -> None:
+        for number in range(first, last + 1):
+            self.fail_at[number] = log
+
+    def _exec(self, remote: str, stdin: bytes | None, timeout: float) -> ssh_module._Call:
+        self.n_exec += 1
+        self.clock += 0.05
+        self.remotes.append(remote)
+        found = _REMOTE_OP.search(remote)
+        assert found is not None, remote
+        op, run_id = found.group(1), found.group(2)
+        numbers = [int(n) for n in found.group(3).split()]
+        self.ops.append((op, run_id, numbers))
+        if self.n_exec in self.cancel_at:
+            raise self.cancel_at[self.n_exec]
+        if self.n_exec in self.raw_at:
+            return ssh_module._Call(code=0, out=self.raw_at[self.n_exec])
+        if self.n_exec in self.fail_at and self.n_exec not in self.lose_reply:
+            return ssh_module._Call(code=255, client_log=self.fail_at[self.n_exec].decode())
+        reply = self._apply(op, run_id, numbers, stdin)
+        if self.n_exec in self.lose_reply:
+            return ssh_module._Call(code=255, client_log=self.fail_at.get(self.n_exec, b"").decode())
+        return reply
+
+    def _apply(self, op: str, run_id: str, numbers: list[int], stdin: bytes | None) -> ssh_module._Call:
+        run = self.runs.get(run_id)
+        if op == "launch" and run is None:
+            proc = self.script.pop(0) if len(self.script) > 1 else self.script[0]
+            run = self.runs[run_id] = {"proc": proc, "shown": 0, "killed": False}
+            self.calls.append({"id": run_id, "stdin": stdin, "remote": self.remotes[-1]})
+        if op == "stop":
+            self.stopped.append(run_id)
+            if run is not None:
+                run["killed"] = True
+            return ssh_module._Call(code=0, out=self.stop_reply)
+        if op == "cleanup":
+            self.cleaned.append(run_id)
+            self.runs.pop(run_id, None)
+            return ssh_module._Call(code=0, out=b"chimera-cleaned\n")
+        if run is None:
+            return ssh_module._Call(code=0, out=b"chimera-poll gone 0 0 0\n")
+        return ssh_module._Call(code=0, out=self._frame(run, numbers))
+
+    def _frame(self, run: dict[str, Any], numbers: list[int]) -> bytes:
+        proc: _Proc = run["proc"]
+        wait, o, e = numbers[0], numbers[1], numbers[2]
+        step = proc.step if proc.step is not None else len(proc.out)
+        run["shown"] = min(len(proc.out), run["shown"] + step)
+        everything = run["shown"] >= len(proc.out)
+        finished = run["killed"] or (everything and not proc.hang)
+        if not finished:
+            self.clock += wait
+        out_part, err_part = proc.out[o:run["shown"]], (proc.err[e:] if everything or run["killed"] else b"")
+        code = (143 if run["killed"] else proc.code) if finished else 0
+        head = f"chimera-poll {1 if finished else 0} {code} {len(out_part)} {len(err_part)}\n"
+        return head.encode() + out_part + err_part
+
+
+class _Popen:
+    """A stand-in for ``subprocess.Popen`` for the one test of what a single ssh call looks like."""
+
+    made: list[dict[str, Any]] = []
+
+    def __init__(self, target: Any, **kwargs: Any) -> None:
+        self.target, self.kwargs = target, kwargs
+        self.returncode = 0
+        self.pid = 4242
+        self.input: bytes | None = None
+        _Popen.made.append({"target": target, **kwargs})
+        Path(target[target.index("-E") + 1]).write_bytes(b"")
+
+    def communicate(self, input: bytes | None = None, timeout: float | None = None) -> tuple[bytes, bytes]:  # noqa: A002
+        _Popen.made[-1]["input"] = input
+        return b"chimera-poll 1 0 0 0\n", b""
+
+    def poll(self) -> int:
+        return 0
 
 
 CONNECT_FAIL = b"ssh: connect to host web1 port 22: Connection timed out\r\n"
 
 
-def _bare(target: list[str]) -> list[str]:
-    """The argv without the ``-E <log file>`` pair, whose path is a fresh temporary file each time."""
-    at = target.index("-E")
-    return [*target[:at], *target[at + 2:]]
-
-
-def test_the_sandbox_runs_ssh_with_an_argv_list_never_a_shell_and_a_scrubbed_environment(
+def test_one_ssh_call_is_an_argv_list_never_a_shell_with_a_scrubbed_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """The argv, the fixed options, the scrubbed environment and the client's own log are unchanged;
+    what is new is that the agent's command is on STDIN (a one-shot argv used to carry it)."""
     monkeypatch.setenv("MY_SERVICE_API_KEY", "super-secret-value")
-    fake = _Ssh(monkeypatch, [_Proc(0, b"hello\n", b"")])
-    result = SshSandbox("web1", "/srv/my app").run("ls -la", timeout=5)
-    assert result.exit_code == 0 and result.stdout == "hello\n"
-    (call,) = fake.calls
-    assert _bare(call["target"]) == [
-        "ssh", *EXPECTED_OPTIONS, "--", "web1", "cd '/srv/my app' || exit 1; ls -la",
-    ]
-    assert call["shell"] is False
-    assert "super-secret-value" not in json.dumps(call["env"])
+    _Popen.made = []
+    monkeypatch.setattr(subprocess, "Popen", _Popen)
+    box = SshSandbox("web1", "/srv/my app")
+    remote = ssh_module.remote_op("launch", "0123456789abcdef", 2, 0, 0)
+    call = box._exec(remote, b"cd '/srv/my app' || exit 1; ls -la\n", 5)
+    assert call is not None and call.code == 0
+    (made,) = _Popen.made
+    target = made["target"]
+    at = target.index("-E")
+    assert [*target[:at], *target[at + 2:]] == ["ssh", *EXPECTED_OPTIONS, "--", "web1", remote]
+    assert made["shell"] is False and made["input"] == b"cd '/srv/my app' || exit 1; ls -la\n"
+    assert "super-secret-value" not in json.dumps(made["env"])
+    assert not Path(target[at + 1]).exists()  # the client's log file is removed after the call
 
 
 def test_a_working_directory_below_the_workspace_becomes_a_folder_below_the_remote_one(
@@ -250,9 +351,9 @@ def test_a_working_directory_below_the_workspace_becomes_a_folder_below_the_remo
     box.run("ls", cwd=tmp_path / "src" / "lib")
     box.run("ls", cwd=tmp_path)
     box.run("ls")
-    remotes = [c["target"][-1] for c in fake.calls]
-    assert remotes == [
-        "cd /srv/app/src/lib || exit 1; ls", "cd /srv/app || exit 1; ls", "cd /srv/app || exit 1; ls",
+    scripts = [c["stdin"].decode() for c in fake.calls]
+    assert scripts == [
+        "cd /srv/app/src/lib || exit 1; ls\n", "cd /srv/app || exit 1; ls\n", "cd /srv/app || exit 1; ls\n",
     ]
 
 
@@ -264,86 +365,31 @@ def test_a_working_directory_outside_the_workspace_is_not_run(
     for outside in (tmp_path, tmp_path / "other", tmp_path / "ws" / ".." / "x"):
         result = box.run("ls", cwd=outside)
         assert result.exit_code == 1 and "not run" in result.stderr
-    assert fake.calls == []
+    assert fake.calls == [] and fake.ops == []
 
 
-# -- reconnecting, and what is never repeated -------------------------------------------------
+# -- refusals the link cannot fix, and what the agent is told ---------------------------------
 
 
 def test_an_unknown_or_changed_host_key_is_a_clear_refusal_and_is_not_retried(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for text in (b"Host key verification failed.\r\n", b"@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@\n"):
-        fake = _Ssh(monkeypatch, [_Proc(255, b"", b"", log=text)])
+        fake = _Ssh(monkeypatch, [_Proc(0, b"", b"")])
+        fake.fail_calls(1, 9, text)
         result = SshSandbox("web1", "/srv").run("ls")
-        assert len(fake.calls) == 1 and fake.waits == []
+        assert fake.n_exec == 1 and fake.waits == []
         assert result.exit_code == 255
         assert "host key is not trusted" in result.stderr
         assert "ssh web1" in result.stderr and "never accepts a new host key" in result.stderr
+        assert "keeps running" not in result.stderr  # it never ran, so there is no run to look for
 
 
 def test_a_refused_credential_says_to_load_the_key_and_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(255, b"", b"", log=b"deploy@web1: Permission denied (publickey).\n")])
+    fake = _Ssh(monkeypatch, [_Proc(0, b"", b"")])
+    fake.fail_calls(1, 9, b"deploy@web1: Permission denied (publickey).\n")
     result = SshSandbox("web1", "/srv").run("ls")
-    assert len(fake.calls) == 1
-    assert "ssh-agent" in result.stderr
-
-
-def test_a_connection_that_never_started_is_retried_a_limited_number_of_times(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(255, b"", b"", log=CONNECT_FAIL)])
-    result = SshSandbox("web1", "/srv").run("make deploy", timeout=60)
-    assert len(fake.calls) == 1 + ssh_module.CONNECT_RETRIES
-    assert fake.waits == [ssh_module.RETRY_WAIT_SECONDS] * ssh_module.CONNECT_RETRIES
-    assert result.exit_code == 255
-
-
-def test_a_retry_that_connects_runs_once_more_and_stops(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(255, b"", b"", log=CONNECT_FAIL), _Proc(0, b"deployed\n", b"")])
-    result = SshSandbox("web1", "/srv").run("make deploy", timeout=60)
-    assert len(fake.calls) == 2 and result.exit_code == 0 and result.stdout == "deployed\n"
-
-
-FORGED = b"ssh: connect to host web1 port 22: Connection refused\n"
-
-
-@pytest.mark.parametrize(
-    ("out", "err", "log"),
-    [
-        (b"partial output\n", b"", CONNECT_FAIL),  # it printed something: the command ran
-        (b"", FORGED, b""),  # the REMOTE command wrote ssh's own sentence to its stderr, then exit 255
-        (b"", FORGED, FORGED),  # forged AND the client really failed after output on stderr
-        (b"", b"", b"Timeout, server web1 not responding.\n"),  # the session died mid-run
-        (b"", b"", b"Connection closed by 10.0.0.1 port 22\n"),  # could be after the command started
-        (b"", b"", b""),  # exit 255 and nothing said by anyone: a command's own exit code
-    ],
-    ids=["output", "forged-stderr", "forged-and-stderr", "midrun", "closed", "silent"],
-)
-def test_a_255_that_may_have_run_the_command_is_never_run_again(
-    out: bytes, err: bytes, log: bytes, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(255, out, err, log=log)])
-    result = SshSandbox("web1", "/srv").run("rm -rf build && make")
-    assert len(fake.calls) == 1 and fake.waits == []
-    assert result.exit_code == 255
-
-
-def test_a_command_that_prints_ssh_looking_lines_and_exits_255_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The review's case: `echo '<ssh sentence>' >&2; exit 255`, byte for byte what the client says."""
-    fake = _Ssh(monkeypatch, [_Proc(255, b"", FORGED)])
-    result = SshSandbox("web1", "/srv").run("echo 'ssh: connect to host x port 22: Connection refused' >&2; exit 255")
-    assert len(fake.calls) == 1 and fake.waits == []
-    assert "Connection refused" in result.stderr  # the command's own stderr still reaches the agent
-
-
-def test_a_nested_ssh_that_fails_on_the_remote_side_is_not_a_failed_connection(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    nested = b"ssh: connect to host db port 22: Connection timed out\n"
-    fake = _Ssh(monkeypatch, [_Proc(255, b"", nested)])
-    SshSandbox("web1", "/srv").run("make migrate && ssh db ./restart")
-    assert len(fake.calls) == 1 and fake.waits == []
+    assert fake.n_exec == 1 and "ssh-agent" in result.stderr
 
 
 def test_the_clients_own_log_never_reaches_the_agent_raw(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -354,11 +400,12 @@ def test_the_clients_own_log_never_reaches_the_agent_raw(monkeypatch: pytest.Mon
         b"ssh: Could not resolve hostname secret.internal.example: Name or service not known\n"
         b"kex failed to 10.20.30.40 port 2222 and 2001:db8::1\n"
     )
-    _Ssh(monkeypatch, [_Proc(255, b"", b"remote said boom\n", log=log)])
-    result = SshSandbox("web1", "/srv").run("ls")
+    fake = _Ssh(monkeypatch, [_Proc(0, b"", b"")])
+    fake.fail_calls(1, 99, log)
+    result = SshSandbox("web1", "/srv").run("ls", timeout=600)
     for leaked in ("secret.internal", "/home/me", "id_ed25519", "10.20.30.40", "2222", "2001:db8", "Identity file"):
         assert leaked not in result.stderr, leaked
-    assert "web1" in result.stderr and "remote said boom" in result.stderr
+    assert "web1" in result.stderr
 
 
 def test_a_hop_of_a_proxy_jump_writes_to_stderr_and_is_cleaned_the_same_way(
@@ -369,18 +416,29 @@ def test_a_hop_of_a_proxy_jump_writes_to_stderr_and_is_cleaned_the_same_way(
         b"Identity file /home/x/.ssh/id_x not accessible: No such file or directory.\n"
         b"kex_exchange_identification: Connection closed by remote host\n"
     )
-    fake = _Ssh(monkeypatch, [_Proc(255, b"", err)])  # exit 255, the client log is empty
-    result = SshSandbox("web1", "/srv").run("ls")
-    assert len(fake.calls) == 1  # still not a provable pre-connection failure: never re-run
+    _Ssh(monkeypatch, [_Proc(0, b"", b"")])
+    box = SshSandbox("web1", "/srv")
+    seen = box._failure(ssh_module._Call(code=255, err=err), "0123456789abcdef", started=False)
     for leaked in ("10.0.0.5", "2222", "/home/x", "id_x", "Identity file"):
-        assert leaked not in result.stderr, leaked
+        assert leaked not in seen.stderr, leaked
+    assert "connect to web1" in seen.stderr
+
+
+def test_a_failed_connection_after_the_reconnects_names_the_alias_and_not_the_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _Ssh(monkeypatch, [_Proc(0, b"", b"")])
+    fake.fail_calls(1, 99, b"ssh: connect to host 203.0.113.9 port 2222: Connection refused\n")
+    result = SshSandbox("web1", "/srv").run("ls", timeout=600)
+    assert "203.0.113.9" not in result.stderr and "2222" not in result.stderr
     assert "connect to web1" in result.stderr
 
 
 def test_a_log_file_that_cannot_be_created_is_a_not_run_result_and_not_an_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(0, b"", b"")])
+    _Popen.made = []
+    monkeypatch.setattr(subprocess, "Popen", _Popen)
 
     def broken(**_: Any) -> Any:
         raise OSError(28, "No space left on device")
@@ -388,24 +446,7 @@ def test_a_log_file_that_cannot_be_created_is_a_not_run_result_and_not_an_except
     monkeypatch.setattr("chimera.sandbox.ssh.tempfile.mkstemp", broken)
     result = SshSandbox("web1", "/srv").run("ls")
     assert result.exit_code == 1 and result.stderr.startswith("error: not run:")
-    assert fake.calls == []
-
-
-def test_a_failed_connection_after_the_retries_names_the_alias_and_not_the_address(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    log = b"ssh: connect to host 203.0.113.9 port 2222: Connection refused\n"
-    _Ssh(monkeypatch, [_Proc(255, b"", b"", log=log)])
-    result = SshSandbox("web1", "/srv").run("ls", timeout=60)
-    assert "203.0.113.9" not in result.stderr and "2222" not in result.stderr
-    assert "connect to web1" in result.stderr
-
-
-def test_the_client_log_file_is_removed_after_each_command(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(0, b"", b"")])
-    SshSandbox("web1", "/srv").run("true")
-    target = fake.calls[0]["target"]
-    assert not Path(target[target.index("-E") + 1]).exists()
+    assert _Popen.made == []
 
 
 def test_the_host_is_checked_again_at_each_command(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -425,17 +466,15 @@ def test_the_host_is_checked_again_at_each_command(monkeypatch: pytest.MonkeyPat
     assert len(fake.calls) == 1
 
 
-def test_other_failures_are_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(1, b"", b"ssh: connect to host web1 port 22: Connection refused\n")])
-    SshSandbox("web1", "/srv").run("false")  # exit 1 is the command's, whatever it printed
-    assert len(fake.calls) == 1
-
-
-def test_a_timeout_kills_the_local_process_and_is_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = _Ssh(monkeypatch, [_Proc(0, b"", b"", hang=True)])
-    result = SshSandbox("web1", "/srv").run("sleep 999", timeout=2)
-    assert result.timed_out and result.exit_code == 124
-    assert len(fake.killed) == 1 and len(fake.calls) == 1
+def test_a_remote_shell_that_ran_and_failed_is_not_a_dropped_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exit 127 from the helper (no ``sh``) is the remote's answer: said once, never reconnected."""
+    fake = _Ssh(monkeypatch, [_Proc(0, b"", b"")])
+    monkeypatch.setattr(
+        SshSandbox, "_exec", lambda _s, _r, _i, _t: ssh_module._Call(code=127, err=b"sh: not found\n"),
+    )
+    result = SshSandbox("web1", "/srv").run("ls")
+    assert result.exit_code == 127 and "could not run the helper" in result.stderr
+    assert fake.waits == []
 
 
 # -- the saved environment --------------------------------------------------------------------

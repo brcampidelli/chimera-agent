@@ -547,6 +547,10 @@ SECTIONS: tuple[PromptSection, ...] = (
 #: Constants whose names look like prompts but are never sent to a model. Each says why, so the scan
 #: in the test cannot be satisfied by quietly adding a name here.
 NOT_PROMPTS: dict[str, str] = {
+    "chimera.sandbox.ssh:_LAUNCHER_TEMPLATE": (
+        "a POSIX sh script run on the remote host over ssh to start, poll, stop and clean up a command; "
+        "it is code for a shell, no model reads it"
+    ),
     "chimera.core.task_cards:BROKEN_REASON": "said to the owner in an HTTP refusal and a log line; no model reads it",
     "chimera.api.plan_gate:REASON": "shown to the person on the approval card; no model reads it",
     "chimera.governance.exec_facts:HEADER": (
