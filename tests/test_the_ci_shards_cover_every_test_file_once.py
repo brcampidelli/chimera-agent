@@ -76,7 +76,7 @@ def test_one_shard_is_the_whole_suite() -> None:
 
 #: Each sharded job and how many shards it is meant to have. Changing a count is a decision, so it
 #: is made here as well as in the workflow, not inferred from whatever the workflow says today.
-SHARDED_JOBS = {"quality-windows": 4, "quality": 3}
+SHARDED_JOBS = {"quality-windows": 5, "quality": 3}
 
 
 def _workflow() -> dict[str, Any]:
