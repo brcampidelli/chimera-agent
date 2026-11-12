@@ -159,7 +159,7 @@ import {
 } from "@/lib/line-comments";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
-import { writeLastSession } from "@/lib/workspace";
+import { readLastPlanMode, readPlanMode, writeLastSession, writePlanMode } from "@/lib/workspace";
 import {
   NOTIFY_ON_FINISH_KEY,
   notifyIfAway,
@@ -1549,7 +1549,17 @@ export function Conversation({
   const [fuse, setFuse] = useState(false);
   // Auto: the field is omitted and the server's rule decides (a big task plans first, in an
   // attended turn). Always / Never: an explicit true / false, which the rule does not override.
-  const [planMode, setPlanMode] = useState<PlanMode>("auto");
+  // Remembered per conversation (localStorage): an existing one keeps its own, a new one starts at the
+  // last choice made anywhere, and a failing store falls back to Auto.
+  const [planMode, setPlanModeState] = useState<PlanMode>(
+    () => (resumeSession ? readPlanMode(resumeSession) : readLastPlanMode()) ?? "auto",
+  );
+  const planModeRef = useRef<PlanMode>(planMode);
+  const setPlanMode = (mode: PlanMode) => {
+    planModeRef.current = mode;
+    setPlanModeState(mode);
+    writePlanMode(sessionId, mode);
+  };
   // Empty means "whatever this install is configured for", which is what every turn sent before the
   // cast could be chosen at all. Per conversation, like the model and the ceiling beside it.
   const [cast, setCast] = useState<Cast>(EMPTY_CAST);
@@ -2237,6 +2247,8 @@ export function Conversation({
           // and a conversation that already exists in the list has not changed by gaining a message.
           if (id !== sessionId)
             void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+          // A conversation that just got its id keeps the choice it was started with.
+          if (id !== sessionId) writePlanMode(id, planModeRef.current);
           setSessionId(id);
           // The project's conversation from now on, so leaving the screen and coming back finds it.
           writeLastSession(workspace, id);

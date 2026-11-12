@@ -64,3 +64,46 @@ export function writeLastSession(workspace: string, id: string | null): void {
     // The screen will open on a new conversation next time, which is what it did before.
   }
 }
+
+/** The composer's "plan first" choice (Auto / Always / Never), remembered per conversation.
+ *
+ * Screen state that started at Auto on every mount, so a reload quietly turned a conversation held
+ * on "Always" back into the rule's decision. A per-viewer convenience like the rest of this file:
+ * every access is guarded, and a failure just means it falls back to Auto. One entry per
+ * conversation, plus the last choice made anywhere, which is where a NEW conversation starts.
+ */
+export type PlanModeChoice = "auto" | "always" | "never";
+const PLAN_MODE_PREFIX = "chimera:code:plan-mode:";
+const PLAN_MODE_LAST = `${PLAN_MODE_PREFIX}last`;
+
+function asPlanMode(value: string | null): PlanModeChoice | null {
+  return value === "auto" || value === "always" || value === "never" ? value : null;
+}
+
+/** The conversation's own choice, or null when it never made one. */
+export function readPlanMode(sessionId: string): PlanModeChoice | null {
+  try {
+    return asPlanMode(localStorage.getItem(`${PLAN_MODE_PREFIX}id:${sessionId}`));
+  } catch {
+    return null;
+  }
+}
+
+/** The last choice made in any conversation: where a new one starts. */
+export function readLastPlanMode(): PlanModeChoice | null {
+  try {
+    return asPlanMode(localStorage.getItem(PLAN_MODE_LAST));
+  } catch {
+    return null;
+  }
+}
+
+/** Keep ``mode`` for the conversation (when it has an id yet) and as the last choice made. */
+export function writePlanMode(sessionId: string | null, mode: PlanModeChoice): void {
+  try {
+    localStorage.setItem(PLAN_MODE_LAST, mode);
+    if (sessionId) localStorage.setItem(`${PLAN_MODE_PREFIX}id:${sessionId}`, mode);
+  } catch {
+    // The choice just will not survive a reload.
+  }
+}
