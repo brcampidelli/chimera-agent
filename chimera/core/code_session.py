@@ -45,10 +45,11 @@ from chimera.core.code_session_marks import (
     merge_pull_requests,
     pull_request_record,
 )
-from chimera.core.context_budget import is_compaction_note, restored_task
+from chimera.core.context_budget import compact, estimate_tokens, is_compaction_note, restored_task
 from chimera.core.conversation_title import choose_title
 from chimera.core.filelock import atomic_write_text, exclusively, read_text, retrying
 from chimera.core.redact import redact_json
+from chimera.providers.cache_ttl import cache_ttl_seconds
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
 
@@ -297,6 +298,111 @@ class CodeSession:
     was. None for a conversation no turn has stamped yet (every file written before this field).
     """
 
+    last_turn: dict[str, Any] | None = None
+    """When the previous turn of this conversation ended, and what it last sent: the model, the route
+    and the three fingerprints. Read before the next turn to measure the pause and to say why its
+    cache missed (`chimera/core/cache_miss.py`); written after each turn, before the save.
+
+    None for a conversation no turn has finished (every file written before this field), which is
+    also what makes the first turn's miss read as a first turn rather than as an expiry."""
+
+    idle_view: dict[str, Any] | None = None
+    """What the model is SENT in place of the oldest messages, after a long pause.
+
+    ``{"covers": n, "lead": [...]}``: the first ``n`` stored messages are shown to the model as
+    ``lead`` (the compaction note and the restored state), and the rest as they are. ``messages``
+    itself is never shortened: it is what the screen replays and what the file keeps, and a shorter
+    prompt must not cost the owner the conversation they are looking at.
+
+    Stored, because the next turn inside the cache's lifetime has to send the same prefix this one
+    just cached; sending the full history again would pay for a prefix nobody has cached."""
+
+    def history_for_model(self) -> list[MessageLike]:
+        """The history a turn sends: the stored messages, with the idle compaction applied when set."""
+        view = self.idle_view
+        if isinstance(view, dict):
+            covers, lead = view.get("covers"), view.get("lead")
+            if (
+                isinstance(covers, int)
+                and isinstance(lead, list)
+                and lead
+                and 0 < covers <= len(self.messages)
+            ):
+                return [*lead, *self.messages[covers:]]
+            # It stands for more messages than are stored (the conversation was cut under it): it
+            # describes nothing now, and is dropped rather than skipped on every turn.
+            self.idle_view = None
+        return list(self.messages)
+
+    def compact_if_idle(
+        self,
+        *,
+        now: float,
+        enabled: bool,
+        model: str,
+        spend: Any = None,
+    ) -> dict[str, Any] | None:
+        """Shorten what the next turn SENDS when the pause was longer than the cache lives.
+
+        The provider's cache has expired by then, so the whole history would be paid for in full
+        either way; a shorter one costs less and loses nothing the cache was keeping. Only the sent
+        history changes (:attr:`idle_view`): ``messages`` keeps the whole conversation.
+
+        It compacts the way the agent compacts mid-run (`Agent.compact_history`: ``keep_recent``,
+        the configured summariser, the run state and the PreCompact hook), and falls back to the
+        budget's plain ``compact`` for an agent that has no such method.
+
+        ``spend`` is the turn's meter, handed to the agent so a summariser call is charged to it.
+        A conversation with a tainted turn in it is never summarised by a model: the summary would
+        carry what an external source said into a stored message that nothing marks as external, so
+        it gets the structural note, which names tools and counts and quotes nothing.
+
+        Does nothing when the switch is off, when the route's lifetime is not known (no guess), when
+        there is no earlier turn, or when the pause is within the lifetime. Returns what changed;
+        the sizes are estimates, as the provider has not counted this history yet.
+        """
+        if not enabled or not self.messages or not isinstance(self.last_turn, dict):
+            return None
+        ended = self.last_turn.get("ended_at")
+        if not isinstance(ended, (int, float)):
+            return None
+        ttl = cache_ttl_seconds(model)
+        gap = now - float(ended)
+        if ttl is None or gap <= ttl:
+            return None
+        history = self.history_for_model()
+        agent_compact = getattr(self.agent, "compact_history", None)
+        if callable(agent_compact):
+            options: dict[str, Any] = {}
+            if _accepts(agent_compact, "spend"):
+                options["spend"] = spend
+            if _accepts(agent_compact, "summarise"):
+                options["summarise"] = not any(r.get("tainted") for r in self.receipts)
+            compacted, changed = agent_compact(history, **options)
+        else:
+            compacted, changed = compact(history)
+        if not changed:
+            return None
+        lead_length = _lead_length(compacted, self.messages)
+        if lead_length is None:
+            return None
+        kept = len(compacted) - lead_length
+        self.idle_view = {
+            "covers": len(self.messages) - kept,
+            "lead": [_as_dict(m) for m in compacted[:lead_length]],
+        }
+        before, after = estimate_tokens(history), estimate_tokens(compacted)
+        return {
+            "gap_seconds": round(gap),
+            "ttl_seconds": ttl,
+            "tokens_before": before,
+            "tokens_after": after,
+            "saved_tokens": max(0, before - after),
+            "estimated": True,
+            # What a model-written summary cost, when the agent is configured to write one.
+            "summary_usd": getattr(self.agent, "last_compaction_usd", 0.0),
+        }
+
     def stamp_checkout(self, folder: str | Path) -> None:
         """Record what ``folder`` is a checkout of — unless that cannot be read now, in which case
         the previous stamp stays: an unreadable answer is not a newer one."""
@@ -364,19 +470,30 @@ class CodeSession:
             extra["spend"] = spend
         if take_guidance is not None and _accepts(self.agent.run, "take_guidance"):
             extra["take_guidance"] = take_guidance
+        sent = self.history_for_model()
         result = self.agent.run(
             task,
             on_token=on_token,
             on_tool=on_tool,
             on_edit=on_edit,
-            history=list(self.messages),
+            history=list(sent),
             **extra,
         )
-        self.absorb(result)
+        self.absorb(result, sent=sent, task=task)
         return result
 
-    def absorb(self, result: AgentResult) -> None:
+    def absorb(
+        self,
+        result: AgentResult,
+        *,
+        sent: list[MessageLike] | None = None,
+        task: str | None = None,
+    ) -> None:
         """Replace the conversation with the transcript the run actually produced.
+
+        When the turn was sent a shortened history (:attr:`idle_view`), the transcript starts from
+        that shortened history, so replacing would put the shortening into the stored conversation.
+        Then the stored messages are kept whole and only what the run added is appended to them.
 
         Replace, not append: the transcript already CONTAINS the history it was handed, plus the
         new turn. Appending it would duplicate the entire conversation each turn — a bug that stays
@@ -389,7 +506,19 @@ class CodeSession:
             _log.debug("session %s: empty transcript, conversation unchanged", self.session_id)
             return
         body = [m for m in result.transcript if _as_dict(m).get("role") != "system"]
-        self.messages = trim_to_a_safe_boundary(body, self.max_messages)
+        view = self.idle_view
+        if sent is None or view is None or list(sent) == list(self.messages):
+            self.messages = trim_to_a_safe_boundary(body, self.max_messages)
+            return
+        # The run began from the shortened history. What it added is everything after that history,
+        # unless the run itself compacted and rewrote the start: then the turn is found by its task.
+        added = body[len(sent) :] if body[: len(sent)] == sent else _added_by(body, task, result.answer)
+        combined = [*self.messages, *added]
+        self.messages = trim_to_a_safe_boundary(combined, self.max_messages)
+        dropped = len(combined) - len(self.messages)
+        covers = int(view["covers"]) - dropped
+        # Trimming took messages the note stood for; none left to stand for means no note.
+        self.idle_view = {**view, "covers": covers} if covers > 0 else None
 
     def replace_last_answer(self, text: str) -> bool:
         """Put ``text`` where the last turn's final answer is — what shipped, when a check after the
@@ -436,6 +565,7 @@ class CodeSession:
 
     def clear(self) -> None:
         self.messages = []
+        self.idle_view = None
 
     # -- persistence ---------------------------------------------------------------------------
 
@@ -463,6 +593,8 @@ class CodeSession:
             "receipts": self.receipts[-MAX_RECEIPTS:],
             # Only once stamped: a file with no stamp reads exactly as it did before the field.
             **({"checkout": self.checkout.to_dict()} if self.checkout is not None else {}),
+            **({"last_turn": dict(self.last_turn)} if self.last_turn is not None else {}),
+            **({"idle_view": dict(self.idle_view)} if self.idle_view else {}),
         }
 
     def remember_receipt(self, receipt: dict[str, Any]) -> None:
@@ -479,6 +611,56 @@ class CodeSession:
             return
         self.receipts.append(receipt)
         del self.receipts[:-MAX_RECEIPTS]
+
+
+def _lead_length(compacted: Sequence[MessageLike], stored: Sequence[MessageLike]) -> int | None:
+    """How many messages at the head of ``compacted`` are NOT a tail of ``stored``.
+
+    A compaction is its note (and the restored state) followed by the recent messages untouched, so
+    what follows the note is a suffix of what was stored. None when no such split exists, which is
+    the case when the kept tail reaches back into an earlier note: there is then no honest way to
+    say which stored messages the note stands for, and the history is left as it was.
+    """
+    for lead in range(1, len(compacted)):
+        kept = len(compacted) - lead
+        if kept <= len(stored) and list(compacted[lead:]) == list(stored[len(stored) - kept :]):
+            return lead
+    return None
+
+
+def _added_by(body: Sequence[MessageLike], task: str | None, answer: str) -> list[MessageLike]:
+    """The messages one turn added, when its transcript no longer starts from what it was sent.
+
+    From the last user message that is the task, to the end. Without that message (the run's own
+    compaction removed it) the exchange is rebuilt from what is known: the task and the answer.
+    """
+    if task is not None:
+        for index in range(len(body) - 1, -1, -1):
+            message = _as_dict(body[index])
+            if message.get("role") == "user" and message.get("content") == task:
+                return list(body[index:])
+        return [{"role": "user", "content": task}, {"role": "assistant", "content": answer}]
+    return []
+
+
+def _idle_view_of(raw: object) -> dict[str, Any] | None:
+    """The stored idle view, or None when the file has none or it is not a usable one."""
+    if (
+        isinstance(raw, dict)
+        and isinstance(raw.get("covers"), int)
+        and raw["covers"] > 0
+        and isinstance(raw.get("lead"), list)
+        and raw["lead"]
+    ):
+        return {"covers": raw["covers"], "lead": list(raw["lead"])}
+    return None
+
+
+def _last_turn_of(raw: object) -> dict[str, Any] | None:
+    """The stored turn record, or None when the file has none or it is not a record."""
+    if isinstance(raw, dict) and isinstance(raw.get("ended_at"), (int, float)):
+        return dict(raw)
+    return None
 
 
 def _accepts(run: Any, name: str) -> bool:
@@ -1028,6 +1210,10 @@ class CodeSessionStore:
             session.workspace = stored.workspace
         if session.checkout is None:
             session.checkout = stored.checkout
+        # The turn that finished last, whichever turn is running: the pause a turn measures is the one
+        # since the last turn that ended, and that is what a stored conversation holds.
+        session.last_turn = stored.last_turn
+        session.idle_view = stored.idle_view
         if not session.pin_changed:
             session.selected_model = stored.selected_model
 
@@ -1062,6 +1248,8 @@ class CodeSessionStore:
             # The marks file's latest PR, with an old transcript's own C1 record merged in.
             pull_request=self._latest_pull_request(session_id, data.get("pull_request")),
             checkout=Checkout.from_dict(data.get("checkout")),
+            last_turn=_last_turn_of(data.get("last_turn")),
+            idle_view=_idle_view_of(data.get("idle_view")),
         )
 
     def _latest_pull_request(self, session_id: str, legacy: object) -> dict[str, Any] | None:

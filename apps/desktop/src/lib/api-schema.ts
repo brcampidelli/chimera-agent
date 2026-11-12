@@ -7117,6 +7117,11 @@ export interface components {
              */
             host_exec: string;
             /**
+             * Idle Compaction
+             * @default true
+             */
+            idle_compaction: boolean;
+            /**
              * Pull Requests
              * @default false
              */

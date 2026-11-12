@@ -154,6 +154,12 @@ from chimera.core.agent_batch_note import (
     batch_record,
     is_batch_note,
 )
+from chimera.core.cache_miss import (
+    classify_cache_miss,
+    external_turn_record,
+    facts_for_turn,
+    turn_record,
+)
 from chimera.core.claims import success_claims
 from chimera.core.close_loop import may_start_loop
 from chimera.core.commands import source_label, taint_for_plugin_command
@@ -193,6 +199,7 @@ from chimera.evolution.code_turn_learning import record_turn_lesson
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
+from chimera.providers.cache_ttl import cache_ttl_seconds, explicit_cache_route
 from chimera.providers.failover import policy_block
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
@@ -5978,6 +5985,11 @@ def register_code_api(
                         # sidebar would show an untitled, empty session for work that really happened.
                         session.messages.append({"role": "user", "content": message})
                         session.messages.append({"role": "assistant", "content": acp_result.answer})
+                        # The pause since this turn is the next turn's to measure; what the external
+                        # agent sent is not known, so nothing is compared against it.
+                        session.last_turn = external_turn_record(
+                            ended_at=time.time(), model=f"external:{external}"
+                        )
                         if turn_id not in deleted_mid_turn:
                             with live_turns.writing(turn_id):
                                 store_for.save(session)
@@ -5994,10 +6006,34 @@ def register_code_api(
                     max_usd=getattr(agent_config, "max_usd", None),
                     warn_usd=getattr(agent_config, "warn_usd", None),
                 )
+                # Set inside the lock and read by the receipt below; None until a turn gets that far.
+                miss_cause: str | None = None
+                cache_gap_seconds: float | None = None
+                cache_write_tokens: int | None = None
+                idle_compaction: dict[str, Any] | None = None
+                turn_model = str(getattr(getattr(agent, "config", None), "model", "") or "")
                 with lock_for(session_id):
                     # What is stored now, not what was stored when this request arrived: a turn of
                     # the same conversation may have finished while this one waited for the lock.
                     store_for.refresh(session)
+                    # The turn that ended before this one, read before anything below changes it: the
+                    # pause this turn follows, and what that turn last sent (`cache_miss.py`).
+                    previous_turn = dict(session.last_turn) if session.last_turn else None
+                    had_history = bool(session.messages)
+                    turn_started = time.time()
+                    # A long pause means the provider's cache has expired: send a shorter history.
+                    # An optimisation: if it fails the turn goes on with the history as stored.
+                    try:
+                        idle_compaction = session.compact_if_idle(
+                            now=turn_started,
+                            enabled=live().idle_compaction,
+                            model=turn_model,
+                            spend=turn_spend,
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        _log.warning("idle compaction failed, sending the history as it is: %s", exc)
+                        session.idle_view = None
+                        idle_compaction = None
                     result = session.send(
                         message,
                         # Fusion has no token stream (the engine only implements `complete`), so
@@ -6027,6 +6063,33 @@ def register_code_api(
                     answer, grounded, grounded_usd = _check_grounded(grounded_turn, result)
                     if answer != result.answer:
                         session.replace_last_answer(answer)
+                    # Why the cache did not answer, from facts (`chimera/core/cache_miss.py`). None when
+                    # the provider reported nothing about the cache: a silent route has no miss to explain.
+                    cache_read = result.steplog.cache_read_tokens
+                    # The model that answered, which a failover or a cascade can make a different one
+                    # from the one asked for: its cache, and its lifetime, are the ones that count.
+                    answered_by = (
+                        result.model
+                        or next((s.model for s in result.steplog.steps if s.model), "")
+                        or turn_model
+                    )
+                    if cache_read is not None:
+                        turn_facts, cache_gap_seconds = facts_for_turn(
+                            previous=previous_turn,
+                            model=answered_by,
+                            steplog=result.steplog,
+                            now=turn_started,
+                            ttl_seconds=cache_ttl_seconds(answered_by),
+                            explicit_cache=explicit_cache_route(answered_by),
+                            had_history=had_history,
+                        )
+                        miss_cause = classify_cache_miss(turn_facts)
+                    # Reported by the provider, or None when it said nothing about the cache at all.
+                    if cache_read is not None or result.cache_write_tokens:
+                        cache_write_tokens = result.cache_write_tokens
+                    session.last_turn = turn_record(
+                        ended_at=time.time(), model=answered_by, steplog=result.steplog
+                    )
                     if turn_id not in deleted_mid_turn:
                         with live_turns.writing(turn_id):
                             store_for.save(session)
@@ -6047,7 +6110,18 @@ def register_code_api(
                         "completion_tokens": result.completion_tokens,
                         # The verifier's and the escalation's calls are this turn's spend too;
                         # an unpriced turn stays unpriced rather than becoming only their cost.
-                        "usd": None if result.usd is None else round(result.usd + grounded_usd, 6),
+                        # What an idle compaction's summariser charged is this turn's too (None: unpriced).
+                        "usd": (
+                            None
+                            if result.usd is None
+                            or (idle_compaction is not None and idle_compaction["summary_usd"] is None)
+                            else round(
+                                result.usd
+                                + grounded_usd
+                                + float((idle_compaction or {}).get("summary_usd") or 0.0),
+                                6,
+                            )
+                        ),
                         # The number that says whether raising max_steps is safe. Reported because
                         # a ceiling the user can raise without seeing its cost is a trap.
                         "context_peak_tokens": result.steplog.context_peak_tokens,
@@ -6095,6 +6169,15 @@ def register_code_api(
                         # This turn could not use tools, and a reader cannot tell that from a zero
                         # tool count alone — the same count a turn that needed none reports.
                         "fused": fused,
+                        # The cache's side of the bill, and why it did not answer. `cache_miss_cause`
+                        # is one of the fixed causes in `chimera/core/cache_miss.py`, or None when the
+                        # provider was silent; `none` means the cache answered this turn.
+                        "cache_write_tokens": cache_write_tokens,
+                        "cache_gap_seconds": cache_gap_seconds,
+                        "cache_miss_cause": miss_cause,
+                        # Set only when this turn's history was shortened for a long pause; the sizes
+                        # are estimates, as the provider has not yet counted the shorter history.
+                        "idle_compaction": idle_compaction,
                         # The style this turn's prompt carried and the version of its words — only
                         # when it carried one, so a default turn's receipt is the one it always was.
                         **(

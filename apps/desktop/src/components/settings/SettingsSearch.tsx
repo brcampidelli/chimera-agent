@@ -89,6 +89,13 @@ const ENTRIES: readonly SearchEntry[] = [
   },
   {
     tab: "general",
+    label: "settings.row.idleCompaction",
+    hint: "settings.hint.idleCompaction",
+    anchor: "settings-idle-compaction",
+    terms: "settings.search.terms.idleCompaction",
+  },
+  {
+    tab: "general",
     label: "settings.row.closeLoopMerge",
     hint: "settings.hint.closeLoopMerge",
     anchor: "settings-close-loop-merge",

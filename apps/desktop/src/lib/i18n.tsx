@@ -29,6 +29,18 @@ export type Lang = (typeof LANGS)[number]["code"];
 type Dict = Record<string, string>;
 
 const en: Dict = {
+  "settings.row.idleCompaction": "Shorten history after a long pause",
+  "settings.hint.idleCompaction": "After a pause longer than the provider's cache lifetime (5 minutes on Anthropic) the cache has already expired, so the history is shortened before the next turn. Off sends the whole history.",
+  "settings.search.terms.idleCompaction": "compaction, cache, idle, pause, history, context, TTL, tokens",
+  "status.cacheMiss": "Last cache miss: {cause}",
+  "code.chat.idleCompacted": "History shortened after a pause: {before} → {after} tokens (estimated)",
+  "code.chat.miss.first_turn": "first turn, nothing cached yet",
+  "code.chat.miss.ttl_expired": "cache expired during the pause",
+  "code.chat.miss.prefix_changed": "the start of the prompt changed",
+  "code.chat.miss.tools_changed": "the tool list changed",
+  "code.chat.miss.model_or_route_changed": "the model or route changed",
+  "code.chat.miss.provider_no_cache": "this route does not cache explicitly",
+  "code.chat.miss.unknown": "cause not identified",
   "design.header.rename": "Rename",
   "design.header.duplicate": "Duplicate design",
   "design.header.export": "Export",
@@ -3759,6 +3771,18 @@ const en: Dict = {
 };
 
 const pt: Dict = {
+  "settings.row.idleCompaction": "Encurtar o histórico após pausa longa",
+  "settings.hint.idleCompaction": "Após uma pausa maior que a vida do cache do provedor (5 minutos na Anthropic), o cache já expirou, então o histórico é encurtado antes do próximo turno. Desligado envia o histórico inteiro.",
+  "settings.search.terms.idleCompaction": "compactação, cache, ociosa, pausa, histórico, contexto, TTL, tokens",
+  "status.cacheMiss": "Último miss de cache: {cause}",
+  "code.chat.idleCompacted": "Histórico encurtado após a pausa: {before} → {after} tokens (estimado)",
+  "code.chat.miss.first_turn": "primeiro turno, nada em cache ainda",
+  "code.chat.miss.ttl_expired": "o cache expirou durante a pausa",
+  "code.chat.miss.prefix_changed": "o início do prompt mudou",
+  "code.chat.miss.tools_changed": "a lista de ferramentas mudou",
+  "code.chat.miss.model_or_route_changed": "mudou o modelo ou a rota",
+  "code.chat.miss.provider_no_cache": "esta rota não usa cache explícito",
+  "code.chat.miss.unknown": "causa não identificada",
   "design.header.rename": "Renomear",
   "design.header.duplicate": "Duplicar design",
   "design.header.export": "Exportar",
@@ -7497,6 +7521,18 @@ const pt: Dict = {
 };
 
 const es: Dict = {
+  "settings.row.idleCompaction": "Acortar el historial tras una pausa larga",
+  "settings.hint.idleCompaction": "Tras una pausa mayor que la vida del caché del proveedor (5 minutos en Anthropic), el caché ya expiró, así que el historial se acorta antes del siguiente turno. Desactivado envía todo el historial.",
+  "settings.search.terms.idleCompaction": "compactación, caché, inactiva, pausa, historial, contexto, TTL, tokens",
+  "status.cacheMiss": "Último fallo de caché: {cause}",
+  "code.chat.idleCompacted": "Historial acortado tras la pausa: {before} → {after} tokens (estimado)",
+  "code.chat.miss.first_turn": "primer turno, aún nada en caché",
+  "code.chat.miss.ttl_expired": "el caché expiró durante la pausa",
+  "code.chat.miss.prefix_changed": "cambió el inicio del prompt",
+  "code.chat.miss.tools_changed": "cambió la lista de herramientas",
+  "code.chat.miss.model_or_route_changed": "cambió el modelo o la ruta",
+  "code.chat.miss.provider_no_cache": "esta ruta no usa caché explícita",
+  "code.chat.miss.unknown": "causa no identificada",
   "design.header.rename": "Renombrar",
   "design.header.duplicate": "Duplicar diseño",
   "design.header.export": "Exportar",
@@ -11246,6 +11282,18 @@ const es: Dict = {
 };
 
 const fr: Dict = {
+  "settings.row.idleCompaction": "Raccourcir l'historique après une longue pause",
+  "settings.hint.idleCompaction": "Après une pause plus longue que la durée de vie du cache du fournisseur (5 minutes chez Anthropic), le cache a déjà expiré : l'historique est raccourci avant le tour suivant. Désactivé, tout l'historique est envoyé.",
+  "settings.search.terms.idleCompaction": "compaction, cache, inactif, pause, historique, contexte, TTL, jetons",
+  "status.cacheMiss": "Dernier raté de cache : {cause}",
+  "code.chat.idleCompacted": "Historique raccourci après la pause : {before} → {after} jetons (estimé)",
+  "code.chat.miss.first_turn": "premier tour, rien en cache encore",
+  "code.chat.miss.ttl_expired": "le cache a expiré pendant la pause",
+  "code.chat.miss.prefix_changed": "le début du prompt a changé",
+  "code.chat.miss.tools_changed": "la liste des outils a changé",
+  "code.chat.miss.model_or_route_changed": "le modèle ou la route a changé",
+  "code.chat.miss.provider_no_cache": "cette route n'utilise pas de cache explicite",
+  "code.chat.miss.unknown": "cause non identifiée",
   "design.header.rename": "Renommer",
   "design.header.duplicate": "Dupliquer le design",
   "design.header.export": "Exporter",
@@ -15009,6 +15057,18 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  "settings.row.idleCompaction": "Verlauf nach langer Pause kürzen",
+  "settings.hint.idleCompaction": "Nach einer Pause, die länger ist als die Cache-Lebensdauer des Anbieters (bei Anthropic 5 Minuten), ist der Cache bereits abgelaufen; der Verlauf wird vor dem nächsten Durchlauf gekürzt. Aus sendet den gesamten Verlauf.",
+  "settings.search.terms.idleCompaction": "Komprimierung, Cache, Leerlauf, Pause, Verlauf, Kontext, TTL, Token",
+  "status.cacheMiss": "Letzter Cache-Fehlgriff: {cause}",
+  "code.chat.idleCompacted": "Verlauf nach der Pause gekürzt: {before} → {after} Token (geschätzt)",
+  "code.chat.miss.first_turn": "erster Durchlauf, noch nichts im Cache",
+  "code.chat.miss.ttl_expired": "Cache während der Pause abgelaufen",
+  "code.chat.miss.prefix_changed": "Anfang des Prompts hat sich geändert",
+  "code.chat.miss.tools_changed": "Werkzeugliste hat sich geändert",
+  "code.chat.miss.model_or_route_changed": "Modell oder Route hat sich geändert",
+  "code.chat.miss.provider_no_cache": "diese Route nutzt keinen expliziten Cache",
+  "code.chat.miss.unknown": "Ursache nicht ermittelt",
   "design.header.rename": "Umbenennen",
   "design.header.duplicate": "Design duplizieren",
   "design.header.export": "Exportieren",
@@ -18769,6 +18829,18 @@ const de: Dict = {
 };
 
 const zh: Dict = {
+  "settings.row.idleCompaction": "长时间停顿后缩短历史",
+  "settings.hint.idleCompaction": "停顿时间超过服务商缓存有效期（Anthropic 为 5 分钟）后，缓存已经失效，因此下一轮前会缩短历史。关闭则发送完整历史。",
+  "settings.search.terms.idleCompaction": "压缩, 缓存, 空闲, 暂停, 历史, 上下文, TTL, 令牌",
+  "status.cacheMiss": "上次缓存未命中：{cause}",
+  "code.chat.idleCompacted": "停顿后缩短了历史：{before} → {after} 个令牌（估算）",
+  "code.chat.miss.first_turn": "首轮，缓存中尚无内容",
+  "code.chat.miss.ttl_expired": "缓存在停顿期间过期",
+  "code.chat.miss.prefix_changed": "提示词开头发生了变化",
+  "code.chat.miss.tools_changed": "工具列表发生了变化",
+  "code.chat.miss.model_or_route_changed": "模型或路由发生了变化",
+  "code.chat.miss.provider_no_cache": "该路由不使用显式缓存",
+  "code.chat.miss.unknown": "未能确定原因",
   "design.header.rename": "重命名",
   "design.header.duplicate": "复制设计",
   "design.header.export": "导出",
@@ -22444,6 +22516,18 @@ const zh: Dict = {
 };
 
 const ja: Dict = {
+  "settings.row.idleCompaction": "長い中断の後で履歴を短縮",
+  "settings.hint.idleCompaction": "プロバイダーのキャッシュ有効期間（Anthropic では 5 分）を超える中断の後、キャッシュは既に失効しているため、次のターンの前に履歴を短縮します。オフにすると履歴全体を送ります。",
+  "settings.search.terms.idleCompaction": "圧縮, キャッシュ, 放置, 中断, 履歴, コンテキスト, TTL, トークン",
+  "status.cacheMiss": "直前のキャッシュミス：{cause}",
+  "code.chat.idleCompacted": "中断後に履歴を短縮：{before} → {after} トークン（推定）",
+  "code.chat.miss.first_turn": "最初のターン、まだキャッシュなし",
+  "code.chat.miss.ttl_expired": "中断中にキャッシュが失効",
+  "code.chat.miss.prefix_changed": "プロンプトの先頭が変わった",
+  "code.chat.miss.tools_changed": "ツール一覧が変わった",
+  "code.chat.miss.model_or_route_changed": "モデルまたは経路が変わった",
+  "code.chat.miss.provider_no_cache": "この経路は明示的なキャッシュを使わない",
+  "code.chat.miss.unknown": "原因は特定できず",
   "design.header.rename": "名前を変更",
   "design.header.duplicate": "デザインを複製",
   "design.header.export": "エクスポート",
@@ -26180,6 +26264,18 @@ const ja: Dict = {
 };
 
 const it: Dict = {
+  "settings.row.idleCompaction": "Accorcia la cronologia dopo una lunga pausa",
+  "settings.hint.idleCompaction": "Dopo una pausa più lunga della durata della cache del fornitore (5 minuti su Anthropic) la cache è già scaduta, quindi la cronologia viene accorciata prima del turno successivo. Disattivato invia tutta la cronologia.",
+  "settings.search.terms.idleCompaction": "compattazione, cache, inattiva, pausa, cronologia, contesto, TTL, token",
+  "status.cacheMiss": "Ultimo miss di cache: {cause}",
+  "code.chat.idleCompacted": "Cronologia accorciata dopo la pausa: {before} → {after} token (stimati)",
+  "code.chat.miss.first_turn": "primo turno, ancora nulla in cache",
+  "code.chat.miss.ttl_expired": "cache scaduta durante la pausa",
+  "code.chat.miss.prefix_changed": "l'inizio del prompt è cambiato",
+  "code.chat.miss.tools_changed": "la lista degli strumenti è cambiata",
+  "code.chat.miss.model_or_route_changed": "sono cambiati modello o percorso",
+  "code.chat.miss.provider_no_cache": "questo percorso non usa una cache esplicita",
+  "code.chat.miss.unknown": "causa non identificata",
   "design.header.rename": "Rinomina",
   "design.header.duplicate": "Duplica design",
   "design.header.export": "Esporta",
@@ -29936,6 +30032,18 @@ const it: Dict = {
 };
 
 const pl: Dict = {
+  "settings.row.idleCompaction": "Skracaj historię po długiej przerwie",
+  "settings.hint.idleCompaction": "Po przerwie dłuższej niż czas życia pamięci podręcznej dostawcy (5 minut w Anthropic) pamięć wygasła, więc historia jest skracana przed następną turą. Wyłączone wysyła całą historię.",
+  "settings.search.terms.idleCompaction": "kompaktowanie, pamięć podręczna, bezczynność, przerwa, historia, kontekst, TTL, tokeny",
+  "status.cacheMiss": "Ostatni brak w pamięci podręcznej: {cause}",
+  "code.chat.idleCompacted": "Historia skrócona po przerwie: {before} → {after} tokenów (szacunkowo)",
+  "code.chat.miss.first_turn": "pierwsza tura, nic jeszcze w pamięci",
+  "code.chat.miss.ttl_expired": "pamięć wygasła podczas przerwy",
+  "code.chat.miss.prefix_changed": "zmienił się początek promptu",
+  "code.chat.miss.tools_changed": "zmieniła się lista narzędzi",
+  "code.chat.miss.model_or_route_changed": "zmienił się model lub trasa",
+  "code.chat.miss.provider_no_cache": "ta trasa nie używa jawnej pamięci podręcznej",
+  "code.chat.miss.unknown": "przyczyny nie ustalono",
   "design.header.rename": "Zmień nazwę",
   "design.header.duplicate": "Duplikuj projekt",
   "design.header.export": "Eksportuj",
@@ -33682,6 +33790,18 @@ const pl: Dict = {
 };
 
 const ru: Dict = {
+  "settings.row.idleCompaction": "Сокращать историю после долгой паузы",
+  "settings.hint.idleCompaction": "После паузы длиннее срока жизни кэша провайдера (5 минут у Anthropic) кэш уже истёк, поэтому история сокращается перед следующим ходом. Выключено — отправляется вся история.",
+  "settings.search.terms.idleCompaction": "сжатие, кэш, простой, пауза, история, контекст, TTL, токены",
+  "status.cacheMiss": "Последний промах кэша: {cause}",
+  "code.chat.idleCompacted": "История сокращена после паузы: {before} → {after} токенов (оценка)",
+  "code.chat.miss.first_turn": "первый ход, в кэше пока ничего нет",
+  "code.chat.miss.ttl_expired": "кэш истёк во время паузы",
+  "code.chat.miss.prefix_changed": "изменилось начало промпта",
+  "code.chat.miss.tools_changed": "изменился список инструментов",
+  "code.chat.miss.model_or_route_changed": "изменились модель или маршрут",
+  "code.chat.miss.provider_no_cache": "этот маршрут не использует явный кэш",
+  "code.chat.miss.unknown": "причина не установлена",
   "design.header.rename": "Переименовать",
   "design.header.duplicate": "Дублировать дизайн",
   "design.header.export": "Экспортировать",

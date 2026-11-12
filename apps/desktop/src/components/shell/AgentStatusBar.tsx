@@ -11,6 +11,7 @@ import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
 import { useAgent } from "@/lib/agent-context";
 import { useRunSession } from "@/lib/run-session";
+import { missLabelKey, shownMissCause } from "@/lib/cache-miss";
 import { useI18n, useNum, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -88,7 +89,15 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
           <Separator />
           {/* This is the total the route reported, not tokens inferred from prompt plus output:
               cache hits are included in prompt tokens and named separately to explain the bill. */}
-          <span>
+          <span
+            title={
+              shownMissCause(report.cache_miss_cause, report.cache_read_tokens)
+                ? t("status.cacheMiss", {
+                    cause: t(missLabelKey(shownMissCause(report.cache_miss_cause, report.cache_read_tokens) as string)),
+                  })
+                : undefined
+            }
+          >
             {t("status.tokens", {
               n: compactTokens(lang, num, report.prompt_tokens + report.completion_tokens),
               ratio:
