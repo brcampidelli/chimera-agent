@@ -1683,6 +1683,11 @@
             "title": "Archive On Pr Merge",
             "type": "boolean"
           },
+          "claude_compat": {
+            "default": true,
+            "title": "Claude Compat",
+            "type": "boolean"
+          },
           "claude_hooks_repo": {
             "default": true,
             "title": "Claude Hooks Repo",

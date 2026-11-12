@@ -356,6 +356,19 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_ARCHIVE_ON_PR_MERGE: String(v) })}
         />
       </Row>
+      {/* Claude Code's instruction files, read beside AGENTS.md (`chimera/core/agents_md.py`). On by default:
+          the same fence and budget apply, and it reads only what the project and the owner already keep. */}
+      <Row
+        label={t("settings.row.claudeCompat")}
+        hint={t("settings.hint.claudeCompat")}
+        env="CHIMERA_CLAUDE_COMPAT"
+      >
+        <Toggle
+          id="settings-claude-compat"
+          on={c.autonomy.claude_compat ?? true}
+          onChange={(v) => save({ CHIMERA_CLAUDE_COMPAT: String(v) })}
+        />
+      </Row>
       {/* An archived conversation's clean, pushed worktree goes about thirty days later (`chimera/core/
           worktree_expiry.py`). The removal cannot be undone, so the switch says so and the sweep keeps
           anything dirty or unpushed; the archived row shows the date and why a worktree was kept. */}

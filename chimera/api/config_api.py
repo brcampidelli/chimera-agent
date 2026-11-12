@@ -127,6 +127,11 @@ _EDITABLE_SETTINGS = {
     # entry. Bridge-writable like the switch above: it archives and deletes nothing, and the sweep
     # only reads GitHub's state with the owner's own `gh` login, as the PR card already does.
     "CHIMERA_ARCHIVE_ON_PR_MERGE",
+    # Whether a run reads Claude Code's instruction files (CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md,
+    # and the owner's ~/.claude/CLAUDE.md) beside AGENTS.md (`chimera/core/agents_md.py`). On by default.
+    # It widens what a run reads from the owner's machine, so it is owner-only and written from the
+    # owner's screen (`bridge_routes.GUARD_SETTINGS`, `SCREEN_WRITE_SETTINGS`). Read per run: no APPLIES_WHEN entry.
+    "CHIMERA_CLAUDE_COMPAT",
     # Remove an archived conversation's clean, pushed worktree after thirty days
     # (`chimera/core/worktree_expiry.py`). Screen-only (SCREEN_WRITE_SETTINGS): it deletes folders.
     "CHIMERA_WORKTREE_CLEANUP",
@@ -354,6 +359,8 @@ SCREEN_WRITE_SETTINGS = frozenset({
     "CHIMERA_PULL_REQUESTS",
     "CHIMERA_CODE_CLOSE_LOOP",
     "CHIMERA_CLOSE_LOOP_MERGE",
+    # Which instruction files a run reads from the owner's machine (`chimera/core/agents_md.py`).
+    "CHIMERA_CLAUDE_COMPAT",
     # Removing a conversation's worktree deletes a folder: the owner's screen decides, not a token.
     "CHIMERA_WORKTREE_CLEANUP",
     # A base URL decides where prompts are sent, and the key env name decides which credential goes
@@ -866,6 +873,8 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             # Whether a conversation leaves the list once its pull request is merged or closed
             # (`chimera/core/pr_auto_archive.py`). On by default; archiving touches nothing.
             "archive_on_pr_merge": settings.archive_on_pr_merge,
+            # Whether a run reads Claude Code's instruction files too (`chimera/core/agents_md.py`). On by default.
+            "claude_compat": settings.claude_compat,
             # Whether an archived conversation's clean, pushed worktree is removed after thirty days.
             "worktree_cleanup": settings.worktree_cleanup,
             # Whether that loop may merge a green pull request. Off by default; owner-only.
@@ -1321,6 +1330,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
     "CHIMERA_CODE_CLOSE_LOOP": _check_boolean("CHIMERA_CODE_CLOSE_LOOP"),
     "CHIMERA_ARCHIVE_ON_PR_MERGE": _check_boolean("CHIMERA_ARCHIVE_ON_PR_MERGE"),
+    "CHIMERA_CLAUDE_COMPAT": _check_boolean("CHIMERA_CLAUDE_COMPAT"),
     "CHIMERA_WORKTREE_CLEANUP": _check_boolean("CHIMERA_WORKTREE_CLEANUP"),
     "CHIMERA_CLOSE_LOOP_MERGE": _check_boolean("CHIMERA_CLOSE_LOOP_MERGE"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,

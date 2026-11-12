@@ -262,6 +262,20 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 _log = get_logger("api.code")
 
 
+def _instruction_source_rows(sources: Any) -> list[dict[str, Any]]:
+    """The receipt's list of instruction files: ``{path, truncated}``, each path once, in load order.
+
+    The steplog keeps a digest beside each path as well; the receipt does not need it, and a digest
+    is a fingerprint of the file's content that a screen has no use for.
+    """
+    rows: dict[str, dict[str, Any]] = {}
+    for source in sources or ():
+        path = str(source.get("path") or "")
+        if path and path not in rows:
+            rows[path] = {"path": path, "truncated": bool(source.get("truncated"))}
+    return list(rows.values())
+
+
 def fence_safe(value: str) -> str:
     """Escape untrusted text so it cannot close the surrounding instruction fence."""
     return (
@@ -3347,6 +3361,8 @@ def register_code_api(
             gateway,
             registry,
             AgentConfig(
+                # The owner's own surface, never a shared-link guest's turn (`guest`, above).
+                user_claude_md=not guest,
                 model=model,
                 system_prompt=system_prompt,
                 turn_context=True,
@@ -6035,6 +6051,10 @@ def register_code_api(
                         # The number that says whether raising max_steps is safe. Reported because
                         # a ceiling the user can raise without seeing its cost is a trap.
                         "context_peak_tokens": result.steplog.context_peak_tokens,
+                        # Which instruction files this turn was given (AGENTS.md, CLAUDE.md, the owner's
+                        # ~/.claude/CLAUDE.md ...) and whether each was cut to fit. Paths and a flag
+                        # only, never the text: the Context card names them, and nothing more.
+                        "instruction_sources": _instruction_source_rows(result.steplog.instruction_sources),
                         # Output tokens per second of time spent INSIDE model calls — measured per
                         # step, not divided out of the run's duration, which would fold the tools
                         # and the verifier into the model's speed. None when nothing was measured;

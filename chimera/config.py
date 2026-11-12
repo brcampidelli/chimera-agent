@@ -1275,6 +1275,13 @@ class Settings(BaseSettings):
     # (The sandbox is still the real boundary for hostile code — see SECURITY.md.)
     trust_workspace: bool = Field(default=True, validation_alias="CHIMERA_TRUST_WORKSPACE")
 
+    # Read the instruction files Claude Code reads, not only AGENTS.md: CLAUDE.md, CLAUDE.local.md and
+    # .claude/CLAUDE.md in each directory on the path, and the owner's ~/.claude/CLAUDE.md. Same fence,
+    # same sanitiser and same budget as AGENTS.md (`chimera/core/agents_md.py`); `@path` imports are
+    # followed inside the project, two levels deep. On by default, the owner's decision (2026-11-10):
+    # a Settings switch turns it off, and off reads AGENTS.md alone, as before.
+    claude_compat: bool = Field(default=True, validation_alias="CHIMERA_CLAUDE_COMPAT")
+
     # Should the CHAT agent be assembled with the same protections the coding turn gets — a posture
     # denylist and the taint ledger wrapped around every tool?
     #

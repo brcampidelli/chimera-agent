@@ -100,7 +100,7 @@ def _row(row_id: str, kind: str, agents_md: str, tool: str, args: dict[str, Any]
         reg = ledger_registry(base, ledger, narrow_on_taint=True, approve=None)
         agent = Agent(
             cast(SupportsComplete, _NoModel()), reg,
-            AgentConfig(model="none", project_root=root, trust_workspace=trusted),
+            AgentConfig(model="none", project_root=root, trust_workspace=trusted, claude_compat=False),
         )
         prompt = agent.compose_system_prompt("do the task")
         out = reg.run(tool, **args)

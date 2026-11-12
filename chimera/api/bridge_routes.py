@@ -817,6 +817,9 @@ GUARD_SETTINGS = frozenset(
         "CHIMERA_DECISION_MODEL",
         # The only brake on what unattended jobs spend (`chimera/scheduler/job_runner.py`).
         "CHIMERA_DAILY_USD_CAP",
+        # Whether a run reads Claude Code's instruction files, and the owner's ~/.claude/CLAUDE.md, from
+        # the owner's machine. Owner-only: a bridge client could widen what the agent is told to read.
+        "CHIMERA_CLAUDE_COMPAT",
         # Whether a typed dollar ceiling is strict (owner's decision, 2026-10-05). On only tightens,
         # but a client that could switch it off would loosen a limit the owner chose to hold hard.
         "CHIMERA_STRICT_SPEND_CAP",

@@ -7063,6 +7063,11 @@ export interface components {
              */
             archive_on_pr_merge: boolean;
             /**
+             * Claude Compat
+             * @default true
+             */
+            claude_compat: boolean;
+            /**
              * Claude Hooks Repo
              * @default true
              */

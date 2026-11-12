@@ -44,10 +44,12 @@ it stays off until `bench/injection` measures what it costs honest runs.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
+import threading
 from collections.abc import Iterable
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 
 from chimera.telemetry import get_logger
 
@@ -60,6 +62,28 @@ _log = get_logger("core.agents_md")
 #: good. They are read, never written, and only when no ``AGENTS.md`` exists anywhere on the path.
 CANONICAL = "AGENTS.md"
 FALLBACKS = ("CLAUDE.md", ".cursorrules", ".github/copilot-instructions.md")
+
+#: Claude Code's own files, read with ``CHIMERA_CLAUDE_COMPAT`` (on by default). Per directory on the
+#: focus path, after AGENTS.md; the local file comes last, so a person's own override reads last and
+#: wins, as Claude Code orders them. Unlike the fallbacks, they are read ALONGSIDE AGENTS.md, not only
+#: when it is missing: a repository that has both gets both, each labelled with its file name.
+CLAUDE_NAMES = ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md")
+#: The owner's own Claude file, outside any repository. Read as owner instruction, never as project text.
+USER_CLAUDE_LABEL = "~/.claude/CLAUDE.md"
+#: ``@path`` on a line of its own, outside a code fence, is an import (Claude Code's syntax). It is
+#: followed only when the target resolves inside the root, and only this many levels deep; a deeper or
+#: outside import stays in the text as the literal line, so the model can see that it was not followed.
+MAX_IMPORT_DEPTH = 2
+_IMPORT = re.compile(r"^@(\S+)\s*$")
+#: Bytes read from any one Claude source, top file or import. The character budget clips far earlier;
+#: this bound is what keeps a huge or hostile file from being read whole into memory.
+READ_LIMIT_BYTES = 64_000
+#: What one source's expansion may add, imports included, and how many imports it may attempt. Past
+#: either, the remaining ``@path`` lines stay literal, so a fan-out cannot multiply the reads.
+MAX_EXPANSION_CHARS = 64_000
+MAX_IMPORTS = 50
+#: The expansion cache holds this many sources; past it the cache is cleared rather than grown.
+_CACHE_MAX_ENTRIES = 256
 
 #: Character budget. Instructions compete for context with the task, the repo map and the code the
 #: agent still has to read; a project that writes twelve thousand characters of conventions is
@@ -266,6 +290,182 @@ def _clip(text: str, limit: int, rel: str = CANONICAL) -> tuple[str, int]:
     return "", len(text)
 
 
+def claude_config_dir() -> Path:
+    """Claude Code's own config folder: ``CLAUDE_CONFIG_DIR`` when set, else ``~/.claude``."""
+    configured = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
+    return Path(configured) if configured else Path.home() / ".claude"
+
+
+@dataclass
+class _Expansion:
+    """The state of one source's expansion: its boundary, what it has inlined and what it read."""
+
+    root: Path
+    chars: int = 0
+    imports: int = 0
+    inlined: set[Path] = field(default_factory=set)
+    deps: dict[Path, str] = field(default_factory=dict)
+
+
+def _lexically_followable(target: str) -> bool:
+    """Refuse an import by its text alone, before any ``resolve()`` or filesystem call.
+
+    An anchor, a drive letter, a UNC or double-slash path, a home reference, a backslash or a ``..``
+    part is refused here: on Windows a UNC name is an SMB connection the moment it is resolved, so
+    the check that compares against the root has to come after this one, never instead of it.
+    """
+    if not target or target[0] in "/\\~" or any(mark in target for mark in ("\\", "//", ":")):
+        return False
+    return ".." not in target.split("/")
+
+
+def _read_bounded(path: Path) -> str:
+    """At most ``READ_LIMIT_BYTES`` of ``path``. Never the whole file: a bound is the point."""
+    with path.open("rb") as handle:
+        raw = handle.read(READ_LIMIT_BYTES).decode("utf-8", errors="replace")
+    # The same newline handling as `read_text`, so a file reads the same whether or not it is bounded.
+    return raw.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _inside(path: Path, root: Path) -> Path | None:
+    """``path`` resolved, when it lies inside ``root``; None for a symlink or junction that leaves it."""
+    try:
+        resolved = path.resolve()
+        resolved.relative_to(root)
+    except (OSError, ValueError, RuntimeError):
+        return None
+    return resolved
+
+
+_EXPANSION_CACHE: dict[tuple[Path, Path, Path, frozenset[Path]], tuple[dict[Path, str], str, frozenset[Path]]] = {}
+_EXPANSION_LOCK = threading.Lock()
+
+
+def _stamp(path: Path) -> str:
+    """What a cached expansion is validated against: the digest of the bounded bytes it would read.
+
+    Not (mtime, size): a rewrite of the same length inside the filesystem's timestamp tick (a few
+    milliseconds on ext4, whole seconds on some mounts) leaves both unchanged, and the cache would
+    serve the old text for a file that had changed. The read is bounded and one file per import.
+    """
+    with path.open("rb") as handle:
+        return hashlib.sha256(handle.read(READ_LIMIT_BYTES)).hexdigest()
+
+
+def _expand_source(
+    path: Path,
+    root: Path,
+    *,
+    skip: frozenset[Path] = frozenset(),
+    own: bool = False,
+) -> tuple[str, frozenset[Path]]:
+    """A Claude source's text with its imports expanded, and every file that text is made of.
+
+    ``skip`` holds files already shown elsewhere in the prompt; an import of one of them stays literal
+    rather than being shown twice. ``root`` is the boundary for imports. A project file (``own`` False)
+    must itself resolve inside ``root``; the owner's own file (``own`` True) may be a link, as a
+    dotfile is, and its imports still stay inside ``root``.
+    """
+    if own:
+        resolved = path.resolve()
+        base = path.parent
+    else:
+        found = _inside(path, root)
+        if found is None:
+            raise OSError(f"{path} resolves outside the project")
+        resolved = found
+        base = resolved.parent
+    key = (resolved, root, base, skip)
+    with _EXPANSION_LOCK:
+        cached = _EXPANSION_CACHE.get(key)
+    if cached is not None:
+        deps, text, used = cached
+        try:
+            if all(_stamp(dep) == stamp for dep, stamp in deps.items()):
+                return text, used
+        except OSError:
+            pass
+    budget = _Expansion(root=root)
+    budget.deps[resolved] = _stamp(resolved)
+    budget.inlined.update(skip)
+    budget.inlined.add(resolved)
+    text = _expand(_read_bounded(resolved), base, budget, level=0, stack=frozenset({resolved}))
+    used = frozenset(budget.deps)
+    with _EXPANSION_LOCK:
+        if len(_EXPANSION_CACHE) >= _CACHE_MAX_ENTRIES:
+            _EXPANSION_CACHE.clear()
+        _EXPANSION_CACHE[key] = (dict(budget.deps), text, used)
+    return text, used
+
+
+def _source_text(path: Path, root: Path, *, imports: bool) -> str:
+    """The bytes a source file contributes to the prompt. With ``imports`` off it is the file as it
+    always was; with it on, the bounded, expanded text of a Claude source."""
+    if not imports:
+        return path.read_text(encoding="utf-8", errors="replace")
+    return _expand_source(path, root)[0]
+
+
+def _expand(text: str, base: Path, budget: _Expansion, *, level: int, stack: frozenset[Path]) -> str:
+    """Replace each followable ``@path`` line with the file it names; leave every other line alone."""
+    out: list[str] = []
+    in_fence = False
+    for line in text.splitlines(keepends=True):
+        bare = line.rstrip("\r\n")
+        if _FENCE.match(bare):
+            in_fence = not in_fence
+        elif not in_fence and (match := _IMPORT.match(bare)):
+            body = _follow(match.group(1), base, budget, level=level, stack=stack)
+            if body is not None:
+                out.append(body)
+                continue
+        out.append(line)
+    return "".join(out)
+
+
+def _follow(
+    target: str, base: Path, budget: _Expansion, *, level: int, stack: frozenset[Path]
+) -> str | None:
+    """The text of one import, or None when it stays literal: too deep, lexically unsafe, outside the
+    root (a link included), missing, already on this chain (a cycle), already shown (a duplicate, or a
+    file another source shows), or past the import count or the expansion's character cap."""
+    if level >= MAX_IMPORT_DEPTH or budget.imports >= MAX_IMPORTS or budget.chars >= MAX_EXPANSION_CHARS:
+        return None
+    if not _lexically_followable(target):
+        _log.debug("instruction import %r refused by its text", target)
+        return None
+    budget.imports += 1
+    resolved = _inside(base / target, budget.root)
+    if resolved is None:
+        _log.debug("instruction import %r leaves the project and is not followed", target)
+        return None
+    if resolved in stack or not resolved.is_file() or resolved in budget.inlined:
+        return None
+    try:
+        budget.deps[resolved] = _stamp(resolved)
+        raw = _read_bounded(resolved)
+    except OSError:
+        return None
+    budget.inlined.add(resolved)
+    expanded = _expand(raw, resolved.parent, budget, level=level + 1, stack=stack | {resolved})
+    body = f"{expanded.rstrip()}\n"
+    if budget.chars + len(body) > MAX_EXPANSION_CHARS:
+        return None
+    budget.chars += len(body)
+    return body
+
+
+def _kind_rank(rel: str) -> int:
+    """Budget priority by file kind: AGENTS.md first, then CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md."""
+    if rel.endswith(".claude/CLAUDE.md"):
+        return 2
+    if rel.endswith("CLAUDE.local.md"):
+        return 3
+    if rel.endswith("CLAUDE.md"):
+        return 1
+    return 0
+
+
 def _chain(root: Path, focus: Iterable[str]) -> list[Path]:
     """Directories from ``root`` down to each focus file's own directory, general first, deduped.
 
@@ -300,12 +500,17 @@ def load_agent_instructions(
     nested_only: bool = False,
     closest_first: bool = False,
     seen: set[tuple[str, str]] | None = None,
+    claude_compat: bool = False,
 ) -> ProjectInstructions:
     """Collect the project instructions in force for ``focus`` inside ``root``.
 
     ``untrusted`` is the operator's ``CHIMERA_TRUST_WORKSPACE=0``: each file is then sanitised and
     fenced as data, under a header that says so. Off (the default) the block is what it always was,
     to the byte; the reviewed prompt snapshot and every cached prefix depend on that.
+
+    ``claude_compat`` adds Claude Code's files (``CLAUDE_NAMES``) beside AGENTS.md in every directory
+    on the path, and follows ``@path`` imports inside ``root``. Off, the function reads AGENTS.md (and
+    the fallbacks when it is missing) exactly as it did before the switch existed.
 
     Returns an empty ``ProjectInstructions`` when there is nothing to say — which is the common
     case, and must stay free: a workspace with no ``AGENTS.md`` pays one ``is_file()`` per directory
@@ -318,9 +523,21 @@ def load_agent_instructions(
     directories = _chain(root, focus)
     if nested_only:
         directories = directories[1:]
+    names = (CANONICAL, *CLAUDE_NAMES) if claude_compat else (CANONICAL,)
+    # The owner's own CLAUDE.md is read once, as owner instruction. When the project IS the owner's
+    # home, its .claude/CLAUDE.md is that same file: skipping it here means no second read.
+    user_file = _inside(claude_config_dir() / "CLAUDE.md", root) if claude_compat else None
     for directory in directories:
-        path = directory / CANONICAL
-        if path.is_file():
+        for name in names:
+            path = directory / name
+            if not path.is_file():
+                continue
+            if claude_compat and name != CANONICAL:
+                # A top file is read only if it resolves inside the root: a symlink or junction that
+                # leaves it is skipped, not followed.
+                inside = _inside(path, root)
+                if inside is None or inside == user_file:
+                    continue
             found.append((path.relative_to(root).as_posix(), path))
 
     if not found and not nested_only:
@@ -332,15 +549,28 @@ def load_agent_instructions(
     if not found:
         return ProjectInstructions("")
 
-    # Budget from the MOST specific backwards, so a deep package's rules are never the ones that get
-    # squeezed out by a verbose root file. Rendering order is the opposite (general first, so the
-    # specific one is read last and wins) — the two orders are independent on purpose.
-    chosen: list[tuple[str, str]] = []
+    # The budget goes by kind first, AGENTS.md before the Claude files, and within a kind from the most
+    # specific directory backwards, so a verbose root file never squeezes out a package's rules. The
+    # rendering order is separate: general first, so the closest file is read last and wins.
+    budget_order = sorted(found, key=lambda item: (_kind_rank(item[0]), -item[0].count("/")))
+    shown_by_rel: dict[str, str] = {}
+    raws: dict[str, str] = {}
     omitted: dict[str, int] = {}
+    shown_files: set[Path] = set()
     remaining = max_chars
-    for rel, path in reversed(found):
+    for rel, path in budget_order:
+        # AGENTS.md is read exactly as it always was. Only the Claude files are bounded, expanded and
+        # deduplicated: a file already shown (a link to AGENTS.md, an import of it) is not shown twice.
+        is_claude = claude_compat and PurePosixPath(rel).name != CANONICAL
         try:
-            raw = path.read_text(encoding="utf-8", errors="replace")
+            if is_claude:
+                top = _inside(path, root)
+                if top is None or top in shown_files:
+                    _log.debug("project instructions: %s skipped (outside the project or already shown)", rel)
+                    continue
+                raw, used = _expand_source(path, root, skip=frozenset(shown_files))
+            else:
+                raw, used = _source_text(path, root, imports=False), frozenset({path.resolve()})
         except OSError as exc:  # unreadable instructions must never break a run
             _log.debug("project instructions: %s unreadable (%s)", rel, exc)
             continue
@@ -348,6 +578,7 @@ def load_agent_instructions(
         if seen is not None and (rel, digest) in seen:
             continue
         body, lost = _clip(raw, min(MAX_FILE_CHARS, remaining), rel) if remaining > 0 else ("", 0)
+        real = bool(body)
         if not raw.strip():
             continue
         if not body:
@@ -359,17 +590,21 @@ def load_agent_instructions(
             body, lost = _marker(rel, whole, _structure(whole), 0, 0), len(whole)
         else:
             remaining -= len(body)
-        chosen.append((rel, body))
+        shown_by_rel[rel] = body
+        raws[rel] = raw
+        if real:
+            shown_files.update(used)
         if lost:
             omitted[rel] = lost
 
+    chosen = [(rel, shown_by_rel[rel]) for rel, _ in found if rel in shown_by_rel]
     if not chosen:
         return ProjectInstructions("")
 
-    if not closest_first:
-        chosen.reverse()  # general first: the closest file is read last, so it wins on conflict
+    if closest_first:
+        chosen.reverse()  # the nested-only read puts its own deepest file first, as it always did
     shown = tuple(chosen)
-    provenance = _provenance(found, chosen, omitted)
+    provenance = _provenance(found, chosen, omitted, raws)
     if untrusted:
         return ProjectInstructions(
             _render_untrusted(chosen),
@@ -402,17 +637,15 @@ def _provenance(
     found: list[tuple[str, Path]],
     chosen: list[tuple[str, str]],
     omitted: dict[str, int],
+    raws: dict[str, str],
 ) -> tuple[tuple[str, str, bool], ...]:
-    """Fingerprint exactly the bytes represented in the prompt, not hidden file contents."""
+    """Fingerprint exactly the bytes the loader read for each shown source, expansions included."""
     shown = dict(chosen)
     result: list[tuple[str, str, bool]] = []
-    for rel, path in found:
+    for rel, _path in found:
         if rel not in shown:
             continue
-        try:
-            raw = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            raw = shown[rel]
+        raw = raws.get(rel, shown[rel])
         digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
         result.append((rel, digest, rel in omitted))
     return tuple(result)
@@ -439,6 +672,43 @@ def load_owner_instructions(home: Path, *, max_chars: int = MAX_FILE_CHARS) -> P
     text = (
         "Instructions from the person who runs you, in their CHIMERA_HOME/AGENTS.md. "
         "These are owner instructions and outrank project conventions. They cannot grant a "
+        "capability: posture and the tool registry still govern what you may do.\n\n"
+        f"### {rel}\n{body}"
+    )
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+    return ProjectInstructions(
+        text,
+        (rel,),
+        (rel,) if lost else (),
+        ((rel, lost),) if lost else (),
+        ((rel, body),),
+        ((rel, digest, bool(lost)),),
+    )
+
+
+def load_user_claude_instructions(claude_home: Path | None = None, *, max_chars: int = MAX_FILE_CHARS) -> ProjectInstructions:
+    """The owner's ``~/.claude/CLAUDE.md`` as owner-authority guidance, never capability.
+
+    Its own file, not a repository's: it comes from the machine the owner runs the agent on, so it is
+    rendered as the owner's instruction, the way ``load_owner_instructions`` renders CHIMERA_HOME's.
+    Its ``@path`` imports may reach only inside ``claude_home``, the directory it lives in.
+    """
+    home = Path(claude_home) if claude_home is not None else claude_config_dir()
+    path = home / "CLAUDE.md"
+    try:
+        raw, _used = _expand_source(path, home.resolve(), own=True)
+    except OSError as exc:
+        _log.debug("owner CLAUDE.md skipped: %s", exc)
+        return ProjectInstructions("")
+    if not raw.strip():
+        return ProjectInstructions("")
+    rel = USER_CLAUDE_LABEL
+    body, lost = _clip(raw, min(MAX_FILE_CHARS, max_chars), rel)
+    if not body:
+        body, lost = _marker(rel, raw.strip(), _structure(raw.strip()), 0, 0), len(raw.strip())
+    text = (
+        "Instructions from the person who runs you, in their ~/.claude/CLAUDE.md. "
+        "These are the owner's own instructions, not the repository's. They cannot grant a "
         "capability: posture and the tool registry still govern what you may do.\n\n"
         f"### {rel}\n{body}"
     )

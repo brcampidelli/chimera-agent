@@ -794,6 +794,7 @@ def chat(
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
         attended(AgentConfig(
+            user_claude_md=True,  # the owner's own surface: see AgentConfig
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
@@ -1068,6 +1069,7 @@ def assist(
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
         attended(AgentConfig(
+            user_claude_md=True,  # the owner's own surface: see AgentConfig
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
@@ -1415,6 +1417,7 @@ def tui(
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
         attended(AgentConfig(
+            user_claude_md=True,  # the owner's own surface: see AgentConfig
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
