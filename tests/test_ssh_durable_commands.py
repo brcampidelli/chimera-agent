@@ -598,7 +598,7 @@ def test_the_real_launcher_leaves_a_young_unmarked_folder_alone(monkeypatch: pyt
     run_id = "0123456789abcdef"
     folder = cache / "chimera" / "runs" / run_id
     folder.mkdir(parents=True)
-    (folder / "claim").write_text(f"other-1 {int(time.time())}\n", encoding="utf-8")  # another launcher, just now
+    (folder / "claim").write_bytes(f"other-1 {int(time.time())}\n".encode())  # another launcher, just now
     (folder / "cmd.tmp").write_text("partial", encoding="utf-8")
     call = SshSandbox("web1", "/srv")._exec(ssh_module.remote_op("launch", run_id, 0, 0, 0, 5), b"x\n", 30)
     assert call is not None and b"launch in progress" in call.out
@@ -692,7 +692,7 @@ def test_a_stale_attempt_that_finishes_after_the_takeover_never_touches_the_new_
     a.stdin.flush()
     assert _wait_for(folder / "claim")
     token = (folder / "claim").read_bytes().decode().split()[0]
-    (folder / "claim").write_text(f"{token} {int(time.time()) - 1000}\n", encoding="utf-8")  # A is now stale
+    (folder / "claim").write_bytes(f"{token} {int(time.time()) - 1000}\n".encode())  # A is now stale
     # Attempt B takes the folder over and runs the command.
     box = SshSandbox("web1", "/srv")
     b = box._exec(ssh_module.remote_op("launch", run_id, 5, 0, 0, len(b_script)), b_script, 30)
@@ -731,7 +731,7 @@ def test_the_real_launcher_sweeps_a_folder_that_only_ever_got_its_claim(
     bare = cache / "chimera" / "runs" / "2222222222222222"
     for folder in (leaked, bare):
         folder.mkdir(parents=True)
-    (leaked / "claim").write_text("t 1\n", encoding="utf-8")
+    (leaked / "claim").write_bytes(b"t 1\n")
     long_ago = time.time() - 10 * 86400
     os.utime(leaked / "claim", (long_ago, long_ago))
     os.utime(bare, (long_ago, long_ago))  # not even a claim
