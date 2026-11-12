@@ -56,6 +56,7 @@ from chimera.api.schemas import (
     ProjectStartIn,
     ProjectStateOut,
     RetiredOut,
+    SkillDoctorOut,
     SkillsOut,
     SpecDraftIn,
     SpecDraftOut,
@@ -771,6 +772,23 @@ def register_features(
             # explaining why a count is zero must explain the state the app is actually in.
             "cards_read": bool(getattr(_settings(), "skill_cards", False)),
         }
+
+    @app.get("/api/skills/doctor", dependencies=[guard], response_model=SkillDoctorOut)
+    def skill_doctor(project: str = "") -> dict[str, Any]:
+        """``/skill-doctor``: what the skills a run is told about cost, and which are unused.
+
+        Read-only and deterministic: no model is called. ``project`` is checked the way
+        `/api/code/commands` checks its folder (an existing directory, or 400), then narrows the
+        bundles by that folder's accepted pack. See `chimera.skills.doctor`.
+        """
+        from chimera.skills.doctor import report_for
+
+        folder: Path | None = None
+        if project.strip():
+            folder = Path(project.strip()).expanduser().resolve()
+            if not folder.is_dir():
+                raise HTTPException(status_code=400, detail="workspace not found")
+        return report_for(_settings(), folder).to_dict()
 
     @app.post("/api/skills/{name}/approve", dependencies=[guard], response_model=ApprovedOut)
     def approve_skill(name: str) -> dict[str, bool]:

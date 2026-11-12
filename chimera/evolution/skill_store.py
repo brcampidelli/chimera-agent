@@ -141,7 +141,7 @@ class SkillStore:
                 entry["stats_by_context"] = previous.get("stats_by_context", {})
                 # The pre-isolation counters are not evidence for any context, but they are the
                 # user's history: re-adding a skill must not delete them from disk.
-                for key in ("uses", "successes"):
+                for key in ("uses", "successes", "counted_since"):
                     if key in previous:
                         entry[key] = previous[key]
             dicts[skill.name] = entry
@@ -230,6 +230,26 @@ class SkillStore:
         these slices instead, each judged on its own evidence only.
         """
         return [self.stats(model=model or None, tools=tools) for model, tools in self.contexts()]
+
+    def counted_since_promotion(self) -> set[str]:
+        """Cards whose counters were reset by a promotion, so their counts start there."""
+        return {name for name, entry in self._dicts.items() if entry.get("counted_since") == "promotion"}
+
+    def credited_runs(self) -> dict[str, int]:
+        """Runs each card was credited in, for the cards that have ever been credited.
+
+        A card missing from the result has NO RECORD: it was never credited, which is not the same
+        as credited zero times. A caller that reads absence as zero calls an unmeasured card idle.
+        """
+        def has_counters(name: str) -> bool:
+            entry = self._dicts.get(name, {})
+            return "uses" in entry or bool(entry.get("stats_by_context"))
+
+        return {
+            str(row["name"]): int(str(row["uses"]))
+            for row in self.stats_overview()
+            if has_counters(str(row["name"]))
+        }
 
     def stats_overview(self) -> list[dict[str, object]]:
         """Display totals: every context summed, plus the legacy pre-isolation counters.
@@ -355,6 +375,9 @@ class SkillStore:
             # regression" contract.
             entry["uses"] = 0
             entry["successes"] = 0
+            # The reset is a fact the report must keep: a counter of zero after a promotion means
+            # "nothing since then", not "never credited", and a card on probation is not idle.
+            entry["counted_since"] = "promotion"
             contexts = entry.get("stats_by_context")
             if isinstance(contexts, dict):
                 entry["stats_by_context"] = {

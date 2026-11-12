@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Conversation, TurnReceipt } from "@/components/code/Conversation";
 import { matchCommands, slashQuery } from "@/components/code/SlashMenu";
-import { listCodeCommands, streamCodeTurn, type CodeTurnDone } from "@/lib/api";
-import type { PromptCommand } from "@/lib/types";
+import { getSkillDoctor, listCodeCommands, streamCodeTurn, type CodeTurnDone } from "@/lib/api";
+import type { PromptCommand, SkillDoctor } from "@/lib/types";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
@@ -80,16 +80,17 @@ describe("the composer's slash list", () => {
     await userEvent.type(box, "/");
     const list = await screen.findByRole("listbox", { name: "Commands" });
     const options = within(list).getAllByRole("option");
-    // The built-in `/code-review` is listed first; the folder's own commands follow it.
-    expect(options).toHaveLength(5);
+    // The built-in `/code-review` and `/skill-doctor` are listed first; the folder's own commands follow them.
+    expect(options).toHaveLength(6);
     expect(within(options[0]).getByText("/code-review")).toBeInTheDocument();
-    expect(within(options[1]).getByText("/review")).toBeInTheDocument();
-    expect(within(options[1]).getByText("<path>")).toBeInTheDocument();
-    expect(within(options[1]).getByText("Review a file")).toBeInTheDocument();
-    expect(within(options[1]).getByText("project")).toBeInTheDocument();
-    expect(within(options[2]).getByText("yours")).toBeInTheDocument();
-    expect(within(options[3]).getByText("plugin my-plugin")).toBeInTheDocument();
-    expect(within(options[4]).getByText("Broken: invalid frontmatter")).toBeInTheDocument();
+    expect(within(options[1]).getByText("/skill-doctor")).toBeInTheDocument();
+    expect(within(options[2]).getByText("/review")).toBeInTheDocument();
+    expect(within(options[2]).getByText("<path>")).toBeInTheDocument();
+    expect(within(options[2]).getByText("Review a file")).toBeInTheDocument();
+    expect(within(options[2]).getByText("project")).toBeInTheDocument();
+    expect(within(options[3]).getByText("yours")).toBeInTheDocument();
+    expect(within(options[4]).getByText("plugin my-plugin")).toBeInTheDocument();
+    expect(within(options[5]).getByText("Broken: invalid frontmatter")).toBeInTheDocument();
     expect(box).toHaveAttribute("aria-expanded", "true");
   });
 
@@ -112,8 +113,8 @@ describe("the composer's slash list", () => {
     expect(options()[1]).toHaveAttribute("aria-selected", "true");
     expect(box).toHaveAttribute("aria-activedescendant", options()[1].id);
     await userEvent.keyboard("{ArrowUp}{ArrowUp}");
-    expect(options()[4]).toHaveAttribute("aria-selected", "true"); // wraps
-    await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+    expect(options()[5]).toHaveAttribute("aria-selected", "true"); // wraps
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{Enter}"); // past the two built-ins
     expect(box).toHaveValue("/review ");
     expect(streamCodeTurn).not.toHaveBeenCalled();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
@@ -196,3 +197,43 @@ describe("the receipt of a command turn", () => {
     expect(screen.queryByText(/code\.chat\.command/)).not.toBeInTheDocument();
   });
 });
+
+/** `/skill-doctor` is answered by the screen: a card, and nothing sent to the agent. */
+describe("/skill-doctor on the composer", () => {
+  const REPORT: SkillDoctor = {
+    skills: [
+      { name: "long-skill", kind: "bundle", origin: "plugin", tokens: 120, injected_runs: null, suggestion: "no_record", every_turn: true },
+    ],
+    tokens_per_turn: 150,
+    cards_tokens_per_task_max: 0,
+    cards_read: false,
+    cards_k: 0,
+    usage_days: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(streamCodeTurn).mockReset().mockResolvedValue(undefined as never);
+    vi.mocked(getSkillDoctor).mockReset().mockResolvedValue(REPORT);
+    localStorage.clear();
+  });
+
+  it("answers the bare command with a card and sends no turn", async () => {
+    const box = await mount();
+    await userEvent.type(box, "/skill-doctor {Enter}");
+    await waitFor(() => expect(getSkillDoctor).toHaveBeenCalled());
+    expect(await screen.findByRole("region", { name: "Skill doctor" })).toBeInTheDocument();
+    expect(screen.getByText("long-skill")).toBeInTheDocument();
+    expect(streamCodeTurn).not.toHaveBeenCalled();
+    expect(box).toHaveValue("");
+  });
+
+  it("sends a line that has more than the bare command as an ordinary message", async () => {
+    const box = await mount();
+    await userEvent.type(box, "/skill-doctor please{Enter}");
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
+    const sent = vi.mocked(streamCodeTurn).mock.calls[0]?.[0] as { message: string };
+    expect(sent.message).toBe("/skill-doctor please");
+    expect(getSkillDoctor).not.toHaveBeenCalled();
+  });
+});
+
