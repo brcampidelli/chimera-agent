@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Settings search finds the Environments card.** "WSL", "SSH" or "environment" in the Settings search now lists the Environments card and the allowed SSH hosts, and opening a result scrolls to it; before, the card was on the General tab but the search could not find it. (#1236)
 
+### Added
+
+- **Act on many folders or conversations at once.** The Folders card in Settings and the Code sidebar gain checkboxes, a tri-state "Select all" and an action bar: pin, unpin, allow or revoke commands, remove from the lists or show again for folders; archive, unarchive, delete or remove their folders from the lists for conversations. Selection mode draws every row so nothing off screen is acted on, deleting asks first with the count, allowing commands in bulk asks first, and one failure is counted without stopping the rest. (#1237)
+
 ## [0.88.0] - 2026-11-12
 ### Fixed
 
