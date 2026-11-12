@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArchiveRestore, Check, ChevronRight, FolderPlus, Pencil, Plus, X } from "lucide-react";
+import { ArchiveRestore, Check, ChevronRight, FolderPlus, ListChecks, Pencil, Plus, X } from "lucide-react";
 
 import {
   ApiError,
@@ -30,11 +30,14 @@ import { screenInBrowser } from "@/lib/server";
 import { ProjectHeader, type ExtraProjectAction } from "@/components/code/ProjectHeader";
 import { SessionRow, rowActionClass, type SessionRowActions } from "@/components/code/SessionRow";
 import { SessionTitleEditor, focusSessionRow } from "@/components/code/SessionTitleEditor";
+import { SessionSelectionBar } from "@/components/code/SessionSelectionBar";
 import { SidebarToolbar, type StateFilter } from "@/components/code/SidebarToolbar";
+import { useSessionSelection } from "@/components/code/useSessionSelection";
 import { WorktreesDialog } from "@/components/code/WorktreesDialog";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog } from "@/components/ui/dialog";
 import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
@@ -177,6 +180,7 @@ export function SessionSidebar({
       return "running";
     return session.state ?? "idle";
   }
+  const selection = useSessionSelection();
   const [stateFilter, setStateFilter] = useState<StateFilter>("all");
   const [query, setQuery] = useState("");
   const [byProject, setByProject] = useState(readGroupWorktrees);
@@ -233,6 +237,17 @@ export function SessionSidebar({
     queryFn: () => listArchivedCodeSessions(),
     enabled: showArchived,
   });
+  // Selection mode reads what the list shows now: after the filter and the search, plus the archive
+  // while it is open. "Working" is the state the single row also refuses to archive.
+  // Exactly the rows drawn, so a box can never select what the person cannot see.
+  const drawnGroups = selection.selecting
+    ? groups.map((g) => ({ ...g, sessions: drawnRows(g, isFolded(g)) }))
+    : groups;
+  const busyIds = new Set(
+    (q.data ?? [])
+      .filter((s) => stateOf(s) === "running" || stateOf(s) === "blocked")
+      .map((s) => s.id),
+  );
 
   // The conversation on screen is being looked at, so its last edits are no longer "to review". On
   // opening it, and again when a turn of it ends while it is open (the list refreshes then and the
@@ -367,7 +382,7 @@ export function SessionSidebar({
   /** Folded on screen: by the person's choice, or — for a section with no conversation that is not the
    *  open project — by default, until unfolded. */
   function isFolded(group: SidebarGroup): boolean {
-    if (narrowing) return false;
+    if (narrowing || selection.selecting) return false;
     if (group.sessions.length === 0 && group.key !== currentKey) return !unfoldedEmpty.has(group.key);
     return collapsed.has(group.key);
   }
@@ -437,11 +452,22 @@ export function SessionSidebar({
     return [{ id: "worktrees", label: t("code.worktrees.open", { name: group.label }), onSelect: () => setCleaning(group) }];
   }
 
+  /** A section's box in selection mode: its conversations, or — with none — the folder itself. */
+  function headerSelect(group: SidebarGroup) {
+    if (!selection.selecting) return undefined;
+    const ids = group.sessions.map((s) => s.id);
+    if (ids.length > 0)
+      return { checked: selection.stateOf(ids), onChange: (on: boolean) => selection.setMany(ids, on) };
+    if (!group.key) return undefined;
+    return { checked: selection.folders.has(group.key), onChange: (on: boolean) => selection.setFolder(group.key, on) };
+  }
+
   /** The rows a section draws: all of them while searching or filtering (the point is to see what
    *  matched), otherwise the first five unless asked for more — and the open conversation always,
    *  even in a folded section, so the screen never loses the row you are in. */
   function drawnRows(group: SidebarGroup, folded: boolean): CodeSessionMeta[] {
-    if (narrowing) return group.sessions;
+    // Selection mode draws every row: whatever a box can select is on screen to be seen.
+    if (narrowing || selection.selecting) return group.sessions;
     const isActive = (s: CodeSessionMeta) => s.id === activeSession;
     if (folded) return group.sessions.filter(isActive);
     if (showingAll.has(group.key)) return group.sessions;
@@ -452,7 +478,17 @@ export function SessionSidebar({
     // `shrink-0`: this is a fixed rail, not a column that negotiates. `max-h-40` only while STACKED:
     // below `lg` the row is a COLUMN, and `shrink-0` then means "do not shrink my HEIGHT" — stacked,
     // this and the file viewer ate the whole row and the conversation resolved to zero height.
-    <aside className="flex max-h-40 min-h-0 w-full shrink-0 flex-col border-r border-hairline lg:max-h-none">
+    <aside className="flex max-h-40 min-h-0 w-full shrink-0 flex-col border-r border-hairline lg:max-h-none"
+      onKeyDown={(e) => {
+        // Esc leaves selection mode — unless it was meant for something drawn over the list (a
+        // menu, the confirmation) or for the search box, which clears itself first.
+        if (e.key !== "Escape" || !selection.selecting || e.defaultPrevented) return;
+        // Escape inside a field (add folder, rename, search) belongs to that field.
+        if ((e.target as HTMLElement).closest('input:not([type="checkbox"]), textarea, [contenteditable="true"]')) return;
+        if ((e.target as HTMLElement).closest('[role="menu"], [role="dialog"], [role="alertdialog"]')) return;
+        selection.exit();
+      }}
+    >
       <div className="flex items-center gap-1 p-2">
         <Button size="sm" variant="ghost" className="flex-1 justify-start" onClick={onNew}>
           <Plus className="h-4 w-4" /> {t("code.sessions.new")}
@@ -465,6 +501,16 @@ export function SessionSidebar({
           onClick={() => setAdding((on) => !on)}
         >
           <FolderPlus className="h-4 w-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          title={t("bulk.select")}
+          aria-label={t("bulk.select")}
+          aria-pressed={selection.selecting}
+          onClick={selection.toggle}
+        >
+          <ListChecks className="h-4 w-4" />
         </Button>
         <HideRegionButton side="left" />
       </div>
@@ -536,6 +582,15 @@ export function SessionSidebar({
         blockedCount={blockedCount}
         reviewCount={reviewCount}
       />
+      {selection.selecting ? (
+        <SessionSelectionBar
+          selection={selection}
+          active={drawnGroups.flatMap((g) => g.sessions)}
+          archived={showArchived ? (archived.data ?? []) : []}
+          groups={drawnGroups}
+          busyIds={busyIds}
+        />
+      ) : null}
       {archiveNote ? (
         <p role="alert" className="px-3 pb-2 text-xs text-bad-foreground">
           {archiveNote}
@@ -599,6 +654,7 @@ export function SessionSidebar({
                     } : undefined}
                     onDelete={() => askDeleteProject(group.key)}
                     extraActions={[...cleanupAction(group), ...(projectActions?.(group) ?? [])]}
+                    select={headerSelect(group)}
                   />
                 )}
                 {/* Unfolded and empty: say so quietly and offer the one thing to do here. The
@@ -637,6 +693,11 @@ export function SessionSidebar({
                       state={stateOf(session)}
                       active={session.id === activeSession}
                       actions={rowActions}
+                      select={
+                        selection.selecting
+                          ? { checked: selection.has(session.id), onChange: (on) => selection.setMany([session.id], on) }
+                          : undefined
+                      }
                       onRename={() => setNaming(session.id)}
                       extra={
                         <button
@@ -653,7 +714,7 @@ export function SessionSidebar({
                     />
                   ),
                 )}
-                {!narrowing && !folded && (more > 0 || (showingAll.has(group.key) && group.sessions.length > ROWS_PER_PROJECT)) ? (
+                {!narrowing && !selection.selecting && !folded && (more > 0 || (showingAll.has(group.key) && group.sessions.length > ROWS_PER_PROJECT)) ? (
                   <button
                     type="button"
                     onClick={() =>
@@ -726,12 +787,22 @@ export function SessionSidebar({
                     : t("code.sessions.worktreeRemovalDue", { days: removalDays(removal.due_at) });
               return (
                 <div key={session.id} className="group/session flex items-center">
+                  {selection.selecting ? (
+                    <span className="flex shrink-0 items-center pl-3">
+                      <Checkbox
+                        checked={selection.has(session.id)}
+                        onChange={(on) => selection.setMany([session.id], on)}
+                        label={t("bulk.pick", { name })}
+                      />
+                    </span>
+                  ) : null}
                   <button
                     type="button"
-                    onClick={() => onResume(session)}
+                    onClick={() => (selection.selecting ? selection.setMany([session.id], !selection.has(session.id)) : onResume(session))}
                     title={name}
                     className={cn(
-                      "min-w-0 flex-1 truncate px-3 py-1 pl-8 text-left text-xs transition-colors duration-1 ease-out",
+                      "min-w-0 flex-1 truncate px-3 py-1 text-left text-xs transition-colors duration-1 ease-out",
+                      selection.selecting ? "pl-2" : "pl-8",
                       session.id === activeSession
                         ? "bg-accent/15 text-accent-ink"
                         : "text-muted-foreground hover:text-foreground",
@@ -745,6 +816,7 @@ export function SessionSidebar({
                       <span className="block truncate text-xs text-muted-foreground/80">{removalLine}</span>
                     ) : null}
                   </button>
+                  {selection.selecting ? null : (
                   <button
                     type="button"
                     aria-label={t("code.sessions.unarchiveOne", { name })}
@@ -754,6 +826,7 @@ export function SessionSidebar({
                   >
                     <ArchiveRestore className="h-3 w-3" />
                   </button>
+                  )}
                 </div>
               );
             })
