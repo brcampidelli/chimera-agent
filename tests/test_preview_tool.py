@@ -167,7 +167,12 @@ def test_a_claude_launch_file_is_one_the_file_tools_may_not_write(tmp_path: Path
     assert ".claude/launch.json" in ALWAYS_DENIED
     region = WriteRegion([], tmp_path)
     assert region.allows(tmp_path / ".claude" / "launch.json") is False
-    assert region.allows(tmp_path / ".claude" / "settings.json") is True
+    # Claude-format hooks live in these two: a command that fires on later tool calls, so the file tools
+    # may not write them either (the agent could persist code across turns). The rest of `.claude` stays open.
+    assert region.allows(tmp_path / ".claude" / "settings.json") is False
+    assert region.allows(tmp_path / ".claude" / "settings.local.json") is False
+    assert region.allows(tmp_path / ".Claude" / "Settings.json") is False
+    assert region.allows(tmp_path / ".claude" / "commands" / "x.md") is True
 
 
 def test_attached_servers_are_the_owners_and_never_the_agents(world: dict[str, Any]) -> None:

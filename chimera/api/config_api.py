@@ -334,6 +334,9 @@ _EDITABLE_SETTINGS = {
     # off removes the guards the owner wrote, and the host switch lets shell hooks leave the sandbox.
     "CHIMERA_HOOKS",
     "CHIMERA_HOOKS_HOST_EXEC",
+    "CHIMERA_CLAUDE_HOOKS_REPO",
+    "CHIMERA_CLAUDE_HOOKS_USER",
+    "CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Settings that PATCH /api/config accepts only from the owner's screen (the screen credential,
@@ -341,6 +344,12 @@ _EDITABLE_SETTINGS = {
 # own shell can read the server token from the service file, so a token-only write is the agent
 # writing the setting. Enforced in `app.py` (`patch_config_endpoint`) before anything is written.
 SCREEN_WRITE_SETTINGS = frozenset({
+    # Switching a Claude-format hook origin OFF loosens (a guard the owner's repository or user file
+    # declared stops running), so the owner's screen writes it, not the server token alone.
+    "CHIMERA_CLAUDE_HOOKS_REPO",
+    "CHIMERA_CLAUDE_HOOKS_USER",
+    # Lets the user's own hooks run on the host: widens where code runs, so the owner's screen writes it.
+    "CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC",
     "CHIMERA_BROWSER_TRUSTED_SITES",
     "CHIMERA_PULL_REQUESTS",
     "CHIMERA_CODE_CLOSE_LOOP",
@@ -443,6 +452,9 @@ APPLIES_WHEN: dict[str, str] = {
     # the Code screen, per job on cron. "Next conversation" is the scope true on all of them.
     "CHIMERA_HOOKS": NEXT_CONVERSATION,
     "CHIMERA_HOOKS_HOST_EXEC": NEXT_CONVERSATION,
+    "CHIMERA_CLAUDE_HOOKS_REPO": NEXT_CONVERSATION,
+    "CHIMERA_CLAUDE_HOOKS_USER": NEXT_CONVERSATION,
+    "CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC": NEXT_CONVERSATION,
     "CHIMERA_DECISION_MODEL": NEXT_CONVERSATION,
     # These start something at boot — a daemon thread and a set of MCP subprocesses. Re-reading the
     # value would not undo that, so the honest answer is the relaunch, not a re-read.
@@ -862,6 +874,11 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             # (`docs/hooks-threat-model.md`). Both off by default; both owner-only.
             "hooks": settings.hooks,
             "hooks_host_exec": settings.hooks_host_exec,
+            # Claude Code compatibility: hooks read from `.claude/settings*.json` (repo) and
+            # `~/.claude/settings.json` (user). On by default; owner-only like the two above.
+            "claude_hooks_repo": settings.claude_hooks_repo,
+            "claude_hooks_user": settings.claude_hooks_user,
+            "claude_user_hooks_host_exec": settings.claude_user_hooks_host_exec,
             # The destinations the owner declared as not-a-way-out. A plain list, not a secret:
             # it is a statement the owner made and has to be able to read back, and a row that
             # cannot show what it holds is a row nobody can correct.
@@ -1298,6 +1315,9 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_AGENT_READS_OWN_ENV": _check_boolean("CHIMERA_AGENT_READS_OWN_ENV"),
     "CHIMERA_HOOKS": _check_boolean("CHIMERA_HOOKS"),
     "CHIMERA_HOOKS_HOST_EXEC": _check_boolean("CHIMERA_HOOKS_HOST_EXEC"),
+    "CHIMERA_CLAUDE_HOOKS_REPO": _check_boolean("CHIMERA_CLAUDE_HOOKS_REPO"),
+    "CHIMERA_CLAUDE_HOOKS_USER": _check_boolean("CHIMERA_CLAUDE_HOOKS_USER"),
+    "CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC": _check_boolean("CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC"),
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
     "CHIMERA_CODE_CLOSE_LOOP": _check_boolean("CHIMERA_CODE_CLOSE_LOOP"),
     "CHIMERA_ARCHIVE_ON_PR_MERGE": _check_boolean("CHIMERA_ARCHIVE_ON_PR_MERGE"),

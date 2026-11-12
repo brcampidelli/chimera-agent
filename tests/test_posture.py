@@ -401,6 +401,11 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
         # Whether a finished worktree is removed once clean and pushed — ON by default, the owner's
         # decision of 2026-11-11; it never removes one holding work only it has.
         "worktree_cleanup": True,
+        # Claude Code compatibility (2026-11-11): the repo and user origins are ON by default, so the
+        # screen shows them on; the user origin's host switch is off, since nothing set it.
+        "claude_hooks_repo": True,
+        "claude_hooks_user": True,
+        "claude_user_hooks_host_exec": False,
     }
     assert "hooks.example" not in repr(cfg), "the webhook URL must not travel to a client"
     stock = read_config(Settings(CHIMERA_HOME=str(tmp_path)))["autonomy"]

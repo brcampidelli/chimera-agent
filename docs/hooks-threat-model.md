@@ -192,10 +192,115 @@ cost per tool call is measured, not assumed (below).
 
 - **No `allow`, no argument rewriting, no session-start command.** Each of those is a way to widen
   or to execute without a tool call to anchor the receipt to.
-- **No hooks from a repository.** Claude Code and others read hooks from the project folder; here a
-  repository cannot carry a hook at all, because a repository is the most common carrier of the
-  injected text this design exists to contain.
+- **No hooks from a repository in `chimera-hooks.json`.** That file lives in the data folder and
+  nothing a repository carries is read into it. Hooks in a repository's `.claude/settings.json` are a
+  separate, later decision, contained as the next section says.
 - **No route that writes the file**, and no bridge route that reads it.
+
+## Claude-format hooks (owner's decision, 2026-11-11): compatibility on by default
+
+The owner decided that Claude Code compatibility is **on by default, hooks included**. A repository
+that already carries `.claude/settings.json` therefore brings hooks here. That reopens the channel
+this document was written to keep closed, on a third-party carrier, so the two guarantees of the
+design are kept whole and the new edges are named.
+
+**What is read.** The `hooks` key of `<project>/.claude/settings.json`,
+`<project>/.claude/settings.local.json` (origin `repo`) and `~/.claude/settings.json` (origin `user`;
+`CLAUDE_CONFIG_DIR` honoured): events → matchers → `{type: "command", command, timeout, onFailure}`.
+Mapped events: `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `SubagentStop`,
+`SessionStart`, `Notification`, `PreCompact`. Everything else (other events, `prompt`/`agent`/`http`
+hook types, a matcher that is not a regular expression, an unreadable file) is **listed as skipped
+on the Settings screen and in one `hook` `load` line per assembly**, never silently dropped.
+`disableAllHooks: true` is honoured; an identical command in two files runs once.
+
+**What does not change (A3, A2, A6).**
+- A hook only tightens. Exit code 2 and `deny`/`block`/`continue: false` block; `ask` goes to the
+  owner's approver (and is a refusal when nobody can answer, or on `UserPromptSubmit`);
+  `permissionDecision: "allow"` and the old `"approve"` are read as **no objection** and written to
+  the receipt as such. They never answer a question the kernel put to a person: hooks sit outside the
+  kernel, so a call that would ask still asks (`tests/test_claude_format_hooks.py`).
+- `Stop`, `SubagentStop`, `SessionStart`, `Notification` and `PreCompact` can only **annotate**. A
+  hook cannot continue a stopped turn, cancel a compaction or change the model.
+- `updatedInput` is applied **only when it provably narrows** the call: a list argument cut down to
+  some of its own items, in order, with every other key identical and none added. A shorter string is
+  not narrower (`rm -rf /` is short), a smaller number is not (`offset`), a removed key can change a
+  default. In any doubt it is ignored, and an `updated_input` receipt says whether it was applied.
+- A hook runs in the sandbox or not at all; the event is a file (`event.json`) fed to its stdin in an
+  empty temporary folder, with the sandbox's scrubbed environment (`scrubbed_environ`: no key, no
+  `CHIMERA_` secret). Document bodies are elided as before.
+- **Who may run on the host.** A repository's hooks (origin `repo`) **never** do, whatever any switch
+  says. The user's own (`~/.claude/settings.json`) only under `CHIMERA_CLAUDE_USER_HOOKS_HOST_EXEC`
+  (off, owner-only, written from the owner's screen). `CHIMERA_HOOKS_HOST_EXEC` keeps meaning the
+  owner's own `chimera-hooks.json` and nothing else.
+- **No network, ever.** The hook sandbox is the agent's own except that Docker runs with the network
+  off even when the agent's is configured `bridge` (`hooks.hook_sandbox`); the OS sandboxes have none.
+- Anything a command says to the model is fenced, sanitised and taints the run (A4): a `deny`'s reason,
+  the tail of a failed hook's stderr, a blocked prompt's reason, `SessionStart` context. For
+  `UserPromptSubmit`, plain stdout and `additionalContext` of an ALLOWED prompt join the turn's notes
+  as fenced data (the code does this; an earlier draft of this section said it was only "treated the
+  same way").
+- **Budgets.** The hooks of one event run at most four at a time, 24 per event at most, each with a
+  timeout (default 30 s, ceiling 60 s) and all of them inside one 45 s budget: a hook not started
+  when it is spent is skipped, one running is cut to what is left. After three timeouts the same hook
+  is skipped for the life of the process (circuit breaker); the receipts say why.
+
+**What is new, and its residual.**
+- **A repository is third-party code, so its hooks load only after the owner confirms them.** The
+  confirmation is of the BYTES of `.claude/settings.json` and `settings.local.json` (a SHA-256 stored
+  per project in `<data>/claude_hooks_trust.json`, a file the agent cannot write: the write tools refuse
+  it by identity and the shell and code tools refuse a command that names it), made from the owner's
+  screen (`POST /api/config/hooks/trust` refuses the server token alone). The screen lists the hooks
+  waiting for confirmation, parsed for display only (commands masked and cut, marked not loaded), beside
+  the button, and the button sends the fingerprint it displayed: if the files changed between looking
+  and confirming the server answers 409 and stores nothing.
+  What is fingerprinted is the two settings files AND the project files their commands name (a token
+  that resolves to an existing regular file under the project root, at most 256 KiB each and 20 files,
+  e.g. `./scripts/check.sh`, `--config=hooks/x.json`, `$CLAUDE_PROJECT_DIR/...`), so a script edited
+  under an unchanged `settings.json` is `changed` too. **The limit that remains:** this reads what the
+  command SAYS. A file such a script sources, imports or downloads, a file named only through a
+  variable or a glob, a symlink whose target lies outside the project, and the interpreter and tools
+  the command finds on `PATH` are not covered; the confirmation is of what was shown, not of
+  everything the command might end up executing. A first sight is `new` and a
+  later edit is `changed`; in both the hooks are listed, not loaded, and the Settings list and the Code
+  screen say so. This is trust on the bytes, not on first sight: auto-trusting a first clone would
+  defeat the point.
+- **Reads are not restricted by the OS sandbox** (it confines writes and the network, not reads), and
+  the hook's folder being empty does not keep it from reading `~`. Under Docker only the temporary
+  folder is mounted, so a hook reads nothing of the host's; under an OS sandbox it can. That is why the
+  confirmation above is mandatory for every repository hook, whatever the sandbox, rather than only
+  where reads cannot be restricted.
+- Each origin has its own owner-only switch (`CHIMERA_CLAUDE_HOOKS_REPO`, `CHIMERA_CLAUDE_HOOKS_USER`,
+  both default on); the bridge refuses to write them and the host switch (`GUARD_SETTINGS`), and the
+  HTTP route accepts them only from the owner's screen (`SCREEN_WRITE_SETTINGS`): switching an origin
+  off loosens, since a guard the repository or the user file declared stops running. The
+  Settings screen lists every loaded hook with its origin (commands masked and cut at 80 characters;
+  the route takes a registered project, never an arbitrary path, and never probes Docker), and the Code
+  screen shows one persistent line per origin when guard hooks (`PreToolUse`) cannot run here or were
+  not confirmed. An `ask` card says whose hook it is ("project hook (.claude/settings.json, third-party
+  code)"). Each receipt carries `origin`, the file and its SHA-256.
+- **The working folder is NOT the project.** A repository hook with write access to the project could
+  rewrite `.claude/settings.json` and persist (A1), so it runs in the same empty folder as the owner's.
+  The project is in the payload's `cwd` and in `CLAUDE_PROJECT_DIR` (set for the command on both POSIX
+  and Windows). A hook that needs project files cannot read them; the price of the containment.
+- **The agent cannot write those files** (`write_region.ALWAYS_DENIED`) and the shell and code tools
+  refuse a command or program that names `.claude/settings.json` or `.claude/settings.local.json`
+  (`queue_fence`), read or write, in the project or in `~`; both the denied names and the fence compare
+  without regard to case (`.Claude/Settings.json` is the same file on Windows and macOS). The same residual as for the owner's file
+  holds: the fence reads what a command says, not what it computes. Even a successful edit voids the
+  confirmation, so the changed hook does not load.
+- **`updatedInput` is accepted for no argument by default.** `NARROWING_ALLOWLIST` (tool -> argument
+  names) is empty, and meant to stay so until an argument has been shown to be an INCLUSION list: a list
+  that grants (`subagent.tools`) or excludes (`scrape.exclude`) widens the call when it shrinks, and a
+  shorter list cannot tell the two apart. Even a listed list is never accepted cut to nothing.
+- **A hook that cannot start** (no isolating sandbox, or a repository hook on a machine with only a host)
+  is a failed hook: it follows `onFailure` (`"block"` blocks the call; the default lets it go on,
+  Claude Code's own behaviour). The owner's `chimera-hooks.json` still refuses the call in that case
+  (A2). On Windows, then, a repository's `PreToolUse` guard does not run, and the Code screen says so.
+- **Which project.** Surfaces built through `govern_step` with a workspace (the Code screen) read that
+  folder, and so do `chimera agent --guard`, `chimera solve --guard`, `solve-batch` and `crew-isolated`
+  (`profile.owner_hooks(workspace=...)`: the run's own folder, not the process's). Other surfaces read
+  the working directory. `chimera agent --guard` has no taint ledger to hand the hooks, so what a shell
+  hook says there is fenced but taints nothing.
 
 ## Where hooks apply
 

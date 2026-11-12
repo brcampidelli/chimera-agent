@@ -1898,6 +1898,40 @@ export interface paths {
         patch: operations["patch_config_endpoint_api_config_patch"];
         trace?: never;
     };
+    "/api/config/hooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Claude Hooks Endpoint */
+        get: operations["read_claude_hooks_endpoint_api_config_hooks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/hooks/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trust Claude Hooks Endpoint */
+        post: operations["trust_claude_hooks_endpoint_api_config_hooks_trust_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config/pool/{provider}": {
         parameters: {
             query?: never;
@@ -7029,6 +7063,21 @@ export interface components {
              */
             archive_on_pr_merge: boolean;
             /**
+             * Claude Hooks Repo
+             * @default true
+             */
+            claude_hooks_repo: boolean;
+            /**
+             * Claude Hooks User
+             * @default true
+             */
+            claude_hooks_user: boolean;
+            /**
+             * Claude User Hooks Host Exec
+             * @default false
+             */
+            claude_user_hooks_host_exec: boolean;
+            /**
              * Close Loop
              * @default false
              */
@@ -8027,6 +8076,110 @@ export interface components {
              */
             enabled: boolean;
             roles?: components["schemas"]["ClaudeAgentRolesOut"];
+        };
+        /** ClaudeHookOut */
+        ClaudeHookOut: {
+            /** Command */
+            command: string;
+            /** Event */
+            event: string;
+            /** Matcher */
+            matcher: string;
+            /** On Failure */
+            on_failure: string;
+            /** Origin */
+            origin: string;
+            /** Source */
+            source: string;
+            /** Timeout */
+            timeout: number;
+        };
+        /** ClaudeHookSourceOut */
+        ClaudeHookSourceOut: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Error
+             * @default
+             */
+            error: string;
+            /**
+             * Exists
+             * @default false
+             */
+            exists: boolean;
+            /**
+             * Hooks
+             * @default 0
+             */
+            hooks: number;
+            /** Origin */
+            origin: string;
+            /** Path */
+            path: string;
+            /**
+             * Skipped
+             * @default []
+             */
+            skipped: string[];
+            /**
+             * Trust
+             * @default
+             */
+            trust: string;
+        };
+        /**
+         * ClaudeHooksOut
+         * @description The hooks loaded from Claude Code settings files, read-only (``GET /api/config/hooks``).
+         */
+        ClaudeHooksOut: {
+            /**
+             * Fingerprint
+             * @default
+             */
+            fingerprint: string;
+            /**
+             * Hooks
+             * @default []
+             */
+            hooks: components["schemas"]["ClaudeHookOut"][];
+            /**
+             * Pending
+             * @default []
+             */
+            pending: components["schemas"]["ClaudeHookOut"][];
+            /** Runnable Repo */
+            runnable_repo?: boolean | null;
+            /** Runnable User */
+            runnable_user?: boolean | null;
+            /**
+             * Sources
+             * @default []
+             */
+            sources: components["schemas"]["ClaudeHookSourceOut"][];
+            /** Workspace */
+            workspace: string;
+        };
+        /** ClaudeHooksTrustIn */
+        ClaudeHooksTrustIn: {
+            /**
+             * Fingerprint
+             * @default
+             */
+            fingerprint: string;
+            /**
+             * Project
+             * @default
+             */
+            project: string;
+        };
+        /** ClaudeHooksTrustOut */
+        ClaudeHooksTrustOut: {
+            /** Trust */
+            trust: string;
         };
         /** ClaudeImportApplyIn */
         ClaudeImportApplyIn: {
@@ -19048,6 +19201,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_claude_hooks_endpoint_api_config_hooks_get: {
+        parameters: {
+            query?: {
+                project?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaudeHooksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trust_claude_hooks_endpoint_api_config_hooks_trust_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaudeHooksTrustIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaudeHooksTrustOut"];
                 };
             };
             /** @description Validation Error */

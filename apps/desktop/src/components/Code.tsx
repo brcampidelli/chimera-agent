@@ -40,6 +40,7 @@ import type { CodeDesignFrame } from "@/lib/design/frames";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Conversation } from "@/components/code/Conversation";
+import { ClaudeHooksNotice } from "@/components/code/ClaudeHooksNotice";
 import { PostureNote } from "@/components/code/PostureNote";
 import { EffortPicker } from "@/components/code/EffortPicker";
 import { PermissionModePicker } from "@/components/code/PermissionModePicker";
@@ -1410,6 +1411,8 @@ export function Code() {
                   approval={posture.approval}
                   provider={provider}
                 />
+                {/* Per origin, when hooks the person wrote to guard tool calls are not in force here. */}
+                <ClaudeHooksNotice workspace={workspace} />
               </div>
             }
           />

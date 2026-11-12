@@ -66,6 +66,9 @@ from chimera.api.schemas import (
     BatchCancelOut,
     BenchmarksOut,
     CancelOut,
+    ClaudeHooksOut,
+    ClaudeHooksTrustIn,
+    ClaudeHooksTrustOut,
     CompletionOut,
     ConfigOut,
     ConfigTestOut,
@@ -1002,6 +1005,46 @@ def build_api_app(
         from chimera.api.config_api import read_config
 
         return read_config(get_settings())  # fresh settings (a prior PATCH cleared the cache)
+
+    def _hooks_project(project: str | None) -> Path:
+        """The folder whose ``.claude`` settings are read: the server's own, or a REGISTERED project.
+        Never an arbitrary path: this route would otherwise tell any caller which folders hold a file."""
+        from chimera.core.code_projects import CodeProjectRegistry
+
+        if not project:
+            return Path.cwd()
+        home = Path(get_settings().home)
+        known = {Path(row.path).resolve() for row in CodeProjectRegistry(home / "code_projects.json").entries()}
+        target = Path(project).resolve()
+        if target != Path.cwd().resolve() and target not in known:
+            raise HTTPException(status_code=404, detail="not a registered project")
+        return target
+
+    @app.get("/api/config/hooks", dependencies=[guard], response_model=ClaudeHooksOut)
+    def read_claude_hooks_endpoint(project: str | None = None) -> dict[str, Any]:
+        # Read-only: the hooks loaded from `.claude/settings*.json` and `~/.claude/settings.json`,
+        # with their origin and, for a repository's, whether the owner confirmed them. Commands are
+        # masked and truncated, and nothing here probes Docker. The switches are written through
+        # PATCH /api/config, by the owner's screen.
+        from chimera.governance.claude_hooks import describe
+
+        return describe(get_settings(), _hooks_project(project))
+
+    @app.post("/api/config/hooks/trust", dependencies=[guard], response_model=ClaudeHooksTrustOut)
+    def trust_claude_hooks_endpoint(request: Request, body: ClaudeHooksTrustIn) -> dict[str, Any]:
+        # A repository's hooks load only once the owner confirmed THESE bytes, and again after any
+        # edit. Confirming widens what runs, so the owner's screen writes it, not the server token.
+        if not request.scope.get(screen_credential.SCOPE_KEY):
+            from chimera.api.browser_screen import needs_screen
+
+            raise needs_screen(request, "a repository's hooks are confirmed from the app's screen")
+        from chimera.governance.claude_hooks import TrustMismatch, trust_repo
+
+        target = _hooks_project(body.project)
+        try:
+            return {"trust": trust_repo(Path(get_settings().home), target, body.fingerprint)}
+        except TrustMismatch as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.patch("/api/config", dependencies=[guard], response_model=UpdatedOut)
     def patch_config_endpoint(request: Request, updates: dict[str, str]) -> dict[str, Any]:

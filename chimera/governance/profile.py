@@ -199,6 +199,7 @@ def govern_step(
     screen: Callable[..., bool] | None = None,
     taint: Callable[[str, str], object] | None = None,
     bypass_permissions: Callable[[], bool] | None = None,
+    workspace: Path | None = None,
 ) -> GovernanceStep:
     """Apply the deployment's trust kernel to ``registry``, under the deployment's mode.
 
@@ -271,9 +272,10 @@ def govern_step(
         # The owner's lifecycle hooks (`chimera/governance/hooks.py`), whatever the mode: the owner
         # switched them on separately. Outside the kernel, so a hook can stop what the kernel would
         # let through and release nothing; inside the taint ledger every caller wraps around this.
-        if not getattr(settings, "hooks", False):
+        from chimera.governance.hooks import apply_hooks, hooks_present, hooks_wanted
+
+        if not hooks_wanted(settings) or not hooks_present(settings, workspace):
             return governed
-        from chimera.governance.hooks import apply_hooks
 
         # A hook's `ask` goes to the OWNER's approver — under `enforce` the kernel's own, under
         # `off` and `observe` the same one built here. Never `observe`'s approve-everything: that
@@ -295,7 +297,7 @@ def govern_step(
             )
         return apply_hooks(
             governed, settings=settings, audit=audit, approve=hook_approve, taint=taint,
-            approver_name=hook_approver_name,
+            approver_name=hook_approver_name, workspace=workspace,
         )
 
     if resolved == "off":
@@ -399,8 +401,12 @@ def owner_hooks(
     audit: AuditLog,
     approve: Callable[..., bool] | None = None,
     taint: Callable[[str, str], object] | None = None,
+    workspace: Path | None = None,
 ) -> Any:
     """The owner's hooks around a kernel some caller built WITHOUT :func:`govern_step`.
+
+    ``workspace`` is the project whose ``.claude`` settings are read; without it they came from the
+    process's working directory, which is not the run's folder in a worktree or a batch worker.
 
     ``chimera agent --guard`` and a standalone ``chimera solve --guard`` wrap ``govern_registry``
     directly, so the hooks installed inside ``govern_step`` never reached them: an owner with a
@@ -410,10 +416,11 @@ def owner_hooks(
     own approver when it has one; otherwise the owner's, built the way ``govern_step`` builds it
     for ``off`` and ``observe`` — never an approve-everything one.
     """
-    if not getattr(settings, "hooks", False):
-        return registry
     from chimera.governance import ApprovalLedger
-    from chimera.governance.hooks import apply_hooks
+    from chimera.governance.hooks import apply_hooks, hooks_present, hooks_wanted
+
+    if not hooks_wanted(settings) or not hooks_present(settings, workspace):
+        return registry
 
     approver_name = ""
     if approve is None:
@@ -422,7 +429,7 @@ def owner_hooks(
         )
     return apply_hooks(
         registry, settings=settings, audit=audit, approve=approve, taint=taint,
-        approver_name=approver_name,
+        approver_name=approver_name, workspace=workspace,
     )
 
 

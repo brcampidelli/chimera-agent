@@ -201,6 +201,11 @@ def test_an_unattended_ask_becomes_the_unattended_reason(monkeypatch: pytest.Mon
     class _S:
         governance_mode = "enforce"
         approval_mode = "ask"
+        # Approver-wiring stub, not a hooks test: it has no `home`, which Claude-format hook
+        # discovery needs, so every hook origin is stated off.
+        hooks = False
+        claude_hooks_repo = False
+        claude_hooks_user = False
 
     profile.govern_step(ToolRegistry(), settings=_S(), audit=_Audit(), surface="api:test", attended=False)
 
@@ -222,6 +227,11 @@ def test_an_attended_ask_leaves_the_reason_empty(monkeypatch: pytest.MonkeyPatch
     class _S:
         governance_mode = "enforce"
         approval_mode = "ask"
+        # Approver-wiring stub, not a hooks test: it has no `home`, which Claude-format hook
+        # discovery needs, so every hook origin is stated off.
+        hooks = False
+        claude_hooks_repo = False
+        claude_hooks_user = False
 
     profile.govern_step(ToolRegistry(), settings=_S(), audit=_Audit(), surface="cli", attended=True)
 
@@ -242,6 +252,11 @@ def test_a_configured_deny_is_reported_as_the_owners_choice(monkeypatch: pytest.
     class _S:
         governance_mode = "enforce"
         approval_mode = "deny"
+        # Approver-wiring stub, not a hooks test: it has no `home`, which Claude-format hook
+        # discovery needs, so every hook origin is stated off.
+        hooks = False
+        claude_hooks_repo = False
+        claude_hooks_user = False
 
     profile.govern_step(ToolRegistry(), settings=_S(), audit=_Audit(), surface="cli", attended=True)
 

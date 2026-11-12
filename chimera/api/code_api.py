@@ -1873,6 +1873,7 @@ def assemble_registry(
         screen=owner if approval_sink is not None else None,
         taint=ledger.record_fetch,
         bypass_permissions=(lambda: _live_flag(bypass_permissions)() and approval_sink is not None),
+        workspace=ws,
     )
     governed = ledger_registry(
         step.registry,

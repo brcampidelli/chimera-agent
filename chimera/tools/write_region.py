@@ -129,7 +129,12 @@ _log = get_logger("tools.write_region")
 #: the writable root — which is some evidence the boundary is in the right place.
 # `.claude/launch.json` is the second place the dev-server recipe lives (`core/launch_config.py`): what it
 # names is run as a command, so the file tools may not write it any more than they may write `.chimera`.
-ALWAYS_DENIED: tuple[str, ...] = (".git", ".chimera", ".env", ".claude/launch.json")
+# `.claude/settings.json` and `settings.local.json` hold Claude-format HOOKS (`governance/claude_hooks.py`):
+# commands that fire on later tool calls, so the agent that could write one would persist across turns.
+ALWAYS_DENIED: tuple[str, ...] = (
+    ".git", ".chimera", ".env", ".claude/launch.json",
+    ".claude/settings.json", ".claude/settings.local.json",
+)
 
 
 def _under(rel: str, directory: str) -> bool:
@@ -159,7 +164,10 @@ class WriteRegion:
         rel = self._rel(path)
         if rel is None:
             return False
-        if any(_under(rel, denied) for denied in ALWAYS_DENIED):
+        # Without case: `.Claude/Settings.json` is the same file on Windows and macOS, and denying one
+        # more spelling on a case-sensitive disk costs nothing.
+        folded = rel.casefold()
+        if any(_under(folded, denied.casefold()) for denied in ALWAYS_DENIED):
             return False
         if not self.patterns:
             return True
