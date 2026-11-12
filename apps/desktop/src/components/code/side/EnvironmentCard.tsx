@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Folder, GitBranch, ShieldHalf } from "lucide-react";
+import { Folder, GitBranch, ShieldHalf, Terminal } from "lucide-react";
 
+import { environmentName } from "@/components/code/EnvironmentPicker";
 import { folderName } from "@/components/code/side/rules";
 import { Badge } from "@/components/ui/panel";
-import { getGitStatus } from "@/lib/api";
+import { getGitStatus, listCodeSessions } from "@/lib/api";
+import { LOCAL_ENVIRONMENT } from "@/lib/environments";
 import { useConversationSide } from "@/lib/conversation-side";
 import { useT } from "@/lib/i18n";
 
@@ -38,7 +40,15 @@ export function EnvironmentCard() {
     queryFn: () => getGitStatus(workspace || null),
     enabled: side !== null && workspace !== "",
   });
+  // Where its commands run, from the same list the sidebar holds. A conversation with no record is
+  // the local one, which is every conversation made before environments and any that chose nothing.
+  const sessions = useQuery({
+    queryKey: ["code-sessions"],
+    queryFn: () => listCodeSessions(),
+    enabled: side !== null && side.sessionId !== null,
+  });
   if (!side) return null;
+  const environment = sessions.data?.find((s) => s.id === side.sessionId)?.environment ?? null;
   const posture = side.posture;
   const postureText = posture
     ? t("side.env.postureValue", {
@@ -72,6 +82,11 @@ export function EnvironmentCard() {
           ) : null}
         </Fact>
       ) : null}
+      <Fact icon={<Terminal className="h-3.5 w-3.5" />} label={t("side.env.environment")}>
+        <span className="truncate text-sm" data-testid="side-environment-name">
+          {environmentName(t, environment ?? { id: LOCAL_ENVIRONMENT, name: "" })}
+        </span>
+      </Fact>
       {posture ? (
         <Fact icon={<ShieldHalf className="h-3.5 w-3.5" />} label={t("side.env.posture")}>
           {/* Wraps instead of truncating (the approval policy is the end of the sentence); the title

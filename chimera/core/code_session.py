@@ -223,6 +223,34 @@ def trim_to_a_safe_boundary(messages: list[MessageLike], limit: int) -> list[Mes
     return []  # no user message at all: nothing here is a safe place to resume from
 
 
+_ALREADY_STARTED = (
+    "this conversation has already started, so its environment is fixed (a first message that failed "
+    "before it was saved fixes it too); open a new conversation to use another environment"
+)
+_FIXED_ELSEWHERE = (
+    "another message fixed this conversation's environment first (a first message that failed before "
+    "it was saved fixes it too); open a new conversation to use another environment"
+)
+
+
+class EnvironmentFixedError(ValueError):
+    """The conversation's environment is already fixed (or it already ran a turn): it cannot be set now."""
+
+
+def environment_record(value: object) -> dict[str, str] | None:
+    """A stored ``environment`` as ``{"id", "name", "kind"}``, or None when absent or malformed.
+
+    None reads as ``local``. A hand-edited value that is not that shape is ignored rather than
+    trusted: the record only names an entry of the server's saved list, and decides nothing itself.
+    """
+    if not isinstance(value, dict):
+        return None
+    env_id, name, kind = value.get("id"), value.get("name"), value.get("kind")
+    if not (isinstance(env_id, str) and isinstance(name, str) and isinstance(kind, str)) or not env_id:
+        return None
+    return {"id": env_id, "name": name, "kind": kind}
+
+
 @dataclass
 class CodeSession:
     """A multi-turn coding conversation over one workspace."""
@@ -296,6 +324,12 @@ class CodeSession:
     repository once that worktree is removed, and a folder that no longer exists cannot say what it
     was. None for a conversation no turn has stamped yet (every file written before this field).
     """
+    environment: dict[str, str] | None = None
+    """Where this conversation's commands run: ``{"id", "name", "kind"}`` of the saved environment its
+    first turn chose (:mod:`chimera.core.environments`). None is ``local`` — every file written before
+    this field, and any conversation that chose nothing — and it is written only when set, so those
+    files read exactly as they did. Fixed after the first turn; the parameters stay in the saved
+    entry, so removing the environment stops the conversation running in it."""
 
     def stamp_checkout(self, folder: str | Path) -> None:
         """Record what ``folder`` is a checkout of — unless that cannot be read now, in which case
@@ -463,6 +497,7 @@ class CodeSession:
             "receipts": self.receipts[-MAX_RECEIPTS:],
             # Only once stamped: a file with no stamp reads exactly as it did before the field.
             **({"checkout": self.checkout.to_dict()} if self.checkout is not None else {}),
+            **({"environment": dict(self.environment)} if self.environment else {}),
         }
 
     def remember_receipt(self, receipt: dict[str, Any]) -> None:
@@ -525,6 +560,8 @@ def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
 
         "last_verdict": last_verdict,
         **_checkout_fields(Checkout.from_dict(data.get("checkout"))),
+        # Only when recorded: a conversation that chose nothing is local and its row reads as before.
+        **({"environment": rec} if (rec := environment_record(data.get("environment"))) else {}),
     }
 
 
@@ -1028,6 +1065,8 @@ class CodeSessionStore:
             session.workspace = stored.workspace
         if session.checkout is None:
             session.checkout = stored.checkout
+        if session.environment is None:
+            session.environment = stored.environment
         if not session.pin_changed:
             session.selected_model = stored.selected_model
 
@@ -1062,6 +1101,7 @@ class CodeSessionStore:
             # The marks file's latest PR, with an old transcript's own C1 record merged in.
             pull_request=self._latest_pull_request(session_id, data.get("pull_request")),
             checkout=Checkout.from_dict(data.get("checkout")),
+            environment=environment_record(data.get("environment")),
         )
 
     def _latest_pull_request(self, session_id: str, legacy: object) -> dict[str, Any] | None:
@@ -1115,6 +1155,62 @@ class CodeSessionStore:
                 raise ValueError("the conversation file is unreadable; its permission mode was not changed")
             document = document or {}
             document["permission_mode"] = mode
+            self._write(path, redact_json(document))
+
+    def stored_environment(self, session_id: str) -> dict[str, str] | None:
+        """The environment a stored conversation recorded, or None (none recorded: it is ``local``)."""
+        try:
+            path = self._path(session_id)
+        except ValueError:
+            return None
+        return environment_record((self._read_document(path) or {}).get("environment"))
+
+    def has_turns(self, session_id: str) -> bool:
+        """Whether the conversation has anything stored beyond a setting: a message or a receipt.
+
+        What fixes the environment: a conversation that has run a turn has run it somewhere.
+        """
+        try:
+            path = self._path(session_id)
+        except ValueError:
+            return False
+        data = self._read_document(path) or {}
+        return bool(data.get("messages") or data.get("receipts"))
+
+    def fix_environment(self, session_id: str, record: dict[str, str] | None) -> None:
+        """Fix the conversation's environment at its first turn, or raise :class:`EnvironmentFixedError`.
+
+        Compare-and-set under the conversation's write lock: the file is read AGAIN here, and the
+        environment is written only if the conversation still has no turn and no environment of its
+        own. The turn decided what to run in from a read made earlier, outside any lock; a second
+        message that fixed another one (or a first turn that saved) in between is found here and
+        refused, instead of the last writer silently winning.
+
+        Written before the turn runs, not with its save: a second message sent while the first is
+        still running must find the environment already fixed.
+
+        ``record`` None is ``local``: nothing is written (a conversation with no record IS local), but
+        the same check runs, so a turn that chose local cannot slip in after another message fixed a
+        different environment. A first turn that fails before saving still leaves the environment
+        fixed; the refusals say so and point to a new conversation.
+        """
+        path = self._path(session_id)
+        with self._guard(path):
+            existed = path.exists()
+            document = self._read_document(path)
+            if existed and document is None:
+                raise ValueError("the conversation file is unreadable; its environment was not recorded")
+            document = document or {}
+            held = environment_record(document.get("environment"))
+            if record is None:
+                if held is not None:
+                    raise EnvironmentFixedError(_FIXED_ELSEWHERE)
+                return
+            if document.get("messages") or document.get("receipts"):
+                raise EnvironmentFixedError(_ALREADY_STARTED)
+            if held is not None and held != record:
+                raise EnvironmentFixedError(_FIXED_ELSEWHERE)
+            document["environment"] = dict(record)
             self._write(path, redact_json(document))
 
     def stored_model(self, session_id: str) -> str:

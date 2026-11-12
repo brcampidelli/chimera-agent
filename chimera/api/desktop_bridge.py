@@ -1284,6 +1284,13 @@ def register_bridge_api(
                         "bridge starts uses the configured models; not accepted through the bridge: "
                         + ", ".join(chosen),
                     )
+            if route.seams and isinstance(body, dict) and body.get("environment") not in (None, ""):
+                raise HTTPException(
+                    status_code=403,
+                    detail="where a conversation's commands run is the owner's decision, made in the "
+                    "app: a turn the bridge sends runs in the environment its conversation already "
+                    "has; not accepted through the bridge: environment",
+                )
             reach, approval = owner_posture(body)
             wider = wider_than(body, reach=reach, approval=approval)
             if wider:

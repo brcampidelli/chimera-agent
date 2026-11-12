@@ -568,6 +568,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Code Environments
+         * @description ``local`` and the saved environments, the kinds this machine can create, the project defaults.
+         *
+         *     With ``project``, also ``project_default``: the environment id a new conversation there starts in.
+         */
+        get: operations["list_code_environments_api_code_environments_get"];
+        put?: never;
+        /**
+         * Save Code Environment
+         * @description Save an environment. The kind checks its own parameters; a bad one is a 400.
+         */
+        post: operations["save_code_environment_api_code_environments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/environments/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Code Environment Default
+         * @description Set (or, with an empty ``environment``, clear) the environment new conversations of a project start in.
+         */
+        put: operations["set_code_environment_default_api_code_environments_default_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/environments/wsl-distros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Wsl Distros
+         * @description The WSL distros installed here, read from ``wsl.exe -l -q`` (empty off Windows or without WSL).
+         */
+        get: operations["list_wsl_distros_api_code_environments_wsl_distros_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/environments/{env_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Code Environment
+         * @description Forget an environment. A conversation that ran in it cannot run commands again (it is not moved).
+         */
+        delete: operations["remove_code_environment_api_code_environments__env_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/pack": {
         parameters: {
             query?: never;
@@ -8330,6 +8416,94 @@ export interface components {
             warning?: string | null;
         };
         /**
+         * CodeEnvironmentDefaultIn
+         * @description A project's default environment for new conversations; ``environment`` empty clears it.
+         */
+        CodeEnvironmentDefaultIn: {
+            /**
+             * Environment
+             * @default
+             */
+            environment: string;
+            /** Project */
+            project: string;
+        };
+        /**
+         * CodeEnvironmentIn
+         * @description A new saved environment: where a conversation's commands run (``chimera.core.environments``).
+         */
+        CodeEnvironmentIn: {
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Params */
+            params?: {
+                [key: string]: string;
+            };
+        };
+        /** CodeEnvironmentKindOut */
+        CodeEnvironmentKindOut: {
+            /** Available */
+            available: boolean;
+            /** Kind */
+            kind: string;
+        };
+        /** CodeEnvironmentOut */
+        CodeEnvironmentOut: {
+            /**
+             * Available
+             * @default true
+             */
+            available: boolean;
+            /**
+             * Builtin
+             * @default false
+             */
+            builtin: boolean;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Params */
+            params?: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * CodeEnvironmentRecordOut
+         * @description What a conversation keeps of its environment: which one, by id, with the name it had.
+         */
+        CodeEnvironmentRecordOut: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * CodeEnvironmentsOut
+         * @description The saved environments (``local`` first), the kinds that can be created and each project's default.
+         */
+        CodeEnvironmentsOut: {
+            /** Defaults */
+            defaults?: {
+                [key: string]: string;
+            };
+            /** Environments */
+            environments: components["schemas"]["CodeEnvironmentOut"][];
+            /** Kinds */
+            kinds: components["schemas"]["CodeEnvironmentKindOut"][];
+            /**
+             * Project Default
+             * @default
+             */
+            project_default: string;
+        };
+        /**
          * CodeExchangeOut
          * @description One question and everything the agent did answering it.
          *
@@ -8727,6 +8901,7 @@ export interface components {
              * @default false
              */
             damaged: boolean;
+            environment?: components["schemas"]["CodeEnvironmentRecordOut"] | null;
             /** Id */
             id: string;
             /**
@@ -9023,6 +9198,8 @@ export interface components {
             context_budget?: number | null;
             /** Deny Tools */
             deny_tools?: string[] | null;
+            /** Environment */
+            environment?: string | null;
             /**
              * Explorer
              * @default false
@@ -9173,6 +9350,13 @@ export interface components {
              * @default
              */
             kept: string;
+        };
+        /** CodeWslDistrosOut */
+        CodeWslDistrosOut: {
+            /** Distros */
+            distros: string[];
+            /** Supported */
+            supported: boolean;
         };
         /**
          * CompletionOut
@@ -17118,6 +17302,154 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PromptCommandsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_code_environments_api_code_environments_get: {
+        parameters: {
+            query?: {
+                project?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeEnvironmentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_code_environment_api_code_environments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeEnvironmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeEnvironmentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_code_environment_default_api_code_environments_default_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeEnvironmentDefaultIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeEnvironmentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_wsl_distros_api_code_environments_wsl_distros_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeWslDistrosOut"];
+                };
+            };
+        };
+    };
+    remove_code_environment_api_code_environments__env_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                env_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeEnvironmentsOut"];
                 };
             };
             /** @description Validation Error */

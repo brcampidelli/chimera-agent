@@ -101,6 +101,9 @@ from chimera.api.schemas import (
     CodeBypassReactivateOut,
     CodeBypassSavedOut,
     CodeBypassToggleOut,
+    CodeEnvironmentDefaultIn,
+    CodeEnvironmentIn,
+    CodeEnvironmentsOut,
     CodeGrantMigrationIn,
     CodeGrantMigrationOut,
     CodeProjectBypassIn,
@@ -128,6 +131,7 @@ from chimera.api.schemas import (
     CodeTurnQueueItemOut,
     CodeTurnQueueListOut,
     CodeTurnStopOut,
+    CodeWslDistrosOut,
     DeletedCountOut,
     DictationOut,
     ProjectPackAcceptIn,
@@ -148,6 +152,7 @@ from chimera.api.sse import SSE_RESPONSE
 from chimera.api.turn_context import MAX_CONTEXT_ITEMS, ResolvedContext, TurnContextItem
 from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
+from chimera.core import environments as envs
 from chimera.core.agent_batch_note import (
     AGENT_BATCH_KEY,
     batch_note_tainted,
@@ -156,6 +161,7 @@ from chimera.core.agent_batch_note import (
 )
 from chimera.core.claims import success_claims
 from chimera.core.close_loop import may_start_loop
+from chimera.core.code_session import EnvironmentFixedError
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
 from chimera.core.diff_self_check import (
@@ -1178,6 +1184,7 @@ def assemble_registry(
     manual_allowances: ManualAllowances | None = None,
     manual_session: Callable[[], str] | None = None,
     manual_screen: bool = False,
+    sandbox: Any = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -1200,6 +1207,11 @@ def assemble_registry(
 
     ``grant_root`` is the folder whose recorded shell grant applies when ``ws`` is a copy of it — a
     crew worker's worktree. None = ``ws`` itself (or the root the server stamped on the seams).
+
+    ``sandbox`` is where the turn's shell and code tools run, when the conversation's environment
+    chose one (``chimera.core.environments.sandbox_for``); None is the install's own, as before. It
+    changes WHERE and nothing about whether: the host-exec gate above is built from the same
+    inputs and judges the object by its own ``is_isolated()``.
 
     ``bot_floor`` is a turn the owner sent from a linked chat (S4): the conversation is the desktop's,
     the reach is the bot's. It gets what a bot's registry would get (`governed_profile` on an
@@ -1315,6 +1327,7 @@ def assemble_registry(
         write_region=browser_write_region,
         host_exec_confirm=host_exec_confirm,
         extra_turn_ports=dev_turn.ports if dev_turn is not None else None,
+        sandbox=sandbox,
     )
     # In-process Python can import and mutate the service's governance state. The subprocess
     # execute_code tool remains available behind the host-execution gate.
@@ -2483,6 +2496,12 @@ class CodeTurnRequest(CodeSeams):
     (``chimera-wt-`` prefix, its worktree folder, durable owner record), so the cleanup dialog and
     the post-merge cleanup remove it like any worktree the app made. Starts a conversation only; the
     first frame says the ``workspace`` and ``branch`` it got."""
+    environment: str | None = Field(default=None, min_length=1, max_length=64)
+    """Where this conversation's commands run: the id of a saved environment
+    (``/api/code/environments``) or ``"local"``. Read on the conversation's FIRST turn, from the owner's
+    own screen only, and fixed after it (:mod:`chimera.core.environments`); a later turn may repeat it
+    but not change it. Omitted: the project's default, else the machine the app runs on, as before.
+    The bridge and a paired device are refused a value."""
     branch: str | None = Field(default=None, max_length=200)
     """The new worktree's branch (``worktree: "new"`` only). Default: ``<branch prefix>/<slug of the
     title>-<hex>``. A run's ``…/attempt-…`` name is refused, and so is one that exists."""
@@ -3215,6 +3234,7 @@ def register_code_api(
         wait_forever: bool = False,
         manual_session: Callable[[], str] | None = None,
         manual_screen: bool = False,
+        sandbox: Any = None,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it. ``guest``: a share link's turn.
 
@@ -3250,7 +3270,7 @@ def register_code_api(
             manual_allowances=manual_allowances,
             manual_session=manual_session,
             manual_screen=manual_screen,
-
+            sandbox=sandbox,
             on_pull_request=(
                 (lambda url: _remember_pull_request(run_id, url)) if run_id is not None else None
             ),
@@ -3505,6 +3525,15 @@ def register_code_api(
         # (for example, from the terminal); the authenticated bridge may stamp its own label.
         if from_bridge:
             req.source = "bridge"
+        if req.environment is not None and (from_bridge or not browser_allowed):
+            # Where commands run is reach, and reach is the owner's, chosen on the app's own screen.
+            # The bridge and a paired device may keep working in the environment a conversation
+            # already has; they never name one (`_turn_environment` repeats this for every door).
+            raise HTTPException(
+                status_code=403,
+                detail="the environment is the owner's decision, made on the app's own screen; "
+                "not accepted here",
+            )
         # The owner's permission switch follows the screen (`via_screen`) or the bridge's forwarded
         # turn (`via_bridge`), each from scope keys only; a body can never set either.
         req._via_screen = browser_allowed
@@ -3778,6 +3807,51 @@ def register_code_api(
     def _session_known(session_id: str) -> bool:
         """A stored conversation, or one whose first turn is still running and not yet saved."""
         return _session_exists(session_id) or live_turns.of_session(session_id) is not None
+
+    def _default_project(registry: envs.EnvironmentRegistry, ws: Path) -> str:
+        """The folder whose default environment applies to a turn in ``ws``.
+
+        ``ws`` itself, else the repository it is a checkout of: a conversation started with
+        ``worktree: "new"`` runs in the worktree, a folder nobody registered a default for, and
+        would otherwise fall back to local without a word.
+        """
+        if registry.default_for(str(ws)):
+            return str(ws)
+        from chimera.core.checkout import checkout_of
+
+        found = checkout_of(ws)
+        root = getattr(found, "project_root", "") if found is not None else ""
+        return str(root) if root and registry.default_for(str(root)) else str(ws)
+
+    def _turn_environment(
+        req: CodeTurnRequest, ws: Path, *, background: Work | None, author: str
+    ) -> tuple[envs.TurnEnvironment, Any]:
+        """The environment of this turn and the sandbox it gives, or the refusal as an HTTP error.
+
+        Only the owner's own screen turn may NAME one, and only on the conversation's first turn.
+        Every other door (a bridge, a paired device, a share link, a linked chat, a background work)
+        runs in the environment the conversation already has, or on this machine when it has none.
+        """
+        local = envs.TurnEnvironment(envs.LOCAL, fix_now=False)
+        if background is not None:
+            return local, None
+        registry = envs.registry_for(live().home)
+        sid = req.session_id or ""
+        stored = store.stored_environment(sid) if sid else None
+        locked = bool(sid) and (
+            stored is not None or store.has_turns(sid) or live_turns.of_session(sid) is not None
+        )
+        may_choose = bool(
+            req._via_screen and not req._via_bridge and not author and not req.channel_origin
+        )
+        try:
+            decided = envs.decide(
+                registry, requested=req.environment, stored=stored, locked=locked,
+                may_choose=may_choose, project=_default_project(registry, ws),
+            )
+            return decided, envs.sandbox_for(decided.env, ws, live())
+        except envs.EnvironmentRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
 
     def _conversation_idle(session_id: str) -> bool:
         """No turn of this conversation is running or waiting for its lock."""
@@ -4303,6 +4377,9 @@ def register_code_api(
         )
         if turn_model != req.model:
             req = req.model_copy(update={"model": turn_model})
+        # Where this turn's commands run. Decided here, before anything is built, so a refusal is a
+        # refusal and not a half-started turn; fixed on the conversation's first turn below.
+        turn_env, turn_sandbox = _turn_environment(req, ws, background=background, author=author)
         # Attachments: images the model looks at, documents it reads. Resolved here rather than in
         # the request so a stale or forged id is simply skipped instead of reaching the model.
         from chimera.api.attachments import load as load_attachment
@@ -4613,6 +4690,7 @@ def register_code_api(
             # Whether this turn is the owner's own screen turn: the only kind Manual can ask on. The
             # stream's `emit` binds later, so the gate also reads it at each question.
             manual_screen=bool(via_screen),
+            sandbox=turn_sandbox,
         )
         if seeded:
             seed_taint(ledger)
@@ -4627,6 +4705,19 @@ def register_code_api(
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
             session.bypass_permissions = bool(bypass_switch())
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        if background is None and turn_env.fix_now:
+            # The first turn fixes it, at once and not with the turn's save: a second message sent
+            # while this one runs must find it already fixed. `local` records nothing — it is what
+            # a conversation with no record already is, and what every older file reads as — but it
+            # is checked the same way (`fix_environment(None)`).
+            fixed = None if turn_env.env.id == envs.LOCAL_ID else turn_env.env.record()
+            if fixed is not None:
+                session.environment = fixed
+            try:
+                store.fix_environment(session.session_id, fixed)
+            except EnvironmentFixedError as exc:
+                # Another message got there between the decision and now (`fix_environment`).
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
         manual_session_id[0] = session.session_id
         if task_tray is not None:
             task_tray.session_id = session.session_id
@@ -7731,6 +7822,96 @@ def register_code_api(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return _project_rows(rows)
+
+    # -- environments: where a conversation's commands run ---------------------------------------
+    #
+    # The owner's, on the owner's own screen, and none of it on the bridge (every route here has its
+    # own entry in `bridge_routes.OWNER_DECISION_ROUTES`). Reading the list is held too: it names the
+    # distros and hosts the agent could be pointed at.
+
+    def _environment_owner_only(request: Request, *, change: bool) -> None:
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
+            raise needs_screen(request, "environments are the owner's decision, made in the app")
+        if change and not request.scope.get(screen_credential.SCOPE_KEY):
+            raise needs_screen(request, "owner screen credential required")
+
+    def _environments_out(project: str = "") -> dict[str, Any]:
+        registry = envs.registry_for(live().home)
+        rows = [envs.LOCAL, *registry.entries()]
+        return {
+            "environments": [
+                {**row.to_json(), "builtin": row.id == envs.LOCAL_ID,
+                 "available": envs.kind_available(row.kind)}
+                for row in rows
+            ],
+            "kinds": [
+                {"kind": kind, "available": envs.kind_available(kind)}
+                for kind in envs.CREATABLE_KINDS
+            ],
+            "defaults": registry.defaults(),
+            # The server resolves the folder, so the screen never has to guess how it is keyed.
+            "project_default": registry.default_for(project) if project else "",
+        }
+
+    @app.get(
+        "/api/code/environments", dependencies=[guard], response_model=CodeEnvironmentsOut
+    )
+    def list_code_environments(request: Request, project: str = "") -> dict[str, Any]:
+        """``local`` and the saved environments, the kinds this machine can create, the project defaults.
+
+        With ``project``, also ``project_default``: the environment id a new conversation there starts in.
+        """
+        _environment_owner_only(request, change=False)
+        return _environments_out(project)
+
+    @app.get(
+        "/api/code/environments/wsl-distros", dependencies=[guard], response_model=CodeWslDistrosOut
+    )
+    async def list_wsl_distros(request: Request) -> dict[str, Any]:
+        """The WSL distros installed here, read from ``wsl.exe -l -q`` (empty off Windows or without WSL)."""
+        _environment_owner_only(request, change=False)
+        from chimera.sandbox.wsl import list_wsl_distros as installed
+        from chimera.sandbox.wsl import wsl_supported
+
+        return {"supported": wsl_supported(), "distros": await run_in_threadpool(installed)}
+
+    @app.post(
+        "/api/code/environments", dependencies=[guard], response_model=CodeEnvironmentsOut
+    )
+    def save_code_environment(request: Request, body: CodeEnvironmentIn) -> dict[str, Any]:
+        """Save an environment. The kind checks its own parameters; a bad one is a 400."""
+        _environment_owner_only(request, change=True)
+        try:
+            envs.registry_for(live().home).add(body.name, body.kind, body.params)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _environments_out()
+
+    @app.put(
+        "/api/code/environments/default", dependencies=[guard], response_model=CodeEnvironmentsOut
+    )
+    def set_code_environment_default(request: Request, body: CodeEnvironmentDefaultIn) -> dict[str, Any]:
+        """Set (or, with an empty ``environment``, clear) the environment new conversations of a project start in."""
+        _environment_owner_only(request, change=True)
+        try:
+            envs.registry_for(live().home).set_default(body.project, body.environment)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _environments_out()
+
+    @app.delete(
+        "/api/code/environments/{env_id}", dependencies=[guard], response_model=CodeEnvironmentsOut
+    )
+    def remove_code_environment(request: Request, env_id: str) -> dict[str, Any]:
+        """Forget an environment. A conversation that ran in it cannot run commands again (it is not moved)."""
+        _environment_owner_only(request, change=True)
+        try:
+            found = envs.registry_for(live().home).remove(env_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not found:
+            raise HTTPException(status_code=404, detail="no such environment")
+        return _environments_out()
 
     @app.put(
         "/api/code/workspaces/bypass", dependencies=[guard], response_model=CodeProjectBypassOut

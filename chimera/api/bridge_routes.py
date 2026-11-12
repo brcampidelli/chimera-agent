@@ -663,6 +663,29 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
         "projects.worktrees_prune is the owner's decision: worktrees are removed by the owner in "
         "the app (the project's worktree cleanup on the Code screen), never through the bridge."
     ),
+    # Where a conversation's commands run (`chimera.core.environments`): a WSL distro today, a remote
+    # host next. Reach, so the owner's: created, listed and chosen on the app's own screen. A turn
+    # the bridge sends runs in the environment its conversation already has and cannot name one.
+    "settings.environments": (
+        "settings.environments is the owner's decision: the places commands may run are listed by "
+        "the owner in the app (Settings > Environments), never through the bridge."
+    ),
+    "settings.environment_distros": (
+        "settings.environment_distros is the owner's decision: the WSL distros are listed by the "
+        "owner in the app (Settings > Environments), never through the bridge."
+    ),
+    "settings.environment_save": (
+        "settings.environment_save is the owner's decision: an environment (a place commands run) is "
+        "created by the owner in the app (Settings > Environments), never through the bridge."
+    ),
+    "settings.environment_remove": (
+        "settings.environment_remove is the owner's decision: an environment is removed by the owner "
+        "in the app (Settings > Environments), never through the bridge."
+    ),
+    "settings.environment_default": (
+        "settings.environment_default is the owner's decision: a project's default environment is "
+        "set by the owner in the app (the Code screen), never through the bridge."
+    ),
 }
 
 #: Body fields that widen what a run may do: ``verify`` and ``provider_command`` are shell commands,
@@ -1217,6 +1240,20 @@ FULL_CONTROL_NEVER: dict[str, str] = {
         "decides who can reach the app."
     ),
 }
+# Where commands run is reach, and the environment list names the distros and hosts the agent could
+# be pointed at: the owner's own screen only, full control included. One sentence for all five, said
+# with the route's own name so a client reads which door it knocked on.
+for _route in (
+    "settings.environments",
+    "settings.environment_distros",
+    "settings.environment_save",
+    "settings.environment_remove",
+    "settings.environment_default",
+):
+    FULL_CONTROL_NEVER[_route] = (
+        f"{_route} stays the owner's even with full control: where a conversation's commands run is "
+        "reach, chosen on the app's own screen and never through the bridge."
+    )
 
 #: Settings full control still may not write: the switches of the bridge itself (a client that
 #: could write them could widen its own access, or switch off what watches it), and the two

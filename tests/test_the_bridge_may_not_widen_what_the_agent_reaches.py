@@ -73,6 +73,14 @@ CLOSED: dict[str, tuple[str, str, dict[str, Any], dict[str, Any]]] = {
     "plugins.remove": ("DELETE", "/api/plugins/{name}", {"name": "p"}, {}),
     "plugins.marketplace_add": ("POST", "/api/plugins/marketplaces", {}, {"source": "github:a/b@x"}),
     "plugins.marketplace_remove": ("DELETE", "/api/plugins/marketplaces/{name}", {"name": "m"}, {}),
+    # Where a conversation's commands run (onda 4, item 17): the owner's, on the app's own screen.
+    "settings.environments": ("GET", "/api/code/environments", {}, {}),
+    "settings.environment_distros": ("GET", "/api/code/environments/wsl-distros", {}, {}),
+    "settings.environment_save": ("POST", "/api/code/environments", {}, {"name": "w", "kind": "wsl"}),
+    "settings.environment_remove": ("DELETE", "/api/code/environments/{env_id}", {"env_id": "e1"}, {}),
+    "settings.environment_default": (
+        "PUT", "/api/code/environments/default", {}, {"project": "proj", "environment": ""},
+    ),
 }
 
 

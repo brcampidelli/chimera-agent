@@ -129,14 +129,53 @@ def refuse_own_files(candidate: Path, verb: str) -> None:
         raise ProtectedPathError(f"no tool may {verb} {candidate}: {reason}. Do not retry.")
 
 
-def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
+def queue_refusal(
+    tool: str, text: str, cwd: Path, *, wsl: bool = False, wsl_cwd: str | None = None
+) -> str | None:
     """The refusal for a command or program that reaches the approval queue or the owner's hooks
     file, else None.
 
     For ``run_shell``, ``execute_code`` and ``code_interpreter``, every turn and every posture: the
     write tools are kept out of ``<home>/approvals`` by :func:`refuse_own_files`, and these three
     could write there anyway, or run ``chimera approve`` (`chimera/core/queue_fence.py`).
+
+    ``wsl``: the command runs in a WSL distro, where the same disk is spelled ``/mnt/c/...``. The
+    fences resolve paths with the host's semantics and would read that as a folder that does not
+    exist, so the command is read as written AND with every ``/mnt/<letter>/`` put back as
+    ``<LETTER>:/`` (:func:`chimera.sandbox.wsl.windows_view`). It only adds readings: whatever
+    refuses locally refuses here, and a command is refused if any reading is.
     """
+    for reading in _readings(text, wsl, cwd, wsl_cwd):
+        refused = _queue_refusal(tool, reading, cwd)
+        if refused is not None:
+            return refused
+    return None
+
+
+def _readings(text: str, wsl: bool, cwd: Path, wsl_cwd: str | None = None) -> list[str]:
+    """The texts a fence reads for one command: itself, and for WSL its host spelling too.
+
+    Taken from each quoting variant, not only the raw text, so ``/m""nt/c/...`` is put back as well,
+    and each both with and without following ``cd`` (a subshell's ``cd`` does not carry over).
+    ``wsl_cwd`` is the folder in the distro; derived from ``cwd`` unless the caller knows it.
+    """
+    if not wsl:
+        return [text]
+    from chimera.core.queue_fence import _as_shells_read_it
+    from chimera.sandbox.wsl import windows_view, wsl_cwd_of
+
+    there = wsl_cwd if wsl_cwd is not None else wsl_cwd_of(cwd)
+    # Followed, not followed, and absolute words only: a relative word the first two rewrite against a
+    # folder the command did not mean (`env -C DIR`, a `cd` in a subshell) is read as written in the third.
+    views = (
+        windows_view(v, folder, follow_cd=follow)
+        for v in _as_shells_read_it(text)
+        for folder, follow in ((there, True), (there, False), ("", False))
+    )
+    return list(dict.fromkeys([text, *views]))
+
+
+def _queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
     from chimera.core.own_files import own_env_file
     from chimera.core.queue_fence import (
         reaches_governance_files,
@@ -193,7 +232,9 @@ def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
     )
 
 
-def audit_refusal(tool: str, text: str, cwd: Path) -> str | None:
+def audit_refusal(
+    tool: str, text: str, cwd: Path, *, wsl: bool = False, wsl_cwd: str | None = None
+) -> str | None:
     """The refusal for a command or program that reaches the audit log, else None.
 
     For ``run_shell``, ``execute_code`` and ``code_interpreter``, every turn and every posture —
@@ -201,10 +242,16 @@ def audit_refusal(tool: str, text: str, cwd: Path) -> str | None:
     of the data folder by :func:`refuse_own_files`, and these three could rewrite
     ``<home>/audit.jsonl`` anyway (`chimera/core/audit_fence.py`). The chain proves the file was
     not edited; it cannot say who edited it, so the run it governs does not get to try.
+
+    ``wsl`` reads the command's ``/mnt/<letter>/`` paths as the Windows paths they are (see
+    :func:`queue_refusal`).
     """
     from chimera.core.audit_fence import reaches_log
 
-    why = reaches_log(text, home=chimera_home(), cwd=cwd)
+    why = next(
+        (w for r in _readings(text, wsl, cwd, wsl_cwd) if (w := reaches_log(r, home=chimera_home(), cwd=cwd))),
+        None,
+    )
     if why is None:
         return None
     from chimera.tools.base import refusal
