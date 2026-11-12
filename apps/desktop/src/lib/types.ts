@@ -166,6 +166,9 @@ export type PromptCommands = Schemas["PromptCommandsOut"];
 /** The `/code-review` card: the review of the working tree, grouped by file. */
 export type CodeReview = Schemas["CodeReviewOut"];
 export type CodeReviewFinding = Schemas["CodeReviewFindingOut"];
+/** The `/skill-doctor` card: what the skills a run is told about cost in context. */
+export type SkillDoctor = Schemas["SkillDoctorOut"];
+export type SkillCost = Schemas["SkillCostOut"];
 /** A Markdown or plugin subagent, read only, with the tools it would really get. */
 export type MarkdownAgent = Schemas["MarkdownAgentOut"];
 export type MarkdownAgents = Schemas["MarkdownAgentsOut"];

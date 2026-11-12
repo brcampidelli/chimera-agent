@@ -117,8 +117,11 @@ import { TurnSuggestions } from "@/components/code/TurnSuggestions";
 import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
 import { CodeReviewCard } from "@/components/code/CodeReviewCard";
 import { parseReviewCommand } from "@/components/code/codeReview";
-import { runCodeReview } from "@/lib/api";
-import type { CodeReview, PromptCommand } from "@/lib/types";
+import { SkillDoctorCard } from "@/components/code/SkillDoctorCard";
+import { isSkillDoctorCommand } from "@/components/code/skillDoctor";
+import { useRoute } from "@/lib/router";
+import { getSkillDoctor, runCodeReview } from "@/lib/api";
+import type { CodeReview, PromptCommand, SkillDoctor } from "@/lib/types";
 import { MentionChips, MentionMenu, useMentionMenu } from "@/components/code/MentionMenu";
 import {
   addEntry,
@@ -882,9 +885,20 @@ export function Conversation({
     }),
     [t],
   );
+  // `/skill-doctor` is built in too: a report of the skills a run is told about. It reads, and spends nothing.
+  const skillDoctorCommand = useMemo<PromptCommand>(
+    () => ({
+      name: "skill-doctor",
+      description: t("code.skillDoctor.command"),
+      source: "builtin",
+      argument_hint: "",
+      error: null,
+    }),
+    [t],
+  );
   const slashCommands = useMemo(
-    () => [reviewCommand, ...(commandList.data?.commands ?? [])],
-    [reviewCommand, commandList.data],
+    () => [reviewCommand, skillDoctorCommand, ...(commandList.data?.commands ?? [])],
+    [reviewCommand, skillDoctorCommand, commandList.data],
   );
   const slash = useSlashMenu(draft, slashCommands, setDraft);
   const slashListId = useId();
@@ -892,6 +906,21 @@ export function Conversation({
   // until the person picks findings and asks for their fixes.
   type ReviewEntry = { id: number; sessionId: string | null; review: CodeReview | null; error: string | null };
   const [reviews, setReviews] = useState<ReviewEntry[]>([]);
+  // The `/skill-doctor` cards of this conversation. Read-only: nothing is sent to the agent.
+  type DoctorEntry = { id: number; sessionId: string | null; report: SkillDoctor | null; error: string | null };
+  const [doctors, setDoctors] = useState<DoctorEntry[]>([]);
+  const router = useRoute();
+  async function runSkillDoctorCard() {
+    const id = Date.now();
+    const owner = sessionId ?? null;
+    setDoctors((list) => [...list, { id, sessionId: owner, report: null, error: null }]);
+    try {
+      const report = await getSkillDoctor(workspace);
+      setDoctors((list) => list.map((e) => (e.id === id ? { ...e, report } : e)));
+    } catch {
+      setDoctors((list) => list.map((e) => (e.id === id ? { ...e, error: t("code.skillDoctor.failed") } : e)));
+    }
+  }
   async function runReview(maxFindings: string) {
     const id = Date.now();
     const owner = sessionId ?? null;
@@ -1924,6 +1953,11 @@ export function Conversation({
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
     // the wrong text.
     const message = (override ?? draft).trim();
+    if (override === undefined && isSkillDoctorCommand(message)) {
+      setDraft("");
+      void runSkillDoctorCard();
+      return true;
+    }
     if (override === undefined) {
       const command = parseReviewCommand(message);
       if (command) {
@@ -3120,6 +3154,17 @@ export function Conversation({
           }}
           t={t}
         />
+        {doctors
+          .filter((e) => e.sessionId === (sessionId ?? null))
+          .map((e) => (
+            <div key={e.id} className="mb-1.5">
+              {e.report ? (
+                <SkillDoctorCard report={e.report} onOpenSkills={() => router.navigate("settings", { tab: "skills" })} />
+              ) : e.error ? (
+                <p className="text-sm text-bad-foreground">{e.error}</p>
+              ) : null}
+            </div>
+          ))}
         {reviews
           .filter((e) => e.sessionId === (sessionId ?? null))
           .map((e) => (

@@ -18043,6 +18043,104 @@
         "title": "SideChatIn",
         "type": "object"
       },
+      "SkillCostOut": {
+        "description": "One skill's share of a run's context (``/skill-doctor``). Estimated, not counted by a tokenizer.",
+        "properties": {
+          "every_turn": {
+            "title": "Every Turn",
+            "type": "boolean"
+          },
+          "injected_runs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Injected Runs"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "suggestion": {
+            "title": "Suggestion",
+            "type": "string"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "origin",
+          "tokens",
+          "injected_runs",
+          "suggestion",
+          "every_turn"
+        ],
+        "title": "SkillCostOut",
+        "type": "object"
+      },
+      "SkillDoctorOut": {
+        "properties": {
+          "cards_k": {
+            "title": "Cards K",
+            "type": "integer"
+          },
+          "cards_read": {
+            "title": "Cards Read",
+            "type": "boolean"
+          },
+          "cards_tokens_per_task_max": {
+            "title": "Cards Tokens Per Task Max",
+            "type": "integer"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillCostOut"
+            },
+            "title": "Skills",
+            "type": "array"
+          },
+          "tokens_per_turn": {
+            "title": "Tokens Per Turn",
+            "type": "integer"
+          },
+          "usage_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Days"
+          }
+        },
+        "required": [
+          "skills",
+          "tokens_per_turn",
+          "cards_tokens_per_task_max",
+          "cards_read",
+          "cards_k"
+        ],
+        "title": "SkillDoctorOut",
+        "type": "object"
+      },
       "SkillStatOut": {
         "properties": {
           "kind": {
@@ -31610,6 +31708,47 @@
           }
         },
         "summary": "Install Bundle"
+      }
+    },
+    "/api/skills/doctor": {
+      "get": {
+        "description": "``/skill-doctor``: what the skills a run is told about cost, and which are unused.\n\nRead-only and deterministic: no model is called. ``project`` is checked the way\n`/api/code/commands` checks its folder (an existing directory, or 400), then narrows the\nbundles by that folder's accepted pack. See `chimera.skills.doctor`.",
+        "operationId": "skill_doctor_api_skills_doctor_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillDoctorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skill Doctor"
       }
     },
     "/api/skills/effective": {

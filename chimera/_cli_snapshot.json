@@ -7037,6 +7037,37 @@
         },
         {
           "deprecated": false,
+          "help": "What the skills a run is told about cost in context, and which of them are unused.\n\nDeterministic: no model is called. Bundles carry a usage count of \"no record\" because nothing\nrecords which one a run read; only a learned card with a measured zero is suggested for switching off.",
+          "hidden": false,
+          "name": "doctor",
+          "params": [
+            {
+              "default": "''",
+              "help": "The folder a run would start in (its accepted pack narrows the skills).",
+              "kind": "option",
+              "name": "project",
+              "opts": [
+                "--project",
+                "-p"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Print the report as JSON.",
+              "kind": "option",
+              "name": "as_json",
+              "opts": [
+                "--json"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "skills doctor"
+        },
+        {
+          "deprecated": false,
           "help": "Reflectively evolve a skill's prompt template against graded instances (GEPA).\n\nEach instance is a `{input, expect}` pair; the (simple, honest) scorer gives 1.0 when the\nproduced output contains the `expect` substring, else 0.0. GEPA reflects on a failing case to\nrewrite the template and keeps a Pareto frontier of candidates. Dry-run by default: the\nimproved skill is only written back to the store with ``--apply``, and only if it beats the seed.",
           "hidden": false,
           "name": "evolve",
