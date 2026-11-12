@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The plan panel's Approve and Ask for changes answer the right question.** The plan event now carries the id of the approval it waits on, and the panel offers its buttons only when that id matches the approval pending on the card; before, it matched by text. A plan whose approval it cannot identify shows "waiting for approval on the card" with no buttons, instead of saying it was approved. (#1233)
+
 - **Settings search finds the hooks and worktree cleanup switches.** Typing "hook" or "worktree" in the Settings search now lists the lifecycle hooks, the Claude Code hook switches and the archived-worktree cleanup, and opening a result focuses its switch; before, these rows were on the General tab but the search could not find them. (#1229)
 
 ### Added
