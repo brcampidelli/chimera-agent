@@ -8,16 +8,28 @@ A separate runner (CLI/daemon) supplies the real clock.
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from croniter import croniter
 
 from chimera.concurrency import call_with_deadline
 from chimera.orchestration.budget import BudgetExceeded
-from chimera.scheduler.models import CreatedBy, CronJob, DispatchStatus, Notify, kill_flag_path
+from chimera.scheduler.history import HISTORY_FILENAME, CronHistory, HistoryRow, Outcome
+from chimera.scheduler.models import (
+    JOB_PERMISSION_MODES,
+    CatchUp,
+    CreatedBy,
+    CronJob,
+    DispatchStatus,
+    Notify,
+    kill_flag_path,
+)
 from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
 
@@ -44,6 +56,72 @@ FAIL_LIMIT = 5
 #: morning · 7h" firing at half past nine is a different promise from the one the screen made.
 JITTER_FRAC = 0.1
 JITTER_CAP_S = 300.0
+
+
+#: How old the latest MISSED time may be and still be run when the scheduler comes back: seven days.
+#: Measured against the most recent time that was missed, not the oldest — a daily job off for ten
+#: days has a missed time from yesterday and runs once, while a monthly job whose only missed time
+#: was ten days ago does not. Past it the time is recorded as ``missed_too_old`` and skipped.
+CATCH_UP_MAX_AGE_S = 7 * 24 * 3600.0
+
+#: How late a single time may run before it counts as missed. A dispatch is sequential, so a job
+#: behind a slow neighbour is minutes late with the scheduler perfectly alive; that is not a missed
+#: time, and under ``catch_up="skip"`` it must not be thrown away. Ten minutes is above anything a
+#: tick, the jitter (which is part of ``next_run`` already) or one ordinary job can cost, and far
+#: below the time a closed app takes to be noticed.
+CATCH_UP_GRACE_S = 600.0
+
+#: How long between two ticks the scheduler is still taken to have been alive the whole time. Dispatch
+#: is sequential, so one slow job holds back every job after it, and the next tick starts only when it
+#: is done: a gap shorter than this is a tick that took long (the default job timeout is 30 minutes),
+#: not an outage, and the jobs behind it are late and not missed. A longer gap, or no earlier tick at
+#: all, is read as the scheduler having been off. The price: an outage shorter than this is not seen
+#: as one, and the job simply runs once, late.
+CATCH_UP_ALIVE_GAP_S = 1800.0
+
+#: How many missed times are counted before the count is given up on. A ``* * * * *`` job off for a
+#: month has forty thousand; the answer to "how many" is "a lot", not an exact number worth a loop.
+MAX_MISSED_SCAN = 1000
+
+#: How many of them get a line each in the history. The rest are said in one line's detail, so a
+#: long outage cannot bury the history of every other job.
+MAX_HISTORY_ROWS_PER_CATCH_UP = 50
+
+
+@dataclass(frozen=True)
+class _CatchUp:
+    """What the scheduler found when a job's time had passed with nothing running."""
+
+    times: list[float]
+    """The missed scheduled times, oldest first (at most :data:`MAX_MISSED_SCAN`)."""
+    capped: bool
+    latest: float
+    """The most recent missed time: the one a catch-up run stands in for."""
+    skip: bool
+    reason: str
+
+
+def _heartbeat_at(path: Path) -> float | None:
+    """When the daemon last ticked, from its heartbeat file, or None (no file, unreadable)."""
+    try:
+        beat = json.loads(path.read_text(encoding="utf-8"))
+        # The END of the daemon's last tick when it wrote one, else the start (an older heartbeat).
+        at = beat.get("ended_at", beat.get("at"))
+    except (OSError, ValueError, AttributeError):
+        return None
+    return float(at) if isinstance(at, (int, float)) else None
+
+
+def _latest_at_or_before(cron_expr: str, now: float) -> float:
+    """The latest scheduled time not after ``now``, in the machine's zone like :func:`_next_after`."""
+    base = datetime.fromtimestamp(now + 1.0, tz=UTC).astimezone(None)
+    return float(croniter(cron_expr, base).get_prev(float))
+
+
+#: ``CronJob.metadata`` key set once the history has said a switched-off job's time passed. One line
+#: per outage and not one per time: a ``* * * * *`` job someone paused would otherwise add a line a
+#: minute for as long as it stays paused.
+_DISABLED_NOTED = "history_disabled_noted"
 
 
 def _clean_tools(tools: list[str] | None) -> list[str] | None:
@@ -169,6 +247,14 @@ class Scheduler:
             # its first tick.
             raise ValueError(f"fail_limit must be at least 1, got {fail_limit}")
         self.store = store
+        self.history = CronHistory(store.path.parent / HISTORY_FILENAME)
+        #: When the previous tick of THIS process ENDED (see :meth:`note_tick_end`); before it has
+        #: had one, the daemon's heartbeat file stands in (see :meth:`_scheduler_was_alive`).
+        self._last_tick: float | None = None
+        # Jobs whose dispatch is in progress, and the (job, time) pairs already said to have been
+        # refused for it, so a long run is one line in the history and not one per tick.
+        self._running: dict[str, object] = {}
+        self._noted_running: set[tuple[str, float | None]] = set()
         self.fail_limit = fail_limit
         #: Off for a caller that needs the exact boundary — a market open, a report due at midnight.
         #: A spread that cannot be switched off is a spread people work around.
@@ -210,6 +296,9 @@ class Scheduler:
         max_attempts: int = 1,
         notify: Notify = "always",
         tools: list[str] | None = None,
+        catch_up: CatchUp = "once",
+        permission_mode: str = "",
+        worktree: bool = False,
     ) -> CronJob:
         """Register a job fired by a cron expression.
 
@@ -223,9 +312,20 @@ class Scheduler:
         notify: When the answer is posted to the job's destination (`CronJob.notify`); `always`
             is today's behaviour.
         tools: The only tools the job may use (`CronJob.tools`); None keeps every tool.
+        catch_up: What to do about a time missed while nothing ran (`CronJob.catch_up`); ``once``
+            is what every job did before the field existed.
+        permission_mode: The mode this job runs under (`CronJob.permission_mode`), or empty for
+            none. Whether it is wider than the install's posture is NOT decided here — a scheduler
+            has no settings — but where the owner's screen sets it, and again when the job runs.
+        worktree: Run in a throwaway git worktree of the job's folder (`CronJob.worktree`).
         """
         if not croniter.is_valid(cron_expr):
             raise ValueError(f"invalid cron expression: {cron_expr!r}")
+        if permission_mode and permission_mode not in JOB_PERMISSION_MODES:
+            raise ValueError(
+                f"permission_mode must be one of {', '.join(JOB_PERMISSION_MODES)} (or empty), "
+                f"got {permission_mode!r}"
+            )
         # Minted before the job, because the job's own id is what its schedule offset is derived
         # from — the first `next_run` has to land in the same slot every later one will.
         job_id = uuid.uuid4().hex[:8]
@@ -246,6 +346,9 @@ class Scheduler:
             max_attempts=max(1, max_attempts),
             notify=notify,
             tools=_clean_tools(tools),
+            catch_up=catch_up,
+            permission_mode=permission_mode,
+            worktree=worktree,
         )
         self.store.add(job)
         return job
@@ -469,6 +572,7 @@ class Scheduler:
         # ever caught.
         job.consecutive_failures = 0
         job.disabled_by = ""
+        job.metadata.pop(_DISABLED_NOTED, None)
         if job.trigger == "cron":
             job.next_run = _next_after(job.schedule, now, jitter_key=self._jitter_key(job))
         self.store.add(job)
@@ -480,6 +584,7 @@ class Scheduler:
         job = self.store.get(job_id)
         job.enabled = False
         job.disabled_by = "human"
+        job.metadata.pop(_DISABLED_NOTED, None)
         self.store.add(job)
         return job
 
@@ -492,6 +597,188 @@ class Scheduler:
             job.next_run = None
         self.store.add(job)
 
+    # ---- history ---------------------------------------------------------------------------------
+
+    def _note(
+        self,
+        job: CronJob,
+        at: float,
+        outcome: Outcome,
+        reason: str,
+        *,
+        status: str = "",
+        scheduled_for: float | None = None,
+        detail: str = "",
+    ) -> None:
+        """One line in the history. Never raises: a record must not cost the tick that made it."""
+        self.history.append(
+            HistoryRow(
+                at=at,
+                job_id=job.id,
+                name=job.name,
+                outcome=outcome,
+                reason=reason,
+                status=status,
+                scheduled_for=scheduled_for,
+                detail=detail[:300],
+            )
+        )
+
+    def _missed_times(self, job: CronJob, now: float) -> tuple[list[float], bool]:
+        """Every scheduled time from ``job.next_run`` up to ``now``, oldest first, and whether the
+        count was cut at :data:`MAX_MISSED_SCAN`. The first is ``next_run`` itself (jitter included,
+        because that is the time the job was actually waiting for) and the rest follow the
+        expression."""
+        if job.next_run is None:
+            return [], False
+        times = [job.next_run]
+        while len(times) < MAX_MISSED_SCAN:
+            nxt = _next_after(job.schedule, times[-1])
+            if nxt > now:
+                return times, False
+            times.append(nxt)
+        return times, True
+
+    def note_tick_end(self, at: float) -> None:
+        """Record when a tick FINISHED, on the caller's clock (the daemon calls this after
+        ``run_due``). The engine has no clock of its own, and a tick that ran sequential jobs for 40
+        minutes ends 40 minutes after it began: measured from its start, the next tick would read
+        that as the scheduler having been off, and ``skip`` would discard jobs the live daemon was
+        only late with."""
+        if self._last_tick is None or at > self._last_tick:
+            self._last_tick = at
+
+    def _scheduler_was_alive(self, now: float) -> bool:
+        """Whether the scheduler ticked recently enough that a late job is behind a slow neighbour,
+        not behind an outage. Read from this process's previous tick, or, before it has had one, the
+        daemon's heartbeat file; no evidence at all reads as "was off", which is what a first start
+        after the app was closed looks like."""
+        before = self._last_tick
+        if before is None:
+            before = _heartbeat_at(self.store.path.parent / "heartbeat.json")
+        return before is not None and 0.0 <= now - before <= CATCH_UP_ALIVE_GAP_S
+
+    def _plan_catch_up(self, job: CronJob, now: float, alive: bool) -> _CatchUp | None:
+        """Whether this job's time passed without a run, and what to do about it. None = on time.
+
+        A time counts as missed when more than one scheduled time has come round since the job last
+        had its turn, or when the one time is later than :data:`CATCH_UP_GRACE_S`. Either way the
+        answer is ONE decision for the job: run it once for the latest missed time, or skip them
+        all. Never one run per missed time.
+        """
+        if alive or job.trigger != "cron" or job.next_run is None:
+            return None
+        times, capped = self._missed_times(job, now)
+        if len(times) < 2 and now - job.next_run <= CATCH_UP_GRACE_S:
+            return None
+        try:
+            latest = _latest_at_or_before(job.schedule, now) if capped else times[-1]
+        except (ValueError, OSError):
+            latest = times[-1]
+        latest = max(latest, times[-1])
+        if now - latest > CATCH_UP_MAX_AGE_S:
+            return _CatchUp(times, capped, latest, True, "missed_too_old")
+        if job.catch_up == "skip":
+            return _CatchUp(times, capped, latest, True, "catch_up_skip")
+        return _CatchUp(times, capped, latest, False, "catch_up")
+
+    def _note_missed(
+        self, job: CronJob, plan: _CatchUp, now: float, reason: str, *, keep_latest: bool
+    ) -> None:
+        """A line per missed time (the most recent :data:`MAX_HISTORY_ROWS_PER_CATCH_UP`), then one
+        line saying how many older ones are not listed.
+
+        ``keep_latest`` leaves the latest time out: the catch-up run's own line stands for it.
+        """
+        times = plan.times[:-1] if keep_latest else list(plan.times)
+        listed = times[-MAX_HISTORY_ROWS_PER_CATCH_UP:]
+        hidden = len(times) - len(listed)
+        more = "+" if plan.capped else ""
+        if hidden > 0:
+            self._note(
+                job, now, "skipped", reason, scheduled_for=times[0],
+                detail=f"{hidden}{more} earlier missed time(s) are not listed one by one",
+            )
+        for when in listed:
+            self._note(job, now, "skipped", reason, scheduled_for=when)
+
+    def _note_disabled(self, now: float) -> None:
+        """Say once, per switched-off cron job, that its time came and nothing ran.
+
+        A disabled job is not due, so nothing visited it: the history had no line for the most
+        ordinary reason a schedule is quiet. Once per outage (:data:`_DISABLED_NOTED`), cleared by
+        ``enable`` and ``disable``, and the job's ``next_run`` is left alone: ``enable`` computes a
+        fresh one from the moment it is switched back on.
+        """
+        for job in self.store.list():
+            if (
+                job.enabled
+                or job.trigger != "cron"
+                or job.next_run is None
+                or job.next_run > now
+                or job.metadata.get(_DISABLED_NOTED)
+            ):
+                continue
+            who = job.disabled_by or "human"
+            self._note(
+                job, now, "skipped", "disabled", scheduled_for=job.next_run,
+                detail=f"switched off by {who}; later times are not listed until it is switched on",
+            )
+            job.metadata[_DISABLED_NOTED] = True
+            self.store.add(job)
+
+    def _claim(self, job: CronJob, now: float) -> bool:
+        """Mark ``job`` as dispatching; False (and one history line) when it already is.
+
+        In-process only: it is a dict on this ``Scheduler``, so it guards two ticks that share ONE
+        scheduler object (a re-entrant call, two threads of the same process). It does not stop a
+        second process on the same ``jobs.json`` from starting the same job.
+        """
+        # `setdefault` is one atomic dict operation, which is what stands in for a lock here: this
+        # module takes no threads of its own (a test holds it to that), and a check-then-add on a
+        # set would let two ticks both pass the check.
+        token = object()
+        if self._running.setdefault(job.id, token) is token:
+            return True
+        key = (job.id, job.next_run)
+        first = key not in self._noted_running
+        self._noted_running.add(key)
+        if first:
+            self._note(job, now, "skipped", "already_running", scheduled_for=job.next_run)
+        return False
+
+    def _release(self, job: CronJob) -> None:
+        self._running.pop(job.id, None)
+        self._noted_running = {k for k in self._noted_running if k[0] != job.id}
+
+    def _note_ran(
+        self, job: CronJob, now: float, scheduled_for: float | None, plan: _CatchUp | None
+    ) -> None:
+        """The line for a dispatch that was attempted, read off how it ended."""
+        status = job.last_status or "ok"
+        if plan is not None:
+            self._note_missed(job, plan, now, "catch_up_merged", keep_latest=True)
+        if status == "budget":
+            # Refused before it spent anything: the time did not run, and the money is why.
+            self._note(
+                job, now, "skipped", "budget_exceeded", status=status,
+                scheduled_for=scheduled_for, detail=job.last_error or "",
+            )
+            return
+        if status == "ok":
+            reason = "catch_up" if plan is not None else "on_time"
+            detail = ""
+        else:
+            reason = status
+            detail = job.last_error or ""
+        if plan is not None:
+            more = "+" if plan.capped else ""
+            lead = f"ran once for {len(plan.times)}{more} missed time(s)"
+            detail = f"{lead}; {detail}" if detail else lead
+        self._note(
+            job, now, "ran", reason, status=status, scheduled_for=scheduled_for, detail=detail
+        )
+
     def run_due(
         self,
         now: float,
@@ -502,13 +789,35 @@ class Scheduler:
         """Dispatch every due cron job and advance its schedule. Returns those run.
 
         Dispatch is sequential, so without ``job_timeout`` one slow or hung job starves every other
-        due job AND delays the next tick indefinitely — on a deployment running dozens of agent-jobs
+        due job AND delays the next tick indefinitely: on a deployment running dozens of agent-jobs
         round the clock, a single stuck provider call silently stops the whole schedule. With it, a
         job that overruns is abandoned (Python cannot kill a running thread), logged, and its
         schedule is still advanced so the tick moves on instead of re-firing it immediately.
+
+        **Catch-up.** A job whose time passed while nothing ran (the app was closed) is dispatched
+        at most ONCE here, however many times it missed, and only if the latest missed time is no
+        more than :data:`CATCH_UP_MAX_AGE_S` old and the job's ``catch_up`` is not ``skip``. Either
+        way the history gets a line per missed time with the reason (``cron_history.jsonl``).
         """
         ran: list[CronJob] = []
+        self._note_disabled(now)
+        alive = self._scheduler_was_alive(now)
         for job in self.due(now):
+            scheduled_for = job.next_run
+            plan = self._plan_catch_up(job, now, alive)
+            if plan is not None and plan.skip:
+                _log.info(
+                    "cron job %s (%s): %d missed time(s) not run (%s)",
+                    job.name, job.id, len(plan.times), plan.reason,
+                )
+                self._note_missed(job, plan, now, plan.reason, keep_latest=False)
+                # The schedule resumes at its next time. `last_run` stays what it was: nothing ran,
+                # and stamping it would make `overdue()` and the screen read a skip as a run.
+                job.next_run = _next_after(job.schedule, now, jitter_key=self._jitter_key(job))
+                self.store.add(job)
+                continue
+            if not self._claim(job, now):
+                continue
             _log.debug("dispatching cron job %s (%s)", job.name, job.id)
             # The outcome is recorded HERE, inside the guard, and `mark_ran` still runs outside it.
             # Those are two different facts and folding them into one field is what made a job that
@@ -527,7 +836,7 @@ class Scheduler:
                     )
                 elif veredito == "cancelled":
                     # The operator stopped this dispatch (`cron kill`), so the job ran and was
-                    # halted — not failed, not finished. Neither reading is true: counting it as
+                    # halted: not failed, not finished. Neither reading is true: counting it as
                     # a failure would let a kill ride `consecutive_failures` into the brake, and
                     # counting it as `ok` would zero the counter over real failures that came
                     # before. Neutral, like `budget`: the counter is left exactly as it was.
@@ -537,7 +846,7 @@ class Scheduler:
             except TimeoutError:
                 # Raised here, outside the dispatch, so the result sink never hears of it. The
                 # owner is told by the daemon's failure notice, which reads `last_status` after
-                # this tick — not from here: this module takes no clock and no I/O. Still open: the
+                # this tick, not from here: this module takes no clock and no I/O. Still open: the
                 # abandoned thread may call the sink later and move `last_delivered_hash` on a job
                 # this tick already saved, so that move can be lost.
                 _log.warning(
@@ -546,7 +855,7 @@ class Scheduler:
                 )
                 self._record(job, "timeout", f"exceeded {job_timeout}s and was abandoned")
             except BudgetExceeded as exc:
-                # Not a failure: the job was refused because the money said no. Loud on purpose —
+                # Not a failure: the job was refused because the money said no. Loud on purpose:
                 # a refusal that only showed up as "nothing happened" is indistinguishable from a
                 # stopped daemon, and this path runs jobs that watch real positions.
                 _log.warning("cron job %s refused on budget: %s", job.name, exc)
@@ -554,10 +863,16 @@ class Scheduler:
             except Exception as exc:  # a failing job must not break the scheduler
                 _log.warning("cron job %s failed: %s", job.id, exc)
                 self._record(job, "error", f"{type(exc).__name__}: {exc}")
+            finally:
+                self._release(job)
             # `mark_ran` already retires a one-shot job; it is also what stamps `last_run`.
             self.mark_ran(job, now)
+            self._note_ran(job, now, scheduled_for, plan)
             self._brake(job)
             ran.append(job)
+        # A caller with no clock of its own (a test, a one-shot) gets the start of the tick as its
+        # end; the daemon replaces it with the real one through `note_tick_end`.
+        self.note_tick_end(now)
         return ran
 
     def kill(self, job_id: str, *, now: float | None = None) -> bool:
@@ -633,6 +948,7 @@ class Scheduler:
                 _log.warning("event job %s failed: %s", job.id, exc)
                 self._record(job, "error", f"{type(exc).__name__}: {exc}")
             self.mark_ran(job, now)
+            self._note_ran(job, now, None, None)
             self._brake(job)
             ran.append(job)
         return ran

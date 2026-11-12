@@ -43,7 +43,9 @@ engine reads as ``ok`` — every dispatch written before this returns None and k
 meaning, so the new outcome costs nothing to the callers that have no verdict to give."""
 
 
-def write_heartbeat(path: Path, *, now: float, tick_seconds: float, pid: int) -> None:
+def write_heartbeat(
+    path: Path, *, now: float, tick_seconds: float, pid: int, ended_at: float | None = None
+) -> None:
     """Write the daemon's sign of life: one small JSON file, atomically replaced.
 
     Atomic (unique temp + ``os.replace``) for the same reason the job store is: a reader must
@@ -61,7 +63,9 @@ def write_heartbeat(path: Path, *, now: float, tick_seconds: float, pid: int) ->
     try:
         tmp.write_text(
             json.dumps(
-                {"at": now, "tick_seconds": tick_seconds, "pid": pid},
+                {"at": now, "tick_seconds": tick_seconds, "pid": pid}
+                # When the tick finished, for the catch-up: a tick that took long is not an outage.
+                | ({"ended_at": ended_at} if ended_at is not None else {}),
                 indent=2,
             ),
             encoding="utf-8",
@@ -265,6 +269,10 @@ class CronDaemon:
             _log.warning("cron store reload failed: %s", exc)
         at = self._clock() if now is None else now
         ran = self.scheduler.run_due(at, self.dispatch, job_timeout=self.job_timeout)
+        # The end of the tick, on the daemon's clock: how long the sequential jobs took is what tells
+        # a slow tick from an outage at the next one.
+        ended = self._clock() if now is None else at
+        self.scheduler.note_tick_end(ended)
         if self.on_outcome is not None:
             for job in ran:
                 try:
@@ -279,6 +287,7 @@ class CronDaemon:
                     now=at,
                     tick_seconds=self.tick_seconds,
                     pid=os.getpid(),
+                    ended_at=ended,
                 )
             except OSError as exc:  # noqa: BLE001 — a failed beat must not kill the tick
                 _log.warning("cron heartbeat write failed: %s", exc)

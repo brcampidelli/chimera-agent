@@ -24,6 +24,9 @@ const SRC = join(__dirname, "..");
 
 /** Prefixes assembled at the call site. Each is a real `` t(`prefix.${x}`) `` in the source. */
 const DYNAMIC = [
+  // `` t(`cron.history.reason.${r.reason}`) `` — a scheduled task's history names why a time ran or
+  // did not from the closed set the server writes (`chimera/scheduler/history.py:REASONS`).
+  "cron.history.reason.",
   // `` t(`agents.ending.${known}`) `` — a batch task's badge names how its loop ended, from the word the
   // server sends (`AutonomousResult.ending`, `code/BatchRecord.tsx`).
   "agents.ending.",

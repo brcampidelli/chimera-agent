@@ -38,7 +38,9 @@ from chimera.api.schemas import (
     ConsolidateApplyOut,
     ConsolidatePreviewOut,
     CronCreateIn,
+    CronHistoryRowOut,
     CronJobOut,
+    CronPermissionModeIn,
     CronResultOut,
     CronSilenceOut,
     DeletedOut,
@@ -125,6 +127,11 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "max_attempts": int(getattr(job, "max_attempts", 1) or 1),
         "notify": getattr(job, "notify", "always") or "always",
         "tools": getattr(job, "tools", None),
+        # Read with a default, like the three above: the store holds jobs written before these
+        # fields existed, and for those the answer is the behaviour they always had.
+        "catch_up": getattr(job, "catch_up", "once") or "once",
+        "permission_mode": getattr(job, "permission_mode", "") or "",
+        "worktree": bool(getattr(job, "worktree", False)),
     }
 
 
@@ -1137,6 +1144,28 @@ def register_features(
             for r in load_results(caminho, job_id=job_id, limit=max(1, min(200, limit)))
         ]
 
+    @app.get(
+        "/api/cron/{job_id}/history", dependencies=[guard], response_model=list[CronHistoryRowOut]
+    )
+    def cron_history(job_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        """One task's history, newest first: every scheduled time that ran or did not, and why.
+
+        `/api/cron/results` holds the answers, so a time that produced none (the app was closed,
+        the task was off, the day's money was spent) was invisible there. This is the record of
+        those, read from the tail of `cron_history.jsonl`. A task that does not exist is a 404; one
+        that exists and has no history yet is an empty list.
+        """
+        from dataclasses import asdict
+
+        from chimera.scheduler.history import CronHistory, history_path
+
+        if job_id not in _cron_store(_settings()):
+            raise HTTPException(status_code=404, detail="job not found")
+        rows = CronHistory(history_path(_settings().home)).load(
+            job_id=job_id, limit=max(1, min(500, limit))
+        )
+        return [asdict(row) for row in rows]
+
     @app.get("/api/cron/silence", dependencies=[guard], response_model=CronSilenceOut)
     def cron_silence(grace_minutes: float = 5.0) -> dict[str, Any]:
         """Ask the schedule what it is not telling you.
@@ -1261,7 +1290,14 @@ def register_features(
         """Schedule a job from the UI — the CLI's `chimera cron add`, over HTTP. A human-created job
         is enabled immediately (unlike an agent-proposed one, which the scheduler starts disabled)."""
         from chimera.scheduler import Scheduler
+        from chimera.scheduler.job_permission import refusal_for
 
+        # The owner's screen may give a task a mode no wider than the install's own posture; a
+        # wider one is a 400 with the sentence, and nothing is written. The bridge never reaches
+        # this field (`bridge_routes`: cron.create refuses it, cron.permission_mode is closed).
+        why = refusal_for(body.permission_mode, _settings())
+        if why:
+            raise HTTPException(status_code=400, detail=why)
         try:
             job = Scheduler(_cron_store(_settings())).schedule_cron(
                 body.name,
@@ -1275,9 +1311,36 @@ def register_features(
                 max_attempts=body.max_attempts,
                 notify=body.notify,
                 tools=body.tools,
+                catch_up=body.catch_up,
+                permission_mode=body.permission_mode,
+                worktree=body.worktree,
             )
         except ValueError as exc:  # an invalid cron expression is a client error, not a 500
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _job_dict(job)
+
+    @app.put(
+        "/api/cron/{job_id}/permission-mode", dependencies=[guard], response_model=CronJobOut
+    )
+    def set_cron_permission_mode(job_id: str, body: CronPermissionModeIn) -> dict[str, Any]:
+        """The owner's choice of the mode a task runs under (`cron.permission_mode`).
+
+        The owner's decision and the screen's alone: the route id is in
+        `bridge_routes.OWNER_DECISION_ROUTES` and `FULL_CONTROL_NEVER`, so no bridge tier reaches
+        it. Refused, with the reason, when the mode is wider than Settings on any axis. Switching to
+        a narrower mode, or clearing it, always works.
+        """
+        from chimera.scheduler.job_permission import refusal_for
+
+        store = _cron_store(_settings())
+        if job_id not in store:
+            raise HTTPException(status_code=404, detail="job not found")
+        why = refusal_for(body.permission_mode, _settings())
+        if why:
+            raise HTTPException(status_code=400, detail=why)
+        job = store.get(job_id)
+        job.permission_mode = body.permission_mode
+        store.add(job)
         return _job_dict(job)
 
     @app.post("/api/cron/{job_id}/enable", dependencies=[guard], response_model=CronJobOut)

@@ -91,6 +91,8 @@ export type PluginMarketplaceEntries = Schemas["PluginMarketplaceEntriesOut"];
  *  looks damaged rather than empty. */
 export type CodeSessionRaw = Schemas["CodeSessionRawOut"];
 export type CronJob = Schemas["CronJobOut"];
+/** One line of a scheduled task's history: a time that ran or did not, and why. */
+export type CronHistoryRow = Schemas["CronHistoryRowOut"];
 export type TaskCard = Schemas["TaskCardOut"];
 export type ProjectState = Schemas["ProjectStateOut"];
 /** The orchestrator's plan for a task, before any worker runs. `decompose_spent` is the honest

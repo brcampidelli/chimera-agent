@@ -19,6 +19,7 @@ import type {
   DelegationSummary,
   HierarchyPreview,
   ConfigTest,
+  CronHistoryRow,
   CronJob,
   DoctorInfo,
   FsFile,
@@ -1143,9 +1144,26 @@ export const createCron = (
      *  this route nor the CLI could write it, so the gate could never arm for anybody. */
     verify?: string;
     max_attempts?: number;
+    /** A time missed while the app was off: run it once when back (`once`) or only record it. */
+    catch_up?: "once" | "skip";
+    /** Never wider than Settings: the server answers 400 with the reason. Empty = none. */
+    permission_mode?: CronPermissionMode | "";
+    /** Run in a new git worktree of the task's folder. */
+    worktree?: boolean;
   },
 ) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
+/** The modes a scheduled task may hold: the Code screen's, never "Ignore permissions". */
+export type CronPermissionMode = "manual" | "accept_edits" | "plan" | "auto" | "dont_ask";
+/** One task's history, newest first: every scheduled time that ran or did not, and why. */
+export const getCronHistory = (jobId: string, limit = 30) =>
+  json<CronHistoryRow[]>(`/api/cron/${jobId}/history?limit=${limit}`);
+/** The owner's choice of a task's mode. Refused (400) when wider than Settings. */
+export const setCronPermissionMode = (jobId: string, mode: CronPermissionMode | "") =>
+  json<CronJob>(`/api/cron/${jobId}/permission-mode`, {
+    method: "PUT",
+    body: JSON.stringify({ permission_mode: mode }),
+  });
 /** What the schedules answered, most recent first.
  *
  *  Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and nothing
