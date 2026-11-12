@@ -22,7 +22,7 @@ import time
 import uuid
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
@@ -1062,6 +1062,8 @@ class Agent:
         #: What a compaction must restore. A caller that knows the open file, the plan or the task
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
+        #: What the last between-turns compaction's summariser charged (`compact_history`).
+        self.last_compaction_usd: float | None = 0.0
         # Built once rather than per compaction, and None unless asked for: `compact()` treats
         # None as "use the structural note", which is the behaviour every caller has today. The
         # run's meters are bound where it is called, in `run`, because they belong to one run.
@@ -2724,6 +2726,41 @@ class Agent:
             route_meta=route_meta,
             steplog=steplog if steplog is not None else StepLog(),
         )
+
+    def compact_history(
+        self,
+        messages: list[MessageLike],
+        *,
+        spend: SpendBudget | None = None,
+        summarise: bool = True,
+    ) -> tuple[list[MessageLike], bool]:
+        """Compact a conversation BETWEEN turns, the way this agent compacts inside a run.
+
+        Same ``keep_recent``, same summariser, same run state (plan, tasks, progress, command
+        results) and the same PreCompact hook as the compactions in `run`, so a history shortened
+        after a long pause reads like one shortened mid-turn.
+
+        What differs is deliberate. The request the run is about to make comes right after this
+        history, so the state restored into it carries neither a task nor a latest request: the
+        note is stored and re-sent on every later turn, and a request restored into it would be the
+        PREVIOUS turn's, stale from the next message on. ``spend`` is the turn's meter, so a
+        summariser call counts against its ceiling and the combined one; ``last_compaction_usd`` is
+        what it charged (0.0 for the structural note, None when a call could not be priced).
+        ``summarise=False`` forces the structural note, which sends nothing to a model. The hook is
+        called only when something was compacted, and after it: it annotates, it does not veto.
+        """
+        usage = _UsageTally()
+        state = replace(self.run_state, task="", latest_request="")
+        compacted, changed = compact(
+            messages,
+            keep_recent=self.config.keep_recent,
+            state=state,
+            summarise=self._metered_summariser(usage, spend) if summarise else None,
+        )
+        self.last_compaction_usd = None if usage.unpriced is not None else round(usage.usd, 6)
+        if changed:
+            self._pre_compact("auto")
+        return compacted, changed
 
     def _pre_compact(self, trigger: str) -> None:
         """``PreCompact`` for the Claude-format hooks: annotate only (the receipt is the record)."""

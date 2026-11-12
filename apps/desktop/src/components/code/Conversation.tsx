@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import rehypeHighlight from "rehype-highlight";
+import { missLabelKey, shownMissCause } from "@/lib/cache-miss";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AppWindow,
@@ -541,6 +542,7 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
   // that finished the work — the receipt drew nine badges and not the one that says whether to
   // believe the other nine.
   const stopped = STOP_REASONS[done.stopped_reason ?? ""];
+  const missCause = shownMissCause(done.cache_miss_cause, done.cache_read_tokens);
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {/* First, ahead of every measurement, because it is what decides how to read them. */}
@@ -596,6 +598,18 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
           55,166 cached tokens to 0. That is the fact the badge exists to show. */}
       {done.cache_read_tokens != null ? (
         <Badge>{t("code.chat.cache", { n: num(done.cache_read_tokens) })}</Badge>
+      ) : null}
+      {/* Only when nothing was read from the cache: the short reason the cache did not answer. */}
+      {missCause ? <Badge>{t(missLabelKey(missCause))}</Badge> : null}
+      {/* A pause longer than the cache lived shortened this turn's history before it was sent. The
+          sizes are estimates, which the badge says. */}
+      {done.idle_compaction ? (
+        <Badge>
+          {t("code.chat.idleCompacted", {
+            before: num(done.idle_compaction.tokens_before),
+            after: num(done.idle_compaction.tokens_after),
+          })}
+        </Badge>
       ) : null}
       {/* Which instructions this turn ran under, as the trace names them. When two turns behave
           differently, this is what says whether the prompt changed between them. */}

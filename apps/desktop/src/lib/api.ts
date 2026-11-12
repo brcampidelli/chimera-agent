@@ -19,6 +19,7 @@ import type {
   DelegationSummary,
   HierarchyPreview,
   ConfigTest,
+  CronHistoryRow,
   CronJob,
   DoctorInfo,
   FsFile,
@@ -1143,9 +1144,26 @@ export const createCron = (
      *  this route nor the CLI could write it, so the gate could never arm for anybody. */
     verify?: string;
     max_attempts?: number;
+    /** A time missed while the app was off: run it once when back (`once`) or only record it. */
+    catch_up?: "once" | "skip";
+    /** Never wider than Settings: the server answers 400 with the reason. Empty = none. */
+    permission_mode?: CronPermissionMode | "";
+    /** Run in a new git worktree of the task's folder. */
+    worktree?: boolean;
   },
 ) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });
+/** The modes a scheduled task may hold: the Code screen's, never "Ignore permissions". */
+export type CronPermissionMode = "manual" | "accept_edits" | "plan" | "auto" | "dont_ask";
+/** One task's history, newest first: every scheduled time that ran or did not, and why. */
+export const getCronHistory = (jobId: string, limit = 30) =>
+  json<CronHistoryRow[]>(`/api/cron/${jobId}/history?limit=${limit}`);
+/** The owner's choice of a task's mode. Refused (400) when wider than Settings. */
+export const setCronPermissionMode = (jobId: string, mode: CronPermissionMode | "") =>
+  json<CronJob>(`/api/cron/${jobId}/permission-mode`, {
+    method: "PUT",
+    body: JSON.stringify({ permission_mode: mode }),
+  });
 /** What the schedules answered, most recent first.
  *
  *  Every dispatch has appended a line to `cron_results.jsonl` since the daemon existed, and nothing
@@ -1825,6 +1843,23 @@ export interface CodeTurnDone {
    *  usage — a silent route, not a miss; zero is a real answer (a route that switched and cached
    *  nothing), and the two must not be drawn alike. */
   cache_read_tokens?: number | null;
+  /** Cache writes the provider reported over the turn; null when it reported no cache usage at all. */
+  cache_write_tokens?: number | null;
+  /** Seconds since the previous turn of this conversation ended; null on the first turn. */
+  cache_gap_seconds?: number | null;
+  /** Why the cache did not answer, one of the fixed causes in `chimera/core/cache_miss.py`. Null when
+   *  the provider was silent. Drawn only on a turn that read nothing from the cache. */
+  cache_miss_cause?: string | null;
+  /** Set when this turn's history was shortened for a pause longer than the cache lived. The sizes are
+   *  estimates: the provider has not counted the shorter history yet. */
+  idle_compaction?: {
+    gap_seconds: number;
+    ttl_seconds: number;
+    tokens_before: number;
+    tokens_after: number;
+    saved_tokens: number;
+    estimated: boolean;
+  } | null;
   /** Which instructions produced this turn: twelve hex characters of the system message's SHA-256,
    *  the same value the turn's trace line carries. Two turns with different values were not given
    *  the same instructions, whatever else they share. The turn context — recalled facts, the plan,

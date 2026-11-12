@@ -186,6 +186,9 @@ BRIDGE_WRITABLE: frozenset[str] = frozenset(
         "CHIMERA_AUTO_CONSOLIDATE",
         "CHIMERA_CHAT_MEMORY",
         "CHIMERA_SKILL_CARDS",  # reads back skills, which only an approval publishes
+        # Shortens only what the model is SENT after a long pause. It deletes nothing: the stored
+        # conversation and its screen keep every message, and nothing here is a guard or a limit.
+        "CHIMERA_IDLE_COMPACTION",
         # Whether a job's channel hears that it failed, and the machine's sleep. (Whether the
         # scheduler runs at all, `CHIMERA_APP_CRON`, is suggestable only: what runs unattended is
         # the owner's to decide.)

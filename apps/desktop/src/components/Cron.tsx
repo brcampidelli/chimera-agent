@@ -7,8 +7,11 @@ import {
   disableCron,
   enableCron,
   getCron,
+  getCronHistory,
   getCronResults,
   getCronSilence,
+  setCronPermissionMode,
+  type CronPermissionMode,
   type CronResult,
 } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
@@ -24,6 +27,17 @@ const PRESETS: { key: string; cron: string }[] = [
   { key: "cron.preset.morning", cron: "0 7 * * *" },
   { key: "cron.preset.hourly", cron: "0 * * * *" },
   { key: "cron.preset.weekdays", cron: "0 9 * * 1-5" },
+];
+
+/** The modes a scheduled task may hold, with the label the Code screen already uses for each.
+ *  No "Ignore permissions": nobody is watching a scheduled run. The server refuses a mode wider
+ *  than Settings, so the list can be the whole set. */
+const JOB_MODES: { mode: CronPermissionMode; label: string }[] = [
+  { mode: "manual", label: "composer.permission.manual" },
+  { mode: "accept_edits", label: "composer.permission.acceptEdits" },
+  { mode: "plan", label: "composer.permission.plan" },
+  { mode: "auto", label: "composer.permission.auto" },
+  { mode: "dont_ask", label: "composer.permission.dontAsk" },
 ];
 
 /** The host of a webhook URL, for showing where a job delivers without showing the secret.
@@ -59,6 +73,52 @@ export function hostOf(url: string): string {
   }
 }
 
+/** One task's history: every scheduled time that ran or did not, and why. Fetched when opened, not
+ *  with the list: a screen with a dozen tasks would otherwise read a dozen histories to show none. */
+function JobHistory({ jobId }: { jobId: string }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const history = useQuery({
+    queryKey: ["cron", "history", jobId],
+    queryFn: () => getCronHistory(jobId),
+    enabled: open,
+  });
+  return (
+    <details className="mt-1 text-xs" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+        {t("cron.history.title")}
+      </summary>
+      {open && history.isLoading ? <Spinner /> : null}
+      {open && history.data && history.data.length === 0 ? (
+        <div className="mt-1 text-muted-foreground">{t("cron.history.empty")}</div>
+      ) : null}
+      {open && history.data && history.data.length > 0 ? (
+        <ul className="mt-1 max-h-48 space-y-1 overflow-auto">
+          {history.data.map((r, i) => (
+            <li key={`${r.at}-${i}`} className="text-muted-foreground">
+              <span className="text-foreground">{whenOf(r.at)}</span>{" "}
+              <Badge tone={r.outcome === "ran" && r.status === "ok" ? "muted" : r.outcome === "ran" ? "bad" : "warn"}>
+                {r.outcome === "ran"
+                  ? t("cron.history.ran")
+                  : r.outcome === "skipped"
+                    ? t("cron.history.skipped")
+                    : t("cron.history.note")}
+              </Badge>{" "}
+              {t(`cron.history.reason.${r.reason}`)}
+              {r.scheduled_for ? ` (${t("cron.history.scheduledFor", { when: whenOf(r.scheduled_for) })})` : ""}
+              {r.worktree ? (
+                <div className="truncate font-mono" title={r.worktree}>
+                  {t("cron.history.worktreeAt", { path: r.worktree })}
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </details>
+  );
+}
+
 function AddSchedule() {
   const { t } = useI18n();
   const qc = useQueryClient();
@@ -67,6 +127,9 @@ function AddSchedule() {
   const [action, setAction] = useState("");
   const [deliverTo, setDeliverTo] = useState("");
   const [verify, setVerify] = useState("");
+  const [catchUp, setCatchUp] = useState<"once" | "skip">("once");
+  const [mode, setMode] = useState<CronPermissionMode | "">("");
+  const [worktree, setWorktree] = useState(false);
   const create = useMutation({
     mutationFn: createCron,
     onSuccess: () => {
@@ -75,6 +138,8 @@ function AddSchedule() {
       setVerify("");
       setAction("");
       setDeliverTo("");
+      setMode("");
+      setWorktree(false);
     },
   });
   const canSubmit = name.trim() && schedule.trim() && action.trim() && !create.isPending;
@@ -141,6 +206,46 @@ function AddSchedule() {
           value={verify}
           onChange={(e) => setVerify(e.target.value)}
         />
+        {/* What happens to a time missed while the app was off, how much the run may do with
+            nobody watching, and whether it works in a worktree of its folder. All three default to
+            what every task did before they existed. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          <label className="flex items-center gap-1.5">
+            <span>{t("cron.add.catchUp")}</span>
+            <select
+              className="field px-1.5 py-0.5 text-xs"
+              value={catchUp}
+              onChange={(e) => setCatchUp(e.target.value as "once" | "skip")}
+            >
+              <option value="once">{t("cron.add.catchUp.once")}</option>
+              <option value="skip">{t("cron.add.catchUp.skip")}</option>
+            </select>
+          </label>
+          <span className="basis-full">{t("cron.add.catchUp.hint")}</span>
+          <label className="flex items-center gap-1.5">
+            <span>{t("cron.add.mode")}</span>
+            <select
+              className="field px-1.5 py-0.5 text-xs"
+              value={mode}
+              onChange={(e) => setMode(e.target.value as CronPermissionMode | "")}
+            >
+              <option value="">{t("cron.add.mode.none")}</option>
+              {JOB_MODES.map((m) => (
+                <option key={m.mode} value={m.mode}>
+                  {t(m.label)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={worktree}
+              onChange={(e) => setWorktree(e.target.checked)}
+            />
+            <span>{t("cron.add.worktree")}</span>
+          </label>
+        </div>
         <div className="flex items-center justify-between gap-3 pt-0.5">
           <span className="text-xs text-muted-foreground">{t("cron.add.hint")}</span>
           <Button
@@ -160,6 +265,11 @@ function AddSchedule() {
                 // nothing can tell a failed attempt from a finished one, so a retry would just
                 // do the work twice and keep the second answer.
                 max_attempts: verify.trim() ? 2 : 1,
+                // Only what was chosen: a task that picks none of the three is sent exactly as it
+                // was before they existed, and the server's defaults are the old behaviour.
+                ...(catchUp === "skip" ? { catch_up: catchUp } : {}),
+                ...(mode ? { permission_mode: mode } : {}),
+                ...(worktree ? { worktree: true } : {}),
               })
             }
             disabled={!canSubmit}
@@ -167,7 +277,13 @@ function AddSchedule() {
             <Plus className="h-3.5 w-3.5" /> {t("cron.add.submit")}
           </Button>
         </div>
-        {create.isError && <div className="text-xs text-bad-foreground">{t("cron.add.error")}</div>}
+        {create.isError && (
+          <div className="text-xs text-bad-foreground">
+            {mode && create.error instanceof Error && /never wider|permission mode/i.test(create.error.message)
+              ? t("cron.add.errorMode")
+              : t("cron.add.error")}
+          </div>
+        )}
       </div>
     </Panel>
   );
@@ -192,6 +308,12 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
   const enable = useMutation({ mutationFn: enableCron, onSuccess: invalidate });
   const disable = useMutation({ mutationFn: disableCron, onSuccess: invalidate });
   const remove = useMutation({ mutationFn: deleteCron, onSuccess: invalidate });
+  // A lambda, not the function itself: the binding is read when the screen renders, and a test (or
+  // an older server) that does not provide it must not take the whole list down with it.
+  const setMode = useMutation({
+    mutationFn: (v: { id: string; mode: CronPermissionMode | "" }) => setCronPermissionMode(v.id, v.mode),
+    onSuccess: invalidate,
+  });
 
   return (
     <Screen title={t("cron.title")} icon={<Clock className="h-5 w-5" />} embedded={embedded}>
@@ -258,6 +380,15 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                       decide whether the folder comes back. The row must say so, next to the name. */}
                   {j.workspace_missing && <Badge tone="warn">{t("cron.workspaceMissing")}</Badge>}
                   {j.workspace_unverifiable && <Badge tone="muted">{t("cron.workspaceUnverifiable")}</Badge>}
+                  {j.permission_mode ? (
+                    <Badge tone="muted">
+                      {t("cron.mode.badge", {
+                        mode: t(JOB_MODES.find((m) => m.mode === j.permission_mode)?.label ?? "cron.add.mode.none"),
+                      })}
+                    </Badge>
+                  ) : null}
+                  {j.catch_up === "skip" && <Badge tone="muted">{t("cron.badge.skip")}</Badge>}
+                  {j.worktree && <Badge tone="muted">{t("cron.badge.worktree")}</Badge>}
                 </div>
                 <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                   {j.schedule} → {j.action}
@@ -286,6 +417,30 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                     {j.workspace}
                   </div>
                 )}
+                {/* The mode is the owner's to change and only ever narrower than Settings: the server
+                    answers 400 for a wider one, and the screen says so beside the select. */}
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                  <select
+                    aria-label={t("cron.mode.change")}
+                    title={t("cron.mode.change")}
+                    className="field px-1.5 py-0.5 text-xs"
+                    value={j.permission_mode ?? ""}
+                    onChange={(e) =>
+                      setMode.mutate({ id: j.id, mode: e.target.value as CronPermissionMode | "" })
+                    }
+                  >
+                    <option value="">{t("cron.add.mode.none")}</option>
+                    {JOB_MODES.map((m) => (
+                      <option key={m.mode} value={m.mode}>
+                        {t(m.label)}
+                      </option>
+                    ))}
+                  </select>
+                  {setMode.isError && setMode.variables?.id === j.id ? (
+                    <span className="text-bad-foreground">{t("cron.mode.error")}</span>
+                  ) : null}
+                </div>
+                <JobHistory jobId={j.id} />
                 {/* What it last answered, folded. The row already says whether the job ran; this
                     says what came of it, which is the thing the schedule exists to produce and the
                     thing nothing in this app could show. */}
