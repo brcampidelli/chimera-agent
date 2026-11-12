@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Settings search finds the hooks and worktree cleanup switches.** Typing "hook" or "worktree" in the Settings search now lists the lifecycle hooks, the Claude Code hook switches and the archived-worktree cleanup, and opening a result focuses its switch; before, these rows were on the General tab but the search could not find them. (#1229)
+
+### Added
+
+- **Scheduled tasks: missed runs, history, a permission mode and a worktree per task.** A task whose time passed while the app was off runs once when it is back, if the missed time is at most 7 days old, never once per missed time (`catch_up`: once or skip; a pause shorter than 30 minutes is not a miss). Every scheduled time is recorded with whether it ran and why not, shown per task on the Schedule screen. A task can have one of the Code screen's permission modes, never wider than Settings and never "Ignore permissions"; a mode that would ask someone refuses instead, and only your own screen sets it. A task can run in a fresh worktree, removed afterwards only when it left nothing (no changes, no ignored files, no unpushed commit), otherwise kept with its path in the history. (#1230)
+
 ## [0.87.0] - 2026-11-12
 ### Added
 

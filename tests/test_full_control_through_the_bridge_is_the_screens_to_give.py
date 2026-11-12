@@ -118,9 +118,11 @@ def test_the_full_control_table_is_served_by_the_app_and_apart_from_the_others(
     # Every owner's decision becomes reachable but the two the owner excluded, which are refused
     # with their own sentence.
     left = set(OWNER_DECISION_ROUTES) - set(FULL_CONTROL_ROUTES)
+    # Where commands run (onda 4, item 17): reach, the owner's screen only. `cron.permission_mode`
+    # joined by the owner's rule for scheduled tasks: the run has nobody watching, so the mode it
+    # runs under is chosen on the screen at every tier.
     assert left == {
-        "settings.exec", "settings.messaging_start",
-        # Where commands run (onda 4, item 17): reach, the owner's screen only.
+        "settings.exec", "settings.messaging_start", "cron.permission_mode",
         "settings.environments", "settings.environment_distros", "settings.environment_save",
         "settings.environment_remove", "settings.environment_default",
     }
