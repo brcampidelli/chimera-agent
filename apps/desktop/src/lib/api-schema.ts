@@ -614,6 +614,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/environments/ssh-hosts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ssh Hosts
+         * @description The ``Host`` aliases of the owner's ``~/.ssh/config`` and the ones allowed for an SSH environment.
+         */
+        get: operations["list_ssh_hosts_api_code_environments_ssh_hosts_get"];
+        put?: never;
+        /**
+         * Allow Ssh Host
+         * @description Allow one alias of ``~/.ssh/config``; an alias that is not there, or a pattern, is a 400.
+         */
+        post: operations["allow_ssh_host_api_code_environments_ssh_hosts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/environments/ssh-hosts/{host}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget Ssh Host
+         * @description Stop allowing an alias. Environments that name it stay listed and refuse commands.
+         */
+        delete: operations["forget_ssh_host_api_code_environments_ssh_hosts__host__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/environments/wsl-distros": {
         parameters: {
             query?: never;
@@ -9141,6 +9185,28 @@ export interface components {
             /** Changed */
             changed: boolean;
         };
+        /**
+         * CodeSshHostIn
+         * @description One alias to allow. It must exist in the owner's ``~/.ssh/config``.
+         */
+        CodeSshHostIn: {
+            /** Host */
+            host: string;
+        };
+        /**
+         * CodeSshHostsOut
+         * @description The SSH hosts an environment may use: what the owner's ``~/.ssh/config`` offers, and what is allowed.
+         *
+         *     Aliases only. Nothing about how a host is reached (user, address, key) is read or returned.
+         */
+        CodeSshHostsOut: {
+            /** Allowed */
+            allowed: string[];
+            /** Config Hosts */
+            config_hosts: string[];
+            /** Supported */
+            supported: boolean;
+        };
         /** CodeToolOut */
         CodeToolOut: {
             /** Arguments */
@@ -17535,6 +17601,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeEnvironmentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ssh_hosts_api_code_environments_ssh_hosts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSshHostsOut"];
+                };
+            };
+        };
+    };
+    allow_ssh_host_api_code_environments_ssh_hosts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSshHostIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSshHostsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_ssh_host_api_code_environments_ssh_hosts__host__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSshHostsOut"];
                 };
             };
             /** @description Validation Error */

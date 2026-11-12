@@ -263,6 +263,14 @@ class RunShellTool(Tool):
                 "live in the distro, where this app cannot list or stop it. Run the command in the "
                 "foreground."
             )
+        from chimera.sandbox.ssh import SshSandbox
+
+        if isinstance(sandbox, SshSandbox):
+            return (
+                "error: background jobs are not available in an SSH environment: the process would "
+                "live on the remote host, where this app cannot list or stop it. Run the command in "
+                "the foreground."
+            )
         if self._jobs is None:
             return (
                 "error: background jobs are not available here — this registry has no job store. "
@@ -411,16 +419,21 @@ class RunShellTool(Tool):
             # The prompt shows what the command resolves to here (S30-30), as the governance cards
             # do; the callback itself still gets exactly the command, which is what it classifies.
             from chimera.governance.exec_facts import describe, offered_with
+            from chimera.sandbox.ssh import SshSandbox
             from chimera.sandbox.wsl import WslSandbox
 
             try:
                 # Programs and git hooks resolve inside the distro there, which this machine cannot
                 # see: naming the Windows `PATH`'s answer would describe a run that does not happen.
-                lines = (
-                    ["runs in the WSL environment: its programs and git hooks resolve in the distro, not here"]
-                    if isinstance(sandbox, WslSandbox)
-                    else describe(command, cwd, self.workspace)
-                )
+                if isinstance(sandbox, SshSandbox):
+                    lines = [
+                        f"runs on {sandbox.host} over ssh, in {sandbox.remote_path}: its programs and "
+                        "files are that machine's, not this one's"
+                    ]
+                elif isinstance(sandbox, WslSandbox):
+                    lines = ["runs in the WSL environment: its programs and git hooks resolve in the distro, not here"]
+                else:
+                    lines = describe(command, cwd, self.workspace)
             except Exception:  # noqa: BLE001 — a prompt without the note is the prompt it was
                 lines = []
             with offered_with(command, lines):

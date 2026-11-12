@@ -2,9 +2,11 @@
 
 An *environment* is a place the agent's shell commands execute. ``local`` is what has always
 happened (the install's configured sandbox, on this machine). ``wsl`` runs them in a Linux distro on
-the same Windows host (:mod:`chimera.sandbox.wsl`). The next kind, ``ssh``, is meant to be one more
-entry in :data:`_KINDS`: a name, a way to validate its parameters, and a way to build its sandbox.
-Nothing else in this file or in the turn path knows which kinds exist.
+the same Windows host (:mod:`chimera.sandbox.wsl`). ``ssh`` runs them on a host from the owner's
+``~/.ssh/config`` (:mod:`chimera.sandbox.ssh`), and only a host the owner also put on the allowed list
+(``ssh_hosts.json``, edited on the app's own screen). Each kind is one entry in :data:`_KINDS`: a
+name, a way to validate its parameters, and a way to build its sandbox. Nothing else in this file or
+in the turn path knows which kinds exist.
 
 The list lives on the server, in the home folder beside the project registry, because the choice is a
 fact about the installation and not about a window. The owner makes it on the Code screen before the
@@ -44,7 +46,10 @@ if TYPE_CHECKING:
 LOCAL_ID = "local"
 FILE_NAME = "environments.json"
 
+SSH_HOSTS_FILE = "ssh_hosts.json"
+
 MAX_ENVIRONMENTS = 50
+MAX_SSH_HOSTS = 100
 MAX_NAME = 80
 MAX_PROJECT_KEY = 4096
 
@@ -93,6 +98,10 @@ class _Kind:
     available: Callable[[], bool]
     #: The sandbox a turn in ``workspace`` gets, or None for "the install's own" (local).
     build: Callable[[Environment, Path], Sandbox | None]
+    #: Checks the cleaned parameters against the owner's own files (the home folder is where the lists
+    #: live), when the kind depends on them; raises ``ValueError`` with a sentence. Run when an
+    #: environment is saved AND at every turn, so a change in those files stops the commands.
+    check: Callable[[Mapping[str, str], Path], None] | None = None
 
 
 def _validate_local(params: Mapping[str, Any]) -> dict[str, str]:
@@ -130,11 +139,58 @@ def _build_wsl(env: Environment, workspace: Path) -> Sandbox | None:
     return WslSandbox(workspace, env.params.get("distro", ""))
 
 
-#: The kinds this build knows. ``ssh`` joins here, next to ``wsl``, with its own validator (a host
-#: alias from ``~/.ssh/config``, never a key or a password) and its own sandbox.
+def _validate_ssh(params: Mapping[str, Any]) -> dict[str, str]:
+    """The SHAPE of an ssh environment: an alias and an absolute remote folder, nothing else.
+
+    A user name, an address, a password or a key has no parameter here and is refused by name: the
+    connection lives in the owner's ``~/.ssh/config`` and ``ssh-agent``. Whether the alias is in that
+    file and on the allowed list is :func:`_check_ssh`'s, because it depends on files that can change.
+    """
+    from chimera.sandbox.ssh import SshPathError, clean_remote_path, valid_alias
+
+    extra = set(params) - {"host", "remote_path"}
+    if extra:
+        raise ValueError(f"unknown parameter for an SSH environment: {sorted(extra)[0]}")
+    host = params.get("host")
+    if not isinstance(host, str) or not valid_alias(host.strip()):
+        raise ValueError("host must be a Host alias from your ~/.ssh/config")
+    try:
+        path = clean_remote_path(params.get("remote_path"))
+    except SshPathError as exc:
+        raise ValueError(str(exc)) from exc
+    return {"host": host.strip(), "remote_path": path}
+
+
+def _ssh_available() -> bool:
+    from chimera.sandbox.ssh import ssh_supported
+
+    return ssh_supported()
+
+
+def _build_ssh(env: Environment, workspace: Path) -> Sandbox | None:
+    from chimera.sandbox.ssh import SshSandbox
+
+    return SshSandbox(env.params["host"], env.params["remote_path"], workspace)
+
+
+def _check_ssh(params: Mapping[str, str], home: Path) -> None:
+    from chimera.sandbox.ssh import config_aliases
+
+    host = params["host"]
+    if host not in config_aliases():
+        raise ValueError(f"{host!r} is not a Host alias in your ~/.ssh/config")
+    if host not in registry_for(home).ssh_hosts():
+        raise ValueError(
+            f"{host!r} is not on your list of allowed SSH hosts (Settings > Environments): allow it there first"
+        )
+
+
+#: The kinds this build knows. ``ssh`` takes an alias from ``~/.ssh/config`` (never a key or a
+#: password), and only one the owner also allowed in Settings.
 _KINDS: dict[str, _Kind] = {
     "local": _Kind(_validate_local, lambda: True, lambda _env, _ws: None),
     "wsl": _Kind(_validate_wsl, _wsl_available, _build_wsl),
+    "ssh": _Kind(_validate_ssh, _ssh_available, _build_ssh, _check_ssh),
 }
 
 #: The kinds an owner may CREATE (``local`` is built in).
@@ -159,7 +215,18 @@ def sandbox_for(env: Environment, workspace: Path, settings: Settings) -> Sandbo
         raise EnvironmentRefused(409, f"this build cannot run environments of kind {env.kind!r}")
     if not spec.available():
         raise EnvironmentRefused(409, f"the {env.kind} environment is not available on this machine")
+    if spec.check is not None:
+        try:
+            spec.check(env.params, Path(settings.home))
+        except ValueError as exc:
+            raise EnvironmentRefused(409, f"the {env.kind} environment cannot be used: {exc}") from exc
     built = spec.build(env, workspace)
+    if built is not None and spec.check is not None:
+        from chimera.sandbox.ssh import SshSandbox
+
+        if isinstance(built, SshSandbox):
+            check, params, home = spec.check, dict(env.params), Path(settings.home)
+            built.bind_recheck(lambda: check(params, home))
     if built is not None and _install_isolates(settings):
         raise EnvironmentRefused(
             409,
@@ -253,6 +320,8 @@ class EnvironmentRegistry:
         if not spec.available():
             raise ValueError(f"the {kind} environment is not available on this machine")
         cleaned = spec.validate(params or {})
+        if spec.check is not None:
+            spec.check(cleaned, self.path.parent)
         with self._lock:
             rows, defaults = self._read()
             if len(rows) >= MAX_ENVIRONMENTS:
@@ -287,6 +356,84 @@ class EnvironmentRegistry:
             else:
                 defaults.pop(key, None)
             self._write(rows, defaults)
+
+    # the allowed SSH hosts ---------------------------------------------------------------
+
+    @property
+    def _hosts_path(self) -> Path:
+        return self.path.with_name(SSH_HOSTS_FILE)
+
+    def ssh_hosts(self) -> list[str]:
+        """The aliases the owner allowed an SSH environment to use, in the order they were allowed."""
+        with _lock_for(self._hosts_path):
+            return self._read_hosts()
+
+    def allow_ssh_host(self, alias: str) -> list[str]:
+        """Allow ``alias``; it must be a concrete ``Host`` alias of the owner's ssh config right now."""
+        from chimera.sandbox.ssh import config_aliases, valid_alias
+
+        clean = alias.strip() if isinstance(alias, str) else ""
+        if not valid_alias(clean):
+            raise ValueError("host must be a Host alias from your ~/.ssh/config")
+        if clean not in config_aliases():
+            raise ValueError(f"{clean!r} is not a Host alias in your ~/.ssh/config")
+        with _lock_for(self._hosts_path):
+            hosts = self._read_hosts()
+            if clean not in hosts:
+                if len(hosts) >= MAX_SSH_HOSTS:
+                    raise ValueError(f"at most {MAX_SSH_HOSTS} allowed hosts")
+                hosts.append(clean)
+                self._write_hosts(hosts)
+            return hosts
+
+    def forget_ssh_host(self, alias: str) -> bool:
+        """Stop allowing ``alias``. Environments that name it are kept and refuse at the next turn."""
+        with _lock_for(self._hosts_path):
+            hosts = self._read_hosts()
+            kept = [h for h in hosts if h != alias]
+            if len(kept) == len(hosts):
+                return False
+            self._write_hosts(kept)
+            return True
+
+    def usable(self, env: Environment) -> bool:
+        """Whether ``env`` can run a turn now: its kind is here and its own files still agree."""
+        spec = _KINDS.get(env.kind)
+        if spec is None or not spec.available():
+            return False
+        if spec.check is None:
+            return True
+        try:
+            spec.check(env.params, self.path.parent)
+        except ValueError:
+            return False
+        return True
+
+    def _read_hosts(self) -> list[str]:
+        from chimera.sandbox.ssh import valid_alias
+
+        path = self._hosts_path
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return []
+        except (OSError, ValueError):
+            with contextlib.suppress(OSError):
+                path.replace(path.with_suffix(path.suffix + ".damaged"))
+            return []
+        listed = raw.get("hosts") if isinstance(raw, dict) else None
+        out: list[str] = []
+        for item in listed if isinstance(listed, list) else []:
+            if valid_alias(item) and item not in out and len(out) < MAX_SSH_HOSTS:
+                out.append(item)
+        return out
+
+    def _write_hosts(self, hosts: list[str]) -> None:
+        path = self._hosts_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps({"hosts": hosts}, indent=2), encoding="utf-8")
+        tmp.replace(path)
 
     # file --------------------------------------------------------------------------------
 
