@@ -113,6 +113,7 @@ import {
   type Cast,
 } from "@/components/code/FusionCast";
 import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeiling";
+import { EnvironmentPicker } from "@/components/code/EnvironmentPicker";
 import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
 import { TurnSuggestions } from "@/components/code/TurnSuggestions";
 import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
@@ -845,6 +846,9 @@ export function Conversation({
     resumeSession ?? null,
   );
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  // Where this conversation's commands will run, as picked before its first message ("" = the
+  // project's default). Sent with that turn only; the server fixes it there (`EnvironmentPicker`).
+  const [environmentChoice, setEnvironmentChoice] = useState("");
   // A batch this conversation confirmed, ending while it is on screen: its record goes after the last
   // exchange at once, the same record the server stores in the conversation (`batchNoteOf`). Only for
   // a batch this mounting saw running: one that ended before is in what the conversation read back,
@@ -2130,6 +2134,8 @@ export function Conversation({
         message,
         ...(taskCardId ? { task_card_id: taskCardId } : {}),
         session_id: sessionId,
+        // The first turn only: later turns say nothing and the server keeps what the first fixed.
+        ...(sessionId === null && environmentChoice ? { environment: environmentChoice } : {}),
         bypass_permissions: bypassPermissions,
         source: "app",
         workspace: workspace || null,
@@ -3308,6 +3314,13 @@ export function Conversation({
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {permissionControl}
+          <EnvironmentPicker
+            workspace={workspace}
+            sessionId={sessionId}
+            started={sessionId !== null || exchanges.length > 0}
+            value={environmentChoice}
+            onChange={setEnvironmentChoice}
+          />
           <AttachButton onAdded={(a) => setAttached((prev) => [...prev, a])} />
           <DictateButton
             onText={(text) =>

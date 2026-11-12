@@ -63,7 +63,11 @@ def python_command(sandbox: Sandbox, script_name: str) -> str | None:
     """
     from chimera.sandbox.docker import DockerSandbox
     from chimera.sandbox.local import LocalSandbox
+    from chimera.sandbox.wsl import WslSandbox
 
+    # The distro's own Python, resolved inside it: a path from the Windows side means nothing there.
+    if isinstance(sandbox, WslSandbox):
+        return f'exec "$(command -v python3 || command -v python || echo python3)" {shlex.quote(script_name)}'
     # A Docker sandbox with no daemon and no fallback refuses the command (plan M8), so it keeps the
     # container's command: a path from this machine would describe a run that cannot happen.
     if isinstance(sandbox, DockerSandbox) and (sandbox.available() or sandbox.fallback is None):
@@ -294,10 +298,13 @@ class ExecuteCodeTool(Tool):
         from chimera.sandbox import LocalSandbox
 
         code = str(kwargs["code"])
-        fenced = queue_refusal(self.name, code, self.workspace)
+        from chimera.sandbox.wsl import WslSandbox
+
+        in_wsl = isinstance(self._sandbox, WslSandbox)
+        fenced = queue_refusal(self.name, code, self.workspace, wsl=in_wsl)
         if fenced is not None:
             return fenced
-        fenced = audit_refusal(self.name, code, self.workspace)
+        fenced = audit_refusal(self.name, code, self.workspace, wsl=in_wsl)
         if fenced is not None:
             return fenced
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)

@@ -266,6 +266,14 @@ class CodeSessionPullRequestRef(BaseModel):
     url: str
 
 
+class CodeEnvironmentRecordOut(BaseModel):
+    """What a conversation keeps of its environment: which one, by id, with the name it had."""
+
+    id: str
+    name: str
+    kind: str
+
+
 class CodeWorktreeRemovalOut(BaseModel):
     """When an archived conversation's worktree is removed, and what the last look kept it for."""
 
@@ -320,6 +328,9 @@ class CodeSessionMetaOut(BaseModel):
     branch: str | None = None
     #: ``main`` checkout, linked ``worktree``, or ``plain`` folder outside git; None when unknown.
     checkout_kind: Literal["main", "worktree", "plain"] | None = None
+    #: Where its commands run, fixed by the first turn (`chimera/core/environments.py`); None is the
+    #: machine the app runs on, which is also what every conversation that chose nothing is.
+    environment: CodeEnvironmentRecordOut | None = None
     #: The conversation's file does not parse, nor its previous copy: listed so it does not vanish,
     #: titled from its id and date, and left on disk untouched (study 34, item 9).
     damaged: bool = False
@@ -559,6 +570,54 @@ class CodeProjectGrantIn(BaseModel):
 class CodeProjectModelIn(BaseModel):
     path: str
     model: str
+
+
+class CodeEnvironmentIn(BaseModel):
+    """A new saved environment: where a conversation's commands run (``chimera.core.environments``)."""
+
+    name: str = Field(min_length=1, max_length=80)
+    kind: str = Field(min_length=1, max_length=16)
+    #: The kind's own parameters (``wsl``: ``{"distro": "Ubuntu"}``). Checked by the kind.
+    params: dict[str, str] = Field(default_factory=dict)
+
+
+class CodeEnvironmentDefaultIn(BaseModel):
+    """A project's default environment for new conversations; ``environment`` empty clears it."""
+
+    project: str = Field(min_length=1, max_length=4096)
+    environment: str = Field(default="", max_length=64)
+
+
+class CodeEnvironmentOut(BaseModel):
+    id: str
+    name: str
+    kind: str
+    params: dict[str, str] = Field(default_factory=dict)
+    #: The built-in ``local`` entry: always there, never removable.
+    builtin: bool = False
+    #: This machine can run the kind (WSL: Windows only).
+    available: bool = True
+
+
+class CodeEnvironmentKindOut(BaseModel):
+    kind: str
+    available: bool
+
+
+class CodeEnvironmentsOut(BaseModel):
+    """The saved environments (``local`` first), the kinds that can be created and each project's default."""
+
+    environments: list[CodeEnvironmentOut]
+    kinds: list[CodeEnvironmentKindOut]
+    #: Resolved project folder -> environment id. Only projects that set one.
+    defaults: dict[str, str] = Field(default_factory=dict)
+    #: With ``?project=``: the id new conversations of that folder start in; "" when none is set.
+    project_default: str = ""
+
+
+class CodeWslDistrosOut(BaseModel):
+    supported: bool
+    distros: list[str]
 
 
 class ProjectPackAcceptIn(BaseModel):

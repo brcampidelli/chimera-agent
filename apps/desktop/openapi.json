@@ -4033,6 +4033,177 @@
         "title": "CodeBypassToggleOut",
         "type": "object"
       },
+      "CodeEnvironmentDefaultIn": {
+        "description": "A project's default environment for new conversations; ``environment`` empty clears it.",
+        "properties": {
+          "environment": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Environment",
+            "type": "string"
+          },
+          "project": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Project",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "title": "CodeEnvironmentDefaultIn",
+        "type": "object"
+      },
+      "CodeEnvironmentIn": {
+        "description": "A new saved environment: where a conversation's commands run (``chimera.core.environments``).",
+        "properties": {
+          "kind": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "CodeEnvironmentIn",
+        "type": "object"
+      },
+      "CodeEnvironmentKindOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "available"
+        ],
+        "title": "CodeEnvironmentKindOut",
+        "type": "object"
+      },
+      "CodeEnvironmentOut": {
+        "properties": {
+          "available": {
+            "default": true,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "builtin": {
+            "default": false,
+            "title": "Builtin",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "title": "CodeEnvironmentOut",
+        "type": "object"
+      },
+      "CodeEnvironmentRecordOut": {
+        "description": "What a conversation keeps of its environment: which one, by id, with the name it had.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "title": "CodeEnvironmentRecordOut",
+        "type": "object"
+      },
+      "CodeEnvironmentsOut": {
+        "description": "The saved environments (``local`` first), the kinds that can be created and each project's default.",
+        "properties": {
+          "defaults": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Defaults",
+            "type": "object"
+          },
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/CodeEnvironmentOut"
+            },
+            "title": "Environments",
+            "type": "array"
+          },
+          "kinds": {
+            "items": {
+              "$ref": "#/components/schemas/CodeEnvironmentKindOut"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "project_default": {
+            "default": "",
+            "title": "Project Default",
+            "type": "string"
+          }
+        },
+        "required": [
+          "environments",
+          "kinds"
+        ],
+        "title": "CodeEnvironmentsOut",
+        "type": "object"
+      },
       "CodeExchangeOut": {
         "description": "One question and everything the agent did answering it.\n\n``edits`` is always empty on a REPLAY: a diff was streamed live and never entered the message\nlist, so a resumed turn can show the tool call that wrote a file but not the coloured patch. The\nfield is here so a replayed exchange has the same shape as a live one, and the UI says which is\nwhich rather than letting the absence read as \"it changed nothing\".",
         "properties": {
@@ -4724,6 +4895,16 @@
             "title": "Damaged",
             "type": "boolean"
           },
+          "environment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeEnvironmentRecordOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -5364,6 +5545,19 @@
             ],
             "title": "Deny Tools"
           },
+          "environment": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
           "explorer": {
             "default": false,
             "title": "Explorer",
@@ -5790,6 +5984,27 @@
           "due_at"
         ],
         "title": "CodeWorktreeRemovalOut",
+        "type": "object"
+      },
+      "CodeWslDistrosOut": {
+        "properties": {
+          "distros": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Distros",
+            "type": "array"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "supported",
+          "distros"
+        ],
+        "title": "CodeWslDistrosOut",
         "type": "object"
       },
       "CompletionOut": {
@@ -21924,6 +22139,182 @@
           }
         },
         "summary": "Code Commands"
+      }
+    },
+    "/api/code/environments": {
+      "get": {
+        "description": "``local`` and the saved environments, the kinds this machine can create, the project defaults.\n\nWith ``project``, also ``project_default``: the environment id a new conversation there starts in.",
+        "operationId": "list_code_environments_api_code_environments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeEnvironmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Code Environments"
+      },
+      "post": {
+        "description": "Save an environment. The kind checks its own parameters; a bad one is a 400.",
+        "operationId": "save_code_environment_api_code_environments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeEnvironmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeEnvironmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Code Environment"
+      }
+    },
+    "/api/code/environments/default": {
+      "put": {
+        "description": "Set (or, with an empty ``environment``, clear) the environment new conversations of a project start in.",
+        "operationId": "set_code_environment_default_api_code_environments_default_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeEnvironmentDefaultIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeEnvironmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Code Environment Default"
+      }
+    },
+    "/api/code/environments/wsl-distros": {
+      "get": {
+        "description": "The WSL distros installed here, read from ``wsl.exe -l -q`` (empty off Windows or without WSL).",
+        "operationId": "list_wsl_distros_api_code_environments_wsl_distros_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeWslDistrosOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Wsl Distros"
+      }
+    },
+    "/api/code/environments/{env_id}": {
+      "delete": {
+        "description": "Forget an environment. A conversation that ran in it cannot run commands again (it is not moved).",
+        "operationId": "remove_code_environment_api_code_environments__env_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "env_id",
+            "required": true,
+            "schema": {
+              "title": "Env Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeEnvironmentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Code Environment"
       }
     },
     "/api/code/pack": {

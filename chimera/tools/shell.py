@@ -255,7 +255,14 @@ class RunShellTool(Tool):
         from chimera.core.jobs import JobLimitError
         from chimera.sandbox import LocalSandbox
         from chimera.sandbox.local import _child_env
+        from chimera.sandbox.wsl import WslSandbox
 
+        if isinstance(sandbox, WslSandbox):
+            return (
+                "error: background jobs are not available in the WSL environment: the process would "
+                "live in the distro, where this app cannot list or stop it. Run the command in the "
+                "foreground."
+            )
         if self._jobs is None:
             return (
                 "error: background jobs are not available here — this registry has no job store. "
@@ -358,10 +365,13 @@ class RunShellTool(Tool):
         # container may still mount the data folder, and a command that answers a question must not
         # become a question the person is asked about instead. The audit log is held by the same
         # two fences: a command that rewrites the record must not run either.
-        fenced = queue_refusal(self.name, command, cwd)
+        from chimera.sandbox.wsl import WslSandbox
+
+        in_wsl = isinstance(self._sandbox, WslSandbox)
+        fenced = queue_refusal(self.name, command, cwd, wsl=in_wsl)
         if fenced is not None:
             return fenced
-        fenced = audit_refusal(self.name, command, cwd)
+        fenced = audit_refusal(self.name, command, cwd, wsl=in_wsl)
         if fenced is not None:
             return fenced
         sandbox = self._sandbox or LocalSandbox()
@@ -401,9 +411,16 @@ class RunShellTool(Tool):
             # The prompt shows what the command resolves to here (S30-30), as the governance cards
             # do; the callback itself still gets exactly the command, which is what it classifies.
             from chimera.governance.exec_facts import describe, offered_with
+            from chimera.sandbox.wsl import WslSandbox
 
             try:
-                lines = describe(command, cwd, self.workspace)
+                # Programs and git hooks resolve inside the distro there, which this machine cannot
+                # see: naming the Windows `PATH`'s answer would describe a run that does not happen.
+                lines = (
+                    ["runs in the WSL environment: its programs and git hooks resolve in the distro, not here"]
+                    if isinstance(sandbox, WslSandbox)
+                    else describe(command, cwd, self.workspace)
+                )
             except Exception:  # noqa: BLE001 — a prompt without the note is the prompt it was
                 lines = []
             with offered_with(command, lines):

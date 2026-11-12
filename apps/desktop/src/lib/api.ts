@@ -1708,6 +1708,9 @@ export const cancelLifecycle = (id: string) =>
 
 export interface CodeTurnInput {
   message: string;
+  /** Where the commands run: a saved environment's id or `"local"`. Sent on the conversation's FIRST
+   *  turn only, from the owner's own screen; the server fixes it there and refuses a change. */
+  environment?: string;
   /** "Do it here": a card proposed in THIS conversation. The server sends the card's own prompt and
    *  applies the card's taint it recorded; `message` is ignored and nothing about taint is sent. */
   task_card_id?: string;
@@ -2632,6 +2635,8 @@ export interface CodeSessionMeta {
   branch?: string | null;
   /** Main checkout, linked worktree, or a plain folder outside git; null when unknown. */
   checkout_kind?: "main" | "worktree" | "plain" | null;
+  /** Where its commands run, fixed by the first turn. Absent = the machine the app runs on. */
+  environment?: ConversationEnvironment | null;
 }
 
 export type CodeSessionState = "blocked" | "review" | "done" | "running" | "failed" | "idle";
@@ -3038,6 +3043,56 @@ export const pruneProjectWorktrees = (project: string, paths: string[], dryRun =
   json<ProjectWorktreePrune>("/api/code/projects/worktrees/prune", {
     method: "POST",
     body: JSON.stringify({ project, paths, dry_run: dryRun }),
+  });
+
+/** What a conversation keeps of its environment: which one, by id, and the name it had. */
+export interface ConversationEnvironment {
+  id: string;
+  name: string;
+  kind: string;
+}
+
+/** A place a conversation's commands can run. `local` is built in; WSL is saved by the owner. */
+export interface CodeEnvironment extends ConversationEnvironment {
+  params: Record<string, string>;
+  builtin: boolean;
+  /** This machine can run the kind (WSL: Windows only). */
+  available: boolean;
+}
+
+export interface CodeEnvironments {
+  environments: CodeEnvironment[];
+  /** The kinds that can be created here, with whether this machine can run each. */
+  kinds: { kind: string; available: boolean }[];
+  /** Resolved project folder -> the environment id new conversations of it start in. */
+  defaults: Record<string, string>;
+  /** With a `project`: the id its new conversations start in; "" when none is set. */
+  project_default?: string;
+}
+
+// The owner's, and the screen header rides on the changes: the server refuses the bridge and a
+// paired device the whole set (`bridge_routes.OWNER_DECISION_ROUTES`).
+export const listCodeEnvironments = (project?: string) =>
+  json<CodeEnvironments>(`/api/code/environments${project ? `?project=${encodeURIComponent(project)}` : ""}`);
+export const listWslDistros = () =>
+  json<{ supported: boolean; distros: string[] }>("/api/code/environments/wsl-distros");
+export const saveCodeEnvironment = (body: { name: string; kind: string; params: Record<string, string> }) =>
+  json<CodeEnvironments>("/api/code/environments", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify(body),
+  });
+export const removeCodeEnvironment = (id: string) =>
+  json<CodeEnvironments>(`/api/code/environments/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: screenJsonHeaders(),
+  });
+/** Set a project's default environment; an empty `environment` clears it. */
+export const setCodeEnvironmentDefault = (project: string, environment: string) =>
+  json<CodeEnvironments>("/api/code/environments/default", {
+    method: "PUT",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify({ project, environment }),
   });
 
 /** One registered project: where it is, what you call it, and what you decided about it. */

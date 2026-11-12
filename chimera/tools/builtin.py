@@ -21,6 +21,7 @@ from chimera.tools.shell import RunShellTool
 from chimera.tools.write_region import WriteRegion
 
 if TYPE_CHECKING:
+    from chimera.sandbox.base import Sandbox
     from chimera.sandbox.confirm import HostExecConfirm
 
 
@@ -156,8 +157,13 @@ def default_registry(
     write_region: WriteRegion | None = None,
     host_exec_confirm: HostExecConfirm | None | _Unset = _UNSET,
     extra_turn_ports: Callable[[], frozenset[int]] | None = None,
+    sandbox: Sandbox | None = None,
 ) -> ToolRegistry:
     """Build a registry pre-populated with the built-in native tools.
+
+    ``sandbox`` is where ``run_shell`` and ``execute_code`` run, for a caller that chose one (a Code
+    conversation's environment, :mod:`chimera.core.environments`). Left unset it is
+    :func:`~chimera.sandbox.get_sandbox` — the install's configured sandbox, as it always was.
 
     ``extra_turn_ports`` adds to the loopback ports the browser may reach as THIS turn's own: the dev
     servers the turn started or asked for by name (`chimera.core.dev_servers.DevServerTurn`). The
@@ -231,7 +237,8 @@ def default_registry(
     # and `job_status` carries the shell tool's own output marker: it returns the shell's output.
     jobs = jobs_for(settings.home)
     jobs.configure_from_settings(settings.jobs_max_running, settings.jobs_max_runtime)
-    shell = RunShellTool(workspace, get_sandbox(), confirm=confirm, jobs=jobs)
+    box = sandbox if sandbox is not None else get_sandbox()
+    shell = RunShellTool(workspace, box, confirm=confirm, jobs=jobs)
     turn_root = Path(workspace or Path.cwd()).resolve()
 
     def turn_ports() -> frozenset[int]:
@@ -272,7 +279,7 @@ def default_registry(
     from chimera.tools.research import ArxivSearchTool, YouTubeTranscriptTool
 
     registry.register(CodeInterpreterTool(confirm=confirm))
-    registry.register(ExecuteCodeTool(workspace, get_sandbox(), confirm=confirm))
+    registry.register(ExecuteCodeTool(workspace, box, confirm=confirm))
     registry.register(ReadDocumentTool(workspace))
     registry.register(ArxivSearchTool())
     registry.register(YouTubeTranscriptTool())
