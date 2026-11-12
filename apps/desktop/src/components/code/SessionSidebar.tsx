@@ -62,6 +62,22 @@ const ARCHIVE_REASON_LABELS = {
   worktree_pruned: "code.sessions.archiveReason.worktree_pruned",
 } as const;
 
+/**
+ * What an archived row says about its worktree's removal, mapped to a literal key per refusal the
+ * sweep can record (`chimera/core/worktree_expiry.py`). Any other code reads as "could not be removed".
+ */
+const WORKTREE_KEPT_LABELS = {
+  dirty: "code.sessions.worktreeKeptDirty",
+  unpushed: "code.sessions.worktreeKeptUnpushed",
+  no_upstream: "code.sessions.worktreeKeptUnpushed",
+  ignored_files: "code.sessions.worktreeKeptIgnored",
+} as const;
+
+/** Whole days until the worktree goes, never less than one. */
+function removalDays(dueAt: number): number {
+  return Math.max(1, Math.ceil((dueAt * 1000 - Date.now()) / 86_400_000));
+}
+
 /** The conversations in the order the sidebar lists them, top to bottom — what Ctrl+Tab walks. Built
  *  from the same grouping the list draws with (`sidebar-groups.ts`), and reading the grouping switch
  *  at the moment of the keypress, so flipping it changes the walk with the list. */
@@ -238,6 +254,11 @@ export function SessionSidebar({
     mutationFn: ({ id, back }: { id: string; back: boolean }) =>
       back ? unarchiveCodeSession(id) : archiveCodeSession(id),
     onMutate: () => setArchiveNote(""),
+    // Bringing a conversation back does not bring back a folder the cleanup already removed.
+    onSuccess: (result) => {
+      if (result && "worktree_removed" in result && result.worktree_removed)
+        setArchiveNote(t("code.sessions.worktreeGone"));
+    },
     // A 409 is the server refusing to hide work in progress or a question waiting; the row stays,
     // and says why rather than appearing to ignore the click.
     onError: (error) => {
@@ -690,6 +711,19 @@ export function SessionSidebar({
                 ? ARCHIVE_REASON_LABELS[stored as keyof typeof ARCHIVE_REASON_LABELS]
                 : undefined;
               const reason = labelKey ? t(labelKey) : "";
+              const removal = session.worktree_removal ?? null;
+              const keptKey = removal?.kept
+                ? Object.prototype.hasOwnProperty.call(WORKTREE_KEPT_LABELS, removal.kept)
+                  ? WORKTREE_KEPT_LABELS[removal.kept as keyof typeof WORKTREE_KEPT_LABELS]
+                  : "code.sessions.worktreeKeptOther"
+                : undefined;
+              const removalLine = !removal
+                ? ""
+                : keptKey
+                  ? t(keptKey)
+                  : removalDays(removal.due_at) === 1
+                    ? t("code.sessions.worktreeRemovalDueOne")
+                    : t("code.sessions.worktreeRemovalDue", { days: removalDays(removal.due_at) });
               return (
                 <div key={session.id} className="group/session flex items-center">
                   <button
@@ -706,6 +740,9 @@ export function SessionSidebar({
                     {name}
                     {reason ? (
                       <span className="block truncate text-xs text-muted-foreground/80">{reason}</span>
+                    ) : null}
+                    {removalLine ? (
+                      <span className="block truncate text-xs text-muted-foreground/80">{removalLine}</span>
                     ) : null}
                   </button>
                   <button

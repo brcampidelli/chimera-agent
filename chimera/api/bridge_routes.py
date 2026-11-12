@@ -879,6 +879,10 @@ REACH_SETTINGS = frozenset(
         # branch. Owner-only and separate from the switch above, so opening a pull request never
         # implies merging one.
         "CHIMERA_CLOSE_LOOP_MERGE",
+        # Removes an archived conversation's worktree folder from disk after thirty days
+        # (`chimera/core/worktree_expiry.py`). Switching it on makes the app delete folders, so it is
+        # the owner's screen alone: a client that could turn it on would choose when work is erased.
+        "CHIMERA_WORKTREE_CLEANUP",
         # The first segment of every branch a run makes (`<prefix>/attempt-…`, study 29, P8.2). It
         # is also what the worktree cleanup force-deletes (`git branch -D <prefix>/attempt-*`,
         # remembered across changes in `worktree-prefixes.txt`), and the name a pull request's

@@ -1,5 +1,5 @@
 ---
-source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
+source_sha256: 278a01e5a149ebc25fc893fdd255f56769e2701bc0134bf7b6e8c0b87bf07e57
 ---
 
 # Segurança & salvaguardas
@@ -305,6 +305,7 @@ A ponte do desktop (`chimera mcp desktop`) tem três chaves, cada uma sem efeito
   usuário ou a pasta de dados é recusada como referência. Só superfícies atendidas as recebem —
   `chat`, `assist`, `tui`, um `solve` atendido, o turno Code do desktop (nunca o de um convidado) —,
   então bots, cron e `scenarios` não têm nenhuma.
+- **`.worktreeinclude` e a limpeza de worktrees arquivados.** O `.worktreeinclude` de um repositório (ou `.chimera/worktreeinclude`) nomeia arquivos ignorados — `.env`, um banco local — para copiar no worktree de cada nova conversa. Além do que a base do repositório já traz, é a única coisa que um novo worktree herda, e é texto do próprio repositório, então nada é copiado até a tela do dono concordar: uma vez por projeto, e de novo sempre que o arquivo mudar. A tela mostra o que seria copiado; um cliente da ponte ou um dispositivo pareado só consegue fazer o pedido aparecer. Um link simbólico ou junction nunca é seguido, a cópia é limitada a 50 MB e 200 arquivos, e cada cópia é conferida com o git dentro do worktree: um arquivo que o git ali não ignoraria é apagado de novo, então `git add -A` não consegue incluí-lo. `CHIMERA_WORKTREE_CLEANUP` remove o worktree de uma conversa arquivada cerca de trinta dias depois, contados a partir do mais tardio entre o arquivamento, a última abertura e o dia em que o interruptor foi visto ligado pela primeira vez. Ligá-lo apaga pastas, então é só da tela do dono, nunca da ponte. Sem ninguém olhando, ele mantém todo worktree que o diálogo de limpeza do dono manteria (alterações não commitadas, commits não enviados, um que o Chimera não criou) e também qualquer worktree com um arquivo ignorado que o `.worktreeinclude` não copiou, pois o `git status` não os lista.
 - **Agentes em Markdown.** `.chimera/agents/*.md` num repositório é texto de outra pessoa, então só
   pode restringir: suas ferramentas são intersectadas com as ferramentas governadas da sessão, seus
   passos são limitados pelos da sessão, chaves desconhecidas são recusadas, seu `model` é ignorado, e

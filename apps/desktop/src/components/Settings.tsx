@@ -74,6 +74,7 @@ import type {
   SandboxState,
 } from "@/lib/types";
 import { Card, PinnedContext, Row, RowLabelContext, Toggle } from "@/components/settings/rows";
+import { WorktreeIncludeConsent } from "@/components/settings/WorktreeIncludeConsent";
 import { ResponseStyleNote } from "@/components/ResponseStyleNote";
 import { SettingsSearchResults, type SearchTarget } from "@/components/settings/SettingsSearch";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
@@ -355,6 +356,23 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_ARCHIVE_ON_PR_MERGE: String(v) })}
         />
       </Row>
+      {/* An archived conversation's clean, pushed worktree goes about thirty days later (`chimera/core/
+          worktree_expiry.py`). The removal cannot be undone, so the switch says so and the sweep keeps
+          anything dirty or unpushed; the archived row shows the date and why a worktree was kept. */}
+      <Row
+        label={t("settings.row.worktreeCleanup")}
+        hint={t("settings.hint.worktreeCleanup")}
+        env="CHIMERA_WORKTREE_CLEANUP"
+      >
+        <Toggle
+          id="settings-worktree-cleanup"
+          on={c.autonomy.worktree_cleanup ?? true}
+          onChange={(v) => save({ CHIMERA_WORKTREE_CLEANUP: String(v) })}
+        />
+      </Row>
+      {/* The files a new conversation worktree copies from the project (`.worktreeinclude`): asked
+          first, and again when the file changes, because the file comes from the repository. */}
+      <WorktreeIncludeConsent />
       {/* The merge is its own switch, off, and owner-only like the one above. A merge puts the change on
           the default branch, so opening a pull request never implies merging one. Billing, a destructive
           migration, row-level security and a secret are never merged, whatever this says. */}

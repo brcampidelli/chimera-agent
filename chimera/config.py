@@ -1321,6 +1321,14 @@ class Settings(BaseSettings):
     # the conversation out of the list, deletes nothing, and the owner switches it off to keep them
     # listed. Read on every sweep, so a change applies at once. Nothing here merges or pushes.
     archive_on_pr_merge: bool = Field(default=True, validation_alias="CHIMERA_ARCHIVE_ON_PR_MERGE")
+    # Remove an archived conversation's worktree about thirty days after it was archived or last
+    # opened, whichever is later, when it is clean and pushed (`chimera/core/worktree_expiry.py`).
+    # ON by default (owner's decision): removal itself is not reversible, but it only happens to a
+    # worktree with a clean tree, everything pushed and no ignored file `.worktreeinclude` did not copy,
+    # so what goes is recoverable from the remote branch. The sweep never forces, never runs
+    # `git branch -D`, leaves the branch of a worktree with no upstream, keeps a folder another live
+    # conversation uses, and the archived row says when it goes. Read on every sweep, so no APPLIES_WHEN entry.
+    worktree_cleanup: bool = Field(default=True, validation_alias="CHIMERA_WORKTREE_CLEANUP")
 
     # Whether a conversation can be shared with a second person at all (`chimera/api/sharing.py`).
     # ON by default because that is what the app did before the switch existed: a share link is made

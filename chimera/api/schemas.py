@@ -266,6 +266,13 @@ class CodeSessionPullRequestRef(BaseModel):
     url: str
 
 
+class CodeWorktreeRemovalOut(BaseModel):
+    """When an archived conversation's worktree is removed, and what the last look kept it for."""
+
+    due_at: float
+    kept: str = ""
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 
@@ -297,6 +304,10 @@ class CodeSessionMetaOut(BaseModel):
     #: Why it was archived: ``owner``, ``inactive``, ``pr_merged``, ``pr_closed`` or ``worktree_pruned``. "" in the list.
     #: Shown on the archived row, so bringing a conversation back is a choice made knowing why it left.
     archive_reason: str = ""
+    #: The archived conversation's worktree removal: when it goes (``due_at``, epoch seconds) and why the
+    #: last look kept it (``kept``, a refusal code, "" when nothing kept it yet). None when there is
+    #: nothing to say (`chimera/core/worktree_expiry.py`).
+    worktree_removal: CodeWorktreeRemovalOut | None = None
     #: The repository ``workspace`` is a checkout of: the main working tree's path, the same for
     #: the main checkout and every linked worktree of it, or the folder itself when it is not in a
     #: git repository (`chimera/core/checkout.py`). Stamped at each turn, so a removed worktree
@@ -330,6 +341,33 @@ class CodeSessionArchiveOut(BaseModel):
 
     id: str
     archived_at: float | None = None
+    #: True when the thirty-day cleanup already removed this conversation's worktree folder
+    #: (`chimera/core/worktree_expiry.py`): bringing it back does not bring the folder back, and the
+    #: screen says so. The transcript is untouched.
+    worktree_removed: bool = False
+
+
+class WorktreeIncludePendingOut(BaseModel):
+    """A project whose `.worktreeinclude` a new conversation worktree wanted to use and could not,
+    because the owner has not agreed to this version of it. ``files`` are the first names it would copy,
+    ``more`` how many are not listed."""
+
+    project: str
+    digest: str
+    files: list[str] = []
+    more: int = 0
+    bytes: int = 0
+
+
+class WorktreeIncludePendingListOut(BaseModel):
+    pending: list[WorktreeIncludePendingOut] = []
+
+
+class WorktreeIncludeConsentIn(BaseModel):
+    """The owner's answer, naming the version of the file it was shown (``digest``)."""
+
+    project: str
+    digest: str
 
 
 class CodeSessionPullRequestOut(BaseModel):
@@ -984,6 +1022,9 @@ class AutonomyCfgOut(BaseModel):
     """``CHIMERA_ARCHIVE_ON_PR_MERGE``: whether a conversation whose pull request is merged or closed
     leaves the list. On by default, the owner's decision; archiving touches nothing. A server without
     the field is on, the same default the settings carry."""
+    worktree_cleanup: bool = True
+    """``CHIMERA_WORKTREE_CLEANUP``: whether an archived conversation's clean, pushed worktree is removed
+    thirty days after archiving or last opening. On by default; a server without the field is on."""
     hooks: bool = False
     """``CHIMERA_HOOKS``: whether the owner's lifecycle hooks (``<home>/chimera-hooks.json``) run
     around tool calls. Off by default; on, a hook can only deny, ask or annotate

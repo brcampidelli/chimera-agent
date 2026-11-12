@@ -129,6 +129,10 @@ def merge_pull_requests(
     return out
 
 
+#: How often `opened` writes: the removal clock is in days, so an hour is as fine as it needs.
+OPENED_RESOLUTION_SECONDS = 3600.0
+
+
 @dataclass
 class ConversationMark:
     """One conversation's facts. The defaults are what a conversation with no entry has."""
@@ -176,6 +180,16 @@ class ConversationMark:
     stamped_title: str = ""
     #: Where :attr:`stamped_title` came from: ``caller`` or ``heading`` ("" when there is none).
     stamped_title_source: str = ""
+    #: The last time the person's screen drew this conversation, to the hour (`opened`). With the
+    #: archive time it sets when the conversation's worktree may be removed (`worktree_expiry.py`).
+    opened_at: float | None = None
+    #: Why the last removal sweep kept this conversation's worktree ("" when it removed it, or never
+    #: looked): a refusal code from `worktree_prune`. Shown on the archived row, so it says what to do.
+    worktree_kept: str = ""
+    #: When the sweep last looked at this worktree; a kept one is looked at again once a day.
+    worktree_checked_at: float | None = None
+    #: When the sweep removed this conversation's worktree. Set once; nothing to show after it.
+    worktree_removed_at: float | None = None
 
     @property
     def pull_request(self) -> dict[str, Any] | None:
@@ -293,6 +307,43 @@ class CodeSessionMarks:
 
         self._update(session_id, change)
         return True
+
+    def holds(self, session_id: str, predicate: Callable[[ConversationMark], bool]) -> bool:
+        """Whether ``predicate`` is true of this conversation's record AS IT IS, read under the same
+        lock the writers take: a check that must not be answered from an older snapshot."""
+        with self._lock:
+            return bool(predicate(self._mark(self._read().get(session_id))))
+
+    def opened(self, session_id: str, *, at: float) -> None:
+        """The person's screen drew this conversation. Written at most once an hour: the removal
+        clock runs in days, so an hour of precision costs nothing and a screen that reports every
+        draw does not write the file on every one."""
+        current = self.get(session_id).opened_at
+        if current is not None and at - current < OPENED_RESOLUTION_SECONDS:
+            return
+
+        def change(mark: ConversationMark) -> None:
+            mark.opened_at = at
+
+        self._update(session_id, change)
+
+    def worktree_verdict(
+        self,
+        session_id: str,
+        *,
+        at: float,
+        kept: str = "",
+        removed: bool = False,
+    ) -> ConversationMark:
+        """Record what the removal sweep found for this conversation's worktree."""
+
+        def change(mark: ConversationMark) -> None:
+            mark.worktree_checked_at = at
+            mark.worktree_kept = kept
+            if removed:
+                mark.worktree_removed_at = at
+
+        return self._update(session_id, change)
 
     def pull_request_opened(
         self,

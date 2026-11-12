@@ -1,5 +1,5 @@
 ---
-source_sha256: 4919800bff05a949e28683bd0cd94a23e5e489d6257ec4a3173ee7f7f1b926ec
+source_sha256: 278a01e5a149ebc25fc893fdd255f56769e2701bc0134bf7b6e8c0b87bf07e57
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -337,6 +337,7 @@ Die Desktop-Brücke (`chimera mcp desktop`) hat drei Schalter, jeder ohne den vo
   Benutzers oder der Datenordner wird als Referenz abgelehnt. Nur betreute Oberflächen erhalten sie —
   `chat`, `assist`, `tui`, ein betreutes `solve`, der Code-Turn des Desktops (nie der eines Gasts) —,
   Bots, Cron und `scenarios` haben also keine.
+- **`.worktreeinclude` und die Bereinigung archivierter Worktrees.** Die `.worktreeinclude` eines Repositorys (oder `.chimera/worktreeinclude`) nennt ignorierte Dateien — `.env`, eine lokale Datenbank —, die in den Worktree jeder neuen Unterhaltung kopiert werden. Über das hinaus, was die Basis des Repositorys schon enthält, ist das das Einzige, was ein neuer Worktree erbt, und es ist der Text des Repositorys selbst; deshalb wird nichts kopiert, bevor der Bildschirm des Eigentümers zustimmt: einmal pro Projekt und erneut bei jeder Änderung der Datei. Der Bildschirm zeigt, was kopiert würde; ein Bridge-Client oder ein gekoppeltes Gerät kann die Anfrage nur erscheinen lassen. Ein symbolischer Link oder eine Junction wird nie verfolgt, die Kopie ist auf 50 MB und 200 Dateien begrenzt, und jede Kopie wird mit git im Worktree geprüft: Eine Datei, die git dort nicht ignorieren würde, wird wieder gelöscht, sodass `git add -A` sie nicht aufnehmen kann. `CHIMERA_WORKTREE_CLEANUP` entfernt den Worktree einer archivierten Unterhaltung etwa dreißig Tage später, gerechnet ab dem spätesten von Archivierung, letzter Öffnung und dem Tag, an dem der Schalter zum ersten Mal eingeschaltet gesehen wurde. Das Einschalten löscht Ordner und ist deshalb allein Sache des Bildschirms des Eigentümers, nie der Bridge. Unbeaufsichtigt behält er jeden Worktree, den auch der Bereinigungsdialog des Eigentümers behalten würde (nicht committete Änderungen, nicht gepushte Commits, einen, den Chimera nicht erstellt hat), und zusätzlich jeden Worktree mit einer ignorierten Datei, die `.worktreeinclude` nicht kopiert hat, da `git status` sie nicht auflistet.
 - **Agenten in Markdown.** `.chimera/agents/*.md` in einem Repository ist der Text eines anderen, kann
   also nur einschränken: seine Werkzeuge werden mit den governten Werkzeugen der Sitzung geschnitten,
   seine Schritte durch die der Sitzung begrenzt, unbekannte Schlüssel verweigert, sein `model`
