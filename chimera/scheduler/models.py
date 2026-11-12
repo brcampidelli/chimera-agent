@@ -29,6 +29,17 @@ CreatedBy = Literal["human", "agent"]
 Notify = Literal["always", "on_change", "failures_only"]
 """When a job's answer is posted to its destination. See :attr:`CronJob.notify`."""
 
+CatchUp = Literal["once", "skip"]
+"""What a job does when its time passed while nothing was running. See :attr:`CronJob.catch_up`."""
+
+#: The permission modes a scheduled job may be given: the Code screen's, WITHOUT ``bypass``.
+#:
+#: Kept here as a literal tuple, and not imported from ``chimera.api.posture``, so the data model
+#: stays importable without the API package; ``tests/test_scheduled_permission_mode.py`` holds the
+#: two equal. ``bypass`` is not a mode a job can name, ever: nobody is watching a scheduled run, so
+#: "ignore permissions" there would be the one switch that has no one to catch its mistake.
+JOB_PERMISSION_MODES: tuple[str, ...] = ("manual", "accept_edits", "plan", "auto", "dont_ask")
+
 DispatchStatus = Literal["ok", "error", "timeout", "budget", "rejected", "cancelled"]
 """How a dispatch ended.
 
@@ -226,4 +237,31 @@ class CronJob(BaseModel):
     """Set by the result sink when THIS run's answer reached :attr:`deliver_to`. Not persisted: it
     describes one dispatch, read by the failure notifier in the same tick and cleared there. It is
     how the notice knows the channel already saw the job run again and need not be told twice."""
+    catch_up: CatchUp = "once"
+    """What happens when the job's time passed while the app or the service was off.
+
+    * ``once`` (the default, and every job written before this field): the job runs ONE time when
+      the scheduler is back, if the latest missed time is no more than seven days old. However many
+      times were missed, it never runs more than once — a daily job off for a weekend is one run
+      on Monday, not three.
+    * ``skip``: the missed times are recorded in the history and nothing is run; the schedule
+      resumes at its next time.
+
+    A missed time older than seven days is skipped under either value (``missed_too_old``): work
+    that was due last month is not what the owner wants to find running on a Tuesday."""
+    permission_mode: str = ""
+    """The permission mode this job runs under, or ``""`` (none chosen: the job runs as it always
+    did). One of :data:`JOB_PERMISSION_MODES`.
+
+    Nobody watches a scheduled run, so the mode is a CEILING and never more than the install's own
+    posture: the owner's screen refuses a mode wider than the global one, and the run narrows to
+    the global posture again if Settings were tightened after the job was written. A mode that
+    would ask a person (``manual``, ``accept_edits``) refuses the action instead — nobody can
+    answer, and the run never approves for itself. Only the owner's screen sets it
+    (``bridge_routes.OWNER_DECISION_ROUTES``)."""
+    worktree: bool = False
+    """Run in a new git worktree of the job's folder instead of in the folder itself.
+
+    Removed when the run ended with nothing changed and nothing committed; kept, with its path in
+    the history, when it left work behind. ``False`` is what every job did before this field."""
     metadata: dict[str, Any] = Field(default_factory=dict)

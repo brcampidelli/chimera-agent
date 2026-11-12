@@ -2229,6 +2229,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cron/{job_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cron History
+         * @description One task's history, newest first: every scheduled time that ran or did not, and why.
+         *
+         *     `/api/cron/results` holds the answers, so a time that produced none (the app was closed,
+         *     the task was off, the day's money was spent) was invisible there. This is the record of
+         *     those, read from the tail of `cron_history.jsonl`. A task that does not exist is a 404; one
+         *     that exists and has no history yet is an empty list.
+         */
+        get: operations["cron_history_api_cron__job_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cron/{job_id}/permission-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Cron Permission Mode
+         * @description The owner's choice of the mode a task runs under (`cron.permission_mode`).
+         *
+         *     The owner's decision and the screen's alone: the route id is in
+         *     `bridge_routes.OWNER_DECISION_ROUTES` and `FULL_CONTROL_NEVER`, so no bridge tier reaches
+         *     it. Refused, with the reason, when the mode is wider than Settings on any axis. Switching to
+         *     a narrower mode, or clearing it, always works.
+         */
+        put: operations["set_cron_permission_mode_api_cron__job_id__permission_mode_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/decide": {
         parameters: {
             query?: never;
@@ -9723,6 +9773,12 @@ export interface components {
         CronCreateIn: {
             /** Action */
             action: string;
+            /**
+             * Catch Up
+             * @default once
+             * @enum {string}
+             */
+            catch_up: "once" | "skip";
             /** Deliver To */
             deliver_to?: string | null;
             /**
@@ -9738,6 +9794,12 @@ export interface components {
              * @enum {string}
              */
             notify: "always" | "on_change" | "failures_only";
+            /**
+             * Permission Mode
+             * @default
+             * @enum {string}
+             */
+            permission_mode: "" | "manual" | "accept_edits" | "plan" | "auto" | "dont_ask";
             /** Schedule */
             schedule: string;
             /** Tools */
@@ -9749,6 +9811,11 @@ export interface components {
             verify: string;
             /** Workspace */
             workspace?: string | null;
+            /**
+             * Worktree
+             * @default false
+             */
+            worktree: boolean;
         };
         /**
          * CronDaemonWatchOut
@@ -9784,10 +9851,52 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * CronHistoryRowOut
+         * @description One line of a task's history: a scheduled time that ran or did not, and why.
+         */
+        CronHistoryRowOut: {
+            /** At */
+            at: number;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /** Job Id */
+            job_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "ran" | "skipped" | "note";
+            /** Reason */
+            reason: string;
+            /** Scheduled For */
+            scheduled_for?: number | null;
+            /**
+             * Status
+             * @default
+             */
+            status: string;
+            /**
+             * Worktree
+             * @default
+             */
+            worktree: string;
+        };
         /** CronJobOut */
         CronJobOut: {
             /** Action */
             action: string;
+            /**
+             * Catch Up
+             * @default once
+             * @enum {string}
+             */
+            catch_up: "once" | "skip";
             /**
              * Consecutive Failures
              * @default 0
@@ -9829,6 +9938,11 @@ export interface components {
              * @enum {string}
              */
             notify: "always" | "on_change" | "failures_only";
+            /**
+             * Permission Mode
+             * @default
+             */
+            permission_mode: string;
             /** Schedule */
             schedule: string;
             /** Schedule Description */
@@ -9854,6 +9968,11 @@ export interface components {
              * @default false
              */
             workspace_unverifiable: boolean;
+            /**
+             * Worktree
+             * @default false
+             */
+            worktree: boolean;
         };
         /** CronLateOut */
         CronLateOut: {
@@ -9867,6 +9986,18 @@ export interface components {
             name: string;
             /** Schedule */
             schedule: string;
+        };
+        /**
+         * CronPermissionModeIn
+         * @description The owner's choice of a task's permission mode. Empty clears it.
+         */
+        CronPermissionModeIn: {
+            /**
+             * Permission Mode
+             * @default
+             * @enum {string}
+             */
+            permission_mode: "" | "manual" | "accept_edits" | "plan" | "auto" | "dont_ask";
         };
         /**
          * CronResultOut
@@ -19811,6 +19942,74 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CronJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cron_history_api_cron__job_id__history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CronHistoryRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_cron_permission_mode_api_cron__job_id__permission_mode_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CronPermissionModeIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
