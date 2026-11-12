@@ -1,6 +1,7 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { ChevronRight, Ellipsis, GitFork, Plus } from "lucide-react";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
 import type { SidebarGroup } from "@/lib/sidebar-groups";
@@ -40,6 +41,7 @@ export function ProjectHeader({
   bypassOn = false,
   onToggleBypass,
   extraActions = [],
+  select,
 }: {
   group: SidebarGroup;
   /** The project the screen has open: never folded, and drawn in the accent. */
@@ -55,6 +57,8 @@ export function ProjectHeader({
   bypassOn?: boolean;
   onToggleBypass?: () => void;
   extraActions?: readonly ExtraProjectAction[];
+  /** Selection mode: a box that ticks the section's conversations (or, for an empty one, the folder). */
+  select?: { checked: boolean | "mixed"; onChange: (on: boolean) => void };
 }) {
   const t = useT();
   const name = group.key ? group.label : t("code.sessions.defaultProject");
@@ -67,6 +71,11 @@ export function ProjectHeader({
   );
   return (
     <div className="group/project flex items-center">
+      {select ? (
+        <span className="flex shrink-0 items-center pl-3">
+          <Checkbox checked={select.checked} onChange={select.onChange} label={t("bulk.pickAll", { name })} />
+        </span>
+      ) : null}
       <button
         type="button"
         aria-expanded={!collapsed}

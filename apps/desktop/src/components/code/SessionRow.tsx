@@ -1,6 +1,7 @@
 import { useId, useMemo, type ReactNode } from "react";
 import { Archive, Braces, Check, CopyPlus, GitBranch, GitPullRequest, Trash2 } from "lucide-react";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { focusRing } from "@/components/ui/focus";
 import type { CodeSessionMeta, CodeSessionState } from "@/lib/api";
 import { useI18n, useT } from "@/lib/i18n";
@@ -76,6 +77,7 @@ export function SessionRow({
   actions,
   extra,
   onRename,
+  select,
 }: {
   session: CodeSessionMeta;
   state: CodeSessionState;
@@ -84,6 +86,9 @@ export function SessionRow({
   extra?: ReactNode;
   /** F2 on the focused row names it, as it renames the selected item in a file list. */
   onRename?: () => void;
+  /** Selection mode: a box before the title, the title ticks it instead of opening the conversation,
+   *  and the row's own actions step aside so one click cannot mean two things. */
+  select?: { checked: boolean; onChange: (on: boolean) => void };
 }) {
   const t = useT();
   const ago = useAgo();
@@ -96,9 +101,18 @@ export function SessionRow({
   const hasMeta = Boolean(branch || when);
   return (
     <div className="group/session flex items-start">
+      {select ? (
+        <span className="flex shrink-0 items-center py-1.5 pl-3">
+          <Checkbox
+            checked={select.checked}
+            onChange={select.onChange}
+            label={t("bulk.pick", { name })}
+          />
+        </span>
+      ) : null}
       <button
         type="button"
-        onClick={() => actions.onResume(session)}
+        onClick={() => (select ? select.onChange(!select.checked) : actions.onResume(session))}
         // Found by `focusSessionRow` to give the focus back once the inline rename closes.
         data-session-row={session.id}
         onKeyDown={(e) => {
@@ -114,7 +128,8 @@ export function SessionRow({
         aria-describedby={hasMeta ? metaId : undefined}
         aria-current={active ? "true" : undefined}
         className={cn(
-          "flex min-w-0 flex-1 flex-col px-3 py-1 pl-6 text-left transition-colors duration-1 ease-out",
+          "flex min-w-0 flex-1 flex-col px-3 py-1 text-left transition-colors duration-1 ease-out",
+          select ? "pl-2" : "pl-6",
           focusRing,
           active ? "bg-accent/15 text-accent-ink" : "text-foreground/80 hover:text-foreground",
         )}
@@ -163,7 +178,9 @@ export function SessionRow({
           <span aria-hidden>{pullRequestCount}</span>
         </a>
       ) : null}
-      <RowActions session={session} state={state} name={name} actions={actions} extra={extra} />
+      {select ? null : (
+        <RowActions session={session} state={state} name={name} actions={actions} extra={extra} />
+      )}
     </div>
   );
 }
