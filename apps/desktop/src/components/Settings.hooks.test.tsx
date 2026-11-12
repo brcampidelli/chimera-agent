@@ -2,11 +2,13 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Settings } from "@/components/Settings";
-import { getConfig, getDoctor, getInstructions, getMessaging, patchConfig } from "@/lib/api";
+import { getClaudeHooks, getConfig, getDoctor, getInstructions, getMessaging, patchConfig, trustClaudeHooks } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
   getCompletionStats: vi.fn(async () => ({ accepted: 0, dismissed: 0, rate: null, mean_ms: null })),
+  getClaudeHooks: vi.fn(),
+  trustClaudeHooks: vi.fn(async () => ({ trust: "trusted" })),
   getConfig: vi.fn(),
   getDoctor: vi.fn(),
   getInstructions: vi.fn(),
@@ -106,5 +108,53 @@ describe("Settings — the owner's lifecycle hooks", () => {
     await user.click(screen.getByRole("switch", { name: "Let shell hooks run without a sandbox" }));
     await waitFor(() => expect(patchConfig).toHaveBeenCalledTimes(2));
     expect(vi.mocked(patchConfig).mock.calls[1][0]).toEqual({ CHIMERA_HOOKS_HOST_EXEC: "true" });
+  });
+
+  it("reads both Claude Code origins as ON when the server says nothing, saves each, and lists what was loaded", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config() as never);
+    vi.mocked(getClaudeHooks).mockResolvedValue({
+      workspace: "/p",
+      runnable_repo: false,
+      runnable_user: false,
+      sources: [{ origin: "repo", path: "/p/.claude/settings.json", exists: true, enabled: true, hooks: 1, error: "", skipped: [], trust: "trusted" }],
+      hooks: [{ origin: "repo", event: "PreToolUse", matcher: "Bash", command: "check.sh", timeout: 30, on_failure: "block", source: "/p/.claude/settings.json" }],
+    } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    const repo = await screen.findByRole("switch", { name: "Run hooks from the project's .claude settings" });
+    expect(repo).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("switch", { name: "Run hooks from ~/.claude/settings.json" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(await screen.findByText("check.sh")).toBeInTheDocument();
+    expect(screen.getByText("PreToolUse")).toBeInTheDocument();
+    expect(screen.getByText(/will not run on this machine/i)).toBeInTheDocument();
+
+    await user.click(repo);
+    await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
+    expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({ CHIMERA_CLAUDE_HOOKS_REPO: "false" });
+  });
+
+  it("shows the hooks a repository wants confirmed BEFORE the button, and sends the fingerprint it showed", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config() as never);
+    vi.mocked(getClaudeHooks).mockResolvedValue({
+      workspace: "/p",
+      runnable_repo: true,
+      runnable_user: true,
+      sources: [{ origin: "repo", path: "/p/.claude/settings.json", exists: true, enabled: true, hooks: 0, error: "", skipped: [], trust: "changed" }],
+      hooks: [],
+      pending: [{ origin: "repo", event: "PreToolUse", matcher: "Bash", command: "bash ./scripts/check.sh", timeout: 30, on_failure: "continue", source: "/p/.claude/settings.json" }],
+      fingerprint: "abc123",
+    } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    expect(await screen.findByText("bash ./scripts/check.sh")).toBeInTheDocument();
+    expect(screen.getByText(/changed since you confirmed it/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm these hooks" }));
+    await waitFor(() => expect(trustClaudeHooks).toHaveBeenCalledOnce());
+    expect(vi.mocked(trustClaudeHooks).mock.calls[0][1]).toBe("abc123");
   });
 });

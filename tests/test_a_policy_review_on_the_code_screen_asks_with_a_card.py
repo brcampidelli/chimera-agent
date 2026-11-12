@@ -158,6 +158,11 @@ def _step(mode: str, wanted: str, screen: Any) -> Any:
         governance_mode = mode
         approval_mode = wanted
         approval_webhook = ""
+        # Approver-wiring stub, not a hooks test: it has no `home`, which Claude-format hook
+        # discovery needs, so every hook origin is stated off.
+        hooks = False
+        claude_hooks_repo = False
+        claude_hooks_user = False
 
     return govern_step(
         ToolRegistry(),
@@ -243,6 +248,11 @@ def test_the_audit_line_names_the_screen_as_the_approver(tmp_path: pathlib.Path)
         governance_mode = "enforce"
         approval_mode = "ask"
         approval_webhook = ""
+        # Approver-wiring stub, not a hooks test: it has no `home`, which Claude-format hook
+        # discovery needs, so every hook origin is stated off.
+        hooks = False
+        claude_hooks_repo = False
+        claude_hooks_user = False
 
     govern_step(
         ToolRegistry(),

@@ -42,6 +42,9 @@ class ToolRegistry:
         #: out of the declared list. A grant that names one (a Markdown agent's `tools:`, a subagent's
         #: allowlist) must still reach it, so the grant is read against ``declared_names()``, not ``names()``.
         self.deferred: dict[str, Tool] = {}
+        #: The Claude-format lifecycle hooks (`chimera.governance.claude_hooks.ClaudeLifecycle`) the
+        #: agent fires around a turn, or ``None`` when no hook is registered. Carried by `like`.
+        self.lifecycle: Any = None
 
     @classmethod
     def like(cls, source: object) -> ToolRegistry:
@@ -53,6 +56,9 @@ class ToolRegistry:
         out.bundle_only = getattr(source, "bundle_only", None)
         out.bundle_home = getattr(source, "bundle_home", None)
         out.plugin_scope = getattr(source, "plugin_scope", None)
+        # The non-tool hook events (`chimera/governance/claude_hooks.py`) ride on the registry the
+        # agent was built with, so every wrapper layered on top of the hooks keeps them.
+        out.lifecycle = getattr(source, "lifecycle", None)
         return out
 
     def register(self, tool: Tool, *, replace: bool = False) -> None:

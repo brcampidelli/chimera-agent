@@ -329,6 +329,66 @@ def _notice(
         _log.debug("on_notice callback raised for %s", code, exc_info=True)
 
 
+def _open_lifecycle(
+    lifecycle: Any,
+    task: str,
+    history: list[MessageLike] | None,
+    turn_notes: str | None,
+    config_notes: str,
+    on_notice: Callable[[str, str, dict[str, Any]], None] | None,
+) -> tuple[AgentResult | None, str | None, Callable[[str, str, dict[str, Any]], None] | None]:
+    """The Claude-format hooks that open a turn: ``SessionStart`` on a conversation's first turn
+    (its context joins the turn's notes, fenced as data), ``UserPromptSubmit`` (which may refuse the
+    prompt before the model sees it), and the ``Notification`` wrapper around ``on_notice``.
+
+    Every hook can only tighten (`chimera/governance/claude_hooks.py`): the result is the refusal
+    to run, extra fenced context, or a note for the person, never a wider turn."""
+    if not history:
+        started = lifecycle.session_start("startup")
+        extra = lifecycle.spoken(started)
+        if extra:
+            base = config_notes if turn_notes is None else turn_notes
+            turn_notes = f"{base}\n\n{extra}" if base else extra
+    gate = lifecycle.user_prompt(task)
+    if gate.decision == "deny":
+        # What the hook said is text a command computed: it comes back fenced as data (and the run
+        # is tainted), exactly as a refused tool call's reason does.
+        said = lifecycle.spoken_reasons(gate) or "the prompt was blocked"
+        answer = (
+            f"[hooks: your prompt was blocked by hook {gate.deciding_hook}. The model did not see it.]"
+            f"\n{said}"
+        )
+        return AgentResult(answer=answer, steps=0, stopped_reason="final"), turn_notes, on_notice
+    # Plain stdout and `additionalContext` of an allowed prompt join the turn's notes, fenced as data.
+    extra = lifecycle.spoken(gate)
+    if extra:
+        base = config_notes if turn_notes is None else turn_notes
+        turn_notes = f"{base}\n\n{extra}" if base else extra
+    if not lifecycle.has("Notification"):
+        return None, turn_notes, on_notice
+    inner = on_notice
+
+    def with_notification(code: str, text: str, data: dict[str, Any]) -> None:
+        if inner is not None:
+            inner(code, text, data)
+        if code == "hook_note":
+            return
+        for line in lifecycle.plain(lifecycle.notification(code, text)):
+            _notice(inner, "hook_note", line)
+
+    return None, turn_notes, with_notification
+
+
+def _close_lifecycle(
+    lifecycle: Any, result: AgentResult,
+    on_notice: Callable[[str, str, dict[str, Any]], None] | None,
+) -> None:
+    """``Stop`` / ``SubagentStop`` after a turn: annotate only. A note reaches the person as a
+    ``hook_note`` notice; there is no way for a hook to continue the turn or change its answer."""
+    for line in lifecycle.plain(lifecycle.stop(reason=result.stopped_reason)):
+        _notice(on_notice, "hook_note", line)
+
+
 def context_report_due(
     last: tuple[int, int | None] | None, used: int, window: int | None
 ) -> bool:
@@ -1464,6 +1524,13 @@ class Agent:
         ``turn_notes`` is :attr:`AgentConfig.turn_notes` for this run only, for a caller that keeps
         one agent across turns (``ChatSession`` under real history). Setting the config instead
         would leave one turn's recalled facts on the agent for the next. None reads the config."""
+        lifecycle = getattr(self.tools, "lifecycle", None)
+        if lifecycle is not None:
+            blocked, turn_notes, on_notice = _open_lifecycle(
+                lifecycle, task, history, turn_notes, self.config.turn_notes, on_notice
+            )
+            if blocked is not None:
+                return blocked
         usage = _UsageTally()
         # Per RUN, not per Agent: the same Agent object serves several runs (a conversation, a
         # scheduler dispatching jobs), and a cap that carried across them would refuse the second
@@ -1486,13 +1553,16 @@ class Agent:
         wire_scope = wire_context.wire_run(uuid.uuid4().hex, traced=self.config.trace_path is not None)
         try:
             with wire_scope:
-                return self._run(
+                result = self._run(
                     task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
                     on_tool_start=on_tool_start, on_context=on_context, on_edit=on_edit,
                     on_todo=on_todo,
                     on_notice=on_notice, history=history, images=images,
                     should_stop=should_stop, turn_notes=turn_notes, take_guidance=take_guidance,
                 )
+            if lifecycle is not None:
+                _close_lifecycle(lifecycle, result, on_notice)
+            return result
         finally:
             runs.pop()
 
@@ -1781,6 +1851,7 @@ class Agent:
                 ):
                     context_retry_used = True
                     self.run_state.tool_calls = dict(Counter(tool_names))
+                    self._pre_compact("auto")
                     messages, compacted = compact(
                         messages,
                         keep_recent=self.config.keep_recent,
@@ -1870,6 +1941,7 @@ class Agent:
             ):
                 # The run's own count, restored after the history that held it is gone (M2).
                 self.run_state.tool_calls = dict(Counter(tool_names))
+                self._pre_compact("auto")
                 messages, compacted = compact(
                     messages,
                     keep_recent=self.config.keep_recent,
@@ -2652,6 +2724,12 @@ class Agent:
             route_meta=route_meta,
             steplog=steplog if steplog is not None else StepLog(),
         )
+
+    def _pre_compact(self, trigger: str) -> None:
+        """``PreCompact`` for the Claude-format hooks: annotate only (the receipt is the record)."""
+        lifecycle = getattr(self.tools, "lifecycle", None)
+        if lifecycle is not None:
+            lifecycle.pre_compact(trigger)
 
     def _observations_together(
         self,

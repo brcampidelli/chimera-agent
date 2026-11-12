@@ -126,6 +126,7 @@ export type ConfigUpdated = Schemas["UpdatedOut"];
 /** A move of the keys between `.env` and the OS vault, by name. */
 export type VaultMove = Schemas["VaultMoveOut"];
 export type AppConfig = Schemas["ConfigOut"];
+export type ClaudeHooks = Schemas["ClaudeHooksOut"];
 /** Whether the app holds the machine awake right now, and for what (`chimera/core/keep_awake.py`). */
 export type KeepAwakeState = Schemas["KeepAwakeOut"];
 /** The desktop shell's own switches (the tray's), as the shell reads them. */
