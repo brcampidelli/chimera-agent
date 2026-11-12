@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **SSH commands survive a dropped connection.** In an SSH conversation each command now runs detached on the remote host under its own run id; if the link drops, Chimera reconnects and keeps reading the output without starting the command again. A script that arrives incomplete is never run, a timeout or Stop ends the whole process group, and if Chimera closes mid-command the command keeps running and the conversation that started it is told where its output is. (#1238)
+
 - **Act on many folders or conversations at once.** The Folders card in Settings and the Code sidebar gain checkboxes, a tri-state "Select all" and an action bar: pin, unpin, allow or revoke commands, remove from the lists or show again for folders; archive, unarchive, delete or remove their folders from the lists for conversations. Selection mode draws every row so nothing off screen is acted on, deleting asks first with the count, allowing commands in bulk asks first, and one failure is counted without stopping the rest. (#1237)
 
 ## [0.88.0] - 2026-11-12
