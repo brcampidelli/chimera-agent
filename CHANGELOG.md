@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.88.0] - 2026-11-12
 ### Fixed
 
 - **The plan panel's Approve and Ask for changes answer the right question.** The plan event now carries the id of the approval it waits on, and the panel offers its buttons only when that id matches the approval pending on the card; before, it matched by text. A plan whose approval it cannot identify shows "waiting for approval on the card" with no buttons, instead of saying it was approved. (#1233)
