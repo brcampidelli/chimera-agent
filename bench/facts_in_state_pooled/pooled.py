@@ -54,7 +54,7 @@ def ci(values: list[float]) -> tuple[float, float]:
     return s[int(0.025 * len(s))], s[min(int(0.975 * len(s)), len(s) - 1)]
 
 
-def main() -> dict[str, Any]:  # noqa: C901 — one registered read, top to bottom
+def main() -> dict[str, Any]:  # one registered read, top to bottom
     L: Scored = {}
     F: Scored = {}
     per_set: dict[str, list[str]] = {}

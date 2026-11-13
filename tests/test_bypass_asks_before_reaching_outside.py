@@ -376,7 +376,7 @@ def _link(link: Path, target: Path) -> None:
     except OSError:
         if os.name != "nt":
             pytest.skip("cannot create a symlink here")
-        done = subprocess.run(  # noqa: S603 - a junction needs no privilege
+        done = subprocess.run(  # a junction needs no privilege
             ["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True, check=False,
         )
         if done.returncode != 0:

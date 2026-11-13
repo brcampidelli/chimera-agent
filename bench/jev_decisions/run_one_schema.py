@@ -152,7 +152,7 @@ def ask(pinned: _Pinned, arm: str, state: str) -> dict[str, Any]:
     t0 = time.perf_counter()
     try:
         reading = backend.ask(state, DANGER)
-    except Exception as exc:  # noqa: BLE001 — a halt leaves every denominator (PROTOCOL §2)
+    except Exception as exc:  # a halt leaves every denominator (PROTOCOL §2)
         return {"halt": f"{type(exc).__name__}: {exc}"[:300], "attempts": rec.attempts, "usd": cost(rec.attempts)}
     final = rec.attempts[-1]["text"] if rec.attempts else ""
     return {

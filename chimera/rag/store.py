@@ -189,7 +189,7 @@ class ChunkStore:
                 vectors = embed([row["text"] for row in batch])
                 if start == 0 and vectors and embedder:
                     self._record_embedder(embedder, len(vectors[0]))
-            except Exception as exc:  # noqa: BLE001 — a dead embedder is a degraded index, not a crash
+            except Exception as exc:  # a dead embedder is a degraded index, not a crash
                 _log.warning("embedding failed after %d chunks: %s", done, exc)
                 break
             if len(vectors) != len(batch):
@@ -227,7 +227,7 @@ class ChunkStore:
             return
         try:
             sonda = embed(["x"])
-        except Exception as exc:  # noqa: BLE001 — a dead embedder must not empty the index
+        except Exception as exc:  # a dead embedder must not empty the index
             _log.warning("could not check the embedder signature: %s", exc)
             return
         if not sonda:

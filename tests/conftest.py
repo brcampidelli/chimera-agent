@@ -35,6 +35,13 @@ import pytest
 from chimera.config import Settings, get_settings
 from chimera.providers.discovery import FIRST_CLASS, NOT_A_MODEL_PROVIDER, provider_from_env_var
 from tests import shards
+from tests.network_guard import (
+    ALLOWLIST_FILE,
+    OPT_OUT_MARKERS,
+    is_allowlisted,
+    load_allowlist,
+    refusing_outside_connections,
+)
 
 
 def _test_file(item: pytest.Item, root: Path) -> str:
@@ -378,3 +385,25 @@ def _built_ins_declared_as_before_the_default_changed(request: pytest.FixtureReq
         yield
     finally:
         Settings.__init__ = original_init  # type: ignore[method-assign]
+
+
+_NETWORK_ALLOWLIST = load_allowlist(Path(__file__).with_name(ALLOWLIST_FILE))
+
+
+@pytest.fixture(autouse=True)
+def _no_test_reaches_a_real_server(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Fail a test that opens a socket to anything but this machine (`tests/network_guard.py` says why).
+
+    Opt out with ``@pytest.mark.network``; ``integration`` tests are already allowed, since reaching the
+    provider is what they are for.
+    """
+    if is_allowlisted(request.node.nodeid, _NETWORK_ALLOWLIST) or any(
+        request.node.get_closest_marker(name) is not None for name in OPT_OUT_MARKERS
+    ):
+        yield
+        return
+    violations: list[str] = []
+    with refusing_outside_connections(violations):
+        yield
+    if violations:
+        pytest.fail("test connected outside this machine: " + ", ".join(violations), pytrace=False)

@@ -16,26 +16,26 @@ import io
 import json
 import signal
 import sys
-from datetime import date  # noqa: F401  (tests use it)
-from decimal import Decimal  # noqa: F401  (tests use it)
+from datetime import date  # (tests use it)
+from decimal import Decimal  # (tests use it)
 
 
-def raises(exc, fn, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003, ANN201
+def raises(exc, fn, *args, **kwargs):
     try:
         fn(*args, **kwargs)
     except exc:
         return True
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
     return False
 
 
-def raises_msg(exc, text, fn, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003, ANN201
+def raises_msg(exc, text, fn, *args, **kwargs):
     try:
         fn(*args, **kwargs)
     except exc as err:
         return text in str(err)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
     return False
 
@@ -43,11 +43,11 @@ def raises_msg(exc, text, fn, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003,
 _HAS_ALARM = hasattr(signal, "setitimer")
 
 
-def _on_alarm(signum, frame):  # noqa: ANN001, ANN202, ARG001
+def _on_alarm(signum, frame):
     raise TimeoutError("h7 grader time limit")
 
 
-def _limited(fn, seconds: float):  # noqa: ANN001, ANN202
+def _limited(fn, seconds: float):
     if _HAS_ALARM:
         signal.setitimer(signal.ITIMER_REAL, seconds)
     try:
@@ -73,8 +73,8 @@ def main() -> None:
             continue
         try:
             with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-                _limited(lambda code=code: exec(code, ns), 5)  # noqa: S102
-        except BaseException as exc:  # noqa: BLE001  (SystemExit included)
+                _limited(lambda code=code: exec(code, ns), 5)
+        except BaseException as exc:  # (SystemExit included)
             load_errors.append(f"block {i}: {type(exc).__name__}: {exc}"[:200])
     missing = [n for n in payload["names"] if not callable(ns.get(n))]
     helpers = {"raises": raises, "raises_msg": raises_msg, "date": date, "Decimal": Decimal}
@@ -85,9 +85,9 @@ def main() -> None:
         source = (payload.get("setup") or "") + "\n" + src
         try:
             with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
-                _limited(lambda source=source, env=env: exec(source, env), 5)  # noqa: S102
+                _limited(lambda source=source, env=env: exec(source, env), 5)
             results.append([True, ""])
-        except BaseException as exc:  # noqa: BLE001
+        except BaseException as exc:
             results.append([False, f"{type(exc).__name__}: {exc}"[:200]])
     with open(sys.argv[2], "w", encoding="utf-8") as fh:
         json.dump({"missing": missing, "load_errors": load_errors, "results": results}, fh)

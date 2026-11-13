@@ -57,7 +57,7 @@ def shadow_receipt(message: str, settings: object) -> dict[str, object] | None:
     """Return a log-only receipt; a decision failure adds no action to the voice turn."""
     try:
         answer = decide_shadow(message, settings)
-    except Exception:  # noqa: BLE001 — shadow must never interfere with the spoken turn
+    except Exception:  # shadow must never interfere with the spoken turn
         return None
     return answer.receipt()
 

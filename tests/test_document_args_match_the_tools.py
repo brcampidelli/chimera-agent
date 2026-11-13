@@ -169,7 +169,7 @@ def _declared_arguments() -> dict[str, set[str]]:
     for module in pkgutil.walk_packages(chimera.__path__, "chimera."):
         try:
             loaded = importlib.import_module(module.name)
-        except Exception:  # noqa: BLE001 — an optional extra that is not installed here
+        except Exception:  # an optional extra that is not installed here
             continue
         for _, obj in inspect.getmembers(loaded, inspect.isclass):
             if not (issubclass(obj, Tool) and obj is not Tool):

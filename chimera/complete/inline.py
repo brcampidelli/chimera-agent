@@ -187,7 +187,7 @@ async def complete_inline(
                     pieces.append(piece)
                 if chunk.get("done"):
                     break
-    except Exception as exc:  # noqa: BLE001 — a missing Ollama is a normal state, not a 500
+    except Exception as exc:  # a missing Ollama is a normal state, not a 500
         _log.debug("inline completion failed: %s", exc)
         return Completion(
             "", False, f"could not reach a model server at {base}", elapsed(), model

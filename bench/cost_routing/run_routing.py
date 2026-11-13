@@ -163,13 +163,13 @@ def cell(task: dict, arm: str, seed: int, root: Path, home: Path, timeout: int) 
 
 def corpus() -> list[dict]:
     sys.path.insert(0, str(REPO / "bench/local_lift"))
-    from tasks import TASKS  # noqa: PLC0415
+    from tasks import TASKS
 
     return list(TASKS)
 
 
 def report(rows: list[dict]) -> str:
-    from chimera.eval.paired import compare_paired, format_report  # noqa: PLC0415
+    from chimera.eval.paired import compare_paired, format_report
 
     live = [r for r in rows if not r["crashed"]]
     dead = len(rows) - len(live)

@@ -28,9 +28,9 @@ import pytest
 
 pytest.importorskip("croniter")
 
-from chimera.scheduler.engine import FAIL_LIMIT, Scheduler  # noqa: E402
-from chimera.scheduler.models import CronJob  # noqa: E402
-from chimera.scheduler.store import CronStore  # noqa: E402
+from chimera.scheduler.engine import FAIL_LIMIT, Scheduler
+from chimera.scheduler.models import CronJob
+from chimera.scheduler.store import CronStore
 
 HOUR = 3600.0
 DAY = 24 * HOUR

@@ -104,7 +104,7 @@ def _read_document(
         text = _document_text(path)
     except ImportError:
         return {**base, "note": "previewing documents needs the 'documents' extra"}
-    except Exception:  # noqa: BLE001 — a document that will not convert is a note, never a 500
+    except Exception:  # a document that will not convert is a note, never a 500
         return {**base, "note": "could not be read as a document"}
     truncated = len(text) > max_chars
     return {

@@ -112,7 +112,7 @@ def _row(solve: claims.Solve, arm: str, client: Any, gateway: Any) -> dict[str, 
             res = local(client, state, think=False, system=LOCAL_SYSTEM, labels=("yes", "no"))
             row.update({"p": res.get("p"), "verdict": res.get("verdict"), "usd": 0.0,
                         "mass": res.get("mass"), "seconds": res.get("seconds")})
-    except Exception as exc:  # noqa: BLE001 — a halt, never a verdict
+    except Exception as exc:  # a halt, never a verdict
         row["halt"] = str(exc)[:300]
     return row
 
@@ -198,7 +198,7 @@ def run(out: Path, arms: str, workers: int, homes: Path | None = None, bench_hom
 def report(path: Path) -> None:
     """AUROC within task, leave-one-task-out, against the lexical signal's 0.6643."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "false_success"))
-    from run import within_task_auroc  # noqa: E402
+    from run import within_task_auroc
 
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     rows = [r for r in rows if r.get("arm") != "meta" and not r.get("halt") and r.get("p") is not None]

@@ -213,7 +213,7 @@ class DiscordAdapter:
             if files and send_files is not None:
                 try:
                     await send_files(files)
-                except Exception as exc:  # noqa: BLE001 — the text already went; say why the file did not
+                except Exception as exc:  # the text already went; say why the file did not
                     _log.warning("discord: attaching %d file(s) failed: %s", len(files), exc)
                     await send(f"⚠ the file(s) could not be attached: {type(exc).__name__}")
         finally:
@@ -230,7 +230,7 @@ class DiscordAdapter:
         try:
             if send_audio is not None:
                 await send_audio(audio)
-        except Exception as exc:  # noqa: BLE001 — the text already went; the voice is only an addition
+        except Exception as exc:  # the text already went; the voice is only an addition
             _log.warning("discord: voice reply failed: %s", type(exc).__name__)
         finally:
             discard_reply_audio(audio)
@@ -268,11 +268,11 @@ class DiscordAdapter:
         client = discord.Client(intents=intents)
         self._client = client
 
-        @client.event  # type: ignore[misc,untyped-decorator]  # discord.py is untyped
+        @client.event  # type: ignore[untyped-decorator]  # discord.py is untyped
         async def on_ready() -> None:
             _log.info("Discord adapter online as %s", client.user)
 
-        @client.event  # type: ignore[misc,untyped-decorator]  # discord.py is untyped
+        @client.event  # type: ignore[untyped-decorator]  # discord.py is untyped
         async def on_message(message: Any) -> None:
             inbound = self._inbound(
                 author_id=message.author.id,
@@ -355,6 +355,6 @@ class DiscordAdapter:
 
         try:
             count = asyncio.run_coroutine_threadsafe(_deliver(), loop).result(timeout=30)
-        except Exception as exc:  # noqa: BLE001 - surface send failures as a tool result
+        except Exception as exc:  # surface send failures as a tool result
             return f"error: discord send failed: {exc}"
         return f"sent {count} message(s) to discord channel {chat_id}"

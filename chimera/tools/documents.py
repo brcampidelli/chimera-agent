@@ -78,7 +78,7 @@ class ReadDocumentTool(_WorkspaceTool):
             text = _markitdown_convert(str(path))
         except ImportError:
             return _INSTALL_HINT
-        except Exception as exc:  # noqa: BLE001 — a bad/unsupported file is a tool error, not a crash
+        except Exception as exc:  # a bad/unsupported file is a tool error, not a crash
             return f"error: could not read {rel}: {exc}"
         text = clip_page(text, _MAX_CHARS, offset)
         if text.startswith("error: offset"):

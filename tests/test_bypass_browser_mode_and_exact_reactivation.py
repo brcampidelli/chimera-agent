@@ -18,16 +18,16 @@ from typing import Any
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.core import bypass_switches, code_session  # noqa: E402
-from chimera.core.bypass_switches import (  # noqa: E402
+from chimera.core import bypass_switches, code_session
+from chimera.core.bypass_switches import (
     OFF_NOT_SAVED,
     SWITCH_FILE_NAME,
     BypassSaveError,
     forget_all_switches,
 )
-from chimera.core.code_projects import CodeProjectRegistry  # noqa: E402
+from chimera.core.code_projects import CodeProjectRegistry
 
 SCREEN = "screen-secret-for-tests-0123456789"
 

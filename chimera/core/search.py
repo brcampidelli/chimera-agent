@@ -168,7 +168,7 @@ def _search_ripgrep(
     result = SearchResult(engine="ripgrep")
     started = time.monotonic()
     try:
-        proc = subprocess.run(  # noqa: S603 — argv list, never a shell string
+        proc = subprocess.run(  # argv list, never a shell string
             _rg_argv(query, regex=regex, case_sensitive=case_sensitive, glob=glob),
             cwd=root,
             capture_output=True,
@@ -278,6 +278,6 @@ def search(
     engine = _search_ripgrep if ripgrep_available() else _search_python
     try:
         return engine(query, root, regex=regex, case_sensitive=case_sensitive, glob=glob)
-    except Exception as exc:  # noqa: BLE001 — a search must not take the server with it
+    except Exception as exc:  # a search must not take the server with it
         _log.warning("search failed: %s", exc)
         return SearchResult(error="the search could not run")

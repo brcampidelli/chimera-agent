@@ -206,7 +206,7 @@ def _call(registry: Any, world: _World, name: str, ran: Callable[[], bool], **ar
     before = len(world.asked)
     try:
         out = str(registry.run(name, **args))
-    except Exception as exc:  # noqa: BLE001 — the loop turns a raise into this observation too
+    except Exception as exc:  # the loop turns a raise into this observation too
         out = tool_raised(name, exc)
     asked = len(world.asked) > before
     did = ran()

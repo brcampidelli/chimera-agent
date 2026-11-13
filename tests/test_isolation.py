@@ -25,7 +25,7 @@ def _init_repo(path: Path) -> None:
     _git(["commit", "-m", "init"], path)
 
 
-def _writer(name: str, content: str):  # noqa: ANN202 — returns a unit fn
+def _writer(name: str, content: str):  # returns a unit fn
     def run(ws: Path) -> str:
         (ws / name).write_text(content, encoding="utf-8")
         return content
@@ -274,7 +274,7 @@ def test_a_bytecode_cache_is_not_a_contested_file(tmp_path: Path) -> None:
     """
     _init_repo(tmp_path)
 
-    def writer_with_cache(name: str, content: str):  # noqa: ANN202 — returns a unit fn
+    def writer_with_cache(name: str, content: str):  # returns a unit fn
         def run(ws: Path) -> str:
             (ws / name).write_text(content, encoding="utf-8")
             cache = ws / "__pycache__"

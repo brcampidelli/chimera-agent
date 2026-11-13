@@ -98,7 +98,7 @@ def _keyring() -> Any | None:
     try:
         if isinstance(keyring.get_keyring(), FailBackend):
             return None
-    except Exception:  # noqa: BLE001 — a backend that cannot even be queried is not a backend
+    except Exception:  # a backend that cannot even be queried is not a backend
         return None
     return keyring
 
@@ -118,7 +118,7 @@ def store(name: str, value: str) -> bool:
         return False
     try:
         kr.set_password(SERVICE, name, value)
-    except Exception as exc:  # noqa: BLE001 — a locked keychain is a refusal, not a crash
+    except Exception as exc:  # a locked keychain is a refusal, not a crash
         _log_().warning("could not write %s to the vault: %s", name, exc)
         return False
     return True
@@ -147,7 +147,7 @@ def forget(name: str) -> bool:
         return False
     try:
         kr.delete_password(SERVICE, name.upper())
-    except Exception:  # noqa: BLE001 — "not found" is the common case and is not an error here
+    except Exception:  # "not found" is the common case and is not an error here
         return False
     return True
 
@@ -166,7 +166,7 @@ def stored() -> list[str]:
         try:
             if kr.get_password(SERVICE, name):
                 achados.append(name)
-        except Exception:  # noqa: BLE001 — an unreadable entry is one we cannot report on
+        except Exception:  # an unreadable entry is one we cannot report on
             continue
     return achados
 
@@ -204,7 +204,7 @@ def load_into_environment(
             continue
         try:
             value = kr.get_password(SERVICE, name)
-        except Exception:  # noqa: BLE001 — a locked vault fills nothing and breaks nothing
+        except Exception:  # a locked vault fills nothing and breaks nothing
             continue
         if value:
             env[name] = value
@@ -229,7 +229,7 @@ def read(name: str) -> str | None:
         return None
     try:
         value = kr.get_password(SERVICE, name)
-    except Exception:  # noqa: BLE001 — an unreadable entry is an absent one
+    except Exception:  # an unreadable entry is an absent one
         return None
     return str(value) if value else None
 
@@ -249,7 +249,7 @@ def store_mcp_token(name: str, token: str) -> bool:
         return False
     try:
         kr.set_password(SERVICE, _mcp_vault_account(name), token)
-    except Exception:  # noqa: BLE001 — credential values never enter an error message
+    except Exception:  # credential values never enter an error message
         _log_().warning("could not write MCP OAuth credential to the vault")
         return False
     return True
@@ -262,7 +262,7 @@ def read_mcp_token(name: str) -> str | None:
         return None
     try:
         value = kr.get_password(SERVICE, _mcp_vault_account(name))
-    except Exception:  # noqa: BLE001 — an unreadable credential is absent
+    except Exception:  # an unreadable credential is absent
         return None
     return str(value) if value else None
 

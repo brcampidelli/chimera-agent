@@ -288,7 +288,7 @@ def _parse_spec(text: str) -> dict[str, Any]:
         data = json.loads(text)
     except ValueError:
         try:
-            data = yaml.load(text, Loader=_NoAliasLoader)  # noqa: S506 — a SafeLoader subclass
+            data = yaml.load(text, Loader=_NoAliasLoader)  # a SafeLoader subclass
         except yaml.YAMLError as exc:
             raise ConnectorError("the spec is neither JSON nor YAML") from exc
     if not isinstance(data, dict) or not isinstance(data.get("paths"), dict):
@@ -864,7 +864,7 @@ def connector_tools(
                         key_in=cfg.key_in, key_name=cfg.key_name, key_prefix=cfg.key_prefix,
                     )
                 )
-        except Exception as exc:  # noqa: BLE001 — a broken connector must never break a turn
+        except Exception as exc:  # a broken connector must never break a turn
             _log.warning("connectors: skipping %r — %s", cfg.name, type(exc).__name__)
     return tools
 
@@ -952,6 +952,6 @@ def with_connectors(registry: Any, settings: Any, *, ask: Any = None, surface: s
         return registry
     try:
         mount(registry, Path(settings.home), ask=ask)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.warning("connectors: not loaded — %s", type(exc).__name__)
     return registry

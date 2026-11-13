@@ -26,7 +26,7 @@ from chimera.skills import bundles
 
 pytest.importorskip("fastapi")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
 
 def _bundle(home: Path, name: str, *, status: str = "active", **extra: Any) -> None:

@@ -49,7 +49,7 @@ def _taint_imported_skills(skills_dir: Path) -> None:
             skill = parse_skill_md(md.read_text(encoding="utf-8", errors="replace"))
             skill.manifest.provenance = "tainted"
             md.write_text(render_skill_md(skill), encoding="utf-8")
-        except Exception as exc:  # noqa: BLE001 — a non-skill .md must not break the import
+        except Exception as exc:  # a non-skill .md must not break the import
             _log.debug("could not taint-stamp %s: %s", md, exc)
 _MEMORY_NOTE = "memory files found; run --apply to merge into Chimera memory (dedup, non-destructive)"
 _BULLET = re.compile(r"^[-*]\s+")

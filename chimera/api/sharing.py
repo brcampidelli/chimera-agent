@@ -131,7 +131,7 @@ class ShareStore:
         for listener in list(self._listeners):
             try:
                 listener(gone)
-            except Exception as exc:  # noqa: BLE001 -- the revoke is written; a listener cannot undo it
+            except Exception as exc:  # the revoke is written; a listener cannot undo it
                 _log.warning("a revoke listener failed: %s", exc)
 
     def _load(self) -> None:
@@ -420,7 +420,7 @@ class SessionBus:
             return []
         try:
             records = self._backfill(turn_id, after, before)
-        except Exception as exc:  # noqa: BLE001 -- a replay short of its start beats no replay
+        except Exception as exc:  # a replay short of its start beats no replay
             _log.warning("could not bring back the start of turn %s: %s", turn_id, exc)
             return []
         out: list[dict[str, Any]] = []

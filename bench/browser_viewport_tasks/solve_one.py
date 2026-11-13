@@ -111,7 +111,7 @@ def solve(task_id: str, arm: str, replica: int, model: str, backend: Any = None)
             }
             try:
                 result = agent.run(task.prompt(origin))
-            except Exception as exc:  # noqa: BLE001 — the provider's failure is the apparatus's, not the arm's
+            except Exception as exc:  # the provider's failure is the apparatus's, not the arm's
                 spend = partial_spend(exc)
                 record["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
                 record["usd"] = spend.usd if spend else None
@@ -148,7 +148,7 @@ def solve(task_id: str, arm: str, replica: int, model: str, backend: Any = None)
             # A solve whose cost cannot be priced is a receipt missing, not a free solve (Bee §2z).
             if result.usd is None:
                 record["error"] = "unpriced: the receipt has no usd"
-    except Exception as exc:  # noqa: BLE001 — Chromium, the server: the apparatus broke
+    except Exception as exc:  # Chromium, the server: the apparatus broke
         record["error"] = record["error"] or f"{type(exc).__name__}: {str(exc)[:300]}"
         # `cap_usd` is set as soon as a model call has happened; unset here means none did.
         record.setdefault("cap_usd", 0.0)

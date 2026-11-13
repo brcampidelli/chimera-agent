@@ -152,7 +152,7 @@ def _turn(backend: Any, item: Item) -> dict[str, Any]:
             "stored": [i.content for i in memory.store.all()],
             "reply": row.reply[:1500],
         }
-    except Exception as exc:  # noqa: BLE001 — counted by the stop rule, never raised
+    except Exception as exc:  # counted by the stop rule, never raised
         kind = "parse" if isinstance(exc, ValueError) else "provider"
         return {"error": f"{kind}: {type(exc).__name__}: {exc}"[:300], "provider": row.provider,
                 "saved": [], "raw": [], "rejected": [], "skipped": [], "reply": row.reply[:1500]}

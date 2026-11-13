@@ -57,7 +57,7 @@ class _Resp:
 
 
 def _normalizar(finish_reason: str | None = "stop", **kwargs: Any) -> Any:
-    return LLMGateway._normalize(_Resp(_Choice(_Msg(**kwargs), finish_reason)), "m")  # noqa: SLF001
+    return LLMGateway._normalize(_Resp(_Choice(_Msg(**kwargs), finish_reason)), "m")
 
 
 # ------------------------------------------------------------------ the field nobody read

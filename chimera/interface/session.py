@@ -555,7 +555,7 @@ class ChatSession:
             return "\n\n".join(part for part in (note, undone) if part)
         try:
             extra = self.turn_note()
-        except Exception:  # noqa: BLE001 — news about a job must never be what fails the turn
+        except Exception:  # news about a job must never be what fails the turn
             _log.debug("turn_note provider raised", exc_info=True)
             extra = ""
         return "\n\n".join(part for part in (note, undone, extra) if part)
@@ -925,7 +925,7 @@ class ChatSession:
             return
         try:
             self.extractor.after_turn(message, answer, tainted=provenance != CLEAN)
-        except Exception as exc:  # noqa: BLE001 — the answer is already recorded; memory is extra
+        except Exception as exc:  # the answer is already recorded; memory is extra
             _log.warning("memory extraction could not start: %s", exc)
 
     def _thread_tainted(self) -> bool:

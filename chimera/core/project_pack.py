@@ -337,7 +337,7 @@ def applied_pack(settings: Any, folder: Path | str | None) -> ProjectPack | None
         if found.pack is not None and found.digest == agreed:
             return found.pack
         return held_pack(home, folder)
-    except Exception as exc:  # noqa: BLE001 -- see the docstring
+    except Exception as exc:  # see the docstring
         _log.debug("project pack skipped for %s: %s", folder, exc)
         return None
 

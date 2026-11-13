@@ -92,7 +92,7 @@ def load(home: Path) -> AgentIdentity:
         return AgentIdentity.model_validate(json.loads(path.read_text(encoding="utf-8")))
     except FileNotFoundError:
         return AgentIdentity()
-    except Exception as exc:  # noqa: BLE001 — a malformed identity must never break a run
+    except Exception as exc:  # a malformed identity must never break a run
         _log.debug("agent identity unreadable (%s): %s", path, exc)
         return AgentIdentity()
 

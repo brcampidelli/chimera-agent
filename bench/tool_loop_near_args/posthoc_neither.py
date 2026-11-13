@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import replay as r  # noqa: E402
+import replay as r
 
 WANT = {"016-code-repair-pytest-sys1-off-weak-r0", "016-code-repair-pytest-sys1h-off-weak-r2"}
 for home in sorted(p for p in r.HOMES.iterdir() if p.is_dir()):

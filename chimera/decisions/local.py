@@ -217,7 +217,7 @@ class LocalLogprobBackend:
                 details = (response.json() or {}).get("details") or {}
                 quant = str(details.get("quantization_level") or "").strip()
                 self._resolved = f"{self.model}@{quant}" if quant else ""
-            except Exception:  # noqa: BLE001 — the build is a fact for the receipt, never a reason to fail the call
+            except Exception:  # the build is a fact for the receipt, never a reason to fail the call
                 self._resolved = ""
         return self._resolved
 

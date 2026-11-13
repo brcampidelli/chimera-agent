@@ -171,7 +171,7 @@ def generate_panel(items: list[dict], models: list[str]) -> list[dict]:
                             "completion_tokens": result.completion_tokens,
                         }
                     )
-                except Exception as exc:  # noqa: BLE001 — a dead panelist is data, not a crash
+                except Exception as exc:  # a dead panelist is data, not a crash
                     answers.append({"model": model, "content": "", "error": str(exc)})
             row = {
                 "id": key,

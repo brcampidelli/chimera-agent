@@ -158,7 +158,7 @@ def local_signals(home: Path) -> list[Signal]:
             for token in package_tokens(server.name):
                 signals.append(Signal(token, f"the MCP server “{server.name}” is configured here",
                                       covers_kind="connectors"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.info("for-you: MCP servers not read: %s", exc)
     try:
         from chimera.skills.bundles import installed
@@ -166,7 +166,7 @@ def local_signals(home: Path) -> list[Signal]:
         for bundle in installed(home):
             signals.append(Signal(bundle.name.lower(), f"the skill “{bundle.name}” is installed here",
                                   covers_kind="skills"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.info("for-you: installed skills not read: %s", exc)
     try:
         from chimera.core.code_projects import CodeProjectRegistry
@@ -174,7 +174,7 @@ def local_signals(home: Path) -> list[Signal]:
         rows = CodeProjectRegistry(home / "code_projects.json").entries()
         projects = [(row.alias or Path(row.path).name, Path(row.path)) for row in rows if not row.hidden]
         signals.extend(project_signals(projects))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.info("for-you: registered projects not read: %s", exc)
     return signals
 

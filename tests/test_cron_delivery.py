@@ -34,7 +34,7 @@ class _Recebedor(BaseHTTPRequestHandler):
     status = 204
     recebidos: list[dict] = []
 
-    def do_POST(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler's spelling
+    def do_POST(self) -> None:  # BaseHTTPRequestHandler's spelling
         n = int(self.headers.get("Content-Length", 0))
         corpo = self.rfile.read(n).decode("utf-8")
         type(self).recebidos.append(

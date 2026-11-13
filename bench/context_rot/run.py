@@ -190,7 +190,7 @@ def main() -> int:
                         prompt_tokens=int(getattr(result, "prompt_tokens", 0) or 0),
                         answer_head=answer[:400],
                     )
-                except Exception as exc:  # noqa: BLE001 — a dead cell is a result, not a crash
+                except Exception as exc:  # a dead cell is a result, not a crash
                     row["error"] = str(exc)[:220]
                 row["seconds"] = round(time.time() - started, 1)
                 rows.append(row)

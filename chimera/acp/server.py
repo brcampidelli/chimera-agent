@@ -189,7 +189,7 @@ class AcpServer:
                 # An answer, not silence. Silence is what makes an editor hang forever on a method
                 # we never implemented — the failure the client half of this package documents.
                 self._error(ident, _METHOD_NOT_FOUND, f"method not found: {method}")
-        except Exception as exc:  # noqa: BLE001 — a failed turn must not take the connection down
+        except Exception as exc:  # a failed turn must not take the connection down
             _log.warning("acp method %s failed: %s", method, exc)
             self._error(ident, _INTERNAL_ERROR, f"{type(exc).__name__}: {exc}")
 

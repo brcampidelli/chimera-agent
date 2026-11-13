@@ -65,7 +65,7 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> dict[str, datetime]:
 
     class _Pinned(datetime):
         @classmethod
-        def now(cls, tz: Any = None) -> Any:  # noqa: ARG003 -- the signature `datetime.now` has
+        def now(cls, tz: Any = None) -> Any:  # the signature `datetime.now` has
             return state["now"]
 
     monkeypatch.setattr(context_module, "datetime", _Pinned)

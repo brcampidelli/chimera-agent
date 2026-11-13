@@ -631,7 +631,7 @@ class FusionEngine:
             return _Settled("", winner, "vote")
         try:
             judge, shown = self._run_judge(messages, panel)
-        except Exception as exc:  # noqa: BLE001 - a judge failure must not lose the panel
+        except Exception as exc:  # a judge failure must not lose the panel
             if _must_propagate(exc):
                 raise
             return self._fallback(panel, "judge", _stage_error(exc))
@@ -639,7 +639,7 @@ class FusionEngine:
             return self._fallback(panel, "judge", _empty_reason(judge), judge=judge, shown=shown)
         try:
             synth = self._run_synth(messages, judge.content, panel, shown)
-        except Exception as exc:  # noqa: BLE001 - same rule for the synthesiser
+        except Exception as exc:  # same rule for the synthesiser
             if _must_propagate(exc):
                 raise
             return self._fallback(panel, "synth", _stage_error(exc), judge=judge, shown=shown)
@@ -721,7 +721,7 @@ class FusionEngine:
             _log.debug("fusion early-stop: %d probe models agreed", len(ok))
             try:
                 agreed, shown = self._run_synth_agreed(messages, ok)
-            except Exception as exc:  # noqa: BLE001 - the agreeing probe is still an answer
+            except Exception as exc:  # the agreeing probe is still an answer
                 if _must_propagate(exc):
                     raise
                 return self._trace(probe, self._fallback(probe, "synth", _stage_error(exc)), early=True)

@@ -96,7 +96,7 @@ class RequirementChecklist:
         except (json.JSONDecodeError, ValueError, ValidationError) as exc:
             _log.debug("checklist extract: unusable response (%s)", exc)
             return []
-        except Exception as exc:  # noqa: BLE001 — never break the solve loop
+        except Exception as exc:  # never break the solve loop
             _log.warning("checklist extract failed, continuing without it: %s", exc)
             return []
 
@@ -147,6 +147,6 @@ class RequirementChecklist:
         except (json.JSONDecodeError, ValueError, ValidationError) as exc:
             _log.debug("checklist grade: unusable response (%s) — abstaining", exc)
             return None
-        except Exception as exc:  # noqa: BLE001 — a grader must never break the run
+        except Exception as exc:  # a grader must never break the run
             _log.warning("checklist grade failed, abstaining: %s", exc)
             return None

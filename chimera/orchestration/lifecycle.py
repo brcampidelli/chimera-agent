@@ -95,7 +95,7 @@ class LifecycleCrew:
         if self.on_stage is not None:
             try:
                 self.on_stage(stage)
-            except Exception:  # noqa: BLE001 — a broken sink is not a broken build
+            except Exception:  # a broken sink is not a broken build
                 _log.debug("lifecycle stage sink raised", exc_info=True)
         return stage
 

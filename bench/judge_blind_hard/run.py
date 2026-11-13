@@ -68,7 +68,7 @@ def load_aime() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     offset = 0
     while True:
-        with urllib.request.urlopen(ROWS_URL.format(offset=offset), timeout=60) as resp:  # noqa: S310
+        with urllib.request.urlopen(ROWS_URL.format(offset=offset), timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         rows = [r["row"] for r in data.get("rows", [])]
         out.extend(rows)
@@ -195,7 +195,7 @@ def main() -> int:
             iid, arm, rot, order = futures[fut]
             try:
                 r = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a provider hiccup must not lose the file
+            except Exception as exc:  # a provider hiccup must not lose the file
                 print(f"  {iid:<10} {arm:<6} r{rot} {order:<7} ERROR {type(exc).__name__}: {str(exc)[:100]}", flush=True)
                 continue
             spent += r.usd or 0.0

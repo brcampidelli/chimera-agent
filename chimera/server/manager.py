@@ -368,7 +368,7 @@ class MessagingManager:
             def _serve() -> None:
                 try:
                     adapter.start(on_message)  # blocking until adapter.stop()
-                except Exception as exc:  # noqa: BLE001 — a dead adapter must not crash the app
+                except Exception as exc:  # a dead adapter must not crash the app
                     rec.error = f"{type(exc).__name__}: {exc}"
                     _log.warning("messaging adapter '%s' stopped: %s", platform, exc)
 
@@ -382,7 +382,7 @@ class MessagingManager:
         if rec is not None:
             try:
                 rec.adapter.stop()
-            except Exception as exc:  # noqa: BLE001 — one broken adapter cannot block teardown
+            except Exception as exc:  # one broken adapter cannot block teardown
                 _log.warning("messaging adapter '%s' failed to stop: %s", platform, exc)
 
     def stop_all(self) -> None:

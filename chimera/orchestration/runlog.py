@@ -90,7 +90,7 @@ def append(
                 return
             with path.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
-    except Exception as exc:  # noqa: BLE001 -- see the docstring
+    except Exception as exc:  # see the docstring
         _log.debug("orchestration frame not persisted: %s", exc)
 
 
@@ -193,6 +193,6 @@ def prune(home: Path, *, keep: int = MAX_RUNS) -> int:
         try:
             shutil.rmtree(directory)
             removed += 1
-        except OSError as exc:  # noqa: PERF203 -- one failure must not stop the rest
+        except OSError as exc:  # one failure must not stop the rest
             _log.debug("could not prune %s: %s", directory, exc)
     return removed

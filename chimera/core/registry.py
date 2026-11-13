@@ -98,7 +98,7 @@ def load(home: Path) -> list[AgentDef]:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return []
-    except Exception as exc:  # noqa: BLE001 — a malformed registry must never break a run
+    except Exception as exc:  # a malformed registry must never break a run
         _log.debug("agent registry unreadable (%s): %s", path, exc)
         return []
     if not isinstance(raw, list):
@@ -108,7 +108,7 @@ def load(home: Path) -> list[AgentDef]:
     for entry in raw:
         try:
             out.append(AgentDef.model_validate(entry))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _log.debug("skipping malformed agent entry: %s", exc)
     return out
 

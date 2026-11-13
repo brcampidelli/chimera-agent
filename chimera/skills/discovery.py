@@ -137,7 +137,7 @@ def _candidates(sources: list[_Source]) -> list[_Candidate]:
                     manifest_bytes=raw,
                     digest=hashlib.sha256(raw).hexdigest(),
                 ))
-            except Exception:  # noqa: BLE001 -- one malformed local file must not break the listing
+            except Exception:  # one malformed local file must not break the listing
                 # An invalid manifest is isolated to itself; a local skills directory is not a
                 # trust boundary, and one malformed card must not erase the rest of the listing.
                 continue

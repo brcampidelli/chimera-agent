@@ -492,6 +492,9 @@ def _listening_off_loopback(port: int) -> bool:
     return False
 
 
+# The subject is a connection to this machine's own LAN address (and none to a remote server): the socket
+# guard counts anything that is not loopback as leaving the machine, so the test opts out of it.
+@pytest.mark.network
 def test_nothing_listens_off_loopback_until_the_owner_opens_the_door(home: Path) -> None:
     app = _app(home)
     door = app.state.device_door

@@ -226,7 +226,7 @@ def run_call(log: CallLog, ledger: Ledger, key: str, kind: str, meta: dict[str, 
             out = fn()
         except BudgetExhausted:
             raise
-        except Exception as exc:  # noqa: BLE001 — a failed call is data, recorded as a halt
+        except Exception as exc:  # a failed call is data, recorded as a halt
             last = f"{type(exc).__name__}: {str(exc)[:200]}"
             if is_rate_limit(last) and not prior_rl and requeue is not None:
                 row = {"key": key, "kind": kind, **meta, "status": "rate_limited", "error": last, "attempt": attempt, "usd": 0.0}

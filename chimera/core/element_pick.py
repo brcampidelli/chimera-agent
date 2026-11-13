@@ -299,7 +299,7 @@ class ElementPicker:
             raise PickRefused(504, "the browser did not answer in time; try again") from exc
         except PickRefused:
             raise
-        except Exception as exc:  # noqa: BLE001 — a driver failure is the owner's sentence, not a 500
+        except Exception as exc:  # a driver failure is the owner's sentence, not a 500
             raise PickRefused(502, str(exc)[:300] or "the browser failed") from exc
 
     def _abandon(self, executor: ThreadPoolExecutor) -> None:
@@ -319,7 +319,7 @@ class ElementPicker:
         self._session = None
         try:
             session.browser.close()
-        except Exception as exc:  # noqa: BLE001 — a browser that will not close is logged, not raised
+        except Exception as exc:  # a browser that will not close is logged, not raised
             _log.debug("element picker browser did not close: %s", exc)
 
     # --- idle expiry ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ class ElementPicker:
             return
         try:
             self.close()
-        except Exception as exc:  # noqa: BLE001 — a timer thread must never raise
+        except Exception as exc:  # a timer thread must never raise
             _log.debug("element picker idle close: %s", exc)
 
     # --- the two calls ------------------------------------------------------------------------
@@ -438,7 +438,7 @@ class ElementPicker:
             future.result(timeout=_CLOSE_WAIT)
         except FutureTimeout:
             _log.debug("element picker: the browser is busy; it closes when its call returns")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _log.debug("element picker close: %s", exc)
 
 

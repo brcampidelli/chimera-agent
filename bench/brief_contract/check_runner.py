@@ -42,11 +42,11 @@ def main() -> None:
         sys.path.insert(0, str(tmp))
         sys.path.insert(1, str(HERE))
         try:
-            from checks import CHECKS  # noqa: PLC0415
+            from checks import CHECKS
 
             CHECKS[task_id]()
             out["check_ok"] = True
-        except BaseException as exc:  # noqa: BLE001 — argparse's SystemExit included: any failure is a failed check
+        except BaseException as exc:  # argparse's SystemExit included: any failure is a failed check
             out["check_ok"] = False
             out["detail"] = f"{type(exc).__name__}: {exc}"[:300]
             out["trace"] = traceback.format_exc()[-600:]

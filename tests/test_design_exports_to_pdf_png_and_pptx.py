@@ -128,7 +128,7 @@ def test_a_png_larger_than_chromium_can_draw_is_refused_with_the_pdf_offered() -
 class _Counter(BaseHTTPRequestHandler):
     hits: list[str] = []
 
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         type(self).hits.append(self.path)
         self.send_response(200)
         self.send_header("Content-Type", "image/png")

@@ -134,7 +134,7 @@ def server_denied(name: str, store: Path | None = None) -> bool:
         from chimera.config import get_settings
 
         settings: object = get_settings()
-    except Exception:  # noqa: BLE001 — fall back to the file beside the store, never to nothing
+    except Exception:  # fall back to the file beside the store, never to nothing
         if store is None:
             return True
         settings = SimpleNamespace(home=Path(store).parent, policy_file=None)
@@ -151,7 +151,7 @@ def server_denied(name: str, store: Path | None = None) -> bool:
             from chimera.plugins.mcp import owner_of
 
             plugin = owner_of(Path(getattr(settings, "home", Path(store).parent if store else ".")), name)
-        except Exception:  # noqa: BLE001 — an unreadable plugins folder is no plugin, not a crash
+        except Exception:  # an unreadable plugins folder is no plugin, not a crash
             plugin = None
         if plugin is not None and policy.denied("integration.use", f"plugin:{plugin}"):
             return True
@@ -437,7 +437,7 @@ def autoload_into_registry(
                 if mounted is None:
                     continue
             connectors.register(MCPConnector(cfg.name, mounted, name_prefix=f"{cfg.name}_"))
-        except Exception as exc:  # noqa: BLE001 — a broken server must never break agent boot
+        except Exception as exc:  # a broken server must never break agent boot
             _log.warning("MCP autoload: skipping server %r (%s)", cfg.name, type(exc).__name__)
     return connectors.into_tool_registry(registry)
 

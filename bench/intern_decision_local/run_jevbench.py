@@ -36,7 +36,7 @@ def main() -> None:
     clone = args.jevbench.resolve()
     pinned(clone)
     sys.path.insert(0, str(clone))
-    from jevbench.scoring import score_task  # noqa: PLC0415 — their code, from the pinned clone
+    from jevbench.scoring import score_task  # their code, from the pinned clone
 
     items = load(clone)
     if args.smoke:
@@ -78,7 +78,7 @@ def main() -> None:
                 input_tokens=data["usage"]["input_tokens"],
                 ms=data["timing"].get("server_ms"),
             )
-        except Exception as exc:  # noqa: BLE001 — recorded, scored invalid
+        except Exception as exc:  # recorded, scored invalid
             probs = None
             row["halt"] = str(exc)[:300]
         task = SimpleNamespace(

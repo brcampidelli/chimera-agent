@@ -30,7 +30,7 @@ def test_tick_fires_due_job_and_advances(tmp_path: Path) -> None:
 def test_future_job_is_not_fired(tmp_path: Path) -> None:
     sch = _scheduler(tmp_path)
     sch.schedule_cron("weekly", "0 0 * * 0", "weekly audit", now=0)  # far in the future
-    daemon = CronDaemon(sch, lambda job: fired.append(job.name))  # noqa: F821 — must not be called
+    daemon = CronDaemon(sch, lambda job: fired.append(job.name))  # must not be called
     fired: list[str] = []
     assert daemon.tick(now=60) == []
     assert fired == []

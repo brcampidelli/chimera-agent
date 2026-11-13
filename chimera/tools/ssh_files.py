@@ -180,7 +180,7 @@ class RemoteFileTool(Tool):
         try:
             target = self.existing_file(path)
             return "" if target is None else self.files.read_bytes(target).decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001 - a preview never raises
+        except Exception:  # a preview never raises
             return ""
 
     def _edit_preview(self, path: str, old: str, new: str, replace_all: bool) -> str:
@@ -379,7 +379,7 @@ class RemoteEditBatch(RemoteFileTool):
         for position, (target, content, newline) in enumerate(pending):
             try:
                 self.put(target, encode_after_edit(content, newline=newline))
-            except Exception as exc:  # noqa: BLE001 - any failure here leaves a partial batch to report
+            except Exception as exc:  # any failure here leaves a partial batch to report
                 done = ", ".join(written) or "none"
                 rest = ", ".join(t.rel for t, _, _ in pending[position + 1:]) or "none"
                 return (

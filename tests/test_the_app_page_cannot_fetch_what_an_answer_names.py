@@ -20,11 +20,11 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.api.page_csp import guest_page_csp, inline_script_hashes  # noqa: E402
-from chimera.config import Settings  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.api.page_csp import guest_page_csp, inline_script_hashes
+from chimera.config import Settings
+from chimera.interface import ChatSession
 
 THEME_SCRIPT = "\n      (function () { document.documentElement.dataset.theme = 'dark'; })();\n    "
 

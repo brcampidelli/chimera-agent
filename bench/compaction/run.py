@@ -126,7 +126,7 @@ def run_conversation(pair: Pair, arm: str) -> Outcome:
     for attempt in (1, 2):
         try:
             return _run_conversation(pair, arm)
-        except Exception as exc:  # noqa: BLE001 — the provider's failure is not the arm's
+        except Exception as exc:  # the provider's failure is not the arm's
             last = f"{type(exc).__name__}: {str(exc)[:200]}"
             print(f"    transport error on {pair.convention.name}/{pair.theme[0]} {arm} (attempt {attempt}): {last}", flush=True)
             time.sleep(30)

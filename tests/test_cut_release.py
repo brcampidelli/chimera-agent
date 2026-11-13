@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-import cut_release  # noqa: E402
+import cut_release
 
 #: Every module-level path `write_versions` writes to. A test redirects all of them or it edits the
 #: repository it is running inside — which is not hypothetical: adding `CARGO_LOCK` to the script

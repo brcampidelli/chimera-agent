@@ -21,12 +21,12 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.api.exec_stream import cancel, run_streamed, running_count  # noqa: E402
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.core.context_budget import RunState  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.api.exec_stream import cancel, run_streamed, running_count
+from chimera.config import Settings, get_settings
+from chimera.core.context_budget import RunState
+from chimera.interface import ChatSession
 
 
 @pytest.fixture(autouse=True)

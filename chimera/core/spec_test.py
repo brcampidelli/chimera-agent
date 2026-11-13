@@ -205,7 +205,7 @@ class SpecTestGenerator:
                 result = self.backend.complete(
                     messages, model=self.model, temperature=0.0, max_tokens=budget,
                 )
-            except Exception as exc:  # noqa: BLE001 — a generator must never break the run
+            except Exception as exc:  # a generator must never break the run
                 _log.warning("spec-test generation failed, continuing without it: %s", exc)
                 return ""
             self.last_finish_reason = str(getattr(result, "finish_reason", "") or "")

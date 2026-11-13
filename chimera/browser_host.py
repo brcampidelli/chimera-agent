@@ -233,7 +233,7 @@ def serve(input_stream: BinaryIO, output_stream: BinaryIO, handler: MessageHandl
             return
         try:
             reply = handler(message)
-        except Exception:  # noqa: BLE001 — never forward page/error text across the protocol
+        except Exception:  # never forward page/error text across the protocol
             reply = {"id": message.get("id"), "ok": False, "error": "request failed"}
         try:
             write_message(output_stream, reply)
