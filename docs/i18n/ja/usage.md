@@ -1,5 +1,5 @@
 ---
-source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
+source_sha256: 6833cdb4488064e31938cb908a7c1aee3316f9eec8cd798be910f8591ee44d41
 ---
 
 # Chimera — 利用ガイド
@@ -12,6 +12,20 @@ ChimeraはCLIファーストで、ガバナンスを備えたエージェント�
 ---
 
 ## インストール
+
+### ツールとして（クローン不要）
+
+Python 3.11〜3.13 が必要です。パッケージは PyPI にあるため、`uv` または `pipx` が `chimera` コマンドを専用の分離環境にインストールし、`PATH` に通します。
+
+```bash
+uv tool install chimera-agent       # アップグレード: uv tool upgrade chimera-agent
+pipx install chimera-agent          # アップグレード: pipx upgrade chimera-agent
+chimera version                     # 確認
+```
+
+extras は角括弧で指定します: `uv tool install 'chimera-agent[full]'`。この節を書いた時点では、この 2 つのコマンドをクリーンなマシンで試していません。失敗した場合は、他のドキュメントが前提とする仮想環境での `pip install chimera-agent` を使ってください。
+
+### クローンから（開発用）
 
 Chimeraは[uv](https://docs.astral.sh/uv/)を使用します。
 

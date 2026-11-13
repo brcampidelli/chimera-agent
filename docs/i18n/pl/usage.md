@@ -1,5 +1,5 @@
 ---
-source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
+source_sha256: 6833cdb4488064e31938cb908a7c1aee3316f9eec8cd798be910f8591ee44d41
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -12,6 +12,20 @@ Ten przewodnik pokrywa instalację, konfigurację i każdą komendę z przykład
 ---
 
 ## Instalacja
+
+### Jako narzędzie (bez klonowania)
+
+Wymaga Pythona 3.11–3.13. Pakiet jest w PyPI, więc `uv` lub `pipx` instalują polecenie `chimera` we własnym, izolowanym środowisku i dodają je do `PATH`:
+
+```bash
+uv tool install chimera-agent       # aktualizacja: uv tool upgrade chimera-agent
+pipx install chimera-agent          # aktualizacja: pipx upgrade chimera-agent
+chimera version                     # sprawdź
+```
+
+Dodatki podaje się w nawiasach kwadratowych: `uv tool install 'chimera-agent[full]'`. Tych dwóch poleceń nie sprawdzono na czystej maszynie w chwili pisania tej sekcji; jeśli któreś zawiedzie, `pip install chimera-agent` w środowisku wirtualnym to ścieżka, którą zakłada reszta dokumentacji.
+
+### Z klonu (rozwój)
 
 Chimera używa [uv](https://docs.astral.sh/uv/).
 

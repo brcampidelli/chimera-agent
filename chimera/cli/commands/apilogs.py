@@ -12,16 +12,27 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Annotated, NoReturn, TextIO
+from typing import Annotated, Any, NoReturn, TextIO
 from urllib.parse import urlsplit
 
-import httpx
 import typer
 from rich.markup import escape
 
 from chimera.cli.commands._shared import app, console
 from chimera.config import get_settings
 from chimera.core.instance import running_url
+
+
+def __getattr__(name: str) -> Any:
+    """``apilogs.httpx`` resolves on first use: importing httpx costs ~0.2 s and ``chimera --help``
+    never makes a request. Tests patch ``apilogs.httpx.Client``; this hands them the real module,
+    the same object the command imports locally, so the patch still reaches the code."""
+    if name == "httpx":
+        import httpx
+
+        return httpx
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _METHODS = frozenset({"GET", "HEAD", "OPTIONS"}) | _MUTATING_METHODS
@@ -129,6 +140,8 @@ def api(
         )
         raise typer.Exit(2)
     target = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+    import httpx
+
     try:
         # Loopback ignores HTTP(S)_PROXY: with a proxy set and no NO_PROXY covering 127.0.0.1, the
         # call would leave the machine, fail, and give the token to the proxy on the way out.
