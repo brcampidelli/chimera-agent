@@ -280,9 +280,9 @@ def test_the_storage_and_diagnostics_cards_cost_one_measurement_and_an_action_a_
     calls: list[Path] = []
     real = storage.measure
 
-    def counted(home: Path, workspace: Path | None = None) -> dict[str, object]:
+    def counted(home: Path, workspace: Path | None = None, **extra: object) -> dict[str, object]:
         calls.append(home)
-        return real(home, workspace)
+        return real(home, workspace, **extra)  # type: ignore[arg-type]  # the keywords measure takes
 
     monkeypatch.setattr(storage, "measure", counted)
     home = tmp_path / "home"

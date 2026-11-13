@@ -15,6 +15,10 @@ export interface ProposedTaskCard {
 /** A card as the conversation shows it: the owner's own outcome for it, kept beside the card. */
 export interface TaskCardState extends ProposedTaskCard {
   status?: "starting" | "started" | "failed";
+  /** Starting in a NEW worktree: the server is fetching the remote's base before it makes the folder. */
+  fetchingBase?: boolean;
+  /** The server's sentence when the new worktree did not start from the remote's tip. */
+  baseWarning?: string;
   startedSessionId?: string;
   error?: string;
 }

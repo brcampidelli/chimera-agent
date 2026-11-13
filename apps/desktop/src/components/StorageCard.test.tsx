@@ -19,6 +19,7 @@ vi.mock("@/lib/api", () => ({
   pruneWorktrees: vi.fn(),
   rotateLogs: vi.fn(),
   clearCache: vi.fn(),
+  archiveCodeSession: vi.fn(),
   getAppDiagnostics: vi.fn(),
   getTroubleshoot: vi.fn(),
   openAppFolder: vi.fn(),
@@ -29,6 +30,23 @@ const api = await import("@/lib/api");
 
 function category(key: string, bytes: number | null, note = "") {
   return { key, bytes, files: bytes === null ? null : 1, paths: [], note };
+}
+
+/** A worktree row as the server now sends it: with its age and the reason it still exists. */
+function worktree(path: string, bytes: number | null, state: string, reason: string, extra = {}) {
+  return {
+    path,
+    bytes,
+    state,
+    reason,
+    age_days: 3,
+    retention: "no_conversation",
+    retention_due_at: null,
+    retention_kept: "",
+    session_id: "",
+    title: "",
+    ...extra,
+  };
 }
 
 function report(over: Partial<StorageReport> = {}): StorageReport {
@@ -43,9 +61,15 @@ function report(over: Partial<StorageReport> = {}): StorageReport {
       category("worktrees", 4096),
     ],
     worktrees: [
-      { path: "/tmp/chimera-wt-a", bytes: 4000, state: "orphan", reason: "owner_gone" },
-      { path: "/tmp/chimera-wt-b", bytes: 96, state: "live", reason: "this_process" },
+      worktree("/tmp/chimera-wt-a", 4000, "orphan", "owner_gone"),
+      worktree("/tmp/chimera-wt-b", 96, "live", "this_process"),
     ],
+    worktrees_counted_bytes: 4096,
+    worktrees_unmeasured: 0,
+    worktrees_limit_gb: 50,
+    worktrees_over_limit: false,
+    archive_idle_days: 14,
+    archive_candidates: [],
     disks: [{ path: "/data", total: 1024 ** 4, free: 1024 ** 3 }],
     rotatable_logs: ["traces.jsonl", "scheduler/cron_traces.jsonl"],
     ...over,
@@ -59,6 +83,84 @@ beforeEach(() => {
     available: true,
     reset_word: "RESET",
     last_reset: null,
+  });
+});
+
+describe("the storage card, worktrees", () => {
+  const idle = {
+    session_id: "s1",
+    title: "Fix the login",
+    idle_days: 20,
+    path: "/wt/chimera-wt-x",
+    bytes: 1024 ** 3,
+  };
+
+  it("warns when the worktrees are over the limit and says why each one is still here", async () => {
+    vi.mocked(api.getStorage).mockResolvedValue(
+      report({
+        worktrees_over_limit: true,
+        worktrees_counted_bytes: 60 * 1024 ** 3,
+        worktrees: [
+          worktree("/wt/chimera-wt-x", 1024 ** 3, "kept", "durable", {
+            retention: "conversation",
+            title: "Fix the login",
+          }),
+          worktree("/wt/chimera-wt-y", 5, "kept", "durable", {
+            retention: "archived",
+            retention_kept: "dirty",
+          }),
+        ],
+      }),
+    );
+    render(<StorageCard worktreeDir="" onSave={vi.fn()} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/above your 50 GB limit/);
+    await userEvent.click(screen.getByText(/Why each worktree is still here/));
+    expect(screen.getByText(/chimera-wt-x/)).toHaveTextContent("its conversation “Fix the login” is open");
+    expect(screen.getByText(/chimera-wt-y/)).toHaveTextContent("uncommitted changes");
+  });
+
+  it("says a folder that was not counted is not measured, and offers to keep counting", async () => {
+    vi.mocked(api.getStorage).mockResolvedValue(
+      report({
+        worktrees_unmeasured: 1,
+        worktrees: [worktree("/wt/chimera-wt-z", null, "kept", "durable")],
+      }),
+    );
+    render(<StorageCard worktreeDir="" onSave={vi.fn()} />);
+
+    expect(await screen.findByText(/1 worktree folders have not been counted/)).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/Why each worktree is still here/));
+    expect(screen.getByText(/chimera-wt-z/)).toHaveTextContent("not measured");
+    await userEvent.click(screen.getByRole("button", { name: "Keep counting" }));
+    await waitFor(() => expect(api.getStorage).toHaveBeenCalledTimes(2));
+  });
+
+  it("archives an idle conversation only after the second press, and calls nothing that removes", async () => {
+    vi.mocked(api.getStorage).mockResolvedValue(report({ archive_candidates: [idle] }));
+    vi.mocked(api.archiveCodeSession).mockResolvedValue({ id: "s1", archived_at: 1 });
+    render(<StorageCard worktreeDir="" onSave={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    expect(api.archiveCodeSession).not.toHaveBeenCalled();
+    expect(screen.getByText(/nothing is deleted now/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Yes, do it" }));
+    await waitFor(() => expect(api.archiveCodeSession).toHaveBeenCalledWith("s1"));
+    expect(api.pruneWorktrees).not.toHaveBeenCalled();
+    expect(api.rotateLogs).not.toHaveBeenCalled();
+    expect(api.clearCache).not.toHaveBeenCalled();
+    expect(await screen.findByText("Archived. Nothing was deleted.")).toBeInTheDocument();
+  });
+
+  it("cancelling the archive offer archives nothing", async () => {
+    vi.mocked(api.getStorage).mockResolvedValue(report({ archive_candidates: [idle] }));
+    render(<StorageCard worktreeDir="" onSave={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(api.archiveCodeSession).not.toHaveBeenCalled();
   });
 });
 
@@ -105,7 +207,7 @@ describe("the storage card", () => {
   it("offers no prune when nothing is orphaned", async () => {
     vi.mocked(api.getStorage).mockResolvedValue(
       report({
-        worktrees: [{ path: "/tmp/chimera-wt-b", bytes: 96, state: "kept", reason: "no_owner" }],
+        worktrees: [worktree("/tmp/chimera-wt-b", 96, "kept", "no_owner")],
       }),
     );
     render(<StorageCard worktreeDir="" onSave={vi.fn()} />);
