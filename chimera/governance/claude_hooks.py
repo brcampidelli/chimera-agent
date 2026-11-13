@@ -87,6 +87,11 @@ EVENT_BUDGET_S = 45.0
 BREAKER_TIMEOUTS = 3
 _BREAKER: dict[tuple[str, str], int] = {}
 _BREAKER_LOCK = threading.Lock()
+#: How many times each hook was skipped without running since this process started (no sandbox
+#: that isolates and no host exec for it, the breaker open, the event's time spent, or a sandbox
+#: that could not start). Shown on the Hooks screen beside the hook: a guard that is listed and
+#: skipped is the false comfort the screen exists to name (audit 2026-11, a07-12).
+_SKIPPED: dict[tuple[str, str], int] = {}
 _MAX_TEXT = 2000
 _MAX_PROMPT = 8000
 
@@ -603,7 +608,21 @@ def _breaker_key(hook: Any) -> tuple[str, str]:
     return (hook.source_sha256, hook.id)
 
 
+def skipped_count(hook: Any) -> int:
+    """How many times this hook was skipped without running, since the process started."""
+    with _BREAKER_LOCK:
+        return _SKIPPED.get(_breaker_key(hook), 0)
+
+
 def _execute(runner: Any, hook: Any, payload: dict[str, Any], deadline: float = 0.0) -> _Exec:
+    done = _attempt(runner, hook, payload, deadline)
+    if not done.ran:
+        with _BREAKER_LOCK:
+            _SKIPPED[_breaker_key(hook)] = _SKIPPED.get(_breaker_key(hook), 0) + 1
+    return done
+
+
+def _attempt(runner: Any, hook: Any, payload: dict[str, Any], deadline: float = 0.0) -> _Exec:
     from chimera.governance.hooks import _sandbox_name
     from chimera.sandbox.confirm import sandbox_is_isolated
 
@@ -830,16 +849,19 @@ def describe(settings: Any, workspace: Path | None = None) -> dict[str, Any]:
         # not trusted; the button sends the fingerprint shown beside these.
         pending, _ = discover(ws, repo=True, user=False, repo_trust=TRUSTED)
 
-    def shown(h: Any) -> dict[str, Any]:
-        return {"origin": h.origin, "event": h.claude_event,
-                "matcher": h.matcher.pattern if h.matcher else "*",
-                "command": _mask(h.command), "timeout": h.timeout,
-                "on_failure": "block" if h.on_error == "deny" else "continue", "source": h.source}
-
     def runnable(origin: str) -> bool | None:
         if origin == ORIGIN_USER and bool(getattr(settings, "claude_user_hooks_host_exec", False)):
             return True
         return isolated
+
+    def shown(h: Any) -> dict[str, Any]:
+        return {"origin": h.origin, "event": h.claude_event,
+                "matcher": h.matcher.pattern if h.matcher else "*",
+                "command": _mask(h.command), "timeout": h.timeout,
+                "on_failure": "block" if h.on_error == "deny" else "continue", "source": h.source,
+                # Per hook, so the screen can mark the one that will not run here and say how often
+                # it was skipped; None when the answer would need Docker probed.
+                "runs_here": runnable(h.origin), "skipped": skipped_count(h)}
 
     return {
         "workspace": str(ws),

@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Tool schema snapshots per surface**: `tests/prompt_snapshots/schema.<surface>.txt` now keeps the tool schema the Code turn, design turn, CLI, cron and bot send, assembled by each surface's own functions, so a changed tool description shows up as a diff; the prompt lint totals it per surface and `docs/tool-schema-by-surface.md` tabulates it (tokens are chars/4, an estimate). The second deferral bench is pre-registered, not run. (#1245)
 
+- **Security: what holds is visible, and the bypass is on the record.** Turning "Ignore permissions" on or off now writes a `bypass_toggle` entry (scope, id, origin) to the audit log, and a switch can take an optional expiry (none by default); Settings > Security opens with one card, computed by the code that decides, showing what still asks you with the switch on, where commands really run, the checks in each place and which switches are on; with the switch on, a recursive delete or write outside the project and your user folder asks again (a lexical check that lowers the risk, not a boundary); crew and hierarchy runs end with the cross-agent monitor's section on the Orchestration tab, which says "not evaluated" rather than "nothing found" when there was nothing to read; and the Hooks list marks a hook that cannot run on this machine with how often it was skipped. (P1-11) (#1246)
+
 - **Tools:** every tool result is now capped at 20 000 characters at the registry (tools that already capped themselves are unchanged), `http_get`, `scrape` and `read_document` take an `offset` to read on past a cut, and a subagent run reports how many subagents it spawned; the lower MCP ceiling and a spawn limit are options that stay off. (#1243)
 
 ### Fixed
+
+- **Desktop: streaming no longer re-renders the whole conversation per token.** Finished exchanges are memoised, streamed text is written once per frame, the heavy screens (Settings, Knowledge, Automation, Work, Onboarding, Activity) and the syntax highlighter load on demand, the running-turns poll is a single hook, and on-screen clocks pause while the window is hidden. Auto-detected highlighting now chooses among the 14 languages the file viewer maps. Not yet measured in the packaged app (see `apps/desktop/PROFILING.md`). (#1247)
 
 - **TUI: unknown slash commands and `/undo N`.** The full-screen terminal app no longer sends an unrecognised `/command` to the model as a paid turn, `/undo N` now previews and asks before restoring, and `chat`, `assist` and the TUI build their command lists from one shared registry. (#1242)
 

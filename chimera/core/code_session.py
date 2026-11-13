@@ -80,6 +80,16 @@ def set_session_bypass(session_id: str, enabled: bool) -> str | None:
     return _ACTIVE.set_conversation(session_id, enabled)
 
 
+def set_session_bypass_expiring(session_id: str, enabled: bool, ttl_seconds: float) -> str | None:
+    """:func:`set_session_bypass` with an ON that expires by itself after ``ttl_seconds``.
+
+    A separate name, not a keyword on the one above, so the owner's PATCH stays the single call of
+    ``set_session_bypass(session_id, enabled)`` that ``test_code_permission_screen_security`` pins:
+    the expiry is optional and absent by default, and the default path is the old call, unchanged.
+    """
+    return _ACTIVE.set_conversation(session_id, enabled, ttl_seconds=ttl_seconds)
+
+
 def forget_session_bypass(session_id: str) -> None:
     """The conversation is gone: its switch goes with it."""
     _ACTIVE.forget_conversation(session_id)

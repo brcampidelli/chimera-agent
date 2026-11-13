@@ -6,6 +6,7 @@ import { useOptionalToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { useP, useT, type TFunc } from "@/lib/i18n";
 import type { ApprovalAnswer, SettingsSuggestion } from "@/lib/types";
+import { setVisibleInterval } from "@/lib/visibleInterval";
 
 /**
  * The question a turn is parked on, with the two answers.
@@ -120,8 +121,7 @@ function useSecondsLeft(question: ApprovalQuestionLike): number | null {
     // reads as the contradiction this component was written to remove.
     const tick = () => setLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
     tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
+    return setVisibleInterval(tick, 1000);
     // `id` is in the list because the same mounted card is reused for the NEXT question of a turn,
     // and a countdown that kept the previous question's deadline would be counting the wrong pause.
   }, [id, wait, askedAt]);
