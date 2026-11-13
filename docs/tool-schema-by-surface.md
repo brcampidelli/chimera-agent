@@ -10,11 +10,11 @@ The tool schema is re-sent on every step of every turn. This is what each surfac
 
 | Surface | Deferral applied | Tools (default) | Chars (default) | Tokens est. (default) | Tools (`defer_tools=False`) | Chars (`defer_tools=False`) | Tokens est. (`defer_tools=False`) |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Code turn with a screen (desktop, with question and task cards) | yes | 17 | 12,508 | ~3,127 | 34 | 24,849 | ~6,212 |
-| Code turn that offers the design tool | yes | 18 | 17,671 | ~4,418 | 35 | 30,012 | ~7,503 |
-| `chimera run` (chat, assist and solve share its deferral) | yes | 15 | 9,826 | ~2,456 | 32 | 22,167 | ~5,542 |
-| scheduled job | no | 32 | 22,167 | ~5,542 | 32 | 22,167 | ~5,542 |
-| messaging bot (Discord, Telegram) | no | 33 | 22,731 | ~5,683 | 33 | 22,731 | ~5,683 |
+| Code turn with a screen (desktop, with question and task cards) | yes | 17 | 12,508 | ~3,127 | 28 | 21,189 | ~5,297 |
+| Code turn that offers the design tool | yes | 18 | 17,671 | ~4,418 | 29 | 26,352 | ~6,588 |
+| `chimera run` (chat, assist and solve share its deferral) | yes | 15 | 9,826 | ~2,456 | 26 | 18,507 | ~4,627 |
+| scheduled job | no | 26 | 18,507 | ~4,627 | 26 | 18,507 | ~4,627 |
+| messaging bot (Discord, Telegram) | no | 27 | 19,071 | ~4,768 | 27 | 19,071 | ~4,768 |
 
 ## What deferral takes out, by `describe_saving`
 
@@ -22,11 +22,11 @@ The tool schema is re-sent on every step of every turn. This is what each surfac
 
 | Surface | Declared | Core, never deferred | Deferred | Chars before | Chars after (core + 3 proxies) | Saving |
 |---|---:|---:|---:|---:|---:|---:|
-| Code turn with a screen (desktop, with question and task cards) | 34 | 14 | 20 | 24,781 | 12,474 | 49.7% |
-| Code turn that offers the design tool | 35 | 15 | 20 | 29,942 | 17,635 | 41.1% |
-| `chimera run` (chat, assist and solve share its deferral) | 32 | 12 | 20 | 22,103 | 9,796 | 55.7% |
-| scheduled job | 32 | 12 | 20 | 22,103 | 9,796 | 55.7% |
-| messaging bot (Discord, Telegram) | 33 | 12 | 21 | 22,665 | 9,796 | 56.8% |
+| Code turn with a screen (desktop, with question and task cards) | 28 | 14 | 14 | 21,133 | 12,474 | 41.0% |
+| Code turn that offers the design tool | 29 | 15 | 14 | 26,294 | 17,635 | 32.9% |
+| `chimera run` (chat, assist and solve share its deferral) | 26 | 12 | 14 | 18,455 | 9,796 | 46.9% |
+| scheduled job | 26 | 12 | 14 | 18,455 | 9,796 | 46.9% |
+| messaging bot (Discord, Telegram) | 27 | 12 | 15 | 19,017 | 9,796 | 48.5% |
 
 ## Not measured
 

@@ -103,11 +103,13 @@ def hermetic(*, defer_tools: bool) -> Iterator[tuple[Path, Path]]:
     Yields ``(home, workspace)``. ``defer_tools`` is the only knob: it is set through the same
     environment variable an owner would use, so every reader of ``get_settings()`` sees it.
     """
+    from chimera import config_vault
     from chimera.config import Settings, get_settings
 
     saved_env = dict(os.environ)
     saved_config = dict(Settings.model_config)
     saved_find_spec = importlib.util.find_spec
+    saved_keyring = config_vault._keyring
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         root = Path(tmp)
         home, workspace, user = root / "home", root / "workspace", root / "user"
@@ -129,11 +131,15 @@ def hermetic(*, defer_tools: bool) -> Iterator[tuple[Path, Path]]:
             })
             cast(Any, Settings).model_config = {**saved_config, "env_file": None}
             importlib.util.find_spec = _optional_modules(saved_find_spec)  # type: ignore[assignment]
+            # The OS vault too: `get_settings()` copies the keys `chimera secrets set` stored there
+            # into the environment, and an OpenRouter key alone registers five media tools.
+            config_vault._keyring = lambda: None  # type: ignore[assignment]
             get_settings.cache_clear()
             yield home, workspace
         finally:
             _release(home)
             importlib.util.find_spec = saved_find_spec  # type: ignore[assignment]
+            config_vault._keyring = saved_keyring  # type: ignore[assignment]
             cast(Any, Settings).model_config = saved_config
             os.environ.clear()
             os.environ.update(saved_env)

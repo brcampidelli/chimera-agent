@@ -258,3 +258,20 @@ def test_the_code_turn_declares_the_screen_tools_and_follows_their_description(
     drifted = {name for name in baseline if changed[name] != baseline[name]}
     expected = {name for name, text in baseline.items() if _declares(text, tool)}
     assert expected and drifted == expected
+
+
+def test_a_key_in_the_os_vault_does_not_reach_the_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`get_settings()` copies what `chimera secrets set` stored into the environment, and an OpenRouter
+    key alone registers the media tools: on a maintainer's machine the snapshot gained six tools and
+    CI, with an empty vault, read it as drift."""
+    from chimera import config_vault
+
+    class _Vault:
+        def get_password(self, service: str, name: str) -> str | None:
+            return "sk-or-" + "fake" if name == "OPENROUTER_API_KEY" else None
+
+    monkeypatch.setattr(config_vault, "_keyring", lambda: _Vault())
+    text = schema_snapshots()["schema.cron"]
+    assert '"generate_image"' not in text
+    assert '"text_to_speech"' not in text
+    assert config_vault._keyring is not None and config_vault._keyring() is not None  # restored on exit
