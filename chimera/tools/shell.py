@@ -178,6 +178,8 @@ class HostExecTurnLimiter:
 
 class RunShellTool(Tool):
     name = "run_shell"
+    #: Bounds its own output: _MAX_OUTPUT_CHARS via clip_output. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     # The shell is named because the model cannot see it: measured 2026-10-06 on Windows, an agent
     # lost four calls in one turn to `;`-chained commands, `pwd` and PowerShell `if (...)` sent to
     # cmd.exe. Static on purpose — the desktop's Capabilities screen pins this text word for word.

@@ -57,6 +57,40 @@ export interface WorkerState {
   tainted: boolean;
 }
 
+/** One thing the cross-agent monitor flagged (`governance/aggregate_monitor.py`). */
+export interface MonitorFinding {
+  /** "cross-agent-taint" | "fan-out-volume" — the server's closed set. */
+  kind: string;
+  detail: string;
+  agents: string[];
+}
+
+/**
+ * The cross-agent monitor's section of a run, from the `monitor` frame the server sends just before
+ * the run's last frame. `evaluated: false` is NEVER "nothing found": it says the monitor had no
+ * record to read (`reason` says why), and the screen keeps the two apart.
+ */
+export interface RunMonitor {
+  evaluated: boolean;
+  reason: string;
+  agents: number;
+  findings: MonitorFinding[];
+}
+
+/** Read a `monitor` frame. Shared by the hierarchy and crew reducers, so the two cannot disagree. */
+export function parseMonitor(data: Record<string, unknown>): RunMonitor {
+  const raw = Array.isArray(data.findings) ? data.findings : [];
+  const findings = raw
+    .filter((f): f is Record<string, unknown> => typeof f === "object" && f !== null)
+    .map((f) => ({ kind: str(f.kind), detail: str(f.detail), agents: strings(f.agents) }));
+  return {
+    evaluated: data.evaluated === true,
+    reason: str(data.reason),
+    agents: num(data.agents),
+    findings,
+  };
+}
+
 export interface OrchestrationTotals {
   tokens: number | null;
   counterfactual: number | null;
@@ -79,6 +113,8 @@ export interface OrchestrationState {
   /** Any envelope the answer was synthesised from read untrusted content. Carried on `done`
    *  because the answer is there, and a sentence made from five pages has no page attached. */
   tainted: boolean;
+  /** The cross-agent monitor's section; null until its frame arrives (or for a run that fell back). */
+  monitor: RunMonitor | null;
 }
 
 export const EMPTY_RUN: OrchestrationState = {
@@ -95,6 +131,7 @@ export const EMPTY_RUN: OrchestrationState = {
   totals: null,
   error: null,
   tainted: false,
+  monitor: null,
 };
 
 function num(value: unknown): number {
@@ -257,6 +294,9 @@ export function applyFrame(state: OrchestrationState, frame: OrchFrame): Orchest
         },
       };
 
+    case "monitor":
+      return { ...state, seq, monitor: parseMonitor(data) };
+
     case "error":
       return { ...state, seq, stage: "error", error: str(data.message) || "the run failed" };
 
@@ -330,6 +370,8 @@ export interface CrewState {
   /** False = no git repository, so the workers shared one folder and nothing was isolated. */
   isRepo: boolean | null;
   error: string | null;
+  /** The cross-agent monitor's section; null until its frame arrives. */
+  monitor: RunMonitor | null;
 }
 
 export const EMPTY_CREW: CrewState = {
@@ -342,6 +384,7 @@ export const EMPTY_CREW: CrewState = {
   answer: null,
   isRepo: null,
   error: null,
+  monitor: null,
 };
 
 function patchCrewWorker(
@@ -465,6 +508,9 @@ export function applyCrewFrame(state: CrewState, frame: OrchFrame): CrewState {
         answer: str(data.answer) || null,
         isRepo: data.is_repo === true,
       };
+
+    case "monitor":
+      return { ...state, seq, monitor: parseMonitor(data) };
 
     case "error":
       return { ...state, seq, stage: "error", error: str(data.message) || "the crew failed" };

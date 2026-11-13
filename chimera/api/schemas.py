@@ -16,6 +16,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+#: The longest expiry a switch of "Ignore permissions" may be given, in seconds (30 days). An expiry
+#: is optional; this only bounds one that is asked for.
+MAX_BYPASS_TTL_S = 30 * 24 * 3600
+
 # --- health / sessions ----------------------------------------------------------------------------
 
 
@@ -545,6 +549,9 @@ class CodeProjectBypassIn(BaseModel):
 
     path: str
     bypass_permissions: bool
+    #: Optional expiry for a switch turned ON, in seconds. Absent (the default) means it stays on
+    #: until it is turned off, as it always has (owner decisions of 27 and 28/10).
+    ttl_seconds: float | None = Field(default=None, ge=1, le=MAX_BYPASS_TTL_S)
 
 
 class CodeProjectBypassOut(BaseModel):
@@ -1599,6 +1606,12 @@ class ClaudeHookOut(BaseModel):
     timeout: int
     on_failure: str
     source: str
+    runs_here: bool | None = None
+    """Whether this hook can run on this machine: False when no sandbox isolates and it may not run on
+    the host, so it is loaded and skipped (it then follows ``on_failure``). None when knowing would need
+    a Docker probe, which this route never makes."""
+    skipped: int = 0
+    """How many times it was skipped without running since the server started."""
 
 
 class ClaudeHooksTrustIn(BaseModel):

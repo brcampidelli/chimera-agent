@@ -537,6 +537,19 @@ class Settings(BaseSettings):
         default="fence", validation_alias="CHIMERA_MCP_ERROR_TEXT_MODE"
     )
 
+    # The most text one MCP tool result may put in the model's context when its server sets no
+    # `max_output_chars` of its own. 60 000 is today's behaviour and stays the default. Lower than
+    # that (20 000 is the figure every native tool already uses), the excess is written to a file
+    # by the same collector the binary payloads use and the marker says where it is. OFF until
+    # `bench/output_ceiling/PREREGISTRATION.md` is run: whether a model that reads less of a long
+    # table answers worse is the unmeasured half.
+    mcp_default_max_output_chars: int = Field(
+        default=60_000, ge=1, validation_alias="CHIMERA_MCP_DEFAULT_MAX_OUTPUT_CHARS"
+    )
+    # The most subagents one run may spawn (`spawn_subagent`). 0 is no limit, which is today's
+    # behaviour: the count is reported either way, and a limit is chosen once somebody has seen it.
+    subagent_max_spawns: int = Field(default=0, ge=0, validation_alias="CHIMERA_SUBAGENT_MAX_SPAWNS")
+
     # --- The same shape for the BUILT-IN tools, which are the larger half of the bill.
     #
     # Twenty-two schemas go out on every step: ~3,205 tokens before the user types. Measured on 28

@@ -6,30 +6,27 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
-import rehypeHighlight from "rehype-highlight";
 import { missLabelKey, shownMissCause } from "@/lib/cache-miss";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AppWindow,
   ArrowDown,
-  Copy,
   Download,
   Eraser,
   History,
   Link2,
   ListChecks,
-  Loader2,
   MessageSquare,
   Network,
   PanelRight,
-  RotateCcw,
   Send,
   ShieldCheck,
   Square,
   Undo2,
-  Wrench,
 } from "lucide-react";
 import {
   deleteCodeSession,
@@ -75,37 +72,31 @@ import {
 } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { GroundedBadge } from "@/components/code/GroundedBadge";
-import { PolicyBlocked } from "@/components/code/PolicyBlocked";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
-import { getTranscriptView, viewShowsToolDetail } from "@/lib/transcriptView";
-import { BrowserView } from "@/components/code/BrowserView";
-import { ChartCard } from "@/components/code/ChartView";
-import { DesignFrameCard, DesignSuggestionCard, withDesign } from "@/components/code/DesignCards";
+import { getTranscriptView } from "@/lib/transcriptView";
+import { withDesign } from "@/components/code/DesignCards";
 import { designFrameOf, designSuggestionOf, type CodeDesignFrame, type CodeDesignSuggestion } from "@/lib/design/frames";
 import type { TaskCardState } from "@/lib/taskSuggestions";
-import { TaskSuggestionCards, type TaskStartOptions } from "@/components/code/TaskSuggestionCards";
+import { type TaskStartOptions } from "@/components/code/TaskSuggestionCards";
 import type { CodeChartFrame } from "@/lib/chart/spec";
-import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
-import { BatchRecord, batchNoteOf } from "@/components/code/BatchRecord";
+import { batchNoteOf } from "@/components/code/BatchRecord";
 import { useOptionalAgentBatch } from "@/lib/agent-batch";
 import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
-import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
+import { type TodoEntry } from "@/components/code/TodoPanel";
 import { turnOutputs } from "@/components/code/turnOutputs";
-import { StepsSummary } from "@/components/code/StepsSummary";
 import { ToolRow } from "@/components/code/ToolRow";
 
 // Kept importable from here: the transcript-view tests reach the row through the conversation.
 export { ToolRow };
-import { EditDiff } from "@/components/code/EditDiff";
 import { LineCommentsBar } from "@/components/code/LineComments";
 import { LastTurnMetrics } from "@/components/code/LastTurnMetrics";
 import { useSideDrawer } from "@/components/shell/sideDrawer";
 import { ConversationMenu, ConversationMenuItem, ConversationMenuToggle } from "@/components/code/ConversationMenu";
-import { CardChrome, cardId, useCardModes } from "@/components/code/CardChrome";
+import { CardChrome, useCardModes } from "@/components/code/CardChrome";
 import { useLayout } from "@/lib/layout/context";
 import { TRANSCRIPT_WIDTH_CLASS } from "@/lib/layout/model";
-import { NoticeList, type NoticeEntry } from "@/components/code/NoticeList";
+import { type NoticeEntry } from "@/components/code/NoticeList";
 import { VoiceMode, type SpokenAnswer, type SpokenAnnouncement } from "@/components/code/VoiceMode";
 import {
   EMPTY_CAST,
@@ -115,7 +106,7 @@ import {
 import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeiling";
 import { EnvironmentPicker } from "@/components/code/EnvironmentPicker";
 import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
-import { TurnSuggestions } from "@/components/code/TurnSuggestions";
+import { ExchangeView, useStableActions } from "@/components/code/ExchangeView";
 import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
 import { CodeReviewCard } from "@/components/code/CodeReviewCard";
 import { parseReviewCommand } from "@/components/code/codeReview";
@@ -136,14 +127,13 @@ import { definitionSourceLabel } from "@/lib/definition-source";
 import { recordSuggestion, turnSuggestions, welcomeSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
 import {
-  exchangeToMarkdown,
   reconcile,
   toMarkdown,
   transcriptFilename,
   type TranscriptExchange,
 } from "@/lib/transcript";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
-import { Elapsed, formatElapsed } from "@/components/code/Elapsed";
+import { formatElapsed } from "@/components/code/Elapsed";
 
 export { formatElapsed };
 import { useAgent, type AgentState } from "@/lib/agent-context";
@@ -231,7 +221,7 @@ const PLAN_MODE_LABEL: Record<PlanMode, "composer.planAuto" | "composer.planAlwa
 /** One exchange. The assistant side carries what the agent DID (tools, edits) alongside what it
  *  said, because in a coding conversation the tool calls are the substance and the prose is the
  *  caption — a transcript that shows only the prose is a transcript of the wrong half. */
-interface Exchange {
+export interface Exchange {
   you: string;
   /** Who asked, when it was not the person at this screen: a guest's name, from the turn's
    *  receipt on a replay or from its opening frame live. Absent for the owner's own turns. */
@@ -318,7 +308,7 @@ interface Exchange {
 
 /** The owner's retry of a turn the provider refused: the model they picked ("" = the install
  *  default), the refusal it answers, and the files the refused turn carried. */
-interface PolicyRetry {
+export interface PolicyRetry {
   model: string;
   /** Absent only when the refusal named no model: the server refuses a retry line naming none. */
   of?: { blocked_model: string; request_id: string | null };
@@ -477,7 +467,7 @@ function measuredSince(startedAt: number | undefined): number | undefined {
 
 /** "Context 30%" and a small bar, or the bare token count when no window is known — never a
  *  percentage of the 128,000 fallback the compaction budget uses, which would read as measured. */
-function ContextMeter({ used, window: windowTokens }: { used: number; window: number | null }) {
+export function ContextMeter({ used, window: windowTokens }: { used: number; window: number | null }) {
   const t = useT();
   const num = useNum();
   if (!windowTokens) {
@@ -845,7 +835,57 @@ export function Conversation({
   const [sessionId, setSessionId] = useState<string | null>(
     resumeSession ?? null,
   );
-  const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const [exchanges, setExchangesState] = useState<Exchange[]>([]);
+  // Streamed text is gathered here and written to state once per animation frame (P1-09). A model
+  // can send dozens of tokens a second; each `setExchanges` re-rendered the whole transcript.
+  const tokenBuffer = useRef("");
+  const tokenFrame = useRef<number | null>(null);
+  /** Write what has been gathered into the last exchange, now. Safe to call with nothing pending. */
+  const flushTokens = useCallback(() => {
+    if (tokenFrame.current !== null) {
+      cancelAnimationFrame(tokenFrame.current);
+      tokenFrame.current = null;
+    }
+    const text = tokenBuffer.current;
+    if (!text) return;
+    tokenBuffer.current = "";
+    setExchangesState((prev) =>
+      prev.length === 0 ? prev : [...prev.slice(0, -1), { ...prev[prev.length - 1], answer: prev[prev.length - 1].answer + text }],
+    );
+  }, []);
+  /**
+   * Every writer of the list goes through here, and so flushes first: the text that arrived before
+   * a tool frame, the end of the turn, an abandon or a new send is in the list BEFORE that change,
+   * in the order it came. Without this, a buffered token could land on the exchange a later
+   * `setExchanges` had just appended.
+   */
+  const setExchanges = useCallback<Dispatch<SetStateAction<Exchange[]>>>(
+    (next) => {
+      flushTokens();
+      setExchangesState(next);
+    },
+    [flushTokens],
+  );
+  /** A streamed token: held until the next frame, or written at once while the window is hidden —
+   *  a hidden window does not run animation frames, so the text would wait for it to come back. */
+  const bufferToken = useCallback(
+    (text: string) => {
+      tokenBuffer.current += text;
+      if (document.hidden || typeof requestAnimationFrame !== "function") {
+        flushTokens();
+        return;
+      }
+      if (tokenFrame.current === null) {
+        tokenFrame.current = requestAnimationFrame(() => {
+          tokenFrame.current = null;
+          flushTokens();
+        });
+      }
+    },
+    [flushTokens],
+  );
+  // Leaving the screen: nothing may stay in the buffer, and no frame may fire into an unmounted view.
+  useEffect(() => flushTokens, [flushTokens]);
   // Where this conversation's commands will run, as picked before its first message ("" = the
   // project's default). Sent with that turn only; the server fixes it there (`EnvironmentPicker`).
   const [environmentChoice, setEnvironmentChoice] = useState("");
@@ -1955,6 +1995,17 @@ export function Conversation({
     },
     [offerKey],
   );
+  // What an exchange may ask of this screen, behind one stable object (see `ExchangeActions`).
+  const exchangeActions = useStableActions({
+    openFile: (path) => onOpenFile?.(path),
+    openDesign: (id, brief) => onOpenDesign?.(id, brief),
+    send,
+    undo,
+    handOff: onHandOff,
+    startTaskCard,
+    removeTaskCard,
+    pickSuggestion,
+  });
 
   function steer(text: string) {
     const activeTurn = currentTurnRef.current ?? followingRef.current;
@@ -2262,7 +2313,7 @@ export function Conversation({
         onToken: (text) => {
           if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           publish({ status: "streaming" });
-          patchLast((e) => ({ ...e, answer: e.answer + text }));
+          bufferToken(text);
         },
         onGuidance: (text) => {
           if (activeRequestRef.current !== requestId || abandoningRef.current) return;
@@ -2826,286 +2877,25 @@ export function Conversation({
             </div>
           ) : null}
           {exchanges.map((e, i) => (
-            <div key={i} className="space-y-2">
-              <div className="rounded-chip bg-surface-2 px-2.5 py-1.5 text-sm text-foreground/90">
-                {/* A guest's turn says whose it is. The owner's own turns say nothing, as they
-                    always have — every turn before sharing existed was theirs. */}
-                {e.author ? (
-                  <span
-                    className="mr-1.5 rounded-chip bg-accent/15 px-1.5 text-xs font-medium text-accent-ink"
-                    data-testid="exchange-author"
-                  >
-                    {e.author}
-                  </span>
-                ) : null}
-                {e.you}
-                {e.selection ? (
-                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="exchange-selection">
-                    {t("code.selection.from", {
-                      file: e.selection.path,
-                      lines:
-                        e.selection.start_line === e.selection.end_line
-                          ? String(e.selection.start_line)
-                          : `${e.selection.start_line}–${e.selection.end_line}`,
-                    })}
-                  </span>
-                ) : null}
-              </div>
-              {e.startedAt !== undefined || e.finalSeconds !== undefined || e.done?.elapsed_seconds !== undefined ? (
-                <div className="flex items-center gap-2 text-xs" data-testid="turn-clock">
-                  <Elapsed
-                    startedAt={e.startedAt}
-                    finalSeconds={e.finalSeconds ?? e.done?.elapsed_seconds}
-                    testId="turn-elapsed"
-                  />
-                  {e.context && !e.done && !e.failed && !e.abandoned ? (
-                    <ContextMeter used={e.context.used} window={e.context.window} />
-                  ) : null}
-                </div>
-              ) : null}
-              {e.tools.length > 0 || e.running ? (
-                <CardChrome id={cardId(i, "tools")} kind="tools" cards={cards}
-                  summary={t("layout.card.count", { name: t("layout.card.name.tools"), n: e.tools.length })}>
-                {e.done ? (
-                  <StepsSummary tools={e.tools} edits={e.edits} detailed={viewShowsToolDetail(transcriptView)} onOpenFile={onOpenFile} />
-                ) : (
-                  <div className="space-y-1 rounded-chip border border-border p-2">
-                    <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                      <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
-                    </div>
-                    {e.tools.map((tool, j) => (
-                      <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} detailed={viewShowsToolDetail(transcriptView)} />
-                    ))}
-                    {e.running ? (
-                      <div className="flex items-baseline gap-2 font-mono text-xs" data-testid="running-step">
-                        <Loader2 className="h-3 w-3 shrink-0 animate-spin self-center text-muted-foreground" />
-                        <span className="shrink-0 text-foreground/80">{e.running.name}</span>
-                        <Elapsed startedAt={e.running.startedAt} testId="step-elapsed" />
-                        <span className="truncate text-muted-foreground">
-                          {String(Object.values(e.running.arguments)[0] ?? "")}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-                </CardChrome>
-              ) : null}
-              {e.todos.length > 0 ? (
-                <CardChrome id={cardId(i, "todo")} kind="todo" cards={cards}>
-                  <TodoPanel items={e.todos} />
-                </CardChrome>
-              ) : null}
-              {e.notices?.length ? (
-                <CardChrome id={cardId(i, "notices")} kind="notices" cards={cards}
-                  summary={t("layout.card.count", { name: t("layout.card.name.notices"), n: e.notices.length })}>
-                  <NoticeList items={e.notices} />
-                </CardChrome>
-              ) : null}
-              {e.browser ? (
-                <CardChrome id={cardId(i, "browser")} kind="browser" cards={cards}>
-                  <BrowserView frame={e.browser} />
-                </CardChrome>
-              ) : null}
-              {e.designSuggestion ? (
-                <CardChrome id={cardId(i, "design")} kind="design" cards={cards} summary={t("design.card.suggestTitle")}>
-                  <DesignSuggestionCard suggestion={e.designSuggestion} onOpen={onOpenDesign ? () => onOpenDesign(null, e.you) : undefined} />
-                </CardChrome>
-              ) : null}
-              {e.designs?.map((frame, j) => (
-                <CardChrome key={frame.document_id} id={cardId(i, "design", j + 1)} kind="design" cards={cards} summary={frame.title}>
-                  <DesignFrameCard frame={frame} onOpen={onOpenDesign ? () => onOpenDesign(frame.document_id) : undefined} />
-                </CardChrome>
-              ))}
-              {e.charts?.map((chart, j) => (
-                <CardChrome key={j} id={cardId(i, "chart", j)} kind="chart" cards={cards}
-                  summary={chart.title ?? chart.path}>
-                  <ChartCard frame={chart} onOpenFile={onOpenFile} />
-                </CardChrome>
-              ))}
-              {e.edits.map((edit, j) => {
-                return (
-                  <CardChrome key={j} id={cardId(i, "diff", j)} kind="diff" cards={cards} summary={edit.path}>
-                    <EditDiff path={edit.path} patch={edit.patch} detailed={viewShowsToolDetail(transcriptView)} onOpenFile={onOpenFile} commentScope={sessionId ? { sessionId, origin: `edit:${i}:${j}` } : undefined} />
-                  </CardChrome>
-                );
-              })}
-              {/* Working, with nothing yet to show for it.
-                  Under fusion the backend emits no token frames at all — deliberately, since the
-                  panel has no single stream to forward and a fabricated cursor would be a lie told
-                  in motion. The cost of that honesty was a screen where a fifteen-minute turn and
-                  a dead one were pixel-identical: the question, and below it nothing. This says
-                  which of the two it is, and under fusion says why the text is not arriving. */}
-              {busy && i === exchanges.length - 1 && !e.answer && !e.done && !e.failed ? (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {fuse && !e.policyRetry ? t("code.chat.workingFused") : t("code.chat.working")}
-                </p>
-              ) : null}
-              {e.answer ? (
-                // Markdown with syntax highlighting, which the chat had and this did not — a coding
-                // conversation rendering a fenced block as prose is the one formatting failure that
-                // matters here.
-                <div className="group relative">
-                  <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
-                    {/* The conversation's workspace: a relative path in the answer is a file there. */}
-                    <SafeMarkdown rehypePlugins={[rehypeHighlight]} workspace={workspace}>
-                      {e.answer}
-                    </SafeMarkdown>
-                  </div>
-                  {/* Copies the exchange as MARKDOWN, not the rendered text: what the reader wants to
-                    paste into an issue is the fenced code that made it worth reading, and the
-                    rendered version loses exactly that. */}
-                  <button
-                    type="button"
-                    aria-label={t("code.chat.copyAnswer")}
-                    title={t("code.chat.copyAnswer")}
-                    className="absolute right-0 top-0 rounded-chip p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
-                    onClick={() => {
-                      void navigator.clipboard
-                        ?.writeText(exchangeToMarkdown(e))
-                        .catch(() => undefined);
-                    }}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : null}
-              {e.guidance?.map((text, index) => (
-                <p key={`${index}:${text}`} className="text-xs text-muted-foreground" data-testid="delivered-guidance">
-                  {t("code.chat.guidanceDelivered")}: {text}
-                </p>
-              ))}
-              {e.abandoned ? (
-                // Muted, not `bad`: stopping is a decision, not a failure, and the tone is what
-                // tells those two apart before any word is read.
-                <p className="text-xs text-muted-foreground">{t("code.chat.abandoned")}</p>
-              ) : null}
-              {e.failed ? (
-                // Minimises to its first line and never closes: a turn that failed must not look like a
-                // turn that finished.
-                <CardChrome id={cardId(i, "error")} kind="error" cards={cards} summary={t("code.chat.error")}>
-                <div className="space-y-1">
-                  {/* A refusal on content policy is said as one, with what refused it, and its way
-                      forward is the owner's pick of another model — not "Try again" on the model
-                      that just refused (study 29 P5.7). */}
-                  {e.blocked ? (
-                    <PolicyBlocked
-                      block={e.blocked}
-                      canRetry={i === exchanges.length - 1 && !busy && !busyElsewhere}
-                      filesMissing={e.attachments === undefined}
-                      onRetry={(picked) => {
-                        const blocked = e.blocked;
-                        // Unknown files are not sent as no files: see `turn_started` in applyLive.
-                        if (!blocked || e.attachments === undefined) return;
-                        send(true, e.you, false, false, {
-                          model: picked,
-                          of: blocked.model
-                            ? { blocked_model: blocked.model, request_id: blocked.request_id }
-                            : undefined,
-                          attachments: e.attachments,
-                        });
-                      }}
-                      t={t}
-                    />
-                  ) : (
-                    <p className="text-xs text-bad-foreground">{t("code.chat.error")}</p>
-                  )}
-                  {/* Folded, not hidden: the headline stays one line for the common case where the
-                    user only wants to retry, and the raw provider message is one click away for
-                    the case where it says `invalid_api_key` and settles the whole question. */}
-                  {e.error ? (
-                    <details className="text-xs">
-                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                        {t("code.chat.errorDetail")}
-                      </summary>
-                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 font-mono text-muted-foreground">
-                        {e.error}
-                      </pre>
-                    </details>
-                  ) : null}
-                  {/* The button the comment above has been describing since it was written — "the
-                      common case where the user only wants to retry" had no way to retry. A failed
-                      turn is usually a provider hiccup, a rate limit or a dropped connection, and
-                      the answer to all three is the same request again. Without this the text has
-                      to be retyped, and on a long prompt it is simply lost.
-                      Only on the LAST exchange: re-sending a message from the middle of a
-                      conversation would append it at the end, in a context that has moved on. */}
-                  {i === exchanges.length - 1 && !busy && !busyElsewhere && !e.blocked ? (
-                    <Button size="sm" variant="ghost" onClick={() => send(true, e.you)}>
-                      <RotateCcw className="h-3.5 w-3.5" /> {t("common.retry")}
-                    </Button>
-                  ) : null}
-                </div>
-                </CardChrome>
-              ) : null}
-              {e.done?.fused ? (
-                // At the answer, which is the only place it lands in time. The composer warns before
-                // the click; neither warning is visible at the moment someone reads a confident
-                // description of a file that was never opened.
-                <p className="flex items-start gap-1.5 text-xs text-warn-foreground">
-                  <Network className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  {t("composer.fusedAnswer")}
-                </p>
-              ) : null}
-              {e.verified ? (
-                <CardChrome id={cardId(i, "verdict")} kind="verdict" cards={cards}>
-                <Verdict
-                  v={e.verified}
-                  undone={e.undone}
-                  keptFiles={e.keptFiles}
-                  onUndo={() => void undo(i, e.verified?.revert_token ?? "")}
-                  original={e.you}
-                  onFix={onHandOff}
-                  fixBlocked={runLive}
-                  t={t}
-                />
-                </CardChrome>
-              ) : null}
-              {e.done ? (
-                <CardChrome id={cardId(i, "receipt")} kind="receipt" cards={cards}>
-                  <TurnReceipt done={e.done} t={t} />
-                  <TurnOutputs tools={e.tools} edits={e.edits} onOpenFile={onOpenFile} t={t} />
-                </CardChrome>
-              ) : null}
-              {/* A finished batch this exchange started: after it, in the agents' own words. */}
-              {e.batches?.map((note) => <BatchRecord key={note.at} note={note} />)}
-              {e.taskCards?.length ? (
-                <TaskSuggestionCards
-                  cards={e.taskCards}
-                  busy={busy || busyElsewhere}
-                  onStart={startTaskCard}
-                  onStartAll={(batch) =>
-                    batch.forEach((c) => startTaskCard(c, { model: "", newWorktree: false }))
-                  }
-                  onHere={(c) => {
-                    // Behind a running turn the prompt would queue, so the card waits for the owner to send it.
-                    if (busy || busyElsewhere) return;
-                    // Only the id goes to the server, which sends the prompt it kept and carries the
-                    // card's taint into the turn. Forced, so the prompt is not split into a batch.
-                    taskCardRef.current = c.id;
-                    send(true, c.prompt);
-                    const sent = taskCardRef.current === null;
-                    taskCardRef.current = null;
-                    if (sent) removeTaskCard(c.id);
-                  }}
-                  onDismiss={(c) => removeTaskCard(c.id)}
-                />
-              ) : null}
-              {i === lastAt ? <TurnSuggestions items={suggestions} onPick={pickSuggestion} /> : null}
-              {/* What was closed in this turn, and the way back to it, where it was. */}
-              {cards.closedInTurn(i) > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => cards.showTurn(i)}
-                  className={cn(
-                    "rounded-chip border border-dashed border-hairline px-2.5 py-0.5 text-xs text-muted-foreground",
-                    "transition-colors duration-1 ease-out hover:border-accent hover:text-foreground",
-                  )}
-                >
-                  {t("layout.card.hiddenInTurn", { n: cards.closedInTurn(i) })}
-                </button>
-              ) : null}
-            </div>
+            <ExchangeView
+              key={i}
+              e={e}
+              i={i}
+              isLast={i === lastAt}
+              busy={busy}
+              busyElsewhere={busyElsewhere}
+              fuse={fuse}
+              runLive={runLive}
+              workspace={workspace}
+              sessionId={sessionId}
+              transcriptView={transcriptView}
+              cards={cards}
+              suggestions={i === lastAt ? suggestions : undefined}
+              actions={exchangeActions}
+              hasOpenFile={onOpenFile !== undefined}
+              hasOpenDesign={onOpenDesign !== undefined}
+              taskCardRef={taskCardRef}
+            />
           ))}
         </div>
       </div>

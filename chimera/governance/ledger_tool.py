@@ -627,7 +627,10 @@ class LedgeredTool(Tool):
         """Use the shared approval floor for ledger and kernel paths alike."""
         from chimera.governance.bypass import bypass_safe
 
-        return bypass_safe(name, args)
+        # The wrapped tool's own workspace, when it has one (the shell does): it places the targets of
+        # a recursive delete or write (bypass.py, case d).
+        workspace = getattr(getattr(self, "inner", None), "workspace", None)
+        return bypass_safe(name, args, workspace=workspace)
 
     def _why_not_approved(self) -> str:
         """The sentence after "the tool did NOT run", naming the way out of a TAINT refusal.

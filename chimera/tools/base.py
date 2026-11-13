@@ -35,6 +35,17 @@ class Tool(ABC):
     through a wrapper chain so a wrapper that forgets cannot quietly disarm the defence.
     """
 
+    clips_own_output: bool = False
+    """Whether this tool bounds its own result, so the registry's central ceiling leaves it alone.
+
+    False by default: a tool that says nothing is held to ``clip.CENTRAL_MAX_OUTPUT_CHARS`` by
+    :meth:`ToolRegistry.run`, so a new tool cannot hand the model an unbounded string by forgetting
+    to cap it. True only for a tool that has a cap of its own (and so a marker of its own that says
+    how to continue), or whose output is bounded by the registry that ran it. Resolved through the
+    ``.inner`` chain, like ``untrusted_output``, so a wrapper that forgets cannot make the tool be
+    cut twice, or not at all.
+    """
+
     open_arguments: bool = False
     """Whether a name absent from ``parameters`` is still the tool's to judge.
 
@@ -76,6 +87,18 @@ def is_untrusted_output(tool: Any) -> bool:
     current = tool
     while current is not None and seen < 16:  # bounded: a cycle must not hang the agent
         if bool(getattr(current, "untrusted_output", False)):
+            return True
+        current = getattr(current, "inner", None)
+        seen += 1
+    return False
+
+
+def clips_own_output(tool: Any) -> bool:
+    """True if ``tool`` — or anything it wraps — bounds its own output (see ``Tool.clips_own_output``)."""
+    seen = 0
+    current = tool
+    while current is not None and seen < 16:  # bounded: a cycle must not hang the agent
+        if bool(getattr(current, "clips_own_output", False)):
             return True
         current = getattr(current, "inner", None)
         seen += 1

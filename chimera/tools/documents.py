@@ -17,6 +17,7 @@ from typing import Any
 from chimera.governance.ledger_tool import fence
 from chimera.governance.sanitize import sanitize_untrusted
 from chimera.tools.base import Tool
+from chimera.tools.clip import OFFSET_PARAMETER, clip_page, parse_offset
 from chimera.tools.workspace import resolve_for
 
 _MAX_CHARS = 20_000
@@ -42,6 +43,8 @@ class _WorkspaceTool(Tool):
 
 class ReadDocumentTool(_WorkspaceTool):
     name = "read_document"
+    #: Bounds its own output: _MAX_CHARS on the text. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     # A document (PDF/DOCX/HTML/…) can carry a prompt injection exactly like a fetched web page —
     # the run() body already fences+sanitizes it for that reason. But fencing is cosmetic: without
     # this flag the taint ledger never learns the run touched untrusted content, so the downstream
@@ -57,13 +60,17 @@ class ReadDocumentTool(_WorkspaceTool):
     parameters = {
         "type": "object",
         "properties": {
-            "path": {"type": "string", "description": "Document path relative to the workspace."}
+            "path": {"type": "string", "description": "Document path relative to the workspace."},
+            "offset": OFFSET_PARAMETER,
         },
         "required": ["path"],
     }
 
     def run(self, **kwargs: Any) -> str:
         rel = str(kwargs["path"])
+        offset = parse_offset(kwargs.get("offset"))
+        if isinstance(offset, str):
+            return offset
         path = resolve_for(self, rel, verb="read")
         if not path.is_file():
             return f"error: file not found: {rel}"
@@ -73,8 +80,9 @@ class ReadDocumentTool(_WorkspaceTool):
             return _INSTALL_HINT
         except Exception as exc:  # noqa: BLE001 — a bad/unsupported file is a tool error, not a crash
             return f"error: could not read {rel}: {exc}"
-        if len(text) > _MAX_CHARS:
-            text = text[:_MAX_CHARS] + f"\n... [truncated, {len(text)} chars total]"
+        text = clip_page(text, _MAX_CHARS, offset)
+        if text.startswith("error: offset"):
+            return text
         # A PDF/DOCX/HTML is untrusted external content — a document can carry a prompt injection
         # just like a web page. Defang control tokens and data-fence it so its text can't pose as
         # instructions, matching how the browser/fetch tools return page content.

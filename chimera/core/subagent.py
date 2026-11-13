@@ -14,13 +14,22 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chimera.config import get_settings
 from chimera.core import claude_agent_format as cf
-from chimera.core.agent import Agent, AgentConfig, AgentResult, _ledgers_of, run_nested
+from chimera.core.agent import (
+    Agent,
+    AgentConfig,
+    AgentResult,
+    _ledgers_of,
+    enclosing_run,
+    run_nested,
+)
 from chimera.governance.sanitize import fence, sanitize_untrusted
 from chimera.orchestration.hierarchy import CUT_OFF_REASONS
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
-from chimera.tools.base import Tool
+from chimera.tools.base import Tool, refusal
+from chimera.tools.clip import CENTRAL_MAX_OUTPUT_CHARS, clip_output
 from chimera.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
@@ -46,6 +55,9 @@ class SubAgentTool(Tool):
     """Lets the main agent delegate a subtask to an isolated, tool-scoped subagent."""
 
     name = "spawn_subagent"
+    #: The answer is cut BEFORE the fence in `run`, at the central ceiling, so the registry's own cut
+    #: never has to guess where the answer ends inside a fenced block.
+    clips_own_output = True
     description = (
         "Delegate a self-contained subtask to a fresh subagent that runs in its own context "
         "with a chosen subset of tools and returns ONLY its final result. Use this to keep your "
@@ -110,6 +122,22 @@ class SubAgentTool(Tool):
         #: What the last delegation's run spent. Inside a run it is on that run's bill already;
         #: this is how a caller that ran the tool on its own reads it.
         self.last_spend: AgentResult | None = None
+
+    def _count_spawn(self) -> int | None:
+        """Count this delegation on the run that made it; None when the run's limit is spent.
+
+        Per run, not per tool: one tool object serves every run of an app. Outside any run (a
+        caller running the tool on its own) there is nothing to count against, so it counts 1
+        and the limit is not applied. The limit is 0 (none) unless the owner sets one.
+        """
+        run = enclosing_run()
+        if run is None:
+            return 1
+        limit = get_settings().subagent_max_spawns
+        if limit > 0 and run.usage.subagent_spawns >= limit:
+            return None
+        run.usage.subagent_spawns += 1
+        return run.usage.subagent_spawns
 
     def _current(self) -> ToolRegistry:
         return self._source() if callable(self._source) else self._source
@@ -207,6 +235,12 @@ class SubAgentTool(Tool):
         selected = self._markdown_agents.get(selected_name) if selected_name else None
         if selected_name and selected is None:
             return f"error: unknown subagent {selected_name!r}"
+        spawns = self._count_spawn()
+        if spawns is None:
+            return refusal(
+                f"this run has already spawned {get_settings().subagent_max_spawns} subagents "
+                "(CHIMERA_SUBAGENT_MAX_SPAWNS). Do the rest yourself and do not report this as done."
+            )
         if selected is None:
             sub = self._build_registry(requested_tools)
             model = self._model
@@ -252,6 +286,10 @@ class SubAgentTool(Tool):
         status = " INCOMPLETE" if result.stopped_reason in CUT_OFF_REASONS else ""
         summary = (
             f"Subagent status: {reason}{status}; steps: {result.steps}; "
-            f"tool calls: {result.tool_calls_made}."
+            f"tool calls: {result.tool_calls_made}. Spawns this run: {spawns}."
         )
-        return f"{summary}\n\n{fence(sanitize_untrusted(result.answer))}"
+        # Cut before the fence: the central ceiling would otherwise have to find the end of the
+        # answer inside the data region, and a model that delegated must not be handed 100 000
+        # characters it did not ask for. The marker sits inside the fence, with the rest.
+        answer = clip_output(sanitize_untrusted(result.answer), CENTRAL_MAX_OUTPUT_CHARS)
+        return f"{summary}\n\n{fence(answer)}"

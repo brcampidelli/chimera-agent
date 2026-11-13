@@ -1,7 +1,10 @@
 """Built-in tools reached on demand instead of declared up front.
 
-Twenty-two tools are advertised on every step of every turn. Measured on this repository's own
-registry, that is ~3,205 tokens of schema, re-sent each step, before the user has typed anything.
+Twenty-six tools are advertised on every step of every turn on the CLI. Measured on 2026-11-12 on
+the registry `chimera run` builds, that is 18,081 characters of schema (~4,520 tokens, estimated as
+characters / 4), re-sent each step, before the user has typed anything. The by-surface figures are
+generated into `docs/tool-schema-by-surface.md`; the figure this paragraph used to give (22 tools,
+~3,205 tokens) was the 0.48.0 registry, and the registry has grown since.
 
 Measured on twenty-eight real sessions from an installed 0.48.0 — 33 tool calls in all — **four
 tools account for every one of them**: `read_file` (14), `write_file` (10), `list_dir` (7),
@@ -22,7 +25,12 @@ reach `scrape`, find it absent from the declared list, and have to go through `t
 extra round trip, not a dead end. `describe_saving` reports what deferral would save on the machine
 that will pay for it, which is the only number that says anything about a given install.
 
-Off by default, for the same reason the MCP one is.
+On by default (`config.py`: `defer_tools=True`, switched on in #1210); the MCP one, `mcp_defer`, is
+still off, for the reason written in its own module. The only measurement of whether a model still
+finds a deferred tool, `bench/tool_defer/RESULT.md` (2026-09-02), was inconclusive (McNemar p = 0.125)
+and its standing recommendation was to keep it off. The second measurement is fixed in
+`bench/tool_defer/PREREGISTRATION_2.md` and has not been run. The Code turn and the CLI apply
+deferral; the cron and the bot do not (`docs/tool-schema-by-surface.md`).
 """
 
 from __future__ import annotations
@@ -242,6 +250,8 @@ class ToolDescribeTool(Tool):
 
 class ToolCallTool(Tool):
     name = "tool_call"
+    #: Bounds its own output: its runner is a ToolRegistry, which applies the ceiling by the TARGET tool; clipping the result again here would add a second marker. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Run one deferred tool by its exact name from tool_list, passing its arguments as an object. "
         "Call tool_describe first unless you already know the schema."
