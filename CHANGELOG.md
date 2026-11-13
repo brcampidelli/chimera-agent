@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.89.0] - 2026-11-12
 ### Fixed
 
 - **The "Plan first" choice survives a reload.** Auto, Always or Never in the Code composer is now remembered per conversation, and a new conversation starts at the last choice made; before, reloading the window put it back on Auto. A test also pins that a plan waiting for approval, and its card, come back after a reload. (#1239)
