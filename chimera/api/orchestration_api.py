@@ -21,6 +21,7 @@ in ``app.py`` because that file is already 105KB.
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import threading
 import uuid
@@ -44,6 +45,8 @@ if TYPE_CHECKING:
     from chimera.config import Settings
 
 _log = get_logger("api.orchestration")
+#: Workers are built on the orchestrator's threads; the dict of their ledgers is written under this.
+_ledger_lock = threading.Lock()
 
 #: Cooperative stop flags, keyed by run id. Same shape and same lifecycle as ``_agents_cancels``
 #: in ``app.py``: registered before the work starts, popped in the worker's ``finally``.
@@ -530,6 +533,37 @@ class ApproachesOut(BaseModel):
     )
 
 
+class MonitorFindingOut(BaseModel):
+    kind: str = Field(default="", description="cross-agent-taint | fan-out-volume")
+    detail: str = ""
+    agents: list[str] = Field(default_factory=list)
+
+
+class MonitorOut(BaseModel):
+    """The cross-agent monitor's section of the run's report, sent once when the workers are done.
+
+    The same monitor `chimera solve` runs over a batch (`governance.aggregate_monitor`): a split flow
+    where one worker reads something untrusted and another acts on it is invisible to each worker's
+    own ledger. It only ever asks for review; it never stops anything.
+    """
+
+    evaluated: bool = Field(
+        default=False,
+        description="False means the monitor had nothing to read, never that it found nothing.",
+    )
+    reason: str = Field(default="", description="governance_off | no_ledger, when not evaluated")
+    agents: int = Field(default=0, description="Workers whose ledgers were read.")
+    findings: list[MonitorFindingOut] = Field(default_factory=list)
+
+
+def _monitor_frame(ledgers: dict[str, Any], governance_mode: str) -> dict[str, Any]:
+    from dataclasses import asdict
+
+    from chimera.governance.aggregate_monitor import review_run
+
+    return asdict(review_run(ledgers, governance_mode=governance_mode))
+
+
 class OrchestrationFramesOut(BaseModel):
     """Every SSE payload this module can emit, in one shape a schema dump can see.
 
@@ -551,6 +585,7 @@ class OrchestrationFramesOut(BaseModel):
     crew_worker_produced: CrewWorkerProducedOut = Field(default_factory=CrewWorkerProducedOut)
     conflict: ConflictOut = Field(default_factory=ConflictOut)
     crew_done: CrewDoneOut = Field(default_factory=CrewDoneOut)
+    monitor: MonitorOut = Field(default_factory=MonitorOut)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -682,7 +717,7 @@ def register_orchestration_api(
     """
     read_settings = live_settings or (lambda: settings)
 
-    def _worker_tools(gateway: Any, ws: Path) -> Any:
+    def _worker_tools(gateway: Any, ws: Path, ledgers: dict[str, Any] | None = None) -> Any:
         """A read-only registry for one worker, built through the governed path.
 
         Via ``assemble_registry`` rather than ``default_registry``: the AST gate in
@@ -702,13 +737,20 @@ def register_orchestration_api(
         registry, ledger = assemble_registry(
             seams, ws, read_settings(), gateway, steps=6, surface="api:hierarchy"
         )
+        if ledgers is not None:
+            # Kept for the cross-agent monitor at the end of the run. The orchestrator does not name
+            # its workers to this factory, so they are numbered in the order they were built.
+            with _ledger_lock:
+                ledgers[f"worker-{len(ledgers) + 1}"] = ledger
         # The ledger goes WITH the registry: it is what records that a worker fetched a page, and
         # the orchestrator reads it after the worker acts to mark the envelope. Discarding it, as
         # this did before the workers could fetch, left the answer unable to say where a sentence
         # came from.
         return WorkerKit(registry=registry, ledger=ledger)
 
-    def _build(req: HierarchyRunIn | HierarchyPreviewIn, **extra: Any) -> Any:
+    def _build(
+        req: HierarchyRunIn | HierarchyPreviewIn, *, ledgers: dict[str, Any] | None = None, **extra: Any,
+    ) -> Any:
         from chimera.evolution import build_evolution_context
         from chimera.fusion.factory import fusion_engine
         from chimera.orchestration.artifacts import ArtifactStore
@@ -765,7 +807,7 @@ def register_orchestration_api(
             ),
             # A factory, so every worker gets its own registry and its own ledger rather than
             # sharing one across a thread pool.
-            worker_tools=lambda: _worker_tools(gateway, ws),
+            worker_tools=lambda: _worker_tools(gateway, ws, ledgers),
             **extra,
         )
 
@@ -860,12 +902,24 @@ def register_orchestration_api(
         # routes recorded different things for no reason but the order they were written.
         emit("run", {"run_id": run_id, "task": req.task, "workspace": str(ws)})
 
+        # Every worker's ledger, filled as the orchestrator builds them, for the cross-agent monitor.
+        ledgers: dict[str, Any] = {}
+        fell_back = threading.Event()
+
         def on_event(event: OrchEvent) -> None:
+            if event.kind == "fell_back":
+                fell_back.set()
+            # The monitor's section goes out just BEFORE the run's last frame: every worker has
+            # finished by then, and `done` stays the frame that closes the run. Not after a fall-back
+            # that built no worker: one agent did the work, and there is no flow between agents to
+            # read — a section there would describe a fan-out that never happened.
+            if event.kind == "done" and (ledgers or not fell_back.is_set()):
+                emit("monitor", _monitor_frame(ledgers, read_settings().governance_mode))
             emit(event.kind, {"task_id": event.task_id, "text": event.text, **event.data})
 
         def work() -> None:
             try:
-                orchestrator = _build(req, on_event=on_event, should_stop=stop.is_set)
+                orchestrator = _build(req, ledgers=ledgers, on_event=on_event, should_stop=stop.is_set)
                 approved = _plans.pop(req.plan_id, None) if req.plan_id else None
                 if approved is not None and approved.specs:
                     # The decomposition a person looked at and said yes to. Popped rather than
@@ -955,11 +1009,15 @@ def register_orchestration_api(
                 loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
         emit("run", {"run_id": run_id, "task": req.task, "workspace": str(ws)})
+        ledgers: dict[str, Any] = {}
 
         def on_event(event: OrchEvent) -> None:
             # Prefixed, because a crew worker and a hierarchy worker are not the same object and a
             # consumer must not have to guess which one a frame describes.
             name: str = event.kind
+            if name == "done":
+                # As on the hierarchy: the monitor's section just before the frame that closes the run.
+                emit("monitor", _monitor_frame(ledgers, read_settings().governance_mode))
             if name.startswith("worker_") or name == "done":
                 name = f"crew_{name}"
             emit(name, {"task_id": event.task_id, "text": event.text, **event.data})
@@ -992,14 +1050,18 @@ def register_orchestration_api(
                 # merge — the same distinction the CLI already draws between the two commands.
                 shared = SharedTaint()
 
-                def tools_for(worker_ws: Path) -> Any:
-                    registry, _ledger = assemble_registry(
+                def tools_for(name: str, worker_ws: Path) -> Any:
+                    registry, ledger = assemble_registry(
                         req, worker_ws, live, gateway,
                         steps=req.max_steps or 6, surface="api:crew", shared=shared,
                         instruction=req.task,
                         # The worker's folder is a copy; the shell grant is the project's.
                         grant_root=ws,
                     )
+                    # Each worker's own ledger, for the cross-agent monitor once they are all done:
+                    # the shared view arms narrowing live, the monitor is the aggregate backstop.
+                    with _ledger_lock:
+                        ledgers[name] = ledger
                     return registry
 
                 # `synthesize` was accepted, documented and dropped: the field reached the schema
@@ -1028,7 +1090,7 @@ def register_orchestration_api(
                     [
                         IsolatedWorker(
                             role=Role(w.name, w.instruction, model=live.tier_ladder().mid),
-                            tools=tools_for,
+                            tools=functools.partial(tools_for, w.name),
                             max_steps=req.max_steps or 6,
                         )
                         for w in req.workers

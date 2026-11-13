@@ -154,6 +154,8 @@ class McpDescribeTool(Tool):
 
 class McpCallTool(Tool):
     name = "mcp_call"
+    #: Bounds its own output: the MCPTool it runs is capped by its session (max_output_chars). The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Run one MCP tool by its exact name, with its arguments as an object. "
         "Get the name from mcp_list and the argument shape from mcp_describe."

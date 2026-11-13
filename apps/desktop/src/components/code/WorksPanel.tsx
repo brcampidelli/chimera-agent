@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
 import type { WorkInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { setVisibleInterval } from "@/lib/visibleInterval";
 
 /**
  * The conversation's background works: what was asked by voice and is being done on the strong
@@ -61,8 +62,7 @@ export function WorksPanel({
   // The clock on a running card, once a second, only while something runs.
   useEffect(() => {
     if (!anyActive) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    return setVisibleInterval(() => setNow(Date.now()), 1000);
   }, [anyActive]);
 
   if (works.length === 0) return null;

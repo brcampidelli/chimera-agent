@@ -24,8 +24,12 @@ export function ClaudeHooksNotice({ workspace }: { workspace: string }) {
   for (const origin of ["repo", "user"] as const) {
     const label = origin === "repo" ? t("settings.hooks.origin.repo") : t("settings.hooks.origin.user");
     const runnable = origin === "repo" ? data.runnable_repo : data.runnable_user;
-    const guards = data.hooks.some((h) => h.origin === origin && h.event === "PreToolUse");
-    if (guards && runnable === false) {
+    // Per hook when the server says so (`runs_here`), the origin's answer otherwise: the same fact the
+    // Hooks list marks beside each hook, so the two screens cannot disagree about one hook.
+    const inert = data.hooks.some(
+      (h) => h.origin === origin && h.event === "PreToolUse" && (h.runs_here ?? runnable) === false,
+    );
+    if (inert) {
       lines.push({ key: `run-${origin}`, text: t("code.hooks.cannotRun", { origin: label }) });
     }
     const source = data.sources.find((s) => s.origin === origin && s.enabled && s.trust && s.trust !== "trusted");
