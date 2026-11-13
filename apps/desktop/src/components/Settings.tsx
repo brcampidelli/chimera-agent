@@ -74,7 +74,7 @@ import type {
   ProviderCfg,
   SandboxState,
 } from "@/lib/types";
-import { Card, PinnedContext, Row, RowLabelContext, Toggle } from "@/components/settings/rows";
+import { AppliesContext, Card, PinnedContext, Row, RowLabelContext, Toggle } from "@/components/settings/rows";
 import { WorktreeIncludeConsent } from "@/components/settings/WorktreeIncludeConsent";
 import { ResponseStyleNote } from "@/components/ResponseStyleNote";
 import { SettingsSearchResults, type SearchTarget } from "@/components/settings/SettingsSearch";
@@ -121,7 +121,7 @@ function IdentityCard() {
   const uiLanguage = LANGS.find((l) => l.code === lang)?.label ?? "";
 
   return (
-    <Card title={t("settings.card.agent")}>
+    <Card id="settings-card-identity" title={t("settings.card.agent")}>
       <Row
         label={t("settings.row.agentName")}
         hint={t("settings.hint.agentName")}
@@ -585,7 +585,7 @@ function GovernanceAuditCard({
   const g = c.governance_audit;
   const deadline = g?.band_deadline_s;
   return (
-    <Card title={t("settings.card.governanceAudit")}>
+    <Card id="settings-card-governance-audit" title={t("settings.card.governanceAudit")}>
       <p className="px-4 py-2.5 text-xs text-muted-foreground">
         {t("settings.governanceAudit.intro")}
       </p>
@@ -1882,6 +1882,7 @@ export function Settings({
     // Built here and read by every Row, rather than threaded through eleven cards as a prop: the
     // rows that need it are three components deep and none of them is otherwise interested in the
     // config object.
+    <AppliesContext.Provider value={c.applies ?? {}}>
     <PinnedContext.Provider value={new Set(c.pinned ?? [])}>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-3 px-6 pt-6">
@@ -1960,7 +1961,7 @@ export function Settings({
             )}
             {tab === "appearance" && (
               <div className="max-w-5xl space-y-6 px-6 py-6">
-                <Card title={t("settings.card.appearance")}>
+                <Card id="settings-card-appearance" title={t("settings.card.appearance")}>
                   <Row
                     label={t("settings.row.language")}
                     hint={t("settings.hint.language")}
@@ -2014,7 +2015,7 @@ export function Settings({
             {tab === "general" && (
               <div className="w-full divide-y divide-hairline">
                 <section className="max-w-5xl space-y-6 px-6 py-6">
-                <Card title={t("settings.card.basics")}>
+                <Card id="settings-card-basics" title={t("settings.card.basics")}>
                   <Row label={t("settings.row.language")} hint={t("settings.hint.language")}>
                     <LanguageSelect />
                   </Row>
@@ -2038,7 +2039,7 @@ export function Settings({
                 <IdentityCard />
 
                 {d && (
-                  <Card title={t("settings.card.status")}>
+                  <Card id="settings-card-status" title={t("settings.card.status")}>
                     <Row label={t("settings.row.providersWithKey")}>
                       <span className="text-sm">
                         {d.configured_providers.length
@@ -2126,7 +2127,7 @@ export function Settings({
                 {/* Where a conversation's commands run besides this machine (a WSL distro). */}
                 <EnvironmentsCard />
 
-                <Card title={t("settings.card.model")}>
+                <Card id="settings-card-model" title={t("settings.card.model")}>
                   <Row
                     label={t("settings.row.costMode")}
                     hint={t("settings.hint.costMode")}
@@ -2306,7 +2307,7 @@ export function Settings({
                   </Row>
                 </Card>
 
-                <Card title={t("settings.card.apiKeys")}>
+                <Card id="settings-card-api-keys" title={t("settings.card.apiKeys")}>
                   {/* Where the next key typed below is saved (study 29, P7.7). Off: `.env`, as
                     always. On: the OS vault, with a comment left in the file. With no vault on this
                     machine the hint says so before the switch is touched, and a save that fell back
@@ -2993,5 +2994,6 @@ export function Settings({
         </div>
       </div>
     </PinnedContext.Provider>
+    </AppliesContext.Provider>
   );
 }

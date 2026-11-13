@@ -124,8 +124,9 @@ def test_each_says_when_a_save_applies() -> None:
     read theirs per call and per run, so those two have no entry (the next call)."""
     for key in ("CHIMERA_EXFIL_HOST_PATH", "CHIMERA_SHELL_FETCH_GUARD", "CHIMERA_TAINT_ROPE_LITE", DEADLINE):
         assert APPLIES_WHEN[key] == NEXT_CONVERSATION, key
-    assert "CHIMERA_WIRE_LOG" not in APPLIES_WHEN
-    assert "CHIMERA_ARM_ON_RECALLED_LESSONS" not in APPLIES_WHEN
+    # Stated, not implied: an absent key no longer stands for "the next call".
+    assert APPLIES_WHEN["CHIMERA_WIRE_LOG"] == "now"
+    assert APPLIES_WHEN["CHIMERA_ARM_ON_RECALLED_LESSONS"] == "now"
 
 
 @pytest.mark.parametrize("key", [*sorted(SWITCHES), DEADLINE])

@@ -1,211 +1,14 @@
 import { Fragment } from "react";
 
+import { SEARCH_INDEX, type SearchEntry, type SearchableTab, type SearchTarget } from "@/components/settings/searchIndex";
 import { useT, type TFunc } from "@/lib/i18n";
 
 /**
  * Search across Settings by what the person reads: the translated label and description of each
  * option, never a list of English keywords kept beside them. An option found here opens the tab that
- * holds it.
- *
- * The index names i18n keys, not strings, so a result is in the interface language and a search for
- * "idioma" finds "Idioma" without a second vocabulary to maintain.
+ * holds it. What can be found is in `searchIndex.ts`.
  */
-export type SearchableTab = "general" | "appearance" | "security" | "connections";
-
-/**
- * Where a result lands. `anchor` is the id of the element to reveal: a switch, or a whole card.
- * `advanced` says it sits inside the Advanced block, which is closed until opened, so the screen has
- * to open it first. Before this existed, a result switched tabs and stopped there, and the card it
- * named was out of sight.
- */
-export interface SearchTarget {
-  tab: SearchableTab;
-  anchor?: string;
-  advanced?: boolean;
-}
-
-interface SearchEntry extends SearchTarget {
-  label: string;
-  hint?: string;
-  /** Words to search by beyond the label and hint: an i18n key whose value is a comma-separated list. */
-  terms?: string;
-}
-
-const inAdvanced = (anchor: string): SearchTarget => ({ tab: "general", anchor, advanced: true });
-
-const ENTRIES: readonly SearchEntry[] = [
-  { tab: "appearance", label: "settings.row.language", hint: "settings.hint.language" },
-  { tab: "appearance", label: "settings.row.theme", hint: "settings.hint.theme" },
-  { tab: "appearance", label: "settings.row.accent" },
-  { tab: "appearance", label: "settings.row.motion" },
-  { tab: "appearance", label: "settings.row.textSize" },
-  { tab: "appearance", label: "settings.row.transcriptWidth" },
-  { tab: "appearance", label: "settings.row.transcriptView" },
-  { tab: "general", label: "code.sessions.defaultProject", hint: "code.workspacePlaceholder" },
-  { tab: "general", label: "settings.row.defaultModel" },
-  { tab: "general", label: "code.style.label", hint: "profile.style.contextual" },
-  { tab: "general", label: "settings.row.agentName", hint: "settings.hint.agentName" },
-  { tab: "general", label: "settings.row.agentLanguage" },
-  { tab: "general", label: "settings.row.voiceModel", hint: "settings.hint.voiceModel" },
-  { tab: "general", label: "settings.row.voiceWorkModel", hint: "settings.hint.voiceWorkModel" },
-  { tab: "general", label: "notify.row.finish" },
-  { tab: "general", label: "notify.row.minSeconds", hint: "notify.hint.minSeconds" },
-  { tab: "general", label: "notify.row.approvals", hint: "notify.hint.approvals" },
-  { tab: "general", label: "settings.row.costMode", hint: "settings.hint.costMode" },
-  {
-    tab: "general",
-    label: "env.settings.title",
-    hint: "env.settings.hint",
-    anchor: "settings-card-environments",
-    terms: "settings.search.terms.environments",
-  },
-  { tab: "general", label: "env.ssh.hosts.title", hint: "env.ssh.hosts.hint", anchor: "settings-ssh-hosts" },
-  {
-    tab: "general",
-    label: "settings.card.autonomy",
-    anchor: "settings-card-autonomy",
-    terms: "settings.search.terms.autonomy",
-  },
-  // The two agent-authority switches sit on the autonomy card, on General, not in the Advanced block.
-  {
-    tab: "general",
-    label: "settings.row.pullRequests",
-    hint: "settings.hint.pullRequests",
-    anchor: "settings-pull-requests",
-    terms: "settings.search.terms.pullRequests",
-  },
-  {
-    tab: "general",
-    label: "settings.row.closeLoop",
-    hint: "settings.hint.closeLoopNoSecret",
-    anchor: "settings-close-loop",
-    terms: "settings.search.terms.closeLoop",
-  },
-  {
-    tab: "general",
-    label: "settings.row.archiveOnPrMerge",
-    hint: "settings.hint.archiveOnPrMerge",
-    anchor: "settings-archive-on-pr-merge",
-    terms: "settings.search.terms.archiveOnPrMerge",
-  },
-  {
-    tab: "general",
-    label: "settings.row.claudeCompat",
-    hint: "settings.hint.claudeCompat",
-    anchor: "settings-claude-compat",
-    terms: "settings.search.terms.claudeCompat",
-  },
-  {
-    tab: "general",
-    label: "settings.row.idleCompaction",
-    hint: "settings.hint.idleCompaction",
-    anchor: "settings-idle-compaction",
-    terms: "settings.search.terms.idleCompaction",
-  },
-  {
-    tab: "general",
-    label: "settings.row.worktreeCleanup",
-    hint: "settings.hint.worktreeCleanup",
-    anchor: "settings-worktree-cleanup",
-  },
-  {
-    tab: "general",
-    label: "settings.row.hooks",
-    hint: "settings.hint.hooks",
-    anchor: "settings-hooks",
-  },
-  {
-    tab: "general",
-    label: "settings.row.hooksHostExec",
-    hint: "settings.hint.hooksHostExec",
-    anchor: "settings-hooks-host-exec",
-  },
-  {
-    tab: "general",
-    label: "settings.row.claudeHooksRepo",
-    hint: "settings.hint.claudeHooksRepo",
-    anchor: "settings-claude-hooks-repo",
-  },
-  {
-    tab: "general",
-    label: "settings.row.claudeHooksUser",
-    hint: "settings.hint.claudeHooksUser",
-    anchor: "settings-claude-hooks-user",
-  },
-  {
-    tab: "general",
-    label: "settings.row.claudeUserHostExec",
-    hint: "settings.hint.claudeUserHostExec",
-    anchor: "settings-claude-user-host-exec",
-  },
-  {
-    tab: "general",
-    label: "settings.row.closeLoopMerge",
-    hint: "settings.hint.closeLoopMerge",
-    anchor: "settings-close-loop-merge",
-    terms: "settings.search.terms.closeLoopMerge",
-  },
-  // The Security screen's Access card: the browser's way to the owner's screen (a code, then a session).
-  {
-    tab: "security",
-    label: "browserPairing.title",
-    anchor: "settings-browser-pairing",
-    terms: "settings.search.terms.browserPairing",
-  },
-  // Named endpoints sit on Connections, not on General, so the result names that tab and reveals the card.
-  {
-    tab: "connections",
-    label: "settings.card.endpoints",
-    anchor: "settings-card-endpoints",
-    terms: "settings.search.terms.endpoints",
-  },
-  // The Advanced block: every card in it is indexed, because a closed block hides what the search
-  // leaves out. The two bridge switches are indexed by row as well, so "ponte" lands on the switch.
-  // The bots' voice switches (Discord's card; Telegram's sits beside it under the same keys).
-  {
-    ...inAdvanced("settings-voice-listen-discord"),
-    label: "settings.row.voiceListen",
-    hint: "settings.hint.voiceListenDownload",
-    terms: "settings.search.terms.voice",
-  },
-  {
-    ...inAdvanced("settings-voice-reply-discord"),
-    label: "settings.row.voiceReply",
-    hint: "settings.hint.voiceReply",
-    terms: "settings.search.terms.voice",
-  },
-  {
-    ...inAdvanced("settings-chat-voice-model-discord"),
-    label: "settings.row.chatVoiceModel",
-    hint: "settings.hint.chatVoiceModel",
-    terms: "settings.search.terms.voice",
-  },
-  { ...inAdvanced("settings-card-pools"), label: "settings.card.pools" },
-  { ...inAdvanced("settings-card-memory"), label: "settings.card.memory" },
-  { ...inAdvanced("settings-card-cache-sandbox"), label: "settings.card.cacheSandbox" },
-  { ...inAdvanced("settings-card-mcp"), label: "settings.card.mcp" },
-  { ...inAdvanced("settings-card-automation"), label: "settings.card.automation" },
-  { ...inAdvanced("settings-card-keep-awake"), label: "settings.card.keepAwake" },
-  { ...inAdvanced("settings-card-experimental"), label: "settings.card.experimental" },
-  { ...inAdvanced("settings-card-system-one"), label: "settings.card.systemOne" },
-  { ...inAdvanced("settings-card-storage"), label: "settings.card.storage" },
-  { ...inAdvanced("settings-card-diagnostics"), label: "settings.card.diagnostics" },
-  { ...inAdvanced("settings-card-server"), label: "settings.card.server" },
-  { ...inAdvanced("settings-card-sharing"), label: "settings.card.sharing" },
-  { ...inAdvanced("settings-card-bridge"), label: "settings.card.bridge", terms: "settings.search.terms.bridge" },
-  {
-    ...inAdvanced("settings-desktop-bridge"),
-    label: "settings.row.desktopBridge",
-    hint: "settings.hint.desktopBridge",
-    terms: "settings.search.terms.bridge",
-  },
-  {
-    ...inAdvanced("settings-desktop-bridge-full"),
-    label: "settings.row.desktopBridgeFull",
-    hint: "settings.hint.desktopBridgeFull",
-    terms: "settings.search.terms.bridge",
-  },
-];
+export type { SearchableTab, SearchTarget };
 
 interface Match {
   entry: SearchEntry;
@@ -216,10 +19,10 @@ interface Match {
 function search(query: string, t: TFunc): Match[] {
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return [];
-  return ENTRIES.map((entry) => ({
+  return SEARCH_INDEX.map((entry) => ({
     entry,
-    label: t(entry.label),
-    hint: entry.hint ? t(entry.hint) : "",
+    label: t(entry.label, entry.params),
+    hint: entry.hint ? t(entry.hint, entry.params) : "",
     terms: entry.terms ? t(entry.terms) : "",
   })).filter(({ label, hint, terms }) => `${label} ${hint} ${terms}`.toLocaleLowerCase().includes(needle));
 }
@@ -265,7 +68,7 @@ export function SettingsSearchResults({
       ) : (
         <ul className="divide-y divide-hairline overflow-hidden rounded-card border border-border">
           {matches.map(({ entry, label, hint }) => (
-            <li key={entry.label}>
+            <li key={`${entry.label}:${JSON.stringify(entry.params ?? {})}`}>
               <button
                 type="button"
                 className="w-full px-4 py-3 text-left hover:bg-surface-hover"

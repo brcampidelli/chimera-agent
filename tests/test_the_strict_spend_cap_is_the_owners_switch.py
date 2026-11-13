@@ -44,7 +44,7 @@ def test_saved_from_the_screen_the_next_run_is_strict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Read when each run builds its budget, so no APPLIES_WHEN entry and no relaunch."""
-    assert "CHIMERA_STRICT_SPEND_CAP" not in APPLIES_WHEN
+    assert APPLIES_WHEN["CHIMERA_STRICT_SPEND_CAP"] == "now"
     env = tmp_path / ".env"
     monkeypatch.chdir(tmp_path)
     # Owned before the save, which exports what it writes to this process's environment.

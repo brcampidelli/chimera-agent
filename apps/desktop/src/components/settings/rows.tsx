@@ -54,6 +54,9 @@ export function AppliesNote({ when }: { when?: string }) {
   const t = useT();
   // `commands_now`: two moments, not one. What builds its sandbox per use (a `!` command, a
   // workflow, the verifier) takes the save at once; an open chat keeps the tools it was built with.
+  // `now` is the plain case, stated since an absent entry stopped meaning it. `unverified` (and
+  // anything the server adds that this build does not know) says nothing, on purpose: a sentence
+  // about a setting nobody traced is the confident wrong answer this label exists to stop.
   const key =
     when === "next_launch"
       ? "settings.applies.nextLaunch"
@@ -61,10 +64,21 @@ export function AppliesNote({ when }: { when?: string }) {
         ? "settings.applies.nextConversation"
         : when === "commands_now"
           ? "settings.applies.commandsNow"
-          : null;
+          : when === "now"
+            ? "settings.applies.now"
+            : null;
   if (!key) return null;
-  return <div className="text-xs text-warn-foreground">{t(key)}</div>;
+  // The two later moments are a caveat and read as one; "now" is good news and reads quieter.
+  return <div className={when === "now" ? "text-xs text-muted-foreground" : "text-xs text-warn-foreground"}>{t(key)}</div>;
 }
+
+/**
+ * What the server says about when each saved setting applies (`config.applies`), for the Rows that
+ * name their variable. A Row used to be handed it one by one and most were not, so most rows said
+ * nothing; read here by `env`, every row that names a variable can say it, and an explicit
+ * `applies` prop still wins.
+ */
+export const AppliesContext = createContext<Readonly<Record<string, string>>>({});
 
 /** The env vars this server inherited from its own environment, so a Row can say it is one of them. */
 export const PinnedContext = createContext<ReadonlySet<string>>(new Set());
@@ -110,6 +124,8 @@ export function Row({
   note?: ReactNode;
   children: ReactNode;
 }) {
+  const appliesByEnv = useContext(AppliesContext);
+  const moment = applies ?? (env ? appliesByEnv[env] : undefined);
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
@@ -120,7 +136,7 @@ export function Row({
           </div>
         )}
         {note}
-        <AppliesNote when={applies} />
+        <AppliesNote when={moment} />
         <PinnedNote env={env} />
       </div>
       <div className="flex shrink-0 items-center gap-2">

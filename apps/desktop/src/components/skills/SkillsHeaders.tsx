@@ -2,6 +2,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
+import { EmptyState } from "@/components/ui/panel";
 import { SkillsActiveNow } from "@/components/SkillsActiveNow";
 import { useT } from "@/lib/i18n";
 import type { CatalogEntry, LibraryCard, PinnedCatalog, SkillsResponse } from "@/lib/types";
@@ -15,12 +16,15 @@ export function MineHeader({
   skills,
   learnedEmpty,
   onReview,
+  onDiscover,
 }: {
   skills: UseQueryResult<SkillsResponse>;
   /** Learned cards are none while Mine still lists something else: said here, since that empty
    *  section is not drawn. */
   learnedEmpty: boolean;
   onReview: () => void;
+  /** Opens the library, the way to a first skill. */
+  onDiscover?: () => void;
 }) {
   const t = useT();
   const stats = skills.data?.stats ?? [];
@@ -44,7 +48,18 @@ export function MineHeader({
       {skills.data?.cards_read === false && stats.length > 0 ? (
         <p className="text-xs text-muted-foreground">{t("skills.notRead")}</p>
       ) : null}
-      {learnedEmpty && skills.isSuccess ? <p className="text-xs text-muted-foreground">{t("skills.empty")}</p> : null}
+      {learnedEmpty && skills.isSuccess ? (
+        <EmptyState
+          text={t("skills.empty")}
+          action={
+            onDiscover ? (
+              <Button size="sm" variant="outline" onClick={onDiscover}>
+                {t("skills.empty.action")}
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : null}
     </div>
   );
 }
