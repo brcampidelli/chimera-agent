@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Security: what holds is visible, and the bypass is on the record.** Turning "Ignore permissions" on or off now writes a `bypass_toggle` entry (scope, id, origin) to the audit log, and a switch can take an optional expiry (none by default); Settings > Security opens with one card, computed by the code that decides, showing what still asks you with the switch on, where commands really run, the checks in each place and which switches are on; with the switch on, a recursive delete or write outside the project and your user folder asks again (a lexical check that lowers the risk, not a boundary); crew and hierarchy runs end with the cross-agent monitor's section on the Orchestration tab, which says "not evaluated" rather than "nothing found" when there was nothing to read; and the Hooks list marks a hook that cannot run on this machine with how often it was skipped. (P1-11) (#1246)
+
 - **Tools:** every tool result is now capped at 20 000 characters at the registry (tools that already capped themselves are unchanged), `http_get`, `scrape` and `read_document` take an `offset` to read on past a cut, and a subagent run reports how many subagents it spawned; the lower MCP ceiling and a spawn limit are options that stay off. (#1243)
 
 ### Fixed
