@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-138 directories: 124 with result, 12 preregistered, no result, 0 wrapper, 2 neither.
+139 directories: 124 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
@@ -97,6 +97,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`memory_selection`](memory_selection/) | preregistered, no result | 1 | 0 |
 | [`memory_staleness`](memory_staleness/) | with result | 1 | 2 |
 | [`other_rule`](other_rule/) | with result | 1 | 1 |
+| [`output_ceiling`](output_ceiling/) | preregistered, no result | 1 | 0 |
 | [`overseer_battery`](overseer_battery/) | with result | 1 | 1 |
 | [`panel_correlation`](panel_correlation/) | with result | 0 | 1 |
 | [`parallel_tools`](parallel_tools/) | with result | 1 | 2 |
