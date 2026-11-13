@@ -17,7 +17,6 @@ import {
   getCodeSessionRaw,
   listArchivedCodeSessions,
   listCodeSessions,
-  listRunningTurns,
   markCodeSessionDone,
   markCodeSessionSeen,
   registerCodeProject,
@@ -49,6 +48,7 @@ import { forgetLineComments } from "@/lib/line-comments";
 import { usePendingUserQuestions } from "@/lib/usePendingUserQuestions";
 import { cn } from "@/lib/utils";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
+import { useRunningTurns } from "@/lib/useRunningTurns";
 
 /** Rows a section shows before "show more". Five is what fits a 240px column several projects deep
  *  without the first project pushing every other one below the fold. */
@@ -143,11 +143,7 @@ export function SessionSidebar({
   // Which conversations have a turn running, asked often because the answer is kept in memory on the
   // server and is one small list. A turn keeps running when the screen that started it goes away, so
   // this is the only way a person who moved to another conversation learns that one is still working.
-  const running = useQuery({
-    queryKey: ["code-turns-running"],
-    queryFn: listRunningTurns,
-    refetchInterval: 4000,
-  });
+  const running = useRunningTurns();
   const runningIds = new Set((running.data ?? []).map((turn) => turn.session_id));
   // The questions waiting for the owner, read from the cache the status bar already polls — no
   // second timer. A question arrives in the middle of a turn, when nothing else would refresh the

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.telemetry import get_logger
-from chimera.tools.base import Tool, is_refusal, unknown_arguments_error
+from chimera.tools.base import Refusal, Tool, clips_own_output, is_refusal, unknown_arguments_error
 
 _log = get_logger("tools.registry")
 
@@ -139,6 +139,22 @@ class ToolRegistry:
             # one the tool would have ignored, and a governance gate approving a call that then
             # quietly did something else is not a check worth running.
             out = unknown_arguments_error(tool, kwargs) or tool.run(**kwargs)
+            # The one ceiling under every tool: whatever does not bound its own output is cut here,
+            # head only, with the `[truncated,` marker. It runs on the OUTSIDE of any wrapper, where
+            # the taint layer's fence is already on the text, and `clip_central` keeps that fence shut.
+            from chimera.tools.clip import CENTRAL_MAX_OUTPUT_CHARS, clip_central
+
+            # A refusal is our own short sentence and is known by its TYPE; a cut would lose it.
+            if (
+                len(out) > CENTRAL_MAX_OUTPUT_CHARS
+                and not isinstance(out, Refusal)
+                and not clips_own_output(tool)
+            ):
+                raw_chars = len(out)
+                clipped = clip_central(out)
+                if clipped is not out:
+                    out = clipped
+                    sp.set(**{"tool.output_clipped": True, "tool.output_raw_chars": raw_chars})
             # Same question as `Agent.run` asks, so it must have the same answer — the rule
             # was written out twice and only one copy knew about refusals.
             sp.set(**{

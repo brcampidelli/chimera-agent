@@ -238,7 +238,18 @@ installer).
 pip install chimera-agent
 ```
 That gives you the `chimera` command. (The examples below use `uv run chimera` for a from-source
-checkout — with a pip install, just run `chimera …`.) To hack on Chimera itself, clone the repo:
+checkout — with a pip install, just run `chimera …`.)
+
+To use `chimera` as a tool without touching a project's environment, install it with
+[uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/); both put it in its own isolated
+environment and on your `PATH`:
+```bash
+uv tool install chimera-agent       # upgrade later with: uv tool upgrade chimera-agent
+pipx install chimera-agent          # upgrade later with: pipx upgrade chimera-agent
+```
+Extras go in brackets, as with pip: `uv tool install 'chimera-agent[full]'`.
+
+To hack on Chimera itself, clone the repo:
 ```bash
 git clone https://github.com/brcampidelli/chimera-agent.git
 cd chimera-agent

@@ -16,6 +16,7 @@ import type {
   AgentsBatch,
   AppConfig,
   ClaudeHooks,
+  SafetyOverview,
   DelegationSummary,
   HierarchyPreview,
   ConfigTest,
@@ -249,6 +250,10 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
+// The security card. A POST and never cached, for the reason the posture line is: a sandbox that
+// stopped answering since the last read has to change the answer.
+export const getSecurityOverview = () =>
+  json<SafetyOverview>("/api/security/overview", { method: "POST" });
 export const getClaudeHooks = (project?: string) =>
   json<ClaudeHooks>(`/api/config/hooks${project ? `?project=${encodeURIComponent(project)}` : ""}`);
 // Confirms a repository's hooks (their current bytes): the owner's screen writes it, never the token alone.

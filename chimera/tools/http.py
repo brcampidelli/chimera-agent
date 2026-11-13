@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from chimera.tools.base import Tool
+from chimera.tools.clip import OFFSET_PARAMETER, clip_page, parse_offset
 from chimera.tools.final_url import set_final_url
 
 _MAX_BODY_CHARS = 20_000
@@ -15,12 +16,15 @@ _DEFAULT_TIMEOUT = 30.0
 
 class HttpGetTool(Tool):
     name = "http_get"
+    #: Bounds its own output: _MAX_BODY_CHARS on the body. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = "Fetch a URL with an HTTP GET and return status + body text."
     parameters = {
         "type": "object",
         "properties": {
             "url": {"type": "string", "description": "The URL to fetch (http/https)."},
             "timeout": {"type": "number", "description": "Timeout in seconds (default 30)."},
+            "offset": OFFSET_PARAMETER,
         },
         "required": ["url"],
     }
@@ -32,6 +36,9 @@ class HttpGetTool(Tool):
 
         url = str(kwargs["url"])
         timeout = float(kwargs.get("timeout") or _DEFAULT_TIMEOUT)
+        offset = parse_offset(kwargs.get("offset"))
+        if isinstance(offset, str):
+            return offset
         try:
             # SSRF guard + manual redirects (re-checked per hop) + a streamed download-size cap — the
             # same protections the scrape tools got; http_get is directly model-callable.
@@ -50,8 +57,9 @@ class HttpGetTool(Tool):
                         status = response.status_code
                         encoding = response.encoding or "utf-8"
                     body = bytes(raw).decode(encoding, errors="replace")
-                    if len(body) > _MAX_BODY_CHARS:
-                        body = body[:_MAX_BODY_CHARS] + f"\n... [truncated, {len(body)} chars total]"
+                    body = clip_page(body, _MAX_BODY_CHARS, offset)
+                    if body.startswith("error: offset"):
+                        return body
                     set_final_url(url)  # the hop that supplied this body, read by the ledger
                     return f"[{status}] {url}\n{body}"
                 return f"error: too many redirects fetching {url!r}"

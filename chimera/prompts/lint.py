@@ -15,6 +15,9 @@ numbers down. Each check names the rule it serves:
 - **tools in prose**: a tool named in prompt text. Rule 6 says to name a tool only where it exists;
   a sentence about a tool the session was not given invites a call to nothing.
 - **length**: sections over a word budget. The plan budgets each layer.
+- **tool schema**: the schema each surface sends, in characters, by default and with
+  ``defer_tools=False`` (:func:`tool_schema_totals`). The prompts above are text the registry holds;
+  the schema is the larger half of what is re-sent, and it was in no total at all.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from chimera.prompts.registry import SECTIONS
 
@@ -222,3 +226,15 @@ def lint_registry() -> Report:
             f"{len(report.affective_claims)} hits exceeds ceiling {ceiling}",
         ))
     return report
+
+
+def tool_schema_totals() -> list[dict[str, Any]]:
+    """The tool-schema section: one row per surface, measured or declared as not measured.
+
+    Apart from :func:`lint_registry` because it assembles each surface (seconds, not milliseconds)
+    and the rules above are checked on every test run. Like the rest of the lint it reports and never
+    fails. Tokens are characters / 4, an estimate, and each row says so.
+    """
+    from chimera.prompts.tool_schemas import lint_rows
+
+    return lint_rows()
