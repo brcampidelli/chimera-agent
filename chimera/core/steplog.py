@@ -202,6 +202,9 @@ class StepLog:
     #: with ``CHIMERA_WIRE_LOG`` off. They are what lets reconciliation account for every wire
     #: record of a run instead of reading each of these as a step the trace lost (S30-61).
     side_calls: list[dict[str, Any]] = field(default_factory=list)
+    #: How many subagents this run delegated to. Absent from the trace line while zero, so a run
+    #: that never delegated serialises exactly as it did.
+    subagent_spawns: int = 0
 
     def add(self, step: StepRecord) -> None:
         self.steps.append(step)
@@ -396,6 +399,8 @@ class StepLog:
         # Only when opt-in data exists: otherwise the serialized trace shape stays unchanged.
         if self.side_calls:
             row["side_calls"] = [dict(call) for call in self.side_calls]
+        if self.subagent_spawns:
+            row["subagent_spawns"] = self.subagent_spawns
         return row
 
     def _summary_dict(self) -> dict[str, Any]:

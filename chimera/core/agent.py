@@ -878,6 +878,10 @@ class _UsageTally:
     # REQUESTED model produced a plausible-looking figure for calls that never happened.
     usd: float = 0.0
     unpriced: str | None = None
+    #: Subagents this run delegated to (`spawn_subagent`). A count rather than a spend: each one's
+    #: tokens are already folded in by `add_nested`, but how MANY there were is what tells a
+    #: fan-out of twelve from one, and nothing else in the result says.
+    subagent_spawns: int = 0
 
     def add(self, result: CompletionResult) -> None:
         from chimera.orchestration.receipts import price_completion
@@ -2684,6 +2688,7 @@ class Agent:
         from chimera.obs import record_llm_metrics
 
         log = steplog if steplog is not None else StepLog()
+        log.subagent_spawns = usage.subagent_spawns
         run_id = ""
         wire_scope, _ = wire_context.current()
         if wire_scope is not None:

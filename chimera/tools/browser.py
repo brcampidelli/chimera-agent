@@ -487,6 +487,8 @@ def _is_paired_browser_refusal(exc: BaseException) -> bool:
 
 class BrowserTool(Tool):
     name = "browser"
+    #: Bounds its own output: _MAX_CHARS on the page text (render_text). The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Navigate and read the web. Actions: navigate (url); read = list interactive elements as "
         "[ref] role: name (use a ref to click/type); read_text (url?) = the page's full rendered "

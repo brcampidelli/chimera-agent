@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- **Tools:** every tool result is now capped at 20 000 characters at the registry (tools that already capped themselves are unchanged), `http_get`, `scrape` and `read_document` take an `offset` to read on past a cut, and a subagent run reports how many subagents it spawned; the lower MCP ceiling and a spawn limit are options that stay off. (#1243)
 
 ### Fixed
 
