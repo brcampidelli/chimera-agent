@@ -118,6 +118,8 @@ class ArxivSearchTool(Tool):
 
 class YouTubeTranscriptTool(Tool):
     name = "youtube_transcript"
+    #: `_MAX_OUTPUT_CHARS` on the transcript, with its own marker.
+    clips_own_output = True
     description = "Fetch the transcript (captions) of a YouTube video by id or URL."
     parameters = {
         "type": "object",

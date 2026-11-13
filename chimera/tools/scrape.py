@@ -20,12 +20,15 @@ from chimera.scrape.crawl import crawl_site, map_site
 from chimera.scrape.extract import extract_by_css, extract_structured
 from chimera.scrape.fetch import fetch_page
 from chimera.tools.base import Tool
+from chimera.tools.clip import OFFSET_PARAMETER, clip_page, parse_offset
 
 _MAX_CHARS = 20_000
 
 
 class ScrapeTool(Tool):
     name = "scrape"
+    #: Bounds its own output: _MAX_CHARS on the page body. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Fetch a web page and return its content as clean Markdown (renders JavaScript when the plain "
         "fetch is empty). Args: url; optional render (auto|http|browser|firecrawl); include_links. "
@@ -42,6 +45,7 @@ class ScrapeTool(Tool):
                 "description": "Fetch strategy (default auto: HTTP, escalate to browser/Firecrawl if empty).",
             },
             "include_links": {"type": "boolean", "description": "Also list the page's links."},
+            "offset": OFFSET_PARAMETER,
         },
         "required": ["url"],
     }
@@ -50,6 +54,9 @@ class ScrapeTool(Tool):
         url = str(kwargs.get("url", "")).strip()
         if not url:
             return "error: scrape needs a url"
+        offset = parse_offset(kwargs.get("offset"))
+        if isinstance(offset, str):
+            return offset
         render = str(kwargs.get("render", "auto")).strip() or "auto"
         if render not in ("auto", "http", "browser", "firecrawl"):
             return f"error: unknown render {render!r} (use auto/http/browser/firecrawl)"
@@ -60,8 +67,9 @@ class ScrapeTool(Tool):
         header = f"[source: {page.source} · {page.url}" + (f" · status {page.status}]" if page.status else "]")
         title = f"# {page.title}\n" if page.title else ""
         body = page.markdown.strip() or "(no readable content)"
-        if len(body) > _MAX_CHARS:
-            body = body[:_MAX_CHARS] + f"\n... [truncated, {len(page.markdown.strip())} chars total]"
+        body = clip_page(body, _MAX_CHARS, offset)
+        if body.startswith("error: offset"):
+            return body
         out = f"{title}{header}\n\n{body}"
         if kwargs.get("include_links") and page.links:
             out += "\n\n## Links\n" + "\n".join(page.links[:50])
@@ -185,6 +193,8 @@ class MapTool(Tool):
 
 class CrawlTool(Tool):
     name = "crawl"
+    #: Bounds its own output: _MAX_CHARS on the whole listing. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Crawl a site: follow links from a seed URL and return each page's clean Markdown. Bounded by "
         "limit + max_depth, same-domain by default, and robots.txt-aware. Args: url; optional limit, "

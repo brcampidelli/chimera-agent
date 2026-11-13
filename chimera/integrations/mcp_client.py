@@ -21,6 +21,7 @@ from typing import Any, Protocol
 
 from chimera.integrations.connectors import Connector
 from chimera.integrations.mcp_payloads import (
+    PayloadRefused,
     PayloadSink,
     binary_block_text,
     bound_sink,
@@ -66,6 +67,10 @@ class MCPTool(Tool):
     #: chosen by the server, so it won't be in the static FETCH_TOOLS set; this marker tells
     #: ``LedgeredTool`` to taint-track it regardless of name.
     untrusted_output = True
+
+    #: Bounded by the session (``max_output_chars``, per server), which says where it cut and how much
+    #: there was. The central ceiling in `ToolRegistry.run` leaves it alone: one cap, one marker.
+    clips_own_output = True
 
     #: The arguments go to the server verbatim and the server validates them against its own schema,
     #: where an unlisted name is allowed unless ``additionalProperties`` is false (JSON Schema's
@@ -274,14 +279,43 @@ def _serialised_in(structured: Any, texts: list[str]) -> bool:
 DEFAULT_MAX_OUTPUT_CHARS = 60_000
 
 
-def _cap_output(text: str, max_output_chars: int | None) -> str:
-    """Bound the text a server can hand to the model, while making the loss explicit."""
+def _resolve_cap(explicit: int | None) -> tuple[int, bool]:
+    """The cap on a server's answer and whether the excess is kept in a file.
+
+    A server's own ``max_output_chars`` always wins and keeps the plain marker. Without one the cap
+    is ``CHIMERA_MCP_DEFAULT_MAX_OUTPUT_CHARS``, 60 000 unless the owner changed it. Below that
+    default the cut part is written out (a lowered ceiling must not make the rest unreachable);
+    at the default nothing changes, byte for byte.
+    """
+    if explicit is not None:
+        return explicit, False
+    from chimera.config import get_settings
+
+    cap = get_settings().mcp_default_max_output_chars
+    return cap, cap < DEFAULT_MAX_OUTPUT_CHARS
+
+
+def _spill(text: str, sink: PayloadSink) -> str:
+    """Write the whole answer to ``sink`` and say where, or "" when it could not be stored."""
+    try:
+        stored = sink.store(text.encode("utf-8"), ".txt")
+    except PayloadRefused:
+        return ""
+    return f"; full output saved to {stored.shown}"
+
+
+def _cap_output(text: str, max_output_chars: int | None, sink: PayloadSink | None = None) -> str:
+    """Bound the text a server can hand to the model, while making the loss explicit.
+
+    With a ``sink``, the whole answer is kept there and the marker names the file.
+    """
     if max_output_chars is None or len(text) <= max_output_chars:
         return text
     prefix = "error: " if text.startswith("error: ") else ""
     retained = max(0, max_output_chars - len(prefix))
+    saved = _spill(text, sink) if sink is not None else ""
     return prefix + text[len(prefix):len(prefix) + retained] + (
-        f"\n... [truncated, {len(text)} chars total; limit {max_output_chars} chars]"
+        f"\n... [truncated, {len(text)} chars total; limit {max_output_chars} chars{saved}]"
     )
 
 
@@ -336,9 +370,7 @@ class StreamableHTTPMCPSession:
         self.connect_timeout = connect_timeout
         self.call_timeout = call_timeout
         self.catalog_timeout = catalog_timeout
-        self.max_output_chars = (
-            DEFAULT_MAX_OUTPUT_CHARS if max_output_chars is None else max_output_chars
-        )
+        self.max_output_chars, self._spill_overflow = _resolve_cap(max_output_chars)
         self.payload_sink = payload_sink
         self._loop: Any = None
         self._thread: Any = None
@@ -495,10 +527,12 @@ class StreamableHTTPMCPSession:
         except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
             raise RuntimeError(f"MCP HTTP tool call failed ({type(exc).__name__})") from None
         # The sink of the run that made this call, when a tool bound one; else the session's own.
-        text = _content_to_text(result, call_sink() or self.payload_sink)
+        sink = call_sink() or self.payload_sink
+        text = _content_to_text(result, sink)
         if getattr(result, "isError", False):
             text = f"error: {text or 'MCP tool reported a failure'}"
-        return _cap_output(text, self.max_output_chars)
+        spill_to = (sink or default_sink()) if getattr(self, "_spill_overflow", False) else None
+        return _cap_output(text, self.max_output_chars, spill_to)
 
     def close(self) -> None:
         if self._loop is None:
@@ -567,9 +601,7 @@ class StdioMCPSession:
         self.call_timeout = call_timeout
         self.catalog_timeout = catalog_timeout
         self.cwd = cwd
-        self.max_output_chars = (
-            DEFAULT_MAX_OUTPUT_CHARS if max_output_chars is None else max_output_chars
-        )
+        self.max_output_chars, self._spill_overflow = _resolve_cap(max_output_chars)
         self.payload_sink = payload_sink
         self._loop: Any = None
         self._thread: Any = None
@@ -726,13 +758,15 @@ class StdioMCPSession:
         )
         result = future.result(timeout=self.call_timeout)
         # The sink of the run that made this call, when a tool bound one; else the session's own.
-        text = _content_to_text(result, call_sink() or self.payload_sink)
+        sink = call_sink() or self.payload_sink
+        text = _content_to_text(result, sink)
         # Per the MCP spec a tool-execution failure comes back as a normal result with isError=True
         # (not a protocol error). Surface it as an `error:` observation so the agent can tell a real
         # answer from a failure — otherwise "database connection refused" reads as a valid result.
         if getattr(result, "isError", False):
             text = f"error: {text or 'MCP tool reported a failure'}"
-        return _cap_output(text, self.max_output_chars)
+        spill_to = (sink or default_sink()) if getattr(self, "_spill_overflow", False) else None
+        return _cap_output(text, self.max_output_chars, spill_to)
 
     def close(self) -> None:
         # Signal _serve to exit; its AsyncExitStack then unwinds in its own task.
