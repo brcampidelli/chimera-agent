@@ -239,6 +239,9 @@ EXEMPT: dict[str, str] = {
     # pinned by `test_lifecycle_api.py::test_the_route_governs_the_registry_it_hands_the_crew`.
     "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the HTTP caller governs",
     "chimera/workflow/executors.py:build_executors.solve_step": "delegates to solve, governed there",
+    # Renders the schemas `chimera run` declares so a snapshot can pin them; it never executes a
+    # tool, and it mirrors `run.py:agent` (exempt above) so the snapshot shows what that surface sends.
+    "chimera/prompts/tool_schemas.py:_assemble_cli": "reads schemas only; mirrors run.py:agent",
 }
 
 

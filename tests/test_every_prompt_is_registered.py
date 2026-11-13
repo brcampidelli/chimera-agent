@@ -14,6 +14,7 @@ diff is what a reviewer reads.
 from __future__ import annotations
 
 import ast
+import functools
 import re
 from pathlib import Path
 from typing import get_args
@@ -25,6 +26,15 @@ from chimera.prompts.registry import Layer, Status
 from chimera.prompts.snapshots import render_all
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+@functools.cache
+def _rendered() -> dict[str, str]:
+    """`render_all()` once per process. It assembles every surface's tool schema now, which takes
+    seconds, and the parametrised test below asks for one entry a hundred times."""
+    return render_all()
+
+
 SNAPSHOTS = ROOT / "tests" / "prompt_snapshots"
 #: The names a prompt constant has been given in this tree. Wide on purpose: a false match costs one
 #: line in NOT_PROMPTS with a reason, a miss costs an unregistered prompt.
@@ -131,18 +141,18 @@ def test_the_exclusions_are_real_and_not_also_registered() -> None:
         assert reason.strip()
 
 
-@pytest.mark.parametrize("name", sorted(render_all()))
+@pytest.mark.parametrize("name", sorted(_rendered()))
 def test_the_snapshot_holds_the_exact_bytes(name: str) -> None:
     path = SNAPSHOTS / f"{name}.txt"
     assert path.exists(), f"no snapshot for {name}: run python scripts/prompt_snapshots.py --write"
-    assert path.read_text(encoding="utf-8") == render_all()[name], (
+    assert path.read_text(encoding="utf-8") == _rendered()[name], (
         f"{name} changed. If that was intended, run python scripts/prompt_snapshots.py --write and "
         "commit the snapshot diff with the change."
     )
 
 
 def test_no_snapshot_is_left_without_a_prompt() -> None:
-    wanted = set(render_all())
+    wanted = set(_rendered())
     orphans = sorted(p.stem for p in SNAPSHOTS.glob("*.txt") if p.stem not in wanted)
     assert not orphans, f"snapshots with no registered prompt behind them: {orphans}"
 
@@ -153,7 +163,7 @@ def test_the_assembled_loop_prompt_keeps_its_order() -> None:
     read last (plan §5.1, rule 4)."""
     from chimera.core.agent import DEFAULT_SYSTEM_PROMPT, TODO_PROMPT
 
-    text = render_all()["assembled.loop_project_owner_todo"]
+    text = _rendered()["assembled.loop_project_owner_todo"]
     positions = [
         text.index(DEFAULT_SYSTEM_PROMPT),
         text.index(TODO_PROMPT),
