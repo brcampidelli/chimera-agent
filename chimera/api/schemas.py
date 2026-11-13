@@ -2053,6 +2053,29 @@ class StorageWorktreeOut(BaseModel):
     bytes: int | None
     state: str
     reason: str
+    #: Days since the folder was last written to; None when it could not be read.
+    age_days: float | None = None
+    #: Why it still exists: ``conversation`` (a conversation that is not archived uses it),
+    #: ``archived`` (every conversation using it is archived; ``retention_due_at`` is when the
+    #: clean-up may remove it and ``retention_kept`` why the last pass kept it) or ``no_conversation``.
+    retention: str = "no_conversation"
+    retention_due_at: float | None = None
+    retention_kept: str = ""
+    #: The conversation behind ``retention`` and its title; "" when none.
+    session_id: str = ""
+    title: str = ""
+
+
+class ArchiveCandidateOut(BaseModel):
+    """A conversation idle long enough to be offered for archiving, with the worktree it holds.
+    Archiving removes nothing: it is the conversation list's own route, and the existing thirty-day
+    clean-up decides about the folder afterwards."""
+
+    session_id: str
+    title: str
+    idle_days: float
+    path: str
+    bytes: int | None  # null = the folder was not counted yet
 
 
 class DiskOut(BaseModel):
@@ -2068,6 +2091,17 @@ class StorageOut(BaseModel):
     worktree_dir: str  # where the NEXT worktree goes: the configured folder, or temp
     categories: list[StorageCategoryOut]
     worktrees: list[StorageWorktreeOut]
+    #: Bytes of the worktrees that WERE counted, and how many could not be (a count that ran out of
+    #: time is "not measured", never zero). The next look continues counting.
+    worktrees_counted_bytes: int = 0
+    worktrees_unmeasured: int = 0
+    #: The owner's limit in GiB; ``over_limit`` is true when what was counted already passes it,
+    #: false when everything was counted and it does not, and null when it cannot be told yet.
+    worktrees_limit_gb: float = 0.0
+    worktrees_over_limit: bool | None = None
+    #: Days idle after which a conversation is offered for archiving, and the ones that are.
+    archive_idle_days: float = 0.0
+    archive_candidates: list[ArchiveCandidateOut] = []
     disks: list[DiskOut]
     rotatable_logs: list[str]  # the only logs the rotate action moves — named, not implied
 

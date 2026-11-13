@@ -154,3 +154,34 @@ describe("a coding turn that finished", () => {
     expect(h.onError).not.toHaveBeenCalled();
   });
 });
+
+describe("a turn that opened in a new worktree", () => {
+  it("hands the server's warning about the base to the screen, and nothing when there is none", async () => {
+    const onSession = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        corta([
+          frame("session", {
+            session_id: "s1",
+            turn_id: "t1",
+            seq: 1,
+            warning: "Local HEAD abc is behind origin/main.",
+          }),
+          frame("done", { seq: 2 }),
+        ]),
+      ),
+    );
+    await streamCodeTurn({ message: "x", session_id: null } as never, { onSession });
+    expect(onSession.mock.calls[0][3]).toEqual({ warning: "Local HEAD abc is behind origin/main." });
+
+    onSession.mockClear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => corta([frame("session", { session_id: "s2", turn_id: "t2", seq: 1 })])),
+    );
+    await streamCodeTurn({ message: "x", session_id: null } as never, { onSession });
+    expect(onSession.mock.calls[0][3]).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+});

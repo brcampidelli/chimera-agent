@@ -20,7 +20,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # stdlib logging rather than `chimera.telemetry.get_logger`: telemetry reads settings, so importing
@@ -1342,6 +1342,14 @@ class Settings(BaseSettings):
     # `git branch -D`, leaves the branch of a worktree with no upstream, keeps a folder another live
     # conversation uses, and the archived row says when it goes. Read on every sweep, so no APPLIES_WHEN entry.
     worktree_cleanup: bool = Field(default=True, validation_alias="CHIMERA_WORKTREE_CLEANUP")
+    # The Storage card warns when the worktrees together pass this many GiB, and offers to ARCHIVE the
+    # conversations whose worktree has sat idle for `worktree_idle_days` (`chimera/core/storage.py`).
+    # Only a warning and an offer: nothing is removed or archived by either number. The defaults are
+    # proposals read off one machine's measured distribution (study/auditoria-2026-11/areas/
+    # a12-worktrees-medicao.md), not limits anyone verified; an empty or unreadable value is the
+    # default, and zero or negative is too (a limit of zero would warn about every checkout).
+    worktree_limit_gb: float = Field(default=50.0, validation_alias="CHIMERA_WORKTREE_LIMIT_GB")
+    worktree_idle_days: float = Field(default=14.0, validation_alias="CHIMERA_WORKTREE_IDLE_DAYS")
 
     # Whether a conversation can be shared with a second person at all (`chimera/api/sharing.py`).
     # ON by default because that is what the app did before the switch existed: a share link is made
@@ -1840,6 +1848,20 @@ class Settings(BaseSettings):
                 text,
             )
             return None
+
+    @field_validator("worktree_limit_gb", "worktree_idle_days", mode="before")
+    @classmethod
+    def _worktree_storage_numbers(cls, value: object, info: ValidationInfo) -> object:
+        """A positive number, else the default: a typo in a warning threshold must not stop the app,
+        and zero or negative would make every worktree "over" or "idle"."""
+        default = 50.0 if info.field_name == "worktree_limit_gb" else 14.0
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            return default
+        try:
+            number = float(value) if str(value).strip() else default
+        except ValueError:
+            return default
+        return number if number > 0 else default
 
     @field_validator("share_expiry_hours", mode="before")
     @classmethod

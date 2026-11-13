@@ -7088,6 +7088,24 @@ export interface components {
             approved: boolean;
         };
         /**
+         * ArchiveCandidateOut
+         * @description A conversation idle long enough to be offered for archiving, with the worktree it holds.
+         *     Archiving removes nothing: it is the conversation list's own route, and the existing thirty-day
+         *     clean-up decides about the folder afterwards.
+         */
+        ArchiveCandidateOut: {
+            /** Bytes */
+            bytes: number | null;
+            /** Idle Days */
+            idle_days: number;
+            /** Path */
+            path: string;
+            /** Session Id */
+            session_id: string;
+            /** Title */
+            title: string;
+        };
+        /**
          * AttachmentOut
          * @description One stored attachment: an id to send with a turn, and what we managed to make of the file.
          *
@@ -15527,6 +15545,16 @@ export interface components {
          * @description What this install keeps on disk, by kind (study 29, P5.3). Nullable like `ResourcesOut`.
          */
         StorageOut: {
+            /**
+             * Archive Candidates
+             * @default []
+             */
+            archive_candidates: components["schemas"]["ArchiveCandidateOut"][];
+            /**
+             * Archive Idle Days
+             * @default 0
+             */
+            archive_idle_days: number;
             /** Categories */
             categories: components["schemas"]["StorageCategoryOut"][];
             /** Disks */
@@ -15539,6 +15567,23 @@ export interface components {
             worktree_dir: string;
             /** Worktrees */
             worktrees: components["schemas"]["StorageWorktreeOut"][];
+            /**
+             * Worktrees Counted Bytes
+             * @default 0
+             */
+            worktrees_counted_bytes: number;
+            /**
+             * Worktrees Limit Gb
+             * @default 0
+             */
+            worktrees_limit_gb: number;
+            /** Worktrees Over Limit */
+            worktrees_over_limit?: boolean | null;
+            /**
+             * Worktrees Unmeasured
+             * @default 0
+             */
+            worktrees_unmeasured: number;
         };
         /**
          * StorageWorktreeOut
@@ -15549,14 +15594,38 @@ export interface components {
          *     ``reason`` is a fixed word a screen translates.
          */
         StorageWorktreeOut: {
+            /** Age Days */
+            age_days?: number | null;
             /** Bytes */
             bytes: number | null;
             /** Path */
             path: string;
             /** Reason */
             reason: string;
+            /**
+             * Retention
+             * @default no_conversation
+             */
+            retention: string;
+            /** Retention Due At */
+            retention_due_at?: number | null;
+            /**
+             * Retention Kept
+             * @default
+             */
+            retention_kept: string;
+            /**
+             * Session Id
+             * @default
+             */
+            session_id: string;
             /** State */
             state: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
         };
         /** SubtaskOut */
         SubtaskOut: {

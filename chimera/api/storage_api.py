@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import platform
 import re
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,6 +43,7 @@ from chimera.api.schemas import (
 from chimera.config import Settings
 from chimera.core.install_id import installation_id
 from chimera.core.redact import MASK, redact
+from chimera.core.storage import WorktreeOwner
 
 #: What the desktop writes when the backend dies mid-session (`apps/desktop/src-tauri/src/main.rs`,
 #: `Trouble::DiedMidSession`), in its data directory.
@@ -160,6 +162,63 @@ def diagnostics(settings: Settings, workspace: Path, *, storage: dict[str, Any] 
     }
 
 
+def worktree_owners(
+    store: Any, home: Path, *, cleanup_on: bool, now: float | None = None
+) -> dict[str, list[WorktreeOwner]]:
+    """The conversations that use a conversation-worktree folder, keyed by the folder.
+
+    Read from the conversation list's own records (``store`` is the one `code_api` holds), and the
+    clean-up's own view of each (`removal_view`: when it may go, what kept it), so this adds no rule
+    of its own. The activation floor is READ from its file and never written: a report must not start
+    the thirty-day clock, and with no floor yet the date shown is the earliest it could be.
+    """
+    from chimera.api.conversation_state import DAY
+    from chimera.core.code_session_marks import ConversationMark
+    from chimera.core.storage import owner_key
+    from chimera.core.worktree_expiry import (
+        ACTIVATION_FILE,
+        ActivationClock,
+        is_conversation_worktree,
+        removal_view,
+    )
+
+    try:
+        marks = store.marks.all()
+        rows = store.list_meta(marks)
+    except OSError:
+        return {}
+    activated_at: float | None = None
+    floor_file = Path(home) / ACTIVATION_FILE
+    if cleanup_on and floor_file.is_file():
+        clock = ActivationClock(floor_file)
+        clock.load()
+        activated_at = clock.value(enabled=True)
+    stamp = time.time() if now is None else now
+    owners: dict[str, list[WorktreeOwner]] = {}
+    for row in rows:
+        folder = str(row.get("workspace") or "")
+        if not is_conversation_worktree(folder):
+            continue
+        sid = str(row["id"])
+        mark = marks.get(sid) or ConversationMark()
+        archived = mark.archived_at is not None
+        view = removal_view(mark, workspace=folder, enabled=cleanup_on, activated_at=activated_at)
+        last_active = max(float(row.get("updated_at") or 0.0), mark.unarchived_at or 0.0)
+        due = view.get("due_at") if view else None
+        owners.setdefault(owner_key(folder), []).append(
+            WorktreeOwner(
+                session_id=sid,
+                title=str(row.get("title") or ""),
+                archived=archived,
+                folder=folder,
+                idle_days=None if archived else max(0.0, (stamp - last_active) / DAY),
+                due_at=float(due) if isinstance(due, (int, float)) else None,
+                kept=str(view.get("kept") or "") if view else "",
+            )
+        )
+    return owners
+
+
 def _confirmed(body: StorageConfirmIn) -> None:
     if not body.confirm:
         raise HTTPException(status_code=400, detail="this removes files; send confirm: true to do it")
@@ -193,12 +252,27 @@ def register_storage_api(
     read_settings = live_settings or (lambda: settings)
     home = Path(settings.home)
 
+    def measured() -> dict[str, Any]:
+        """The shared report with the conversations behind each worktree and the owner's two limits.
+        The store is the one the conversation list holds (`app.state.code_sessions`), so its parsed
+        rows are reused; one is built here only when this app has no code routes."""
+        from chimera.core.code_session import CodeSessionStore
+        from chimera.core.storage import measure_shared
+
+        current = read_settings()
+        store = getattr(app.state, "code_sessions", None) or CodeSessionStore(home / "code_sessions")
+        return measure_shared(
+            home,
+            workspace,
+            owners=lambda: worktree_owners(store, home, cleanup_on=bool(current.worktree_cleanup)),
+            limit_gb=float(current.worktree_limit_gb),
+            idle_days=float(current.worktree_idle_days),
+        )
+
     @app.get("/api/storage", dependencies=[guard], response_model=StorageOut)
     def storage_endpoint() -> dict[str, Any]:
         """What this install keeps on disk, by kind. A category that could not be counted is null."""
-        from chimera.core.storage import measure_shared
-
-        return measure_shared(home, workspace)
+        return measured()
 
     @app.post(
         "/api/storage/worktrees/prune", dependencies=[guard], response_model=WorktreePruneOut
@@ -304,9 +378,7 @@ def register_storage_api(
 
     @app.get("/api/diagnostics", dependencies=[guard], response_model=AppDiagnosticsOut)
     def diagnostics_endpoint() -> dict[str, Any]:
-        from chimera.core.storage import measure_shared
-
         current = read_settings()
         # The same shared report the Storage card asked for a moment ago, not a second walk.
-        storage = measure_shared(home, workspace)
+        storage = measured()
         return diagnostics(current.model_copy(update={"home": home}), workspace, storage=storage)
