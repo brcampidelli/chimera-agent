@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Every HTML page the server hands out now carries a Content-Security-Policy.** FastAPI's `/redoc` and `/docs/oauth2-redirect`, served outside the token guard with no policy and loading a CDN script onto the app's origin, are off; `/api/docs` sends a policy naming exactly what Swagger loads; a stray `.htm` or `.xhtml` at the bundle root is policed like `.html`; and a new test requests every page and enumerates every route outside the API so the next one cannot ship without a policy. (#1248)
+
 - **Desktop: streaming no longer re-renders the whole conversation per token.** Finished exchanges are memoised, streamed text is written once per frame, the heavy screens (Settings, Knowledge, Automation, Work, Onboarding, Activity) and the syntax highlighter load on demand, the running-turns poll is a single hook, and on-screen clocks pause while the window is hidden. Auto-detected highlighting now chooses among the 14 languages the file viewer maps. Not yet measured in the packaged app (see `apps/desktop/PROFILING.md`). (#1247)
 
 - **TUI: unknown slash commands and `/undo N`.** The full-screen terminal app no longer sends an unrecognised `/command` to the model as a paid turn, `/undo N` now previews and asks before restoring, and `chat`, `assist` and the TUI build their command lists from one shared registry. (#1242)
