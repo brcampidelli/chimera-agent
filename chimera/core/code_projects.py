@@ -439,7 +439,7 @@ class CodeProjectRegistry:
         row = self._row_for(workspace, granted_only=False)
         return str(_resolved(row.path)) if row is not None else ""
 
-    def set_bypass(self, path: str, enabled: bool) -> str | None:
+    def set_bypass(self, path: str, enabled: bool, *, ttl_seconds: float | None = None) -> str | None:
         """Turn the project-wide switch on or off for one folder, registering it if it was not.
 
         Refused for a hidden folder: the lists no longer show it, so a switch on it would be one the
@@ -457,6 +457,9 @@ class CodeProjectRegistry:
         switch would stay ON in memory while the owner was refused. The registration write that follows
         is best-effort: its failure is logged and reported as a warning, never raised.
 
+        ``ttl_seconds`` makes a switch turned ON go off by itself that many seconds later; None, the
+        default, keeps it on (bypass_switches.py).
+
         Returns a warning when turning OFF could not be saved.
         """
         value = _clean(path, MAX_PATH, "path")
@@ -472,7 +475,7 @@ class CodeProjectRegistry:
                 return self._turn_switch_off(rows, row, str(key))
             self._put(rows, row)
             self._write(rows)
-            return self._switches().set_project(str(key), True)
+            return self._switches().set_project(str(key), True, ttl_seconds=ttl_seconds)
 
     def _turn_switch_off(self, rows: list[RegisteredProject], row: RegisteredProject, key: str) -> str | None:
         """Turn one folder's switch OFF in memory, then save the registration best-effort."""

@@ -43,6 +43,7 @@ import {
 } from "@/components/AppearanceControls";
 import { Tabs, TabPanel, type TabItem } from "@/components/ui/tabs";
 import { ClaudeHooksList } from "@/components/ClaudeHooksList";
+import { SafetyOverviewCard } from "@/components/SafetyOverviewCard";
 import { Connections } from "@/components/Connections";
 import { Connectors } from "@/components/Connectors";
 import { Skills } from "@/components/Skills";
@@ -1947,6 +1948,9 @@ export function Settings({
             )}
             {tab === "security" && (
               <div className="max-w-5xl space-y-6 px-6 py-6">
+                {/* What holds on this machine, first: the floor, the real sandbox, each place's checks
+                    and the switches that are on, all computed by the server (`safety_overview`). */}
+                <SafetyOverviewCard />
                 <Governance
                   embedded
                   onOpenSettings={(anchor) => openTarget({ tab: "general", anchor, advanced: true })}

@@ -5354,6 +5354,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/security/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Security Overview
+         * @description The security card: the bypass floor, the sandbox that really runs, governance per surface
+         *     and the switches that are on. Read-only, and a POST for the reason ``/api/code/posture`` is:
+         *     a sandbox that stopped answering must change the answer, never be served from a cache.
+         */
+        post: operations["security_overview_api_security_overview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/service/activity": {
         parameters: {
             query?: never;
@@ -6598,6 +6620,21 @@ export interface components {
             enabled: boolean;
             /** Expiry Hours */
             expiry_hours?: number | null;
+        };
+        /**
+         * ActiveBypassFacts
+         * @description One "Ignore permissions" switch that is on in this process.
+         */
+        ActiveBypassFacts: {
+            /** Expires At */
+            expires_at?: number | null;
+            /** Id */
+            id: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "conversation" | "project";
         };
         /**
          * AgentBatchNoteOut
@@ -8279,6 +8316,13 @@ export interface components {
             on_failure: string;
             /** Origin */
             origin: string;
+            /** Runs Here */
+            runs_here?: boolean | null;
+            /**
+             * Skipped
+             * @default 0
+             */
+            skipped: number;
             /** Source */
             source: string;
             /** Timeout */
@@ -8664,6 +8708,8 @@ export interface components {
             bypass_permissions: boolean;
             /** Path */
             path: string;
+            /** Ttl Seconds */
+            ttl_seconds?: number | null;
         };
         /**
          * CodeProjectBypassOut
@@ -13122,6 +13168,52 @@ export interface components {
             /** Sources */
             sources?: ("catalog" | "openrouter" | "ollama")[];
         };
+        /** MonitorFindingOut */
+        MonitorFindingOut: {
+            /** Agents */
+            agents?: string[];
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /**
+             * Kind
+             * @description cross-agent-taint | fan-out-volume
+             * @default
+             */
+            kind: string;
+        };
+        /**
+         * MonitorOut
+         * @description The cross-agent monitor's section of the run's report, sent once when the workers are done.
+         *
+         *     The same monitor `chimera solve` runs over a batch (`governance.aggregate_monitor`): a split flow
+         *     where one worker reads something untrusted and another acts on it is invisible to each worker's
+         *     own ledger. It only ever asks for review; it never stops anything.
+         */
+        MonitorOut: {
+            /**
+             * Agents
+             * @description Workers whose ledgers were read.
+             * @default 0
+             */
+            agents: number;
+            /**
+             * Evaluated
+             * @description False means the monitor had nothing to read, never that it found nothing.
+             * @default false
+             */
+            evaluated: boolean;
+            /** Findings */
+            findings?: components["schemas"]["MonitorFindingOut"][];
+            /**
+             * Reason
+             * @description governance_off | no_ledger, when not evaluated
+             * @default
+             */
+            reason: string;
+        };
         /** NetworkShareIn */
         NetworkShareIn: {
             /**
@@ -13236,6 +13328,7 @@ export interface components {
             decomposed?: components["schemas"]["DecomposedOut"];
             done?: components["schemas"]["HierarchyDoneOut"];
             fell_back?: components["schemas"]["FellBackOut"];
+            monitor?: components["schemas"]["MonitorOut"];
             worker_rejected?: components["schemas"]["WorkerRejectedOut"];
             worker_started?: components["schemas"]["WorkerStartedOut"];
             worker_verified?: components["schemas"]["WorkerVerifiedOut"];
@@ -13874,6 +13967,7 @@ export interface components {
              * @enum {string}
              */
             pauses: "always" | "tainted" | "never";
+            safety?: components["schemas"]["SafetyOverview"] | null;
             /**
              * Shell
              * @enum {string}
@@ -14926,6 +15020,28 @@ export interface components {
             /** Workspace */
             workspace: string;
         };
+        /**
+         * SafetyOverview
+         * @description The one card of what holds on this machine: the floor, the real sandbox, governance per surface
+         *     and the switches that are on. Every field is computed by the function the code decides with, never
+         *     written down a second time (audit 2026-11, a07-14).
+         */
+        SafetyOverview: {
+            /** Bypass */
+            bypass: components["schemas"]["ActiveBypassFacts"][];
+            /** Floor */
+            floor: string[];
+            /** Floor Lexical */
+            floor_lexical: string[];
+            /** Governance */
+            governance: components["schemas"]["SurfaceGovernanceFacts"][];
+            /** Sandbox */
+            sandbox: string;
+            /** Sandbox Configured */
+            sandbox_configured: string;
+            /** Sandbox Isolated */
+            sandbox_isolated: boolean;
+        };
         /** SandboxCfgOut */
         SandboxCfgOut: {
             /** Image */
@@ -15646,6 +15762,24 @@ export interface components {
             sent: number;
             /** Shown */
             shown: number;
+        };
+        /**
+         * SurfaceGovernanceFacts
+         * @description One surface's governance, as its assembly decides it (``profile.surface_governance``).
+         */
+        SurfaceGovernanceFacts: {
+            /**
+             * Kernel
+             * @enum {string}
+             */
+            kernel: "off" | "observe" | "enforce";
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "chat" | "code" | "cron" | "bot" | "solve";
+            /** Taint */
+            taint: boolean;
         };
         /**
          * SystemOneModelOut
@@ -25249,6 +25383,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    security_overview_api_security_overview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SafetyOverview"];
                 };
             };
         };

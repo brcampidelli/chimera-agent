@@ -129,6 +129,9 @@ export type ConfigUpdated = Schemas["UpdatedOut"];
 export type VaultMove = Schemas["VaultMoveOut"];
 export type AppConfig = Schemas["ConfigOut"];
 export type ClaudeHooks = Schemas["ClaudeHooksOut"];
+/** The security card (`POST /api/security/overview`): the bypass floor, the sandbox that really runs,
+ *  governance per surface and the switches that are on, each computed by the code that decides it. */
+export type SafetyOverview = Schemas["SafetyOverview"];
 /** Whether the app holds the machine awake right now, and for what (`chimera/core/keep_awake.py`). */
 export type KeepAwakeState = Schemas["KeepAwakeOut"];
 /** The desktop shell's own switches (the tray's), as the shell reads them. */
