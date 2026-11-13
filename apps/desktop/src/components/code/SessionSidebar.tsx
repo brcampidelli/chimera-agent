@@ -481,7 +481,7 @@ export function SessionSidebar({
         if (e.key !== "Escape" || !selection.selecting || e.defaultPrevented) return;
         // Escape inside a field (add folder, rename, search) belongs to that field.
         if ((e.target as HTMLElement).closest('input:not([type="checkbox"]), textarea, [contenteditable="true"]')) return;
-        if ((e.target as HTMLElement).closest('[role="menu"], [role="dialog"], [role="alertdialog"]')) return;
+        if ((e.target as HTMLElement).closest("[role=menu], [role=dialog], [role=alertdialog]")) return;
         selection.exit();
       }}
     >

@@ -1181,6 +1181,14 @@ class Settings(BaseSettings):
     # decision, 2026-11-10). Voice notes are transcribed on this computer (faster-whisper); images go
     # to the chat model's vision path, which may cost extra model tokens. Off refuses both with a reply.
     chat_inbound_media: bool = Field(default=True, validation_alias="CHIMERA_CHAT_INBOUND_MEDIA")
+    # Two reads that used to go straight to `os.environ` from inside the app, and now come through here
+    # (P1-14, item 6). Both stay STRINGS, parsed where they are used by the very rules they had: a typo
+    # in either must keep meaning "the default", whereas a typed field would make `get_settings()` raise
+    # and take the whole app down over a switch nobody offers on the screen.
+    #: Opt-in "1/true/yes/on": give the chat the one-shot reminder tool (`tools/schedule_once.py`).
+    chat_schedule_once: str = Field(default="", validation_alias="CHIMERA_CHAT_SCHEDULE_ONCE")
+    #: Length of a browser-opened screen session, in seconds; clamped by `api/browser_screen.py`.
+    browser_screen_seconds: str = Field(default="", validation_alias="CHIMERA_BROWSER_SCREEN_SECONDS")
     # Answer a voice note with a voice note as well as text (`chimera/server/voice.py`). Local
     # only: the speech is synthesised on this computer, never sent to a hosted service. Off, and
     # owner-only like the switch above, because it makes the bot speak in the owner's name.

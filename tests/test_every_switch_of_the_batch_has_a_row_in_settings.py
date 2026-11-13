@@ -62,7 +62,7 @@ def test_the_cron_failure_notice_is_read_back_so_the_screen_can_show_it(tmp_path
     assert read_config(on)["automation"]["notify_failures"] is True, "it ships on"
     assert read_config(off)["automation"]["notify_failures"] is False
     # Read on every tick of the daemon, so a save applies to the next notice, not the next launch.
-    assert "CHIMERA_CRON_NOTIFY_FAILURES" not in APPLIES_WHEN
+    assert APPLIES_WHEN["CHIMERA_CRON_NOTIFY_FAILURES"] == "now"
 
 
 def test_a_saved_notice_switch_reaches_the_settings_the_daemon_reads(

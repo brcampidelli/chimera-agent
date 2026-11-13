@@ -240,9 +240,9 @@ class MessagingManager:
                 # lost the second.
                 voice=[send_tool],
             )
-            import os
+            from chimera.config import get_settings
 
-            if os.environ.get("CHIMERA_CHAT_SCHEDULE_ONCE", "").strip().lower() in {"1", "true", "yes", "on"}:
+            if get_settings().chat_schedule_once.strip().lower() in {"1", "true", "yes", "on"}:
                 from chimera.governance.approval import always_ask
                 from chimera.tools.schedule_once import ScheduleOnceTool
 
