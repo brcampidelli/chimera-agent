@@ -1,5 +1,5 @@
 ---
-source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
+source_sha256: 6833cdb4488064e31938cb908a7c1aee3316f9eec8cd798be910f8591ee44d41
 ---
 
 # Chimera — руководство по использованию
@@ -13,6 +13,20 @@ Chimera — это управляемый ИИ-агент, у которого �
 ---
 
 ## Установка
+
+### Как инструмент (без клонирования)
+
+Нужен Python 3.11–3.13. Пакет есть в PyPI, поэтому `uv` или `pipx` установят команду `chimera` в собственное изолированное окружение и добавят её в `PATH`:
+
+```bash
+uv tool install chimera-agent       # обновление: uv tool upgrade chimera-agent
+pipx install chimera-agent          # обновление: pipx upgrade chimera-agent
+chimera version                     # проверка
+```
+
+Дополнения указываются в квадратных скобках: `uv tool install 'chimera-agent[full]'`. На момент написания этого раздела обе команды не проверялись на чистой машине; если одна не сработает, используйте `pip install chimera-agent` в виртуальном окружении — именно его предполагает остальная документация.
+
+### Из клона (разработка)
 
 Chimera использует [uv](https://docs.astral.sh/uv/).
 

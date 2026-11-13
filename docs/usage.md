@@ -9,6 +9,23 @@ This guide covers installation, configuration, and every command with examples.
 
 ## Install
 
+### As a tool (no clone)
+
+Needs Python 3.11–3.13. The package is on PyPI, so `uv` or `pipx` can install the `chimera` command
+into its own isolated environment and put it on your `PATH`:
+
+```bash
+uv tool install chimera-agent       # upgrade: uv tool upgrade chimera-agent
+pipx install chimera-agent          # upgrade: pipx upgrade chimera-agent
+chimera version                     # verify
+```
+
+Extras are named in brackets: `uv tool install 'chimera-agent[full]'`. These two commands were not
+exercised on a clean machine when this section was written; if one fails, `pip install chimera-agent`
+in a virtualenv is the path the rest of the docs assume.
+
+### From a clone (development)
+
 Chimera uses [uv](https://docs.astral.sh/uv/).
 
 ```bash
