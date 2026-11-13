@@ -46,6 +46,11 @@ KEPT: dict[tuple[str, str], tuple[int, str]] = {
     ("chimera/server/voice.py", "CHIMERA_WHISPER_MODEL"): (1, _TEST),
     ("chimera/server/gateway.py", "CHIMERA_CHAT_STATED_RUNTIME"): (1, _TEST),
     ("chimera/tools/browser.py", "CHIMERA_BROWSER_AUTO_INSTALL"): (1, _TEST),
+    ("chimera/eval/token_baseline.py", "CHIMERA_HOME"): (
+        1,
+        "A read-only report that looks for ANOTHER process's home (the desktop app's data folder, found "
+        "via APPDATA); it reads the mapping its caller passes, and Settings only knows this process's home",
+    ),
 }
 
 
@@ -77,7 +82,9 @@ def test_every_kept_read_has_a_reason() -> None:
 
 
 def test_the_pass_that_started_at_21_ended_at_the_size_of_the_list() -> None:
-    assert sum(n for n, _why in KEPT.values()) == 18
+    # 18 when the P1-14 pass ended; +1 for the token baseline (#1252), which landed on main while this
+    # list was in review and reads another process's home, not a setting. Any further rise needs the same.
+    assert sum(n for n, _why in KEPT.values()) == 19
 
 
 def test_the_two_moved_reads_come_through_settings() -> None:
