@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Tool schema snapshots per surface**: `tests/prompt_snapshots/schema.<surface>.txt` now keeps the tool schema the Code turn, design turn, CLI, cron and bot send, assembled by each surface's own functions, so a changed tool description shows up as a diff; the prompt lint totals it per surface and `docs/tool-schema-by-surface.md` tabulates it (tokens are chars/4, an estimate). The second deferral bench is pre-registered, not run. (#1245)
+
 - **Tools:** every tool result is now capped at 20 000 characters at the registry (tools that already capped themselves are unchanged), `http_get`, `scrape` and `read_document` take an `offset` to read on past a cut, and a subagent run reports how many subagents it spawned; the lower MCP ceiling and a spawn limit are options that stay off. (#1243)
 
 ### Fixed
