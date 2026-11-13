@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useT, type TFunc } from "@/lib/i18n";
+import { setVisibleInterval } from "@/lib/visibleInterval";
 
 /** Elapsed seconds as the two largest translated units — "1 h 5 min", "2 min 0 s", "7 s".
  *
@@ -38,8 +39,7 @@ export function Elapsed({
   useEffect(() => {
     if (!running) return;
     setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    return setVisibleInterval(() => setNow(Date.now()), 1000);
   }, [running]);
   const seconds = finalSeconds ?? (startedAt === undefined ? 0 : (now - startedAt) / 1000);
   return (

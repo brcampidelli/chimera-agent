@@ -1,6 +1,20 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import hljs from "highlight.js";
+import hljs from "highlight.js/lib/core";
+import bash from "highlight.js/lib/languages/bash";
+import css from "highlight.js/lib/languages/css";
+import go from "highlight.js/lib/languages/go";
+import ini from "highlight.js/lib/languages/ini";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import markdown from "highlight.js/lib/languages/markdown";
+import python from "highlight.js/lib/languages/python";
+import rust from "highlight.js/lib/languages/rust";
+import scss from "highlight.js/lib/languages/scss";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
+import yaml from "highlight.js/lib/languages/yaml";
 import {
   ChevronDown,
   FileCode2,
@@ -93,6 +107,14 @@ const DesignPane = lazy(() => import("@/components/design/DesignPane"));
 /** The viewer's width with a design in it, until the person drags it: a canvas needs more than a file. */
 const DESIGN_VIEWER_WIDTH = 720;
 const FILE_VIEWER_WIDTH = 448;
+
+/**
+ * Only the languages `EXT_LANG` can name are registered — `highlight.js` whole is ~1 MB of grammars
+ * in the main chunk. The behaviour change: the auto-detect fallback for an extension that is not in
+ * the map now chooses among these fourteen instead of the ~190 the package ships.
+ */
+const REGISTERED_LANGUAGES = { bash, css, go, ini, javascript, json, markdown, python, rust, scss, sql, typescript, xml, yaml };
+for (const [name, grammar] of Object.entries(REGISTERED_LANGUAGES)) hljs.registerLanguage(name, grammar);
 
 /** Map a filename extension to a highlight.js language id; unknown → let hljs auto-detect. */
 const EXT_LANG: Record<string, string> = {

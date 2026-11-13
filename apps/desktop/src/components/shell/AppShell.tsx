@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as RadixDialog from "@radix-ui/react-dialog";
-import { useQuery } from "@tanstack/react-query";
 
 import { AgentStatusBar } from "@/components/shell/AgentStatusBar";
 import { EdgeTab, edgeTabId, useRegionEnter } from "@/components/shell/RegionToggle";
@@ -10,7 +9,7 @@ import { Dock, LayoutDnd } from "@/components/shell/Dock";
 import { MaximizedPanel, useEscapeRestores } from "@/components/shell/Maximize";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalAgentBatch } from "@/lib/agent-batch";
-import { listRunningTurns } from "@/lib/api";
+import { useRunningTurns } from "@/lib/useRunningTurns";
 import { useRunSession } from "@/lib/run-session";
 import { useAgent } from "@/lib/agent-context";
 import { useT } from "@/lib/i18n";
@@ -73,12 +72,7 @@ export function AppShell({
   const agent = useAgent();
   const runSession = useRunSession();
   // The same list, key and interval as the bar's own "running elsewhere", so no second poll.
-  const otherTurns = useQuery({
-    queryKey: ["code-turns-running"],
-    queryFn: listRunningTurns,
-    refetchInterval: 4000,
-    enabled: quietStatus,
-  });
+  const otherTurns = useRunningTurns({ enabled: quietStatus });
   const statusIdle =
     agent.status === "idle" && !agent.busy && !runSession.running && (otherTurns.data ?? []).length === 0;
   // Quiet: the screen has a turn to describe and there is none yet. A failed turn keeps its tool
