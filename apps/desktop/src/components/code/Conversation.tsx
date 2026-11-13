@@ -1752,7 +1752,7 @@ export function Conversation({
   const startTaskCard = useCallback(
     (card: TaskCardState, options: TaskStartOptions) => {
       if (!sessionId) return;
-      setTaskCard(card.id, { status: "starting" });
+      setTaskCard(card.id, { status: "starting", fetchingBase: options.newWorktree });
       void startTaskSuggestion(
         {
           // Only the card's id and the owner's options: the server reads the title, prompt and taint it kept.
@@ -1762,7 +1762,13 @@ export function Conversation({
           new_worktree: options.newWorktree,
         },
         {
-          onSession: (id) => setTaskCard(card.id, { status: "started", startedSessionId: id }),
+          onSession: (id, _turnId, _startedAt, placed) =>
+            setTaskCard(card.id, {
+              status: "started",
+              fetchingBase: false,
+              baseWarning: placed?.warning,
+              startedSessionId: id,
+            }),
           onError: (message) => setTaskCard(card.id, { status: "failed", error: message }),
         },
       );

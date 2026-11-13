@@ -30,6 +30,25 @@ function mount(cards: TaskCardState[], busy = false) {
 }
 
 describe("TaskSuggestionCards", () => {
+  it("says it is fetching the remote base while a new worktree is being made, and only then", () => {
+    mount([card("a", { status: "starting", fetchingBase: true }), card("b", { status: "starting" })]);
+    const [first, second] = screen.getAllByTestId("task-suggestion-card");
+    expect(within(first).getByRole("status").textContent).toBe("Fetching the remote base…");
+    expect(within(second).queryByRole("status")).toBeNull();
+  });
+
+  it("puts the server's warning about the base in evidence once the task started", () => {
+    mount([
+      card("a", {
+        status: "started",
+        baseWarning: "Local HEAD abc is behind origin/main at def; the new worktree starts from origin/main.",
+      }),
+    ]);
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("did not start from the remote base");
+    expect(alert.textContent).toContain("origin/main at def");
+  });
+
   it("renders nothing when the turn proposed no card", () => {
     mount([]);
     expect(screen.queryByTestId("task-suggestion-cards")).toBeNull();

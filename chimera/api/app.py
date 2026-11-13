@@ -725,12 +725,20 @@ def build_api_app(
     # the CLI tells it the port (`attach`). See `chimera/api/desktop_bridge.py`.
     desktop_bridge = DesktopBridge(live_settings)
 
+    # FastAPI's three documentation pages are HTML on this origin, and it serves them with no policy.
+    # `/redoc` and `/docs/oauth2-redirect` were never meant to exist here: the docs moved under
+    # `/api` and those two stayed at FastAPI's defaults, outside the token guard (it covers `/api/`
+    # only), so a page loading a CDN script ran on the app's origin, beside its localStorage. They are
+    # off; `/api/docs` is registered below with a policy of its own (`page_csp.DOCS_PAGE_CSP`).
     app = FastAPI(
         title="Chimera Desktop API",
         version="1",
-        docs_url="/api/docs",
+        docs_url=None,
+        redoc_url=None,
+        swagger_ui_oauth2_redirect_url=None,
         openapi_url="/api/openapi.json",
     )
+    _register_api_docs(app)
     # The authenticated Chrome host is app-local, paired by a per-installation key, and stopped with
     # this API. It uses only a named pipe / Unix socket; never an HTTP port reachable from a page.
     from chimera.browser_link import BrowserLink
@@ -3739,6 +3747,23 @@ _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 _OFF_WORDS = {"false", "0", "no", "off", "f", "n"}
 
 
+def _register_api_docs(app: FastAPI) -> None:
+    """``/api/docs``: FastAPI's Swagger page, unchanged, with a Content-Security-Policy on it.
+
+    The same page ``docs_url`` used to serve. It loads Swagger UI from jsDelivr and starts it with an
+    inline script, so the policy names exactly that and nothing more (see ``DOCS_PAGE_CSP``).
+    """
+    from fastapi.openapi.docs import get_swagger_ui_html
+    from fastapi.responses import HTMLResponse
+
+    from chimera.api.page_csp import DOCS_PAGE_CSP
+
+    @app.get("/api/docs", include_in_schema=False)
+    def _api_docs() -> HTMLResponse:
+        page = get_swagger_ui_html(openapi_url="/api/openapi.json", title=f"{app.title} - Swagger UI")
+        return HTMLResponse(bytes(page.body), headers={"Content-Security-Policy": DOCS_PAGE_CSP})
+
+
 def _index_html(index: Path, request: Request) -> Any:
     """Serve index.html, injecting the bearer token as a meta tag ONLY for a loopback client.
 
@@ -4364,8 +4389,11 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
             if candidate.is_file() and static_dir.resolve() in candidate.parents:
                 # A page reached by its file name (`/index.html`, `/guest.html`) is still a page of
                 # this origin: without the policy it would be the one way around it.
-                if candidate.suffix.lower() == ".html":
-                    from chimera.api.page_csp import APP_PAGE_CSP
+                # Every suffix a browser renders as a page, not only `.html`: a stray `x.htm` at the
+                # root was served same-origin with no policy at all.
+                from chimera.api.page_csp import APP_PAGE_CSP, serves_as_page
+
+                if serves_as_page(candidate.name):
 
                     return FileResponse(candidate, headers={"Content-Security-Policy": APP_PAGE_CSP})
                 return FileResponse(candidate)

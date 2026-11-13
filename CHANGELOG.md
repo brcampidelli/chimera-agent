@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **The Storage card now sees the conversations' worktrees, says why each is kept, and offers to archive idle ones.** It used to list only the worktrees in the system temp folder, missing the project's durable folder (89 checkouts, 72.9 GiB measured on one machine); it now lists them with size, age and the reason each still exists, warns above a limit (`CHIMERA_WORKTREE_LIMIT_GB`, default 50) and offers to archive conversations idle for `CHIMERA_WORKTREE_IDLE_DAYS` (default 14) through the existing archive route, never deleting anything. A new worktree card also says "fetching the remote base" while it waits and highlights the warning when it did not start from the remote tip. (P1-18) (#1253)
+
+- **Token and cost baseline, read-only.** `scripts/token_baseline.py` reads the usage, run and trace logs under the desktop home and prints only aggregates (per surface, with coverage of price and cache and a 30-turn floor below which only the n is shown); its totals match the Cost screen over the same rows, and `bench/token_baseline/` holds the pre-registration and the first reading. (P0-18) (#1252)
+
 - **Tool schema snapshots per surface**: `tests/prompt_snapshots/schema.<surface>.txt` now keeps the tool schema the Code turn, design turn, CLI, cron and bot send, assembled by each surface's own functions, so a changed tool description shows up as a diff; the prompt lint totals it per surface and `docs/tool-schema-by-surface.md` tabulates it (tokens are chars/4, an estimate). The second deferral bench is pre-registered, not run. (#1245)
 
 - **Security: what holds is visible, and the bypass is on the record.** Turning "Ignore permissions" on or off now writes a `bypass_toggle` entry (scope, id, origin) to the audit log, and a switch can take an optional expiry (none by default); Settings > Security opens with one card, computed by the code that decides, showing what still asks you with the switch on, where commands really run, the checks in each place and which switches are on; with the switch on, a recursive delete or write outside the project and your user folder asks again (a lexical check that lowers the risk, not a boundary); crew and hierarchy runs end with the cross-agent monitor's section on the Orchestration tab, which says "not evaluated" rather than "nothing found" when there was nothing to read; and the Hooks list marks a hook that cannot run on this machine with how often it was skipped. (P1-11) (#1246)
@@ -15,11 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Every HTML page the server hands out now carries a Content-Security-Policy.** FastAPI's `/redoc` and `/docs/oauth2-redirect`, served outside the token guard with no policy and loading a CDN script onto the app's origin, are off; `/api/docs` sends a policy naming exactly what Swagger loads; a stray `.htm` or `.xhtml` at the bundle root is policed like `.html`; and a new test requests every page and enumerates every route outside the API so the next one cannot ship without a policy. (#1248)
+
+- **Two tests that depended on timing now measure what they claim.** The shared-conversation test waits for the animation frame that draws streamed tokens since #1247, and the pathological-command test warms the shell parser up before starting its 1 s clock; both limits are unchanged. (#1250)
+
 - **Faster CLI start, and a repo that searches better.** `chimera --help` no longer imports the agent core, the Discord adapter or `httpx` (`chimera code` took three names from `chimera.server.desktop_mcp`, whose package `__init__` loads the whole server stack; they now live in the stdlib-only `chimera/api/bridge_transport.py`, re-exported under the old names), and `chimera version` drops from 1.16 s to about 0.78 s in a back-to-back median on the same machine, the rest being `chimera.config`. A `.rgignore` hides bench data and generated files from ripgrep (a closed, commented list; `PREREGISTRATION*`, `RESULT*` and sources stay searchable), `bench/INDEX.md` lists every bench directory with a status read from its files, and installing with `uv tool install chimera-agent` or `pipx install chimera-agent` is documented; `install.sh` now says which Python version it needs. The paired benchmark that would measure the `.rgignore` is pre-registered in `bench/rgignore_context/` and not yet run. (P1-16) (#1249)
 
 - **Desktop: streaming no longer re-renders the whole conversation per token.** Finished exchanges are memoised, streamed text is written once per frame, the heavy screens (Settings, Knowledge, Automation, Work, Onboarding, Activity) and the syntax highlighter load on demand, the running-turns poll is a single hook, and on-screen clocks pause while the window is hidden. Auto-detected highlighting now chooses among the 14 languages the file viewer maps. Not yet measured in the packaged app (see `apps/desktop/PROFILING.md`). (#1247)
 
 - **TUI: unknown slash commands and `/undo N`.** The full-screen terminal app no longer sends an unrecognised `/command` to the model as a paid turn, `/undo N` now previews and asks before restoring, and `chat`, `assist` and the TUI build their command lists from one shared registry. (#1242)
+
+### Changed
+
+- **Settings:** the search now finds every row (it covered about half), each setting says when a saved change applies (now, next conversation or next launch; the ones not yet traced say nothing), empty Memory, Runs, Decisions and Skills screens offer a first step, the presentation view uses the shared dialog, and reads of `CHIMERA_*` outside `Settings` are pinned by a ratchet. (#1251)
 
 ## [0.89.0] - 2026-11-12
 ### Fixed

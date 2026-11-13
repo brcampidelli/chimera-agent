@@ -308,7 +308,8 @@ def test_the_screen_may_write_both_and_they_apply_from_the_next_call() -> None:
 
     for key in ("CHIMERA_OPENROUTER_DATA_COLLECTION", "CHIMERA_OPENROUTER_ZDR"):
         assert is_editable(key)
-        assert key not in APPLIES_WHEN
+        # Stated, not implied: an absent key no longer stands for "the next call" (see `APPLIES_WHEN`).
+        assert APPLIES_WHEN[key] == "now"
 
 
 def test_a_saved_deny_reaches_the_next_call_without_a_relaunch(

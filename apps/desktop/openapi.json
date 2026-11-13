@@ -1418,6 +1418,47 @@
         "title": "ApprovedOut",
         "type": "object"
       },
+      "ArchiveCandidateOut": {
+        "description": "A conversation idle long enough to be offered for archiving, with the worktree it holds.\nArchiving removes nothing: it is the conversation list's own route, and the existing thirty-day\nclean-up decides about the folder afterwards.",
+        "properties": {
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "idle_days": {
+            "title": "Idle Days",
+            "type": "number"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "title",
+          "idle_days",
+          "path",
+          "bytes"
+        ],
+        "title": "ArchiveCandidateOut",
+        "type": "object"
+      },
       "AttachmentOut": {
         "description": "One stored attachment: an id to send with a turn, and what we managed to make of the file.\n\nNever the content. ``chars`` is how much text a document yielded, which is the honest way to say\n\"we read it\" \u2014 a document that converted to nothing is not the same as one we never opened, and\n``note`` carries the reason when there is one.",
         "properties": {
@@ -19098,6 +19139,19 @@
       "StorageOut": {
         "description": "What this install keeps on disk, by kind (study 29, P5.3). Nullable like `ResourcesOut`.",
         "properties": {
+          "archive_candidates": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ArchiveCandidateOut"
+            },
+            "title": "Archive Candidates",
+            "type": "array"
+          },
+          "archive_idle_days": {
+            "default": 0.0,
+            "title": "Archive Idle Days",
+            "type": "number"
+          },
           "categories": {
             "items": {
               "$ref": "#/components/schemas/StorageCategoryOut"
@@ -19133,6 +19187,32 @@
             },
             "title": "Worktrees",
             "type": "array"
+          },
+          "worktrees_counted_bytes": {
+            "default": 0,
+            "title": "Worktrees Counted Bytes",
+            "type": "integer"
+          },
+          "worktrees_limit_gb": {
+            "default": 0.0,
+            "title": "Worktrees Limit Gb",
+            "type": "number"
+          },
+          "worktrees_over_limit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worktrees Over Limit"
+          },
+          "worktrees_unmeasured": {
+            "default": 0,
+            "title": "Worktrees Unmeasured",
+            "type": "integer"
           }
         },
         "required": [
@@ -19149,6 +19229,17 @@
       "StorageWorktreeOut": {
         "description": "One isolated worktree folder, and whether the prune would collect it.\n\n``state`` is ``live`` (a run is using it, or it is too new to judge), ``orphan`` (the prune\nremoves it) or ``kept`` (its maker cannot be identified, so it is not called dead on a guess).\n``reason`` is a fixed word a screen translates.",
         "properties": {
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days"
+          },
           "bytes": {
             "anyOf": [
               {
@@ -19168,8 +19259,39 @@
             "title": "Reason",
             "type": "string"
           },
+          "retention": {
+            "default": "no_conversation",
+            "title": "Retention",
+            "type": "string"
+          },
+          "retention_due_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Due At"
+          },
+          "retention_kept": {
+            "default": "",
+            "title": "Retention Kept",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
           "state": {
             "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
             "type": "string"
           }
         },

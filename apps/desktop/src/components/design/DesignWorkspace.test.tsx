@@ -594,7 +594,9 @@ describe("menus, zoom, shortcuts and presentation", () => {
     await user.click(present);
 
     const dialog = screen.getByRole("dialog", { name: "Presentation" });
-    expect(dialog).toHaveFocus();
+    // Focus lands on a control inside it (the shared dialog's trap puts it on the first one) instead of
+    // on the container, which the hand-made dialog focused. What matters is that it is inside.
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
     expect(within(dialog).getByText("1 of 2")).toBeInTheDocument();
     await user.keyboard("{ArrowRight}");
     expect(within(dialog).getByText("2 of 2")).toBeInTheDocument();

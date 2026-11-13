@@ -32,7 +32,6 @@ import contextlib
 import hashlib
 import hmac
 import json
-import os
 import secrets
 import threading
 import time
@@ -95,7 +94,9 @@ REFUSAL_LOG_SECONDS = 60.0
 
 def session_seconds_from_env() -> int:
     """The configured session length, clamped. A value that does not parse takes the default."""
-    raw = os.environ.get("CHIMERA_BROWSER_SCREEN_SECONDS", "").strip()
+    from chimera.config import get_settings
+
+    raw = get_settings().browser_screen_seconds.strip()
     try:
         seconds = int(raw) if raw else SESSION_SECONDS_DEFAULT
     except ValueError:
