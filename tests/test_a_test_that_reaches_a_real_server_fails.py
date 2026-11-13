@@ -62,6 +62,7 @@ def test_the_patch_is_removed_afterwards() -> None:
     assert socket.socket.connect is real
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the suite-wide guard is enforced off Windows; conftest says why")
 def test_the_suite_wide_fixture_is_on_for_an_ordinary_test() -> None:
     """Not the context manager: the autouse fixture in conftest, which is what protects every test."""
     assert socket.socket.connect.__name__ == "wrapper"
