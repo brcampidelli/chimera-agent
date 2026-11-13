@@ -277,25 +277,14 @@ def _expand_prompt_command(head: str, argument: str, templates: dict[str, Any]) 
 def _chat_commands() -> list[Any]:
     """``chat``'s commands, for BOTH ``/help`` and the unknown-command message.
 
-    One table for the two, so they cannot disagree about what exists. ``/quit`` and ``/q`` are
-    aliases of ``/exit`` and are matched before this table is consulted. Built lazily because the
-    CLI pays for every module it imports at start, on every command.
+    A filter of the one registry in ``chimera.interface.commands``, so the three terminal surfaces
+    cannot disagree about what exists. ``/quit`` and ``/q`` are aliases of ``/exit`` and are matched
+    before this table is consulted. Imported late because the CLI pays for every module it imports
+    at start, on every command.
     """
-    from chimera.interface.render import SlashCommand, session_commands
+    from chimera.interface.commands import CHAT, slash_commands
 
-    return [
-        SlashCommand("/help", "", "this list"),
-        SlashCommand("/new", "", "start a fresh thread (the current one stays saved)"),
-        SlashCommand("/reset", "", "same as /new — the transcript is on disk now"),
-        SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
-        *session_commands(),
-        SlashCommand("/plan", "<task>", "show a plan first; run the task only once you approve it"),
-        SlashCommand(
-            "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
-        ),
-        SlashCommand("/attach", "<file>", _ATTACH_HELP),
-        SlashCommand("/exit", "", "quit (also /quit, /q)"),
-    ]
+    return slash_commands(CHAT)
 
 
 _ATTACH_HELP = "attach a document to your next message; the answer is checked against it"
@@ -347,24 +336,10 @@ def _grounded_answers_for(settings: Settings, gateway: Any) -> Any:
 
 
 def _assist_commands() -> list[Any]:
-    """``assist``'s commands — a different set, which is why each surface owns its own table."""
-    from chimera.interface.render import SlashCommand, session_commands
+    """``assist``'s commands — a different subset of the same registry (``/task``, ``/profile``)."""
+    from chimera.interface.commands import ASSIST, slash_commands
 
-    return [
-        SlashCommand("/help", "", "this list"),
-        SlashCommand("/task", "<hard ask>", "full-power fusion route, one shot"),
-        SlashCommand(
-            "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
-        ),
-        SlashCommand("/profile", "<kind>: <fact>", "remember a fact about you"),
-        SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
-        *session_commands(),
-        SlashCommand("/plan", "<task>", "show a plan first; run the task only once you approve it"),
-        SlashCommand("/new", "", "clear the conversation context (same as /reset)"),
-        SlashCommand("/reset", "", "clear the conversation context (nothing is deleted)"),
-        SlashCommand("/attach", "<file>", _ATTACH_HELP),
-        SlashCommand("/exit", "", "quit (also /quit, /q)"),
-    ]
+    return slash_commands(ASSIST)
 
 
 def _bind_durable_thread(session: Any, thread_id: str) -> None:
@@ -380,48 +355,21 @@ def _bind_durable_thread(session: Any, thread_id: str) -> None:
 def _undo_turns(session: Any, count: int, *, home: Path, usage_id: str) -> None:
     """``/undo N``: show the files of the last ``count`` retained turns, ask, then put them back.
 
-    Goes through :class:`~chimera.api.durable_undo.DurableUndo` — the store the desktop's Code
-    screen uses — so a file edited again after the turn is kept, not overwritten, and the answer
-    survives a restart. ``before=True`` undoes the oldest of the last ``count`` turns as well.
+    The preview and the restoration are `chimera.interface.undo_turns`, which the full-screen app
+    uses too; this function is only the console half: print the lines, ask on stdin.
     """
-    from chimera.api.durable_undo import DurableUndo
+    from chimera.interface import undo_turns
 
-    workspace = getattr(session, "workspace", None)
-    if workspace is None:
-        console.print("[dim]undo is unavailable without a workspace[/dim]")
+    shown = undo_turns.preview(session, count, home=home, usage_id=usage_id)
+    for line in shown.lines:
+        console.print(line)
+    if not shown.askable:
         return
-    store = getattr(session, "durable_undo", None) or DurableUndo(home)
-    turns = store.list_turns(usage_id, Path(workspace))
-    targets = turns[-count:]
-    if not targets:
-        console.print("[dim]no retained file changes to undo[/dim]")
+    if not typer.confirm(undo_turns.UNDO_QUESTION, default=False):
+        console.print(undo_turns.UNDO_CANCELLED)
         return
-    paths = sorted({path for turn in targets for path in turn["files"]})
-    console.print(f"[yellow]will undo the last {len(targets)} turn(s) with file changes:[/yellow]")
-    for path in paths:
-        console.print("  " + escape(path))
-    if not typer.confirm("Undo these file changes?", default=False):
-        console.print("[dim]undo cancelled[/dim]")
-        return
-    result = store.revert_to(usage_id, targets[0]["turn_id"], Path(workspace), before=True)
-    if not result.get("ok"):
-        console.print("[yellow]undo not applied:[/yellow] " + escape(str(result.get("reason", "unknown error"))))
-        return
-    console.print(f"[green]restored {result.get('restored', 0)} file(s)[/green]")
-    for label, key in (
-        ("kept, changed again after the turn", "kept"),
-        ("kept, created by the turn", "left_new_files"),
-    ):
-        if result.get(key):
-            console.print(f"[yellow]{label}:[/yellow] " + escape(", ".join(result[key])))
-    done = [p for p in paths if p not in result.get("kept", []) and p not in result.get("left_new_files", [])]
-    if done and hasattr(session, "_pending_note"):
-        session._last_change = None  # a plain /undo must not take the same turn back twice
-        session._pending_note = (
-            "The person undid the file changes of the last "
-            f"{len(targets)} turn(s); these files are back to how they were before: "
-            + ", ".join(done) + ". Re-read them before relying on what those turns wrote."
-        )
+    for line in undo_turns.apply(session, shown, home=home, usage_id=usage_id):
+        console.print(line)
 
 
 def _approve_plan(task: str, backend: Any) -> tuple[str, str] | None:
@@ -475,15 +423,16 @@ def _session_command(head: str, session: Any, *, home: Path, usage_id: str, argu
     full-screen terminal app uses too, so the three surfaces cannot word the same fact differently.
     ``/undo`` alone takes back the last turn; ``/undo N`` the last N, after a preview.
     """
-    from chimera.interface import render
+    from chimera.interface import render, undo_turns
 
     if head == "/undo":
         raw = argument.strip()
         if raw:
-            if not raw.isdigit() or int(raw) < 1:
-                console.print("[dim]usage: /undo [N] — N is a whole number, 1 or more[/dim]")
+            count = undo_turns.parse_count(raw)
+            if count is None:
+                console.print(undo_turns.UNDO_USAGE)
             else:
-                _undo_turns(session, int(raw), home=home, usage_id=usage_id)
+                _undo_turns(session, count, home=home, usage_id=usage_id)
             return True
         for line in render.undo_lines(session.undo_last()):
             console.print(line)
@@ -1299,6 +1248,7 @@ def tui(
     Note that the scrollback is not redrawn on resume: a resumed turn is in the model's context and
     not on your screen, and the line under the banner says how many.
     """
+    from chimera.api.durable_undo import DurableUndo
     from chimera.api.sessions import SessionManager, SessionStore
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
@@ -1464,6 +1414,9 @@ def tui(
             extractor=_memory_extractor(settings, mem, lambda: screen.session_id),
             cite_facts=settings.memory_extract,
             turn_note=lambda: finished_note(settings.home, Path(workspace)),
+            # The store `chat` and `assist` give theirs, so `/undo N` here reads the same retained
+            # turns the Code screen does; the thread is named by the app once it knows it.
+            durable_undo=DurableUndo(settings.home),
             workspace=Path(workspace),
         ),
         store,
