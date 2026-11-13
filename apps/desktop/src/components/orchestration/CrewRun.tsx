@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 import { StopButton } from "./StopButton";
 import { useStop } from "./use-stop";
+import { MonitorSection } from "./MonitorSection";
 
 const rails: Record<CrewWorkerState["status"], string> = {
   queued: "bg-muted",
@@ -297,6 +298,9 @@ export function CrewRun({
       {state.answer ? (
         <section className="surface whitespace-pre-wrap p-4 text-sm">{state.answer}</section>
       ) : null}
+
+      {/* The run's report: what the cross-agent monitor read once every worker was done. */}
+      <MonitorSection monitor={state.monitor} />
     </div>
   );
 }

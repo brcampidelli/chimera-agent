@@ -201,6 +201,9 @@ def _unified(rel: str, before: str, after: str, *, new_file: bool) -> str:
 
 
 class RemoteReadFile(RemoteFileTool):
+    #: Windowed by `read_window`, as `read_file` is, and says how to continue (start_line).
+    clips_own_output = True
+
     def act(self, **kwargs: Any) -> str:
         target = self.existing_file(str(kwargs["path"]))
         if target is None:

@@ -24,6 +24,12 @@ const SRC = join(__dirname, "..");
 
 /** Prefixes assembled at the call site. Each is a real `` t(`prefix.${x}`) `` in the source. */
 const DYNAMIC = [
+  // `` t(`settings.safety.floor.${category}`) ``, `` t(`settings.safety.surface.${row.surface}`) `` and
+  // `` t(`settings.safety.kernel.${row.kernel}`) `` — the security card names what the server sends
+  // (`chimera/api/posture.py`, `safety_overview`), so the labels cannot drift from the rules.
+  "settings.safety.floor.",
+  "settings.safety.surface.",
+  "settings.safety.kernel.",
   // `` t(`cron.history.reason.${r.reason}`) `` — a scheduled task's history names why a time ran or
   // did not from the closed set the server writes (`chimera/scheduler/history.py:REASONS`).
   "cron.history.reason.",

@@ -1,5 +1,5 @@
 ---
-source_sha256: 278a01e5a149ebc25fc893fdd255f56769e2701bc0134bf7b6e8c0b87bf07e57
+source_sha256: 7f5fca41b1aee08855e7e093378dcbb321639030f29b4fc89c219aaf65167e16
 ---
 
 # 安全与防护措施
@@ -246,4 +246,4 @@ export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorizatio
 
 ## 会话权限绕过的限制
 
-可选的代码会话权限绕过使用进程内存中生成的 HMAC 密钥进行认证；该密钥绝不会写入磁盘，也不会由子进程继承。没有有效 HMAC 的持久化 `bypass_permissions` 标志和排队的 `via_screen` 证明都会被忽略。因此，权限选择只持续到应用／服务进程重启；重启后绕过默认关闭。Shell 仍可编辑 JSON，但无法伪造证明。所有者决定（26/10）：开关打开后，代理会放行原本会询问的所有操作——git 以及向 GitHub 的推送、`gh`、MCP 连接器工具、部署、上传、HTTP 写入和发送类工具，无论是干净运行还是受污染运行。仍需所有者确认的只有以下三类，其他一律不问：(a) 内核的 BLOCK 规则和破坏性拒绝列表（`rm -rf /`、`mkfs` 等）；(b) 作为外发命令一部分发送或读取秘密文件（`.env`、密钥、`.npmrc`、`.netrc`、`.pypirc`、`.git-credentials`、AWS 凭据），以及 PowerShell 的 `-EncodedCommand`；(c) 在远程重写默认分支的历史——强制推送、`+refspec`，或删除 `main`/`master`（`git push --delete`、`git push origin :main`），包括写在 `bash -c` 或 `powershell -Command` 中的同类命令，以及通过 `gh api` 删除默认引用。强制推送到功能分支则予以放行。这些检查是词法启发式规则，不是安全边界：无法保证检测到 glob 展开的名称（如 `cat .e*`）、动态拼接的字符串（如 `python -c "open('.'+'env')"`）、其他编码、包装器或不符合已识别语法的命令。恶意网页仍可能绕过它们。处理不可信工作时请使用隔离沙箱。
+可选的代码会话权限绕过使用进程内存中生成的 HMAC 密钥进行认证；该密钥绝不会写入磁盘，也不会由子进程继承。没有有效 HMAC 的持久化 `bypass_permissions` 标志和排队的 `via_screen` 证明都会被忽略。因此，权限选择只持续到应用／服务进程重启；重启后绕过默认关闭。Shell 仍可编辑 JSON，但无法伪造证明。所有者决定（26/10）：开关打开后，代理会放行原本会询问的所有操作——git 以及向 GitHub 的推送、`gh`、MCP 连接器工具、部署、上传、HTTP 写入和发送类工具，无论是干净运行还是受污染运行。仍需所有者确认的只有以下四类，其他一律不问：(a) 内核的 BLOCK 规则和破坏性拒绝列表（`rm -rf /`、`mkfs` 等）；(b) 作为外发命令一部分发送或读取秘密文件（`.env`、密钥、`.npmrc`、`.netrc`、`.pypirc`、`.git-credentials`、AWS 凭据），以及 PowerShell 的 `-EncodedCommand`；(c) 在远程重写默认分支的历史——强制推送、`+refspec`，或删除 `main`/`master`（`git push --delete`、`git push origin :main`），包括写在 `bash -c` 或 `powershell -Command` 中的同类命令，以及通过 `gh api` 删除默认引用。强制推送到功能分支则予以放行。（d）在 2026-11 审计（a07-04）之后新增：在工作区之外且在主目录之外递归删除或写入的 shell 或代码命令（`rm -r`、`Remove-Item -Recurse`、`rd /s`、`robocopy`、`cp -r`、`mv`、带字面路径的 Python `shutil.rmtree`/`copytree`/`move`；`chimera/governance/bypass_reach.py`）；通过无法解析的变量写出的目标会被询问。每次开启或关闭开关都会作为 `bypass_toggle` 条目记录在 `audit.jsonl` 中，附带其范围、id 和来源，开关还可以设置可选的过期时间（默认没有）。这些检查是词法启发式规则，不是安全边界：无法保证检测到 glob 展开的名称（如 `cat .e*`）、动态拼接的字符串（如 `python -c "open('.'+'env')"`）、其他编码、包装器或不符合已识别语法的命令。恶意网页仍可能绕过它们。处理不可信工作时请使用隔离沙箱。

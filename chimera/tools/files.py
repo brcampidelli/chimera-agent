@@ -34,6 +34,8 @@ class _WorkspaceTool(Tool):
 
 class ReadFileTool(_WorkspaceTool):
     name = "read_file"
+    #: Bounds its own output: _MAX_READ_CHARS, and the notice says how to continue (start_line). The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Read a UTF-8 text file from the workspace. A large file is returned in windows: pass "
         "`start_line` (1-based) and `max_lines` to read a part of it; the truncation notice says "

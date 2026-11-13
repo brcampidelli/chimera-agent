@@ -67,6 +67,8 @@ _IDENTIFIERS = frozenset({
     # `read_file`: which window of the file — two integers, no body.
     "start_line",
     "max_lines",
+    # `http_get` / `scrape` / `read_document`: which page of a long result, a character position, no body.
+    "offset",
     # `job_status`: how many lines of a job's log, from each end, and how long to wait for it to
     # end — three integers, no body.
     "head_lines",

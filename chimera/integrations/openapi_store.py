@@ -568,6 +568,9 @@ class ConnectorTool(Tool):
     #: makes the taint ledger fence and record it.
     untrusted_output = True
 
+    #: Bounded by the REST tool it runs (`_MAX_BODY_CHARS`), which says so in its own marker.
+    clips_own_output = True
+
     def __init__(
         self,
         rest: RestApiTool,
