@@ -242,6 +242,8 @@ class ToolDescribeTool(Tool):
 
 class ToolCallTool(Tool):
     name = "tool_call"
+    #: Bounds its own output: its runner is a ToolRegistry, which applies the ceiling by the TARGET tool; clipping the result again here would add a second marker. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Run one deferred tool by its exact name from tool_list, passing its arguments as an object. "
         "Call tool_describe first unless you already know the schema."

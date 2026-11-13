@@ -7,7 +7,9 @@ widget tree, the streaming/tool callbacks, the activity panel, and the key bindi
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
+from chimera.api.durable_undo import DurableUndo
 from chimera.core.agent import ToolActivity
 from chimera.interface.session import TurnReport
 from chimera.tui.app import ChimeraTUI
@@ -312,3 +314,135 @@ async def test_the_task_list_the_agent_kept_is_drawn_under_the_answer() -> None:
         await pilot.pause()
         text = _log_text(app)
         assert "tasks 1/2 done" in text and "fix it" in text
+
+
+# -- an unrecognised slash is never a paid turn, and `/undo N` works here ---------------------------
+
+
+class _CountingHand:
+    """The `RightHand` seam a turn touches first: every call to it means a turn was about to start."""
+
+    attended = False
+
+    def __init__(self) -> None:
+        self.begun: list[str] = []
+
+    def turn_verdicts(self) -> tuple[int, int]:
+        return 0, 0
+
+    def begin_turn(self, text: str) -> None:
+        self.begun.append(text)
+
+    def taint_if_plugin_command(self, _custom: object, _text: str) -> None:
+        return None
+
+
+async def _submit(app: ChimeraTUI, pilot: object, text: str) -> None:
+    from textual.widgets import Input
+
+    app.query_one("#prompt", Input).value = text
+    await pilot.press("enter")  # type: ignore[attr-defined]
+    await app.workers.wait_for_complete()
+    await pilot.pause()  # type: ignore[attr-defined]
+
+
+async def test_an_unknown_slash_command_is_answered_by_the_app_and_never_reaches_the_model() -> None:
+    from chimera.orchestration.budget import SpendBudget
+
+    session, hand, budget = DrivenSession(), _CountingHand(), SpendBudget(max_usd=1.0)
+    app = ChimeraTUI(session, model_label="stub", hand=hand, budget=budget)  # type: ignore[arg-type]
+    left = budget.remaining
+    async with app.run_test() as pilot:
+        for typed in ("/foo", "/undoo", "/newsletter"):
+            await _submit(app, pilot, typed)
+        text = _log_text(app)
+    assert "unknown command /foo" in text
+    assert "unknown command /undoo" in text
+    assert "unknown command /newsletter" in text
+    assert "not sent to the model" in text
+    assert session.sent == []
+    assert hand.begun == []
+    assert budget.remaining == left
+    assert "you ›" not in text  # not even echoed as if it were a message
+
+
+async def test_a_path_or_a_fraction_still_reaches_the_model() -> None:
+    session, hand = DrivenSession(), _CountingHand()
+    app = ChimeraTUI(session, model_label="stub", hand=hand)  # type: ignore[arg-type]
+    async with app.run_test() as pilot:
+        await _submit(app, pilot, "/usr/local/bin")
+        await _submit(app, pilot, "/2")
+    assert session.sent == ["/usr/local/bin", "/2"]
+    assert hand.begun == ["/usr/local/bin", "/2"]
+
+
+class _UndoableSession(DrivenSession):
+    """A session that keeps what its turns changed, the way `ChatSession` does with a workspace."""
+
+    def __init__(self, workspace: Path, store: DurableUndo) -> None:
+        super().__init__()
+        self.workspace = workspace
+        self.durable_undo = store
+        self.turns: list[object] = []
+        self._pending_note = ""
+        self._last_change = None
+
+
+def _undo_app(tmp_path: Path) -> tuple[ChimeraTUI, Path, Path, _UndoableSession]:
+    """An app over a folder where two turns each changed one file, recorded under the app's own id."""
+    from chimera.core.checkpoint import WorkspaceGuard
+
+    root, home = tmp_path / "project", tmp_path / "home"
+    root.mkdir()
+    first, second = root / "a.txt", root / "b.txt"
+    first.write_text("a0", encoding="utf-8")
+    second.write_text("b0", encoding="utf-8")
+    store = DurableUndo(home)
+    session = _UndoableSession(root, store)
+    app = ChimeraTUI(session, model_label="stub", usage_home=home)  # type: ignore[arg-type]
+    guard = WorkspaceGuard(root)
+    for turn_id, path, text in (("00000001", first, "a1"), ("00000002", second, "b1")):
+        before = guard.snapshot()
+        path.write_text(text, encoding="utf-8")
+        store.record(app._usage_id(), turn_id, root, guard.diff_since(before))
+    return app, first, second, session
+
+
+async def test_undo_n_in_the_tui_previews_asks_and_restores_only_on_yes(tmp_path: Path) -> None:
+    from chimera.tui.confirm import ConfirmScreen
+
+    app, a, b, session = _undo_app(tmp_path)
+    async with app.run_test() as pilot:
+        await _submit(app, pilot, "/undo 2")
+        assert isinstance(app.screen, ConfirmScreen)
+        text = _log_text(app)
+        assert "will undo the last 2 turn(s)" in text and "a.txt" in text and "b.txt" in text
+        assert (a.read_text(encoding="utf-8"), b.read_text(encoding="utf-8")) == ("a1", "b1")
+        await pilot.press("n")  # a no restores nothing
+        await pilot.pause()
+        assert (a.read_text(encoding="utf-8"), b.read_text(encoding="utf-8")) == ("a1", "b1")
+        assert "undo cancelled" in _log_text(app)
+
+        await _submit(app, pilot, "/undo 2")
+        assert isinstance(app.screen, ConfirmScreen)
+        await pilot.press("y")
+        await pilot.pause()
+        assert (a.read_text(encoding="utf-8"), b.read_text(encoding="utf-8")) == ("a0", "b0")
+        assert "restored 2 file(s)" in _log_text(app)
+    assert session.sent == []  # neither undo reached the model
+    assert "b.txt" in session._pending_note
+
+
+async def test_undo_with_a_bad_count_asks_nothing_and_never_calls_the_model(
+    tmp_path: Path,
+) -> None:
+    from chimera.tui.confirm import ConfirmScreen
+
+    app, first, _second, session = _undo_app(tmp_path)
+    async with app.run_test() as pilot:
+        for bad in ("/undo 0", "/undo x", "/undo -1"):
+            await _submit(app, pilot, bad)
+            assert not isinstance(app.screen, ConfirmScreen)
+        assert _log_text(app).count("usage: /undo [N]") == 3
+    assert first.read_text(encoding="utf-8") == "a1"
+    assert session.sent == []

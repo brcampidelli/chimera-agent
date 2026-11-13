@@ -365,6 +365,7 @@ only_mutate = [
 # that way) — is neither listed here nor excluded there with a reason (the slow ones are).
 pytest_add_cli_args_test_selection = [
   "tests/test_code_environments.py",
+  "tests/test_the_registry_bounds_every_tool_output.py",  # names governance/ledger.py and ledger_tool.py
   "tests/test_ssh_environment.py",
   "tests/test_ssh_remote_files_hardening.py",  # names governance/ledger.py (WORKSPACE_WRITERS)
   "tests/test_the_ledger_judges_git_hooks_and_the_new_text_of_an_edit.py",
