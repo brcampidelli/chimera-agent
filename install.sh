@@ -14,7 +14,12 @@ if [ ! -f pyproject.toml ] || ! grep -q 'name = "chimera-agent"' pyproject.toml 
   cd "$DIR"
 fi
 
-command -v python3 >/dev/null 2>&1 || { echo "python3 (>=3.11) is required"; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 (>=3.11) is required: none found on PATH"; exit 1; }
+# Without this, an old python3 fails later with a resolver error that never says "Python version".
+python3 - <<'PYCHECK' || { echo "Chimera needs Python >= 3.11, <3.14; found $(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])'). Use a supported python3, or: uv tool install chimera-agent"; exit 1; }
+import sys
+sys.exit(0 if (3, 11) <= sys.version_info[:2] < (3, 14) else 1)
+PYCHECK
 
 echo "Creating virtualenv and installing (this pulls the deps) ..."
 python3 -m venv .venv
