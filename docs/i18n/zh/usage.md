@@ -1,5 +1,5 @@
 ---
-source_sha256: 7a697c5887c1e5b301a070af2877c563608ff9af16eb407cd6690326b47b42c9
+source_sha256: 6833cdb4488064e31938cb908a7c1aee3316f9eec8cd798be910f8591ee44d41
 ---
 
 # Chimera —— 使用指南
@@ -12,6 +12,20 @@ Chimera 是一个以 CLI 为核心、受治理的 AI agent，配有 LLM-Fusion �
 ---
 
 ## 安装
+
+### 作为工具安装（无需克隆）
+
+需要 Python 3.11–3.13。该包已发布到 PyPI，因此 `uv` 或 `pipx` 可以把 `chimera` 命令安装到各自独立的隔离环境中，并加入 `PATH`：
+
+```bash
+uv tool install chimera-agent       # 升级： uv tool upgrade chimera-agent
+pipx install chimera-agent          # 升级： pipx upgrade chimera-agent
+chimera version                     # 验证
+```
+
+附加依赖写在方括号中：`uv tool install 'chimera-agent[full]'`。撰写本节时，这两条命令没有在干净的机器上试过；如果其中一条失败，请在虚拟环境中使用 `pip install chimera-agent`，文档其余部分都以此为前提。
+
+### 从克隆安装（开发）
 
 Chimera 使用 [uv](https://docs.astral.sh/uv/)。
 

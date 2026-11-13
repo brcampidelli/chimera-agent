@@ -40,12 +40,15 @@ import re
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlsplit
 
-import httpx
-
 from chimera.core.service_record import Probe, ServiceRecord, probe, read_record
+
+if TYPE_CHECKING:
+    # httpx costs ~0.25 s to import and `chimera --help` never makes a request: it is imported in
+    # the three places that do (`_client`, `_json`, `stream_turn`).
+    import httpx
 
 #: Only these hosts. The record is a file anyone on the machine could have written; a URL that
 #: leaves the machine would hand the owner's token to whoever it names.
@@ -151,6 +154,8 @@ class ServiceCode:
         return value.replace(token, "[redacted]") if token else value
 
     def _client(self, read: float = 30.0) -> httpx.Client:
+        import httpx
+
         kwargs: dict[str, Any] = {
             "base_url": self.record.url.rstrip("/"),
             "headers": {"Authorization": f"Bearer {self.record.token}"},
@@ -172,6 +177,8 @@ class ServiceCode:
         return ServiceUnavailable(self.clean(f"The service answered {status}: {detail}"))
 
     def _json(self, method: str, path: str, body: Any = None) -> Any:
+        import httpx
+
         try:
             with self._client() as client:
                 response = client.request(method, path, json=body)
@@ -193,6 +200,8 @@ class ServiceCode:
 
     def stream_turn(self, body: dict[str, Any]) -> Iterator[tuple[str, Any]]:
         """One Code turn, as the screen sends it, read frame by frame until the stream ends."""
+        import httpx
+
         try:
             with (
                 self._client(read=READ_SECONDS) as client,

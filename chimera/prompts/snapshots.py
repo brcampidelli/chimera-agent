@@ -12,6 +12,10 @@ order:
 - the untrusted-data sentence comes with the base prompt.
 
 A snapshot of each piece alone would not notice either one moving.
+
+The ``schema.<surface>`` entries are the tool schema each surface sends, from
+:mod:`chimera.prompts.tool_schemas`. They are text too, and a changed tool description is a changed
+prompt: it is re-sent on every step.
 """
 
 from __future__ import annotations
@@ -109,4 +113,8 @@ def render_all() -> dict[str, str]:
         "design.html_turn_note": HTML_DESIGN_TURN_NOTE,
     })
     out.update(assembled_examples())
+    # What each surface sends as tool schema, built by the functions the surface itself calls.
+    from chimera.prompts.tool_schemas import schema_snapshots
+
+    out.update(schema_snapshots())
     return out
