@@ -1085,6 +1085,11 @@ def test_a_command_over_the_size_cap_is_asked_about_without_being_read() -> None
 def test_pathological_commands_return_quickly(command: str) -> None:
     import time
 
+    # The first call in a fresh process pays for imports and regex compilation
+    # (~0.8 s here, more on a loaded CI worker), and whichever case runs first in
+    # a worker paid it inside the clock. Warm up, then time only the input.
+    reaches_outside("ls", workspace=_ML_WORKSPACE, home=_ML_HOME)
+    bypass_safe("run_shell", {"command": "ls"}, workspace=_ML_WORKSPACE, home=_ML_HOME)
     started = time.monotonic()
     reaches_outside(command, workspace=_ML_WORKSPACE, home=_ML_HOME)
     bypass_safe("run_shell", {"command": command}, workspace=_ML_WORKSPACE, home=_ML_HOME)
