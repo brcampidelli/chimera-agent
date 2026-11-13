@@ -565,6 +565,10 @@ pytest_add_cli_args_test_selection = [
     "tests/test_version_api.py",
     "tests/test_web_search_uses_available_providers.py",
     "tests/test_worth.py",
+    "tests/test_bypass_asks_before_reaching_outside.py",  # P1-11: case (d) of the bypass floor
+    "tests/test_bypass_toggle_is_audited.py",  # P1-11: bypass_toggle on the audit chain, and the TTL
+    "tests/test_the_desktop_crew_runs_the_cross_agent_monitor.py",  # P1-11: AggregateMonitor on the desktop
+    "tests/test_the_security_card_is_derived.py",  # P1-11: the security card reads the deciding functions
     # Tests that `chdir` cannot run under mutmut 3.6: its hit recorder resolves `source_paths`
     # against the CURRENT directory, so after a chdir every call into a mutated function raises
     # FileNotFoundError and the stats run aborts. They still run in the normal suite.
@@ -577,6 +581,11 @@ pytest_add_cli_args_test_selection = [
     "--deselect=tests/test_the_card_shows_the_number_that_asked.py::test_the_route_that_lists_a_reloaded_card_sends_the_number",
     "--deselect=tests/test_the_kernel_has_a_review_band.py::test_the_band_is_off_by_default_and_only_counts_under_a_judging_mode",
     "--deselect=tests/test_the_kernel_has_a_review_band.py::test_under_observe_the_band_s_review_is_recorded_and_not_enforced",
+    # These three only carry `--chdir`/`chdir` inside shell strings they feed the parser; the gate
+    # matches the word lexically, and deselecting is cheaper than spelling the commands around it.
+    "--deselect=tests/test_bypass_asks_before_reaching_outside.py::test_a_cd_outside_moves_the_relative_targets_with_it",
+    "--deselect=tests/test_bypass_asks_before_reaching_outside.py::test_wrapper_options_are_read_not_skipped",
+    "--deselect=tests/test_bypass_asks_before_reaching_outside.py::test_the_floor_reads_the_script_env_dash_s_hands_over",
     "--deselect=tests/test_the_kernel_has_a_review_band.py::test_with_the_band_off_no_decider_is_built",
 ]
 # mutmut runs the tests from a copied `mutants/` tree. Whatever the selected tests read from the

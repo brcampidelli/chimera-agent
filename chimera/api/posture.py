@@ -194,6 +194,88 @@ Pauses = Literal["always", "tainted", "never"]
 FellBackReason = Literal["", "no_container", "no_os_sandbox"]
 
 
+class SurfaceGovernanceFacts(BaseModel):
+    """One surface's governance, as its assembly decides it (``profile.surface_governance``)."""
+
+    surface: Literal["chat", "code", "cron", "bot", "solve"]
+    #: The trust kernel's mode there: ``off`` judges nothing, ``observe`` records what it would ask,
+    #: ``enforce`` asks.
+    kernel: Literal["off", "observe", "enforce"]
+    #: Whether a ledger watches for untrusted reads there and narrows what follows them.
+    taint: bool
+
+
+class ActiveBypassFacts(BaseModel):
+    """One "Ignore permissions" switch that is on in this process."""
+
+    scope: Literal["conversation", "project"]
+    id: str
+    #: Epoch seconds when it goes off by itself, or None when it stays on until turned off.
+    expires_at: float | None = None
+
+
+class SafetyOverview(BaseModel):
+    """The one card of what holds on this machine: the floor, the real sandbox, governance per surface
+    and the switches that are on. Every field is computed by the function the code decides with, never
+    written down a second time (audit 2026-11, a07-14)."""
+
+    #: What still comes back to the owner with the switch on (``bypass.floor_categories``).
+    floor: list[str]
+    #: The floor's last category is a lexical rule: it reduces, it does not close (bypass_reach.py).
+    floor_lexical: list[str]
+    #: What ``CHIMERA_SANDBOX`` asks for.
+    sandbox_configured: str
+    #: What actually runs commands, resolved by ``get_sandbox`` (``auto`` is ``local`` on Windows).
+    sandbox: str
+    sandbox_isolated: bool
+    governance: list[SurfaceGovernanceFacts]
+    bypass: list[ActiveBypassFacts]
+
+
+def safety_overview(settings: Settings, switches: Any = None) -> SafetyOverview:
+    """Build the security card from the deciding functions themselves.
+
+    ``switches`` is the process's :class:`~chimera.core.bypass_switches.BypassSwitches`; None reads
+    the one the Code server uses. Reading it applies any expiry that is due, as every reader does.
+    """
+    from chimera.governance.bypass import floor_categories
+    from chimera.governance.hooks import _sandbox_name
+    from chimera.governance.profile import CARD_SURFACES, surface_governance
+    from chimera.sandbox import get_sandbox
+    from chimera.sandbox.confirm import sandbox_is_isolated
+
+    if switches is None:
+        from chimera.core.code_session import active_switches
+
+        switches = active_switches()
+    try:
+        sandbox = get_sandbox(settings)
+        sandbox_name = _sandbox_name(sandbox)
+        isolated = bool(sandbox_is_isolated(sandbox))
+    except Exception:  # noqa: BLE001 - an unbuildable sandbox runs nothing isolated: the safe read
+        sandbox_name, isolated = "unknown", False
+    governance = []
+    for surface in CARD_SURFACES:
+        kernel, taint = surface_governance(settings, surface)
+        governance.append(SurfaceGovernanceFacts.model_validate(
+            {"surface": surface, "kernel": kernel, "taint": taint}
+        ))
+    return SafetyOverview(
+        floor=floor_categories(),
+        floor_lexical=["outside_reach"],
+        sandbox_configured=(settings.sandbox or "auto").lower(),
+        sandbox=sandbox_name,
+        sandbox_isolated=isolated,
+        governance=governance,
+        bypass=[
+            ActiveBypassFacts.model_validate(
+                {"scope": row.scope, "id": row.key, "expires_at": row.expires_at}
+            )
+            for row in switches.live_entries()
+        ],
+    )
+
+
 class PostureFacts(BaseModel):
     """What is true right now, for the UI to render as one sentence.
 
@@ -241,6 +323,8 @@ class PostureFacts(BaseModel):
     #: smaller one, and stating the smaller one is the whole reason this field exists. A posture
     #: sentence that claimed prevention here would be the one lie this product cannot afford.
     external_agent: str = ""
+    #: The machine-wide half of the answer (:func:`safety_overview`): the same for every turn.
+    safety: SafetyOverview | None = None
 
 
 def describe(
@@ -311,6 +395,7 @@ def describe(
         fell_back_reason=fell_back_reason,
         unguarded=not guarded,
         external_agent=external_agent,
+        safety=safety_overview(settings),
     )
 
 
