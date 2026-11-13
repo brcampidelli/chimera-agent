@@ -1,12 +1,13 @@
 import { useState } from "react";
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Square } from "lucide-react";
 
 import { focusRing } from "@/components/ui/focus";
-import { listRunningTurns, stopCodeTurn, type RunningTurn } from "@/lib/api";
+import { stopCodeTurn, type RunningTurn } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { RUNNING_TURNS_KEY, useRunningTurns } from "@/lib/useRunningTurns";
 
 /** The last part of a folder path, which is how the sidebar names a project. */
 function projectName(workspace: string): string {
@@ -27,7 +28,7 @@ export function RunningElsewhere({ current }: { current: string | null }) {
   const t = useT();
   const qc = useQueryClient();
   const [stopping, setStopping] = useState<ReadonlySet<string>>(() => new Set());
-  const running = useQuery({ queryKey: ["code-turns-running"], queryFn: listRunningTurns, refetchInterval: 4000 });
+  const running = useRunningTurns();
   const others = (running.data ?? []).filter((turn) => turn.turn_id !== current);
   if (others.length === 0) return null;
 
@@ -38,7 +39,7 @@ export function RunningElsewhere({ current }: { current: string | null }) {
     } catch {
       // A 404 is a turn that ended on its own meanwhile; the next poll drops it either way.
     }
-    void qc.invalidateQueries({ queryKey: ["code-turns-running"] });
+    void qc.invalidateQueries({ queryKey: RUNNING_TURNS_KEY });
   }
 
   const label = t("running.elsewhere.label", { n: others.length });

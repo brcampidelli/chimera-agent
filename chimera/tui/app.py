@@ -42,7 +42,8 @@ from textual.worker import Worker
 from chimera.core.agent import ToolActivity
 from chimera.core.code_session import _accepts
 from chimera.core.commands import PromptCommand, discover_commands, expand_command
-from chimera.interface import ChatSession, render
+from chimera.interface import ChatSession, render, undo_turns
+from chimera.interface.commands import TUI, commands_for
 from chimera.interface.render import scrub_provider_ids
 from chimera.interface.session import TurnReport
 from chimera.tui.activity import ActivityPanel
@@ -53,13 +54,20 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.orchestration.budget import SpendBudget
     from chimera.tui.confirm import ModalGate
 
-_SESSION = [command.name for command in render.session_commands()]
-_SLASH = ["/model ", "/new", "/reset", "/clear", "/stream", *_SESSION, "/help", "/exit"]
+#: The TUI's commands, from the one registry the three terminal surfaces share. `_SLASH` is what the
+#: prompt completes (a command that takes a required argument gets a trailing space); `_HELP` is the
+#: line `/help` prints. Neither is written out by hand any more: they were the third copy of a table
+#: that `chat` and `assist` already had, and the one that had no way to say `/undo 2` existed.
+_COMMANDS = commands_for(TUI)
+_SLASH = [c.name + (" " if c.argument.startswith("<") else "") for c in _COMMANDS]
 _HELP = (
-    "[b]commands[/b]  /model <slug> · /new (fresh thread) · /reset (same) · "
-    + " · ".join(_SESSION)
-    + " · /clear (clear screen) · /stream (toggle live tokens) · /exit\n"
-    "[b]keys[/b]  ^R new thread · ^L clear · ^P palette · PgUp/PgDn scroll · "
+    "[b]commands[/b]  "
+    + " · ".join(
+        " ".join(part for part in (c.name, c.argument, c.terse) if part)
+        for c in _COMMANDS
+        if c.name != "/help"
+    )
+    + "\n[b]keys[/b]  ^R new thread · ^L clear · ^P palette · PgUp/PgDn scroll · "
     "^C cancel the running turn (quits when idle)"
 )
 
@@ -211,6 +219,7 @@ class ChimeraTUI(App[None]):
         #: Whether this run picked up an existing thread. Said out loud on mount, because resuming
         #: in silence is the same surprise as forgetting.
         self.resumed = resumed
+        self._bind_undo_thread()
         self.command_workspace = workspace or getattr(session, "workspace", None) or Path.cwd()
         # Names in this set are the TUI's actual dispatch branches; keeping their files out prevents
         # completion from advertising a command that can never override the embedded action.
@@ -219,16 +228,7 @@ class ChimeraTUI(App[None]):
             for command in discover_commands(
                 self.command_workspace, usage_home or Path.home() / ".chimera"
             )
-            if command.name not in {
-                "model",
-                "new",
-                "reset",
-                "clear",
-                "stream",
-                "help",
-                "exit",
-                *_SESSION,
-            }
+            if command.name not in {c.name.lstrip("/") for c in _COMMANDS}
         }
 
     def compose(self) -> ComposeResult:
@@ -289,8 +289,8 @@ class ChimeraTUI(App[None]):
             self.action_reset()
         elif text == "/stream":
             self._toggle_stream()
-        elif text == "/undo":
-            self._undo()
+        elif render.split_command(text)[0] == "/undo":
+            self._undo(render.split_command(text)[1])
         elif text == "/cost":
             self._show_cost()
         elif text == "/compact":
@@ -309,6 +309,12 @@ class ChimeraTUI(App[None]):
                 except ValueError as exc:
                     self._append(f"[red]command unavailable:[/red] {escape(str(exc))}")
                     return
+            elif render.is_command_like(head):
+                # Never a paid turn: an unrecognised `/word` used to go to the model as an ordinary
+                # message, which is what `chat` and `assist` already refuse. A path
+                # (`/usr/local`) or a fraction (`/2`) is not command-shaped and still goes through.
+                self._append_unknown_command(head)
+                return
             # escape() the untrusted text so brackets can't crash Rich's markup parser (e.g. "[/]").
             self._append(f"[bold green]you ›[/bold green] {escape(text)}")
             if self.budget is not None and self.budget.blocked():
@@ -505,9 +511,57 @@ class ChimeraTUI(App[None]):
             return
         self.exit()
 
-    def _undo(self) -> None:
-        for line in render.undo_lines(self.session.undo_last()):
+    def _bind_undo_thread(self) -> None:
+        """File this thread's retained file changes under its id, so `/undo N` has something to read."""
+        undo_turns.bind_thread(self.session, self._usage_id())
+
+    def _append_unknown_command(self, head: str) -> None:
+        rows = [
+            *(c.row(TUI) for c in _COMMANDS),
+            *(
+                render.SlashCommand(f"/{name}", "<arguments>", command.description)
+                for name, command in self.prompt_commands.items()
+            ),
+        ]
+        for line in render.unknown_command_lines(head, rows):
             self._append(line)
+
+    def _undo(self, argument: str = "") -> None:
+        """``/undo`` takes back the last turn; ``/undo N`` the last N, after a preview and a yes."""
+        raw = argument.strip()
+        if not raw:
+            for line in render.undo_lines(self.session.undo_last()):
+                self._append(line)
+            return
+        count = undo_turns.parse_count(raw)
+        if count is None:
+            self._append(undo_turns.UNDO_USAGE)
+            return
+        home = self.usage_home or Path.home() / ".chimera"
+        usage_id = self._usage_id()
+        shown = undo_turns.preview(self.session, count, home=home, usage_id=usage_id)
+        for line in shown.lines:
+            self._append(line)
+        if not shown.askable:
+            return
+        from chimera.sandbox.confirm import PROMPT_TIMEOUT_SECONDS
+        from chimera.tui.confirm import YES, ConfirmScreen
+
+        def answered(answer: str | None) -> None:
+            if answer != YES:
+                self._append(undo_turns.UNDO_CANCELLED)
+                return
+            for line in undo_turns.apply(self.session, shown, home=home, usage_id=usage_id):
+                self._append(line)
+
+        # Drawn here, on the UI thread, with a callback: `ModalGate` is for the worker thread that
+        # a turn runs in, and blocks on `call_from_thread`, which refuses to run from the loop.
+        # Silence, Escape and Enter on the default button are all a no, as for the tool gates.
+        timeout = self.gate.timeout if self.gate is not None else PROMPT_TIMEOUT_SECONDS
+        self.push_screen(
+            ConfirmScreen(undo_turns.UNDO_QUESTION, shown.plain_body(), "", timeout=timeout),
+            answered,
+        )
 
     def _show_cost(self) -> None:
         if self.usage_home is None:
@@ -532,6 +586,7 @@ class ChimeraTUI(App[None]):
             return
         self.session_id = self.sessions.new()
         self.session = self.sessions.get(self.session_id)
+        self._bind_undo_thread()
         self._append(f"[dim]new thread {escape(self.session_id)} — the previous one is saved.[/dim]")
         self._activity().set_status("idle")
 

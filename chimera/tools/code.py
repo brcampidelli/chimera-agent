@@ -197,6 +197,8 @@ class CodeInterpreterTool(Tool):
     """
 
     name = "code_interpreter"
+    #: Bounds its own output: _MAX_OUTPUT_CHARS via clip_output. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     description = (
         "Run Python in a persistent session — variables and imports persist across calls. "
         "Pass reset=true to clear the session. Runs in-process (not sandboxed)."
@@ -265,6 +267,8 @@ class CodeInterpreterTool(Tool):
 
 class ExecuteCodeTool(Tool):
     name = "execute_code"
+    #: Bounds its own output: _MAX_OUTPUT_CHARS via clip_output. The central ceiling in `ToolRegistry.run` leaves it alone.
+    clips_own_output = True
     # "in the sandbox" read as "isolated from your machine", and the default sandbox is `local`,
     # whose own `is_isolated()` returns False and whose module docstring says outright that it is
     # not isolated. Read beside `code_interpreter`, which says "(not sandboxed)", the omission

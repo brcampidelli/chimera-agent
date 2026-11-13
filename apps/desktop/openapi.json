@@ -352,6 +352,40 @@
         "title": "AccessSharingOut",
         "type": "object"
       },
+      "ActiveBypassFacts": {
+        "description": "One \"Ignore permissions\" switch that is on in this process.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "conversation",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "id"
+        ],
+        "title": "ActiveBypassFacts",
+        "type": "object"
+      },
       "AgentBatchNoteOut": {
         "description": "A parallel batch the conversation started, recorded in it when the batch ended.\n\nNot a turn: nobody typed it and no model answered it. It sits after the exchange that confirmed\nthe batch, and the next turn's model reads it as context (``agent_batch_note.AGENT_BATCH_KEY``).",
         "properties": {
@@ -3589,6 +3623,22 @@
             "title": "Origin",
             "type": "string"
           },
+          "runs_here": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runs Here"
+          },
+          "skipped": {
+            "default": 0,
+            "title": "Skipped",
+            "type": "integer"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -4332,6 +4382,19 @@
           "path": {
             "title": "Path",
             "type": "string"
+          },
+          "ttl_seconds": {
+            "anyOf": [
+              {
+                "maximum": 2592000.0,
+                "minimum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Seconds"
           }
         },
         "required": [
@@ -13903,6 +13966,62 @@
         "title": "ModelsOut",
         "type": "object"
       },
+      "MonitorFindingOut": {
+        "properties": {
+          "agents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Agents",
+            "type": "array"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "description": "cross-agent-taint | fan-out-volume",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "MonitorFindingOut",
+        "type": "object"
+      },
+      "MonitorOut": {
+        "description": "The cross-agent monitor's section of the run's report, sent once when the workers are done.\n\nThe same monitor `chimera solve` runs over a batch (`governance.aggregate_monitor`): a split flow\nwhere one worker reads something untrusted and another acts on it is invisible to each worker's\nown ledger. It only ever asks for review; it never stops anything.",
+        "properties": {
+          "agents": {
+            "default": 0,
+            "description": "Workers whose ledgers were read.",
+            "title": "Agents",
+            "type": "integer"
+          },
+          "evaluated": {
+            "default": false,
+            "description": "False means the monitor had nothing to read, never that it found nothing.",
+            "title": "Evaluated",
+            "type": "boolean"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/MonitorFindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "reason": {
+            "default": "",
+            "description": "governance_off | no_ledger, when not evaluated",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "title": "MonitorOut",
+        "type": "object"
+      },
       "NetworkShareIn": {
         "properties": {
           "port": {
@@ -14136,6 +14255,9 @@
           },
           "fell_back": {
             "$ref": "#/components/schemas/FellBackOut"
+          },
+          "monitor": {
+            "$ref": "#/components/schemas/MonitorOut"
           },
           "worker_rejected": {
             "$ref": "#/components/schemas/WorkerRejectedOut"
@@ -15331,6 +15453,16 @@
             ],
             "title": "Pauses",
             "type": "string"
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafetyOverview"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "shell": {
             "enum": [
@@ -17715,6 +17847,62 @@
         "title": "RunningTurnOut",
         "type": "object"
       },
+      "SafetyOverview": {
+        "description": "The one card of what holds on this machine: the floor, the real sandbox, governance per surface\nand the switches that are on. Every field is computed by the function the code decides with, never\nwritten down a second time (audit 2026-11, a07-14).",
+        "properties": {
+          "bypass": {
+            "items": {
+              "$ref": "#/components/schemas/ActiveBypassFacts"
+            },
+            "title": "Bypass",
+            "type": "array"
+          },
+          "floor": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floor",
+            "type": "array"
+          },
+          "floor_lexical": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Floor Lexical",
+            "type": "array"
+          },
+          "governance": {
+            "items": {
+              "$ref": "#/components/schemas/SurfaceGovernanceFacts"
+            },
+            "title": "Governance",
+            "type": "array"
+          },
+          "sandbox": {
+            "title": "Sandbox",
+            "type": "string"
+          },
+          "sandbox_configured": {
+            "title": "Sandbox Configured",
+            "type": "string"
+          },
+          "sandbox_isolated": {
+            "title": "Sandbox Isolated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "floor",
+          "floor_lexical",
+          "sandbox_configured",
+          "sandbox",
+          "sandbox_isolated",
+          "governance",
+          "bypass"
+        ],
+        "title": "SafetyOverview",
+        "type": "object"
+      },
       "SandboxCfgOut": {
         "properties": {
           "image": {
@@ -19171,6 +19359,42 @@
           "note"
         ],
         "title": "SuggestionStatsOut",
+        "type": "object"
+      },
+      "SurfaceGovernanceFacts": {
+        "description": "One surface's governance, as its assembly decides it (``profile.surface_governance``).",
+        "properties": {
+          "kernel": {
+            "enum": [
+              "off",
+              "observe",
+              "enforce"
+            ],
+            "title": "Kernel",
+            "type": "string"
+          },
+          "surface": {
+            "enum": [
+              "chat",
+              "code",
+              "cron",
+              "bot",
+              "solve"
+            ],
+            "title": "Surface",
+            "type": "string"
+          },
+          "taint": {
+            "title": "Taint",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "surface",
+          "kernel",
+          "taint"
+        ],
+        "title": "SurfaceGovernanceFacts",
         "type": "object"
       },
       "SystemOneModelOut": {
@@ -32063,6 +32287,25 @@
           }
         },
         "summary": "Revoke Device"
+      }
+    },
+    "/api/security/overview": {
+      "post": {
+        "description": "The security card: the bypass floor, the sandbox that really runs, governance per surface\nand the switches that are on. Read-only, and a POST for the reason ``/api/code/posture`` is:\na sandbox that stopped answering must change the answer, never be served from a cache.",
+        "operationId": "security_overview_api_security_overview_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SafetyOverview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Security Overview"
       }
     },
     "/api/service/activity": {

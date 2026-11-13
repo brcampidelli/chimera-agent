@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { useI18n, useT } from "@/lib/i18n";
 import type { BrowserScreenCode, BrowserScreenSession } from "@/lib/types";
+import { setVisibleInterval } from "@/lib/visibleInterval";
 
 const SESSIONS_KEY = ["browser-screen-sessions"] as const;
 
@@ -24,8 +25,7 @@ function useSecondsLeft(until: number | null): number {
   useEffect(() => {
     if (until === null) return undefined;
     setNow(Date.now() / 1000);
-    const id = window.setInterval(() => setNow(Date.now() / 1000), 1000);
-    return () => window.clearInterval(id);
+    return setVisibleInterval(() => setNow(Date.now() / 1000), 1000);
   }, [until]);
   return until === null ? 0 : Math.max(0, Math.ceil(until - now));
 }

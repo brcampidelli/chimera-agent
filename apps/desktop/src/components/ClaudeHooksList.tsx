@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/panel";
 import { getClaudeHooks, trustClaudeHooks } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useNum, useT } from "@/lib/i18n";
 
 /**
  * The hooks Chimera loaded from Claude Code's settings files (`chimera/governance/claude_hooks.py`),
@@ -22,6 +23,7 @@ export function ClaudeHooksList({
   project?: string;
 }) {
   const t = useT();
+  const num = useNum();
   const queryClient = useQueryClient();
   const hooks = useQuery({
     queryKey: ["claude-hooks", repoOn, userOn, project ?? ""],
@@ -91,6 +93,19 @@ export function ClaudeHooksList({
                 <code className="break-all text-xs">{h.command}</code>
                 {h.on_failure === "block" && (
                   <span className="text-muted-foreground"> · {t("settings.hooks.onFailureBlock")}</span>
+                )}
+                {/* Per hook, from the server: loaded and skipped here is a guard that is not on. */}
+                {h.runs_here === false && (
+                  <>
+                    {" "}
+                    <Badge tone="warn">{t("settings.hooks.notHere")}</Badge>
+                  </>
+                )}
+                {(h.skipped ?? 0) > 0 && (
+                  <span className="text-xs text-warn-foreground">
+                    {" "}
+                    · {t("settings.hooks.skipped", { n: num(h.skipped ?? 0) })}
+                  </span>
                 )}
               </li>
             ))}

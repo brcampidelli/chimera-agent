@@ -21,12 +21,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="print the findings as JSON lines")
     args = parser.parse_args(argv)
     sys.path.insert(0, str(ROOT))
-    from chimera.prompts.lint import lint_registry
+    from chimera.prompts.lint import lint_registry, tool_schema_totals
 
     report = lint_registry()
+    schemas = tool_schema_totals()
     if args.json:
         for f in report.findings:
             print(json.dumps({"rule": f.rule, "section": f.section, "detail": f.detail}, ensure_ascii=False))
+        for row in schemas:
+            rule = "tool schema" if row["measured"] else "tool schema not measured"
+            line = {"rule": rule, "section": row["surface"], **{k: v for k, v in row.items() if k != "surface"}}
+            print(json.dumps(line, ensure_ascii=False))
         return 0
     rules: dict[str, list[str]] = {}
     for f in report.findings:
@@ -41,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     print("\n== fence syntaxes anywhere in the package")
     for marker, files in sorted(report.source_fences.items()):
         print(f"  <<{marker}: {', '.join(files)}")
+    print("\n== tool schema by surface (tokens are characters / 4: an estimate)")
+    for row in schemas:
+        print(f"  {row['surface']}: {row['detail']}")
     return 0
 
 

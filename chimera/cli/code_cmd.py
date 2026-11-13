@@ -16,7 +16,7 @@ anywhere else — except by Claude, through the MCP bridge, which already does e
 The bridge path is that same door with a person at it. It does not read the app's files and it
 does not build an agent: every request goes to the RUNNING app's bridge (``/api/bridge/*``), over the
 discovery file the app writes while Settings > "Allow Claude to operate this app" is on, with the
-same transport ``chimera mcp desktop`` uses (:func:`chimera.server.desktop_mcp.urllib_call`). The
+same transport ``chimera mcp desktop`` uses (:func:`chimera.api.bridge_transport.urllib_call`). The
 app's own handler runs the turn — ``POST /api/code/turn``, read as a stream on the app's side — under
 the owner's configured posture, writing to the same conversation the screen shows.
 
@@ -48,9 +48,9 @@ from rich.table import Table
 
 from chimera.api.bridge_discovery import read_discovery
 from chimera.api.bridge_routes import scrub
+from chimera.api.bridge_transport import NOT_RUNNING, HttpCall, urllib_call
 from chimera.cli import code_service
 from chimera.cli.code_service import ServiceCode, ServiceUnavailable
-from chimera.server.desktop_mcp import NOT_RUNNING, HttpCall, urllib_call
 
 code_app = typer.Typer(
     help="Start or continue a Code conversation from this terminal, through the running service "

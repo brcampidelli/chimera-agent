@@ -48,6 +48,9 @@ class RestApiTool(Tool):
     #: taint-track the response regardless of name.
     untrusted_output = True
 
+    #: `_MAX_BODY_CHARS` on the body, with its own marker.
+    clips_own_output = True
+
     def __init__(
         self,
         *,

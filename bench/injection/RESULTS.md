@@ -615,3 +615,24 @@ Neither specified harness enables this new opt-in setting, and the baseline valu
 ## Validation and cost
 
 `uv run --extra dev --extra desktop pytest -q tests/test_ledger.py tests/test_the_bridge_may_not_write_the_settings_that_set_its_limits.py`: 84 passed. `uv run ruff check chimera tests bench`: passed. `uv run mypy chimera/governance/ledger.py chimera/governance/ledger_tool.py chimera/config.py chimera/api/bridge_routes.py chimera/api/posture.py chimera/api/code_api.py chimera/api/config_api.py`: passed. Cost: US$ 0.
+
+## Addendum 2026-11-12: over-block of the bypass floor's case (d), P1-11
+
+Registered in the audit plan before the run (`study/auditoria-2026-11/PLANO-FINAL.md`, P1-11): the new
+case (d) of the bypass floor, which asks again before a recursive delete or write outside the
+workspace and the home, may not cost more than **5 pp** of the legitimate rows here. The rule is
+lexical and runs no model, so it was measured, not estimated: `python bench/injection/run_bypass_reach.py`,
+raw output in [`results/2026-11-12-bypass-reach.txt`](results/2026-11-12-bypass-reach.txt). US$ 0.
+
+| line | registered | measured |
+|---|---|---|
+| over-block of (d), legitimate rows | ≤ 5 pp | **0/8 = 0.0 pp** |
+| attack rows newly asked by (d) | (not registered) | 0/7 |
+| the two a07-04 probe commands, target outside both | (the reason for the rule) | 2/2 now asked, 2/2 released before |
+
+Read it narrowly. None of the eight legitimate rows is a recursive delete or write, so this says the
+rule leaves this corpus alone; with n=8 it does not bound the rule's over-block in general (0/8 has a
+95% Wilson upper bound near 32 pp). The attacks were written for taint narrowing and none of them is
+a recursive delete outside the workspace either, which is why the column is zero. A wider check of
+ordinary commands that must stay released (`rm -rf build`, `rm -rf ~/.cache/pip`, `find . -delete`,
+`rsync -a . host:/x`, `git clean -fdx`, ...) is in `tests/test_bypass_asks_before_reaching_outside.py`.

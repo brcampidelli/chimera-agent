@@ -83,6 +83,7 @@ from chimera.api.posture import (
     PostureFacts,
     Reach,
     ResolvedPosture,
+    SafetyOverview,
     bridge_mode,
     bridge_turn,
     commands_run_without_asking,
@@ -90,12 +91,14 @@ from chimera.api.posture import (
     describe,
     mode_for_approval,
     narrow_posture,
+    safety_overview,
 )
 from chimera.api.posture import resolve as _resolve_posture
 from chimera.api.proposed_change import change_note, proposal_target
 from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
+    MAX_BYPASS_TTL_S,
     AttachmentOut,
     CodeBypassReactivateIn,
     CodeBypassReactivateOut,
@@ -3804,6 +3807,14 @@ def register_code_api(
     async def _queued_event(item: QueueItem) -> AsyncIterator[dict[str, str]]:
         yield {"event": "queued", "data": json.dumps(queue_item_out(item))}
 
+    def _bypass_ttl(raw: Any) -> float | None:
+        """The optional expiry of a switch turned on, in seconds; absent by default (no expiry)."""
+        if raw is None:
+            return None
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not 1 <= raw <= MAX_BYPASS_TTL_S:
+            raise HTTPException(status_code=422, detail=f"ttl_seconds must be between 1 and {MAX_BYPASS_TTL_S}")
+        return float(raw)
+
     def _refuse_bypass_on_in_browser(request: Request, turning_on: bool) -> None:
         """Refuse switching "Ignore permissions" on from a browser's screen (`screen_credential.may_switch_bypass_on`).
 
@@ -6844,6 +6855,13 @@ def register_code_api(
             external_agent=(req.provider or "").strip().lower(),
         )
 
+    @app.post("/api/security/overview", dependencies=[guard], response_model=SafetyOverview)
+    def security_overview() -> SafetyOverview:
+        """The security card: the bypass floor, the sandbox that really runs, governance per surface
+        and the switches that are on. Read-only, and a POST for the reason ``/api/code/posture`` is:
+        a sandbox that stopped answering must change the answer, never be served from a cache."""
+        return safety_overview(live())
+
     @app.post("/api/code/roles", dependencies=[guard], response_model=RoleModels)
     def code_roles(req: RolesQuery) -> RoleModels:
         """The concrete model slugs a profile resolves to, so the UI can show them.
@@ -7524,9 +7542,10 @@ def register_code_api(
             raise needs_screen(request, "owner screen credential required")
         enabled = bool(req.get("bypass_permissions", False))
         _refuse_bypass_on_in_browser(request, enabled)
+        ttl_seconds = _bypass_ttl(req.get("ttl_seconds"))
         if not _session_known(session_id):
             raise HTTPException(status_code=404, detail="no such conversation")
-        from chimera.core.code_session import set_session_bypass
+        from chimera.core.code_session import set_session_bypass, set_session_bypass_expiring
         from chimera.governance.audit import AuditLog
         from chimera.governance.waiting_release import (
             WaitingRelease,
@@ -7535,7 +7554,11 @@ def register_code_api(
         )
 
         try:
-            warning = set_session_bypass(session_id, enabled)
+            warning = (
+                set_session_bypass(session_id, enabled)
+                if ttl_seconds is None
+                else set_session_bypass_expiring(session_id, enabled, ttl_seconds)
+            )
         except OSError as exc:
             # Nothing changed in memory either: the file is written first (bypass_switches.py).
             raise HTTPException(
@@ -8134,7 +8157,7 @@ def register_code_api(
         )
 
         try:
-            warning = projects.set_bypass(body.path, body.bypass_permissions)
+            warning = projects.set_bypass(body.path, body.bypass_permissions, ttl_seconds=body.ttl_seconds)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except OSError as exc:

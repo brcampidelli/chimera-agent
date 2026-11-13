@@ -114,3 +114,17 @@ def test_the_affective_census_reads_a_real_corpus() -> None:
     assert len(prompt_lint._english_ui_values(root / "apps/desktop/src/lib/i18n.tsx")) > 1000
     assert len(prompt_lint._server_template_strings(root / "chimera/server")) > 500
     assert sum(1 for s in prompt_lint.SECTIONS if s.text()) > 50
+
+
+def test_the_lint_carries_a_tool_schema_section_per_surface() -> None:
+    """The prompt text was in the totals and the tool schema, the larger half of what is re-sent on
+    every step, was in none. The section must name each surface with a number or a reason, and label
+    its tokens as the estimate they are (characters / 4)."""
+    from chimera.prompts.lint import tool_schema_totals
+    from chimera.prompts.tool_schemas import NOT_MEASURED, SURFACES
+
+    rows = {row["surface"]: row for row in tool_schema_totals()}
+    assert set(rows) == {*SURFACES, *NOT_MEASURED}
+    for surface in SURFACES:
+        assert rows[surface]["chars"] > 0 and "estimate" in rows[surface]["tokens_are"]
+    assert all(not rows[s]["measured"] for s in NOT_MEASURED)

@@ -357,7 +357,9 @@ class GovernedTool(Tool):
             ):
                 from chimera.governance.bypass import bypass_safe
 
-                safe = bypass_safe(judged, judged_args, verdict)
+                safe = bypass_safe(
+                    judged, judged_args, verdict, workspace=getattr(self.inner, "workspace", None),
+                )
                 if safe and self.bypass_safe is not None:
                     safe = self.bypass_safe(judged, shown)
                 if safe:

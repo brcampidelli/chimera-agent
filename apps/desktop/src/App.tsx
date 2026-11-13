@@ -4,14 +4,9 @@ import { BrowserScreenPrompt } from "@/components/BrowserScreenPrompt";
 import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
 import { legacyRedirect } from "@/lib/legacyRoutes";
-import { Settings, settingsTab } from "@/components/Settings";
-import { Knowledge } from "@/components/Knowledge";
-import { Automation, automationTab } from "@/components/Automation";
 import { Code } from "@/components/Code";
-import { Work } from "@/components/Work";
-import { Maturity } from "@/components/Maturity";
-import { Onboarding } from "@/components/Onboarding";
-import { Activity } from "@/components/Activity";
+import { settingsTab } from "@/lib/settingsTab";
+import { automationTab } from "@/lib/automationTab";
 import { BackendDown } from "@/components/BackendDown";
 import { FullControlBanner } from "@/components/FullControlBanner";
 import { AppShell } from "@/components/shell/AppShell";
@@ -54,6 +49,20 @@ const Edit = lazy(() => import("@/components/Edit").then((m) => ({ default: m.Ed
 const EditSidebar = lazy(() =>
   import("@/components/editor/EditSidebar").then((m) => ({ default: m.EditSidebar })),
 );
+
+/**
+ * The heavy screens arrive on demand too (P1-09). Code is the screen the app opens on and stays in
+ * the main bundle; the rest are visited a few times a session. `settingsTab` / `automationTab` come
+ * from small modules in `lib/` — importing them from the screens would keep the whole screen in the
+ * main chunk and make this split a no-op.
+ */
+const Settings = lazy(() => import("@/components/Settings").then((m) => ({ default: m.Settings })));
+const Knowledge = lazy(() => import("@/components/Knowledge").then((m) => ({ default: m.Knowledge })));
+const Automation = lazy(() => import("@/components/Automation").then((m) => ({ default: m.Automation })));
+const Work = lazy(() => import("@/components/Work").then((m) => ({ default: m.Work })));
+const Maturity = lazy(() => import("@/components/Maturity").then((m) => ({ default: m.Maturity })));
+const Onboarding = lazy(() => import("@/components/Onboarding").then((m) => ({ default: m.Onboarding })));
+const Activity = lazy(() => import("@/components/Activity").then((m) => ({ default: m.Activity })));
 
 /** A chunk that is still arriving. Centred and quiet — this is a fraction of a second on local
  *  disk, and a heavy skeleton would be more noticeable than the wait it covers. */
@@ -424,12 +433,14 @@ function Workspace() {
   if (doctor.data && !doctor.data.can_answer && !skipOnboarding) {
     return (
       <Framed banner={outage}>
-        <Onboarding
-          onSkip={() => {
-            setSkipOnboarding(true);
-            navigate("settings");
-          }}
-        />
+        <Loading>
+          <Onboarding
+            onSkip={() => {
+              setSkipOnboarding(true);
+              navigate("settings");
+            }}
+          />
+        </Loading>
       </Framed>
     );
   }
@@ -486,7 +497,7 @@ function Workspace() {
         // Right = what the agent is doing. The conversation keeps its own list of past sessions
         // inside itself (grouped by project, which the flat chat list could not do), so the left
         // slot stays empty rather than holding a second list of the same thing.
-        inspector={view === "code" ? <Activity /> : undefined}
+        inspector={view === "code" ? <Loading><Activity /></Loading> : undefined}
         // Before the first turn the activity column was a stack of empty panels taking a quarter of
         // the screen; it now appears when there is a turn to watch.
         inspectorFollowsAgent={view === "code"}
@@ -509,14 +520,24 @@ function Workspace() {
           ) : undefined
         }
       >
-        {view === "knowledge" && <Knowledge />}
-        {view === "automation" && (
-          <Automation
-            tab={automationTab(route.params.get("tab"))}
-            onTabChange={(next) => setParams(next === "schedule" ? {} : { tab: next })}
-          />
+        {view === "knowledge" && (
+          <Loading>
+            <Knowledge />
+          </Loading>
         )}
-        {view === "work" && <Work />}
+        {view === "automation" && (
+          <Loading>
+            <Automation
+              tab={automationTab(route.params.get("tab"))}
+              onTabChange={(next) => setParams(next === "schedule" ? {} : { tab: next })}
+            />
+          </Loading>
+        )}
+        {view === "work" && (
+          <Loading>
+            <Work />
+          </Loading>
+        )}
         {view === "code" && <Code />}
         {view === "edit" && (
           <Loading>
@@ -546,14 +567,20 @@ function Workspace() {
           </Loading>
         )}
         {/* Dev-only, matching the rail: in a shipped build this screen has no data. */}
-        {view === "maturity" && import.meta.env.DEV && <Maturity />}
+        {view === "maturity" && import.meta.env.DEV && (
+          <Loading>
+            <Maturity />
+          </Loading>
+        )}
         {view === "settings" && (
-          <Settings
-            tab={settingsTab(route.params.get("tab"))}
-            // Replaces rather than pushes (see `setParams`): clicking through tabs should not fill
-            // the back button. General is the bare `#/settings`, so the common URL stays readable.
-            onTabChange={(next) => setParams(next === "general" ? {} : { tab: next })}
-          />
+          <Loading>
+            <Settings
+              tab={settingsTab(route.params.get("tab"))}
+              // Replaces rather than pushes (see `setParams`): clicking through tabs should not fill
+              // the back button. General is the bare `#/settings`, so the common URL stays readable.
+              onTabChange={(next) => setParams(next === "general" ? {} : { tab: next })}
+            />
+          </Loading>
         )}
       </AppShell>
       </Framed>
