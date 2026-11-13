@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Desktop: streaming no longer re-renders the whole conversation per token.** Finished exchanges are memoised, streamed text is written once per frame, the heavy screens (Settings, Knowledge, Automation, Work, Onboarding, Activity) and the syntax highlighter load on demand, the running-turns poll is a single hook, and on-screen clocks pause while the window is hidden. Auto-detected highlighting now chooses among the 14 languages the file viewer maps. Not yet measured in the packaged app (see `apps/desktop/PROFILING.md`). (#1247)
+
 - **TUI: unknown slash commands and `/undo N`.** The full-screen terminal app no longer sends an unrecognised `/command` to the model as a paid turn, `/undo N` now previews and asks before restoring, and `chat`, `assist` and the TUI build their command lists from one shared registry. (#1242)
 
 ## [0.89.0] - 2026-11-12
