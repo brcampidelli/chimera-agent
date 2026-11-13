@@ -92,3 +92,37 @@ class AggregateMonitor:
                 )
             )
         return findings
+
+
+@dataclass
+class RunReview:
+    """The monitor's section of one orchestration run's report.
+
+    ``evaluated`` False is never "nothing found": it says the monitor had nothing to read, and
+    ``reason`` says why (``governance_off`` when the deployment builds no ledger, ``no_ledger`` when
+    no worker reached one). A section that read "clean" there would be a verdict on events nobody
+    recorded.
+    """
+
+    evaluated: bool
+    reason: str = ""
+    agents: int = 0
+    findings: list[CollusionFinding] = field(default_factory=list)
+
+
+def review_run(ledgers: Mapping[str, object | None], *, governance_mode: str = "off") -> RunReview:
+    """Run :class:`AggregateMonitor` over the ledgers of one run's workers, ``{name: ledger}``.
+
+    The same call ``chimera solve`` makes at the end of a batch (``_report_collusion``), for the
+    desktop's crew and hierarchy. A worker whose ledger is None is left out; with none at all the
+    run is reported as not evaluated rather than as clean.
+    """
+    present = {
+        name: list(getattr(ledger, "events", ()))
+        for name, ledger in ledgers.items()
+        if ledger is not None
+    }
+    if not present:
+        mode = (governance_mode or "off").strip().lower()
+        return RunReview(evaluated=False, reason="governance_off" if mode == "off" else "no_ledger")
+    return RunReview(evaluated=True, agents=len(present), findings=AggregateMonitor().assess(present))

@@ -168,6 +168,6 @@ def _releasable(
         return False
     # The same two checks the live paths make: the ledger on the call, the kernel on the call and
     # on the text the card showed (`governed_tool` and `profile._bypass_safe`).
-    if not bypass_safe(call.tool, call.args, call.evaluation):
+    if not bypass_safe(call.tool, call.args, call.evaluation, workspace=workspace):
         return False
-    return not call.shown or bypass_safe(call.tool, {"command": call.shown})
+    return not call.shown or bypass_safe(call.tool, {"command": call.shown}, workspace=workspace)

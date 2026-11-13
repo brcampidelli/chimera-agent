@@ -77,6 +77,47 @@ _log = get_logger("governance.profile")
 MODES = ("off", "observe", "enforce")
 
 
+def resolve_mode(settings: Any, mode: str = "", *, surface: str = "") -> str:
+    """The kernel mode an assembly runs under: ``mode`` when the caller names one, else the deployment's.
+
+    One function, read by :func:`govern_step` and by the security card (``posture.safety_overview``),
+    so the card cannot show a mode the assemblies do not use. An unknown value is ``off``, as it
+    always was, and is logged.
+    """
+    resolved = (mode or getattr(settings, "governance_mode", "") or "off").strip().lower()
+    if resolved not in MODES:
+        _log.warning("unknown governance mode %r on %s: treating as 'off'", resolved, surface)
+        resolved = "off"
+    return resolved
+
+
+#: The surfaces the security card lists, in its order.
+CARD_SURFACES: tuple[str, ...] = ("chat", "code", "cron", "bot", "solve")
+
+
+def surface_governance(settings: Any, surface: str) -> tuple[str, bool]:
+    """``(kernel mode, taint watch)`` for one of :data:`CARD_SURFACES`, as its assembly decides them.
+
+    * ``code``: :func:`govern_step` with no mode of its own, and a taint ledger always
+      (``code_api.assemble_registry`` builds one on every turn).
+    * ``cron`` and ``bot``: :func:`governed_profile`, whose ledger is thrown away under ``off``.
+    * ``chat``: the app's chat installs no kernel (``posture.guard_chat_registry``); its ledger is
+      ``CHIMERA_GUARD_CHAT``.
+    * ``solve``: the command's ``--guard`` is off unless asked for, and ``taint`` likewise; a
+      ``/solve`` typed in a governed conversation inherits that conversation's mode instead.
+    """
+    if surface == "code":
+        return resolve_mode(settings, surface=surface), True
+    if surface in {"cron", "bot"}:
+        mode = resolve_mode(settings, surface=surface)
+        return mode, mode != "off"
+    if surface == "chat":
+        return "off", bool(getattr(settings, "guard_chat", True))
+    if surface == "solve":
+        return "off", False
+    raise ValueError(f"not a surface the card lists: {surface!r}")
+
+
 class GovernanceStep(NamedTuple):
     """What the deployment's governance decided, and the registry it produced."""
 
@@ -256,17 +297,14 @@ def govern_step(
     from chimera.governance.band import band_enabled, build_band
     from chimera.governance.governed_tool import govern_registry
 
-    resolved = (mode or settings.governance_mode or "off").strip().lower()
-    if resolved not in MODES:
-        _log.warning("unknown governance mode %r on %s: treating as 'off'", resolved, surface)
-        resolved = "off"
+    resolved = resolve_mode(settings, mode, surface=surface)
 
     approvals = ApprovalLedger()
 
     def _bypass_safe(tool: str, shown: str) -> bool:
         from chimera.governance.bypass import bypass_safe
 
-        return bypass_safe(tool, {"command": shown})
+        return bypass_safe(tool, {"command": shown}, workspace=workspace)
 
     def with_hooks(governed: Any, kernel_approve: Any, kernel_approver_name: str) -> Any:
         # The owner's lifecycle hooks (`chimera/governance/hooks.py`), whatever the mode: the owner

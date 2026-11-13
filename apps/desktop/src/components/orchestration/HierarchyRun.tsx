@@ -11,6 +11,7 @@ import {
 } from "@/lib/orchestration-run";
 
 import { FellBackNote } from "./FellBackNote";
+import { MonitorSection } from "./MonitorSection";
 import { rememberRun } from "./resume";
 import { StopButton } from "./StopButton";
 import { useStop } from "./use-stop";
@@ -172,6 +173,9 @@ export function HierarchyRun({
           <Totals totals={state.totals} t={t} />
         </section>
       ) : null}
+
+      {/* The run's report: what the cross-agent monitor read once every worker was done. */}
+      <MonitorSection monitor={state.monitor} />
     </div>
   );
 }
