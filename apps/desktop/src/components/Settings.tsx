@@ -79,6 +79,7 @@ import { Card, PinnedContext, Row, RowLabelContext, Toggle } from "@/components/
 import { WorktreeIncludeConsent } from "@/components/settings/WorktreeIncludeConsent";
 import { ResponseStyleNote } from "@/components/ResponseStyleNote";
 import { SettingsSearchResults, type SearchTarget } from "@/components/settings/SettingsSearch";
+import { SETTINGS_TABS, settingsTab, type SettingsTab } from "@/lib/settingsTab";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 
 /**
@@ -1725,47 +1726,9 @@ export function MessagingCard({
 }
 
 
-export type SettingsTab =
-  | "general"
-  | "appearance"
-  | "skills"
-  | "connectors"
-  | "plugins"
-  | "connections"
-  | "usage"
-  | "security"
-  | "decisions";
-
-/** In the order the column shows them. */
-export const SETTINGS_TABS: readonly SettingsTab[] = [
-  "general",
-  "appearance",
-  "skills",
-  "connectors",
-  "plugins",
-  "connections",
-  "usage",
-  "security",
-  "decisions",
-];
-
-/**
- * Names a person may type for a tab that has another address. MCP servers and OpenAPI connectors
- * were sub-tabs of Connections kept in `useState`, so no link to them ever existed; both now live
- * under Connectors, and these are a courtesy for an address written by hand (study 04, §1.3).
- */
-const SETTINGS_TAB_ALIASES: ReadonlyMap<string, SettingsTab> = new Map<string, SettingsTab>([
-  ["mcp", "connectors"],
-  ["openapi", "connectors"],
-]);
-
-/** A `?tab=` value from the URL, or General for anything that is not a tab — a stale link lands on
- *  the screen rather than on nothing. */
-export function settingsTab(value: string | null | undefined): SettingsTab {
-  const known = SETTINGS_TABS.find((tab) => tab === value);
-  if (known) return known;
-  return (value ? SETTINGS_TAB_ALIASES.get(value) : undefined) ?? "general";
-}
+// The tab names and `settingsTab` live in `@/lib/settingsTab` so the router (App) can read an address
+// without importing this whole screen — which would keep it out of the lazy chunk.
+export { SETTINGS_TABS, settingsTab, type SettingsTab };
 
 /**
  * The tab can be owned by the caller. It lived only in `useState`, so nothing outside this screen

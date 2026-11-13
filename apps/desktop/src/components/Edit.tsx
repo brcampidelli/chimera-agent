@@ -17,7 +17,7 @@ import { languageName } from "@/components/editor/languages";
 import { diagnosticsExtension } from "@/components/editor/diagnostics";
 import { inlineCompletion } from "@/components/editor/inline";
 import { Runner } from "@/components/editor/Runner";
-import { getFsFile, listRunningTurns, saveFile } from "@/lib/api";
+import { getFsFile, saveFile } from "@/lib/api";
 import type { FsFile } from "@/lib/types";
 import {
   linesOf,
@@ -34,6 +34,7 @@ import { focusRing } from "@/components/ui/focus";
 import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { useT } from "@/lib/i18n";
+import { useRunningTurns } from "@/lib/useRunningTurns";
 
 /**
  * The editor screen.
@@ -160,7 +161,7 @@ export function Edit({
   // Whether an agent is working in this project now: a conversation's turn (any of them, from the
   // same list the status bar reads) or a verified run. While one is, the open file is re-read every
   // two seconds, so its change shows up as it lands rather than on the next window focus.
-  const turns = useQuery({ queryKey: ["code-turns-running"], queryFn: listRunningTurns, refetchInterval: 4000 });
+  const turns = useRunningTurns();
   const run = useRunSession(workspace);
   const agentActive =
     (turns.data ?? []).some((turn) => !workspace || turn.workspace === workspace) ||
