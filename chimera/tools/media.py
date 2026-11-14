@@ -348,7 +348,7 @@ class ImageGenTool(Tool):
                     "error: local image generation needs the 'imagegen-local' extra "
                     "(pip install 'chimera-agent[imagegen-local]') — a large GPU download"
                 )
-            except Exception as exc:  # noqa: BLE001 — a model/GPU failure is a tool error
+            except Exception as exc:  # a model/GPU failure is a tool error
                 return f"error: local image generation failed: {exc}"
             return f"saved image to {out} (local: {settings.image_model_local})"
 
@@ -955,6 +955,6 @@ class TranscribeAudioTool(Tool):
                         "or an OpenAI key (CHIMERA_OPENAI_KEYS)"
                     )
                 text = _transcribe_openai(str(path), keys[0], language)
-        except Exception as exc:  # noqa: BLE001 — a bad file / API error is a tool error, not a crash
+        except Exception as exc:  # a bad file / API error is a tool error, not a crash
             return f"error: transcription failed: {exc}"
         return text or "(no speech detected)"

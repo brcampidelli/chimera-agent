@@ -193,7 +193,7 @@ def main() -> None:
             "agent_cache_read_tokens": result.cache_read_tokens, "agent_usd": result.usd,
             "shell": shell_commands(result.transcript),
         })
-    except Exception as exc:  # noqa: BLE001 — a provider or harness failure is a halt (PROTOCOL §2)
+    except Exception as exc:  # a provider or harness failure is a halt (PROTOCOL §2)
         row["halted"] = f"{type(exc).__name__}: {exc}"[:400]
         row["traceback"] = traceback.format_exc()[-1500:]
     finally:

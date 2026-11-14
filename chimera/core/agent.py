@@ -325,7 +325,7 @@ def _notice(
         return
     try:
         on_notice(code, text, data)
-    except Exception:  # noqa: BLE001 - a warning channel must not be able to fail the run
+    except Exception:  # a warning channel must not be able to fail the run
         _log.debug("on_notice callback raised for %s", code, exc_info=True)
 
 
@@ -417,7 +417,7 @@ def _report_context(
         return
     try:
         on_context(used, window)
-    except Exception:  # noqa: BLE001 - a progress channel must not be able to fail the run
+    except Exception:  # a progress channel must not be able to fail the run
         _log.debug("on_context callback raised", exc_info=True)
 
 
@@ -448,7 +448,7 @@ def _read_guidance(
         return 0
     try:
         items = take()
-    except Exception:  # noqa: BLE001 - the guidance channel must not be able to fail the run
+    except Exception:  # the guidance channel must not be able to fail the run
         _log.debug("take_guidance raised", exc_info=True)
         return 0
     added = [
@@ -504,7 +504,7 @@ def _default_model() -> str:
         from chimera.config import get_settings
 
         return get_settings().default_model or ""
-    except Exception:  # noqa: BLE001 — sizing a context must not be what takes a run down
+    except Exception:  # sizing a context must not be what takes a run down
         return ""
 
 
@@ -1242,7 +1242,7 @@ class Agent:
             return ""
         try:
             return str(self.cards.card_context(task) or "")
-        except Exception as exc:  # noqa: BLE001 -- retrieval must never break the loop
+        except Exception as exc:  # retrieval must never break the loop
             _log.debug("skill-card retrieval skipped: %s", exc)
             return ""
 
@@ -1285,7 +1285,7 @@ class Agent:
             # The surface's plugin scope (`chimera.plugins.mapping.scope_for_surface`), stamped on
             # the registry by `governed_profile` for every unattended surface.
             block = prompt_block(home, only=only, plugin_scope=getattr(self.tools, "plugin_scope", None))
-        except Exception as exc:  # noqa: BLE001 -- same discipline as above
+        except Exception as exc:  # same discipline as above
             _log.debug("bundle context skipped: %s", exc)
             return ""
         return f"\n\n{block}" if block else ""
@@ -1312,7 +1312,7 @@ class Agent:
             found = load_user_claude_instructions()
             self._record_instruction_sources(found.provenance)
             return found.text
-        except Exception as exc:  # noqa: BLE001 -- optional owner context cannot break a run
+        except Exception as exc:  # optional owner context cannot break a run
             _log.debug("user CLAUDE.md skipped: %s", exc)
             return ""
 
@@ -1330,7 +1330,7 @@ class Agent:
             )
             self._record_instruction_sources(owner_sources)
             return found.text
-        except Exception as exc:  # noqa: BLE001 — optional owner context cannot break a run
+        except Exception as exc:  # optional owner context cannot break a run
             _log.debug("owner instructions skipped: %s", exc)
             return ""
 
@@ -1408,7 +1408,7 @@ class Agent:
                 getattr(self._local, "nested_instruction_chars", 0)
             ) + sum(len(body) for _, body in found.shown)
             return found.text
-        except Exception as exc:  # noqa: BLE001 — instruction context must never break the loop
+        except Exception as exc:  # instruction context must never break the loop
             _log.debug("nested project instructions skipped: %s", exc)
             return ""
 
@@ -1473,7 +1473,7 @@ class Agent:
                 if local is not None:
                     local.instructions_cut = found.omitted
             return found.text
-        except Exception as exc:  # noqa: BLE001 — instructions must never break the loop
+        except Exception as exc:  # instructions must never break the loop
             _log.debug("project instructions skipped: %s", exc)
             return ""
 
@@ -1835,7 +1835,7 @@ class Agent:
                     messages, tool_calls_made, tool_names, usage,
                     self.config.model or _last_answering_model(steplog), None, steplog, task,
                 )
-            except Exception as exc:  # noqa: BLE001 — classified before preserving the original failure
+            except Exception as exc:  # classified before preserving the original failure
                 # A provider that did not answer in time. The gateway has already tried its fallback
                 # chain before this reaches the loop, so there is nothing left to resend: the run
                 # ends like a cap does, keeping the calls that answered. Raised instead, it escaped
@@ -2158,7 +2158,7 @@ class Agent:
                 if on_tool_start is not None:
                     try:
                         on_tool_start(call.name, call.arguments, tool_started_at)
-                    except Exception:  # noqa: BLE001 — progress must not fail a run
+                    except Exception:  # progress must not fail a run
                         _log.debug("on_tool_start callback raised", exc_info=True)
                 # Capture the file's real pre-write content (only when a diff sink is attached, so
                 # there is zero overhead — and no extra read — otherwise).
@@ -2472,7 +2472,7 @@ class Agent:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(payload)
                 saved.append(path.relative_to(root).as_posix())
-            except Exception as exc:  # noqa: BLE001 — image failures must not lose text
+            except Exception as exc:  # image failures must not lose text
                 _log.warning("could not save a provider-returned image (%s)", type(exc).__name__)
         return saved
 
@@ -2941,7 +2941,7 @@ class Agent:
             if before is None:  # binary / undecodable — skip (can't render a text diff)
                 return None
             return resolved, raw, before
-        except Exception as exc:  # noqa: BLE001 — diff capture must never break the tool run
+        except Exception as exc:  # diff capture must never break the tool run
             _log.debug("edit pre-read skipped for %s: %s", name, exc)
             return None
 
@@ -2969,7 +2969,7 @@ class Agent:
             if len(patch) > _MAX_EDIT_DIFF_CHARS:
                 patch = patch[:_MAX_EDIT_DIFF_CHARS] + "\n… [diff truncated]"
             on_edit(raw, patch)
-        except Exception as exc:  # noqa: BLE001 — a diff failure must never affect the loop
+        except Exception as exc:  # a diff failure must never affect the loop
             _log.debug("edit diff emit skipped for %s: %s", raw, exc)
 
     @staticmethod

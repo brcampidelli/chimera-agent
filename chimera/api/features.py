@@ -178,7 +178,7 @@ def _project_title(state: Any) -> str:
         return ""
     try:
         return load_spec(state.spec_path).name
-    except Exception:  # noqa: BLE001 — a missing or unreadable spec must not break the list
+    except Exception:  # a missing or unreadable spec must not break the list
         return ""
 
 
@@ -625,7 +625,7 @@ def register_features(
         return _item_dict(item)
 
     @app.get("/api/memory/export", dependencies=[guard], response_model=MemoryExportOut)
-    def export_memory_file(format: str = "json") -> dict[str, Any]:  # noqa: A002 — the query name
+    def export_memory_file(format: str = "json") -> dict[str, Any]:  # the query name
         from datetime import UTC, datetime
 
         from chimera.memory.export import EXPORT_FORMATS, export_memory
@@ -1399,7 +1399,7 @@ def register_features(
         board = KanbanBoard(_settings().home / "kanban.json")
         if board.get(card_id) is None:
             raise HTTPException(status_code=404, detail="card not found")
-        return _card_dict(board.move(card_id, move.column))  # type: ignore[arg-type]
+        return _card_dict(board.move(card_id, move.column))
 
     @app.delete("/api/kanban/cards/{card_id}", dependencies=[guard], response_model=DeletedOut)
     def remove_kanban_card(card_id: str) -> dict[str, bool]:
@@ -1475,7 +1475,7 @@ def register_features(
                     on_conflict=emit_conflict,
                 )
                 done = {"worked": len(outcomes)}
-            except Exception as exc:  # noqa: BLE001 — a dispatch failure is a frame, not a 500
+            except Exception as exc:  # a dispatch failure is a frame, not a 500
                 done = {"worked": 0, "error": str(exc)}
             loop.call_soon_threadsafe(
                 queue.put_nowait, {"event": "done", "data": json.dumps(done)}
@@ -1516,7 +1516,7 @@ def register_features(
                 # An honest empty draft with the reason, never a 500: the description was the
                 # user's, and "I could not turn that into a spec" is a sentence they can act on.
                 return {"name": "", "requirements": [], "note": str(exc)}
-            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+            except Exception as exc:  # a model hiccup is not a server error
                 _log.warning("spec draft failed: %s", exc)
                 return {"name": "", "requirements": [], "note": "the draft call did not complete"}
             return {
@@ -1619,7 +1619,7 @@ def register_features(
             for state_path in sorted(root.glob("*/project.json")):
                 try:
                     out.append(_state_dict(ProjectState.load(state_path)))
-                except Exception as exc:  # noqa: BLE001 — a corrupt project must not break the list
+                except Exception as exc:  # a corrupt project must not break the list
                     _log.debug("skipping unreadable project %s: %s", state_path, exc)
         return out
 

@@ -287,7 +287,7 @@ def _turn(gateway: Any, fx: dict[str, Any], arm: str, root: Path, budget: _Budge
             "residual_risks": report.residual_risks, "untested_paths": report.untested_paths,
             "log": pinned.log, "usd": _usd(arm, pinned.log), "error": None,
         }
-    except Exception as exc:  # noqa: BLE001 — counted by the stop rule, never raised
+    except Exception as exc:  # counted by the stop rule, never raised
         return {**empty, "status": "error", "error": f"{type(exc).__name__}: {exc}"[:300],
                 "usd": _usd(arm, pinned.log)}
     finally:

@@ -130,16 +130,16 @@ def hermetic(*, defer_tools: bool) -> Iterator[tuple[Path, Path]]:
                 "CHIMERA_DEFER_TOOLS": "true" if defer_tools else "false",
             })
             cast(Any, Settings).model_config = {**saved_config, "env_file": None}
-            importlib.util.find_spec = _optional_modules(saved_find_spec)  # type: ignore[assignment]
+            importlib.util.find_spec = _optional_modules(saved_find_spec)
             # The OS vault too: `get_settings()` copies the keys `chimera secrets set` stored there
             # into the environment, and an OpenRouter key alone registers five media tools.
-            config_vault._keyring = lambda: None  # type: ignore[assignment]
+            config_vault._keyring = lambda: None
             get_settings.cache_clear()
             yield home, workspace
         finally:
             _release(home)
-            importlib.util.find_spec = saved_find_spec  # type: ignore[assignment]
-            config_vault._keyring = saved_keyring  # type: ignore[assignment]
+            importlib.util.find_spec = saved_find_spec
+            config_vault._keyring = saved_keyring
             cast(Any, Settings).model_config = saved_config
             os.environ.clear()
             os.environ.update(saved_env)

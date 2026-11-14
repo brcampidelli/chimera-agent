@@ -311,7 +311,7 @@ class _Popen:
         _Popen.made.append({"target": target, **kwargs})
         Path(target[target.index("-E") + 1]).write_bytes(b"")
 
-    def communicate(self, input: bytes | None = None, timeout: float | None = None) -> tuple[bytes, bytes]:  # noqa: A002
+    def communicate(self, input: bytes | None = None, timeout: float | None = None) -> tuple[bytes, bytes]:
         _Popen.made[-1]["input"] = input
         return b"chimera-poll 1 0 0 0\n", b""
 

@@ -31,18 +31,18 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
-from starlette.routing import Mount  # noqa: E402
+from fastapi.testclient import TestClient
+from starlette.routing import Mount
 
-from chimera.api.device_door import PAIR_PAGE_CSP, DeviceGateway  # noqa: E402
-from chimera.api.page_csp import (  # noqa: E402
+from chimera.api.device_door import PAIR_PAGE_CSP, DeviceGateway
+from chimera.api.page_csp import (
     APP_PAGE_CSP,
     ASSET_HTML_CSP,
     DOCS_PAGE_CSP,
     guest_page_csp,
 )
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.config import Settings, get_settings
+from chimera.interface import ChatSession
 
 REPO = Path(__file__).resolve().parents[1]
 PAGE = "<html><head><script>document.documentElement.dataset.theme = 'dark';</script></head><body>{}</body></html>"

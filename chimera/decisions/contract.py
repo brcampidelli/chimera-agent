@@ -467,7 +467,7 @@ class Decider:
         else:
             try:
                 reading = self._ask(state, question, budget)
-            except Exception as exc:  # noqa: BLE001 — a halt, recorded as one, never a verdict
+            except Exception as exc:  # a halt, recorded as one, never a verdict
                 halt = f"{type(exc).__name__}: {str(exc)[:200]}"
                 # A refusal by the spend/rate gate is a halt that says which meter was out.
                 from chimera.decisions.gate import GateRefused

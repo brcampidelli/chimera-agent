@@ -123,7 +123,7 @@ def _prompt(command: str) -> bool:
 
         typer.secho(f"    {with_facts(command)}", fg="cyan")
         return _answer_or_refuse(lambda: bool(typer.confirm("Run it?", default=False)), command)
-    except Exception:  # noqa: BLE001 — no TTY / typer missing: fail safe (do not run)
+    except Exception:  # no TTY / typer missing: fail safe (do not run)
         _log.warning("host-exec confirm could not prompt; refusing. Command: %s", command[:200])
         return False
 

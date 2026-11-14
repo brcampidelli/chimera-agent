@@ -51,7 +51,7 @@ def evaluate(backend: AddresseeBackend, items: list[Item]) -> list[dict[str, obj
         spoken_error = ""
         try:
             spoken = backend.spoken_turn(item.transcript)
-        except Exception as exc:  # noqa: BLE001 — retain failed rows rather than biasing the denominator
+        except Exception as exc:  # retain failed rows rather than biasing the denominator
             spoken = SpokenOutcome(tool_call=False, answer="")
             spoken_error = type(exc).__name__
         else:
@@ -65,7 +65,7 @@ def evaluate(backend: AddresseeBackend, items: list[Item]) -> list[dict[str, obj
         choice_error = ""
         try:
             reading = backend.ask_choice(item.transcript)
-        except Exception as exc:  # noqa: BLE001 — failures are data, not implicit negative labels
+        except Exception as exc:  # failures are data, not implicit negative labels
             reading = Reading(choice=None, shares=None, p=None)
             choice_error = type(exc).__name__
         choice_seconds = time.perf_counter() - choice_started

@@ -214,7 +214,7 @@ class ChromeExtensionDriver:
                         **({"text_length": text_length} if action == "type" else {}),
                     },
                 )
-            except Exception:  # noqa: BLE001 — audit failure cannot change an action result
+            except Exception:  # audit failure cannot change an action result
                 return
 
     def _action_elements(self, result: object) -> list[Element]:
@@ -231,7 +231,7 @@ class ChromeExtensionDriver:
         try:
             current = urlsplit(self.current_url())
             host = (current.hostname or "").lower()
-        except Exception as exc:  # noqa: BLE001 — do not act without origin confirmation
+        except Exception as exc:  # do not act without origin confirmation
             self._record_action("", action, "", "", "refused", None, text)
             raise RuntimeError("Could not verify browser origin; the action did not run.") from exc
         element = self._elements_by_ref.get(str(target.get("ref", "")))
@@ -449,7 +449,7 @@ class ChromeExtensionDriver:
                         **({"text_length": len(text)} if action == "type" else {}),
                     },
                 )
-            except Exception:  # noqa: BLE001 — audit failure cannot change a safety decision
+            except Exception:  # audit failure cannot change a safety decision
                 return
 
     def back(self) -> list[Element]:
@@ -642,7 +642,7 @@ def _page_is_challenge(driver: ChromeExtensionDriver) -> bool:
             re.search(r"recaptcha|hcaptcha|turnstile|challenges\.cloudflare", str(url), re.IGNORECASE)
             for url in frames
         )
-    except Exception:  # noqa: BLE001 — if challenge inspection fails, fail closed
+    except Exception:  # if challenge inspection fails, fail closed
         return True
 
 

@@ -307,7 +307,7 @@ def _near(memory: MemoryManager, message: str) -> dict[str, MemoryItem]:
     """Stored facts that look related, under short aliases: fewer tokens, fewer invented ids."""
     try:
         items = memory.search(message, k=_NEAR_K)
-    except Exception as exc:  # noqa: BLE001 — without neighbours the dedup is weaker, not absent
+    except Exception as exc:  # without neighbours the dedup is weaker, not absent
         _log.debug("near-fact search failed: %s", exc)
         items = []
     return {f"f{i}": item for i, item in enumerate(items, 1)}
@@ -455,7 +455,7 @@ class MemoryExtractor:
             meter = _Meter(self.backend, label="memory")
             done = extract(user_message, answer, memory=self.memory, backend=meter,
                            model=self.model, tainted=tainted)
-        except Exception as exc:  # noqa: BLE001 — the answer is the product; memory is extra
+        except Exception as exc:  # the answer is the product; memory is extra
             _log.warning("memory extraction skipped: %s", exc)
             done = Extraction(error=f"{type(exc).__name__}: {exc}")
         self._record_spend(meter, done)
@@ -481,5 +481,5 @@ class MemoryExtractor:
                 prompt_tokens=done.prompt_tokens, completion_tokens=done.completion_tokens,
                 usd=done.usd, route_kind=MEMORY_KIND,
             )
-        except Exception as exc:  # noqa: BLE001 — a record that will not write costs no turn
+        except Exception as exc:  # a record that will not write costs no turn
             _log.debug("memory extraction spend not recorded: %s", exc)

@@ -132,7 +132,7 @@ def _painel_com_erro(mensagem: str) -> str:
             raise RuntimeError(mensagem)
 
     engine = FusionEngine(_Explode())
-    respostas = engine._run_panel([{"role": "user", "content": "oi"}], ["m1"])  # noqa: SLF001
+    respostas = engine._run_panel([{"role": "user", "content": "oi"}], ["m1"])
     assert respostas[0].error is not None
     return respostas[0].error
 

@@ -126,7 +126,7 @@ def one(call: dict[str, Any]) -> dict[str, Any]:
             result = backend.gateway.complete(
                 messages, model=MODEL, temperature=backend.temperature,
                 max_tokens=backend.max_tokens, extra_body=PIN, timeout=TIMEOUT_S)
-    except Exception as exc:  # noqa: BLE001 — a halt, recorded as one
+    except Exception as exc:  # a halt, recorded as one
         return {**call, "halt": f"{type(exc).__name__}: {str(exc)[:200]}"}
     prompt = int(result.prompt_tokens or 0)
     completion = int(result.completion_tokens or 0)

@@ -116,7 +116,7 @@ class HostExecTurnLimiter:
     def _read_grant(self) -> bool:
         try:
             return bool(self._granted())
-        except Exception:  # noqa: BLE001 — a failed status read must not grant more capability
+        except Exception:  # a failed status read must not grant more capability
             return False
 
     def refresh(self) -> None:
@@ -436,7 +436,7 @@ class RunShellTool(Tool):
                     lines = ["runs in the WSL environment: its programs and git hooks resolve in the distro, not here"]
                 else:
                     lines = describe(command, cwd, self.workspace)
-            except Exception:  # noqa: BLE001 — a prompt without the note is the prompt it was
+            except Exception:  # a prompt without the note is the prompt it was
                 lines = []
             with offered_with(command, lines):
                 confirmed = self._confirm(command)

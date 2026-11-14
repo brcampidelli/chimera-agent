@@ -50,11 +50,11 @@ def catalog_view(kind: CatalogKind, home: Path, *, stars: bool) -> CatalogOut:
         return catalog
     try:
         with_stars(catalog, home, enabled=stars)
-    except Exception as exc:  # noqa: BLE001 -- stars are an extra; the catalogue still reads
+    except Exception as exc:  # stars are an extra; the catalogue still reads
         log.info("catalogue stars not applied: %s", exc)
     try:
         catalog.sections = compute_sections(catalog, local_signals(home))
-    except Exception as exc:  # noqa: BLE001 -- sections are an extra; the catalogue still reads
+    except Exception as exc:  # sections are an extra; the catalogue still reads
         log.warning("catalogue sections not computed: %s", exc)
     return catalog
 
@@ -69,7 +69,7 @@ def register_catalogs_api(app: FastAPI, guard: params.Depends, settings: Setting
         """One catalogue: its items, the pinned commit, and why it is empty or partial if it is."""
         try:
             return await run_in_threadpool(catalog_view, kind, home, stars=stars_on)
-        except Exception as exc:  # noqa: BLE001 -- the screen gets a sentence, never a 500
+        except Exception as exc:  # the screen gets a sentence, never a 500
             log.warning("reading the %s catalogue failed: %s", kind, exc)
             return CatalogOut(kind=kind, repo="", sha="", available=False,
                               reason=f"the {kind} catalogue could not be read on this machine")

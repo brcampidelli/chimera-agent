@@ -82,7 +82,7 @@ def _json(url: str) -> object:
 def _api_pages(path: str) -> list[object]:
     """Every page of an `api.github.com` read, parsed (one element per page)."""
     if shutil.which("gh"):
-        out = subprocess.run(  # noqa: S603 -- fixed argv; `path` is built in this file
+        out = subprocess.run(  # fixed argv; `path` is built in this file
             ["gh", "api", "--paginate", "--slurp", path],
             check=True, capture_output=True, text=True, encoding="utf-8",
         ).stdout

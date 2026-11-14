@@ -297,7 +297,7 @@ class BackendDeltaProposer:
                 model=self.model,
                 temperature=0.2,
             ).content
-        except Exception as exc:  # noqa: BLE001 — a flaky curator must not fail the run
+        except Exception as exc:  # a flaky curator must not fail the run
             _log.warning("delta proposer failed, no update: %s", exc)
             return []
         return _parse_deltas(raw)

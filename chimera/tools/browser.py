@@ -335,7 +335,7 @@ def _html_to_markdown(html: str) -> str | None:
         return _markitdown_convert(name)
     except ImportError:
         return None  # 'documents' extra not installed -> caller uses plain text
-    except Exception:  # noqa: BLE001 — any conversion glitch -> fall back to plain text, don't break reading
+    except Exception:  # any conversion glitch -> fall back to plain text, don't break reading
         return None
     finally:
         with contextlib.suppress(OSError):
@@ -659,7 +659,7 @@ class BrowserTool(Tool):
             frame = self._driver.frame()
             if frame is not None:
                 self.on_frame(action, frame)
-        except Exception as exc:  # noqa: BLE001 — the panel is a courtesy; the action already happened
+        except Exception as exc:  # the panel is a courtesy; the action already happened
             _log.debug("browser frame skipped after %s: %s", action, exc)
 
     def _activate_turn_reach(self) -> None:
@@ -697,12 +697,12 @@ class BrowserTool(Tool):
             self._driver = self._new_driver()  # constructing it imports playwright
         except ImportError:
             return None  # playwright package missing — a broken install (it's a core dependency)
-        except Exception as exc:  # noqa: BLE001 — most likely the Chromium binary isn't downloaded yet
+        except Exception as exc:  # most likely the Chromium binary isn't downloaded yet
             if not (_missing_browser_binary(exc) and _auto_install_enabled()):
                 raise  # a real launch failure, or auto-install opted out -> surfaced by run()
             try:
                 _install_chromium()  # fetch the browser once…
-            except Exception as install_exc:  # noqa: BLE001 — the download could not run; say so usefully
+            except Exception as install_exc:  # the download could not run; say so usefully
                 # Both failures, not just the second one. The launch error is what is actually
                 # missing and the install error is what was tried about it; letting the second
                 # replace the first dropped Playwright's own message — the only line naming the
@@ -813,7 +813,7 @@ class BrowserTool(Tool):
         try:
             self._activate_turn_reach()
             driver = self._ensure_driver()
-        except Exception as exc:  # noqa: BLE001 — driver bring-up failed (Chromium missing + auto-install off, etc.)
+        except Exception as exc:  # driver bring-up failed (Chromium missing + auto-install off, etc.)
             return f"error: browser unavailable: {exc}"
         if driver is None:
             return _INSTALL_HINT
@@ -1026,7 +1026,7 @@ class BrowserTool(Tool):
                     "browser.google_search",
                     {"query": query[:200], "result": result, "approved_by": approved_by},
                 )
-            except Exception as exc:  # noqa: BLE001 — audit failure must not hide a search decision
+            except Exception as exc:  # audit failure must not hide a search decision
                 _log.warning("could not audit Google search: %s", exc)
 
     def _dispatch(self, action: str, driver: BrowserDriver, kwargs: dict[str, Any]) -> str:
@@ -1038,7 +1038,7 @@ class BrowserTool(Tool):
         self.last_call_loaded_content = False
         try:
             guard = getattr(driver, "guard", None)
-        except Exception:  # noqa: BLE001 — minimal injected drivers need not expose Playwright internals
+        except Exception:  # minimal injected drivers need not expose Playwright internals
             guard = None
         guard_start = getattr(guard, "request_count", 0)
         # SSRF guard: a navigate target is a model-/content-supplied URL, so re-check every hop the
@@ -1180,7 +1180,7 @@ class BrowserTool(Tool):
             return f"error: {exc}"  # SSRF-blocked URL
         except KeyError as exc:
             return f"error: {exc}"  # unknown ref, surfaced by the driver
-        except Exception as exc:  # noqa: BLE001 — a page/driver failure is a tool error, not a crash
+        except Exception as exc:  # a page/driver failure is a tool error, not a crash
             return f"error: browser action failed: {exc}"
 
     def observe_page(self, url: str, png_path: str) -> dict[str, Any]:
@@ -1203,7 +1203,7 @@ class BrowserTool(Tool):
         try:
             driver.screenshot(png_path)
             text = driver.page_text()[:800]
-        except Exception as exc:  # noqa: BLE001 — a failed capture is the tool's answer, not a crash
+        except Exception as exc:  # a failed capture is the tool's answer, not a crash
             return {"error": f"error: capture failed: {exc}", "text": "", "console": [], "console_known": False, "path": ""}
         self._announce("screenshot")
         messages = list(report()) if callable(report) else []
@@ -1227,14 +1227,14 @@ class BrowserTool(Tool):
             return {"error": "error: the browser is not running"}
         try:
             frame = driver.frame()
-        except Exception as exc:  # noqa: BLE001 — a failed capture is the answer, not a crash
+        except Exception as exc:  # a failed capture is the answer, not a crash
             return {"error": f"error: capture failed: {exc}"}
         if frame is None:
             return {"error": "error: this browser cannot capture the page"}
         reader = getattr(driver, "revision", None)
         try:
             revision = str(reader()) if callable(reader) else frame.url
-        except Exception:  # noqa: BLE001 — without a revision the address is all there is to compare
+        except Exception:  # without a revision the address is all there is to compare
             revision = frame.url
         return {
             "error": None, "jpeg": frame.jpeg, "width": frame.width, "height": frame.height,
@@ -1265,13 +1265,13 @@ class BrowserTool(Tool):
         if revision and callable(reader):
             try:
                 current = str(reader())
-            except Exception:  # noqa: BLE001
+            except Exception:
                 current = ""
             if current != revision:
                 return {"error": "error: the page changed since the picture was taken; capture it again"}
         try:
             found = finder(x, y)
-        except Exception as exc:  # noqa: BLE001 — a page that cannot be read is the answer, not a crash
+        except Exception as exc:  # a page that cannot be read is the answer, not a crash
             return {"error": f"error: could not read the element: {exc}"}
         if not isinstance(found, dict):
             return {"error": "error: nothing is at that point"}
@@ -1292,7 +1292,7 @@ class BrowserTool(Tool):
             trusted_checker = getattr(guard, "trusted_only_since", None)
             if callable(trusted_checker) and reported:
                 self.last_trusted_only = bool(trusted_checker(start, top_url, self.trusted_sources))
-        except Exception:  # noqa: BLE001 — optional driver guard and page state may be unavailable
+        except Exception:  # optional driver guard and page state may be unavailable
             self.last_local_only = False
             self.last_trusted_only = False
 

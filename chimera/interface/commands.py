@@ -61,7 +61,7 @@ class RegisteredCommand:
 def _entry(
     name: str,
     argument: str = "",
-    help: str = "",  # noqa: A002 — the field is called `help` everywhere else too
+    help: str = "",  # the field is called `help` everywhere else too
     *,
     chat: int | None = None,
     assist: int | None = None,

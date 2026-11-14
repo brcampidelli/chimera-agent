@@ -132,7 +132,7 @@ class Pinned:
                     messages, model=MODEL, temperature=TEMPERATURE,
                     extra_body={"provider": {"order": [PROVIDER], "allow_fallbacks": False}},
                 )
-            except Exception as exc:  # noqa: BLE001 — a provider failure is a halt, not a fail
+            except Exception as exc:  # a provider failure is a halt, not a fail
                 err = f"{type(exc).__name__}: {exc}"[:300]
                 log.append(err)
                 time.sleep(5 * (attempt + 1))
@@ -217,7 +217,7 @@ def execute(units: list[tuple[Task, int]], conds: tuple[str, ...], out: Path, sp
                 continue
             try:
                 row = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a harness error loses the unit, never the run
+            except Exception as exc:  # a harness error loses the unit, never the run
                 task, rep = futures[fut]
                 print(f"  HARNESS ERROR on {task.id} r{rep}: {type(exc).__name__}: {exc}"[:300], flush=True)
                 continue

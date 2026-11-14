@@ -330,7 +330,7 @@ class KeepAwake:
         for reason, probe in probes:
             try:
                 live = int(probe())
-            except Exception:  # noqa: BLE001 — a broken probe must not stop the keeper
+            except Exception:  # a broken probe must not stop the keeper
                 _log.debug("keep awake: probe %s failed", reason, exc_info=True)
                 continue
             if live > 0 and reason not in held:
@@ -405,7 +405,7 @@ class KeepAwake:
         """
         try:
             wanted = normalize_mode(getattr(self.settings(), "keep_awake", "off")) != "off"
-        except Exception:  # noqa: BLE001 — a settings read that fails must not break its caller
+        except Exception:  # a settings read that fails must not break its caller
             _log.debug("keep awake: settings read failed", exc_info=True)
             wanted = False
         with self._lock:
@@ -437,7 +437,7 @@ class KeepAwake:
             state: KeepAwakeState | None = None
             try:
                 state = self.tick()
-            except Exception:  # noqa: BLE001 — the keeper outlives a bad tick
+            except Exception:  # the keeper outlives a bad tick
                 _log.debug("keep awake: tick failed", exc_info=True)
             # Off, holding nothing, and nobody asked for another look since this tick: nothing is
             # left for the thread to do, so it ends rather than read "off" four times a minute until

@@ -182,7 +182,7 @@ def mcp_test(
         raise typer.Exit(code=1)
     try:
         tools = probe_tools(cfg, connect_timeout=timeout)
-    except Exception as exc:  # noqa: BLE001 — a graceful message, never a stack trace
+    except Exception as exc:  # a graceful message, never a stack trace
         from chimera.integrations.mcp_oauth import SignInRequired
 
         if isinstance(exc, SignInRequired):
@@ -417,7 +417,7 @@ def kanban_move(
     if board.get(card_id) is None:
         console.print(f"[red]no card {card_id}[/red]")
         raise typer.Exit(code=1)
-    board.move(card_id, column)  # type: ignore[arg-type]
+    board.move(card_id, column)
     console.print(f"moved [cyan]{card_id}[/cyan] -> {column}")
 
 

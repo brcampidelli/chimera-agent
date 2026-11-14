@@ -111,7 +111,7 @@ def fetch_text(url: str) -> tuple[int | None, str]:
             break
         try:
             page = fetch_page(url, render="http")
-        except Exception as exc:  # noqa: BLE001 — an unreachable page is a failed check, not a crash
+        except Exception as exc:  # an unreachable page is a failed check, not a crash
             _PAGES[url] = (None, f"error: {type(exc).__name__}: {exc}")
             break
         if page.status == 429 and attempt < 3:
@@ -186,7 +186,7 @@ def _turn(backend: _Pinned, arm: str, item: Item) -> dict[str, Any]:
             "prompt_tokens": prompt, "completion_tokens": completion, "cache_read_tokens": cached,
             "usd": usd, "registry": sorted(registry.names()),
         }
-    except Exception as exc:  # noqa: BLE001 — a provider failure is counted by the stop rule
+    except Exception as exc:  # a provider failure is counted by the stop rule
         return {"error": f"{type(exc).__name__}: {exc}"[:300]}
 
 

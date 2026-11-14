@@ -179,7 +179,7 @@ def from_feeds() -> list[dict]:
         try:
             _, body, _ = get(url, max_bytes=6_000_000)
             root = ET.fromstring(body)
-        except Exception as exc:  # noqa: BLE001 - uma fonte fora do ar não derruba o boletim
+        except Exception as exc:  # uma fonte fora do ar não derruba o boletim
             log(f"feed {outlet}: {type(exc).__name__} {str(exc)[:70]}")
             continue
         for item in root.iter():
@@ -217,7 +217,7 @@ def from_openrouter() -> list[dict]:
     outlet, url = OPENROUTER_BLOG
     try:
         _, body, _ = get(url)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log(f"html {outlet}: {type(exc).__name__} {str(exc)[:70]}")
         return []
     slugs = set(re.findall(r'href="(/blog/[a-z0-9\-]{6,})"', body))
@@ -246,7 +246,7 @@ def from_search() -> list[dict]:
     try:
         with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
             data = json.load(resp)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log(f"tavily: {type(exc).__name__} {str(exc)[:70]}")
         return []
     # `hint` fica vazio de propósito: o título publicável sai do artigo, não do buscador.
@@ -316,7 +316,7 @@ def verify(cand: dict) -> tuple[dict | None, str]:
         status, body, final = get(url)
     except urllib.error.HTTPError as exc:
         return None, f"HTTP {exc.code}"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return None, type(exc).__name__
     if status != 200:
         return None, f"HTTP {status}"
@@ -601,7 +601,7 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
                 continue
             log(f"modelo: HTTP {exc.code}")
             return None
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log(f"modelo: {type(exc).__name__} {str(exc)[:70]}")
             return None
     else:
@@ -929,7 +929,7 @@ def gh(method: str, path: str, payload: dict | None = None) -> tuple[int, dict]:
     # Nem toda resposta da API tem corpo: apagar uma ref devolve 204 vazio, e `json.load` num
     # corpo vazio levanta JSONDecodeError — que foi como a primeira publicação real morreu, DEPOIS
     # de já ter criado o branch e escrito os arquivos.
-    def body_of(resp) -> dict:  # noqa: ANN001
+    def body_of(resp) -> dict:
         raw = resp.read()
         if not raw:
             return {}

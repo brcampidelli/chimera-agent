@@ -238,7 +238,7 @@ def run_solve(inst: dict[str, Any], arm: str) -> dict[str, Any]:
 
         try:
             po.prepare_workspace(inst, arm)
-        except Exception as exc:  # noqa: BLE001 — a harness failure is a halt (PROTOCOL §2)
+        except Exception as exc:  # a harness failure is a halt (PROTOCOL §2)
             row = {"instance_id": inst["instance_id"], "arm": arm, "calls": [], "patch": "",
                    "halted": f"workspace: {type(exc).__name__}: {exc}"[:400],
                    "seconds": round(time.monotonic() - started, 1)}
@@ -380,7 +380,7 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
                     if admitted[iid]:
                         try:
                             build_template(inst)
-                        except Exception as exc:  # noqa: BLE001 — the solve retries it and records the halt
+                        except Exception as exc:  # the solve retries it and records the halt
                             print(f"  template for {iid} failed here: {exc}", flush=True)
             if not admitted[iid]:
                 return f"{arm}$"

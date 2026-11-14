@@ -231,7 +231,7 @@ class TelegramAdapter:
                     files={"voice": (audio.name, handle, "audio/ogg")},
                 )
             response.raise_for_status()
-        except Exception as exc:  # noqa: BLE001 — the text is already with the chat
+        except Exception as exc:  # the text is already with the chat
             _log.warning("telegram voice reply failed: %s", type(exc).__name__)
         finally:
             discard_reply_audio(audio)

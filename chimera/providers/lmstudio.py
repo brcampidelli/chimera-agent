@@ -55,7 +55,7 @@ def loaded_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> Loa
     budget = httpx.Timeout(timeout_s, connect=_connect_budget(base, timeout_s))
     try:
         response = call_with_deadline(lambda: httpx.get(f"{base}/models", timeout=budget), timeout_s)
-    except Exception as exc:  # noqa: BLE001 — an absent LM Studio is a normal state, not a 500
+    except Exception as exc:  # an absent LM Studio is a normal state, not a 500
         _log.debug("lm studio model list failed at %s: %s", base, exc)
         return LoadedModels(base, False, reason="unreachable")
     if response.status_code >= 400:
@@ -64,7 +64,7 @@ def loaded_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> Loa
 
     try:
         entries = response.json()["data"]
-    except Exception:  # noqa: BLE001 — a 200 from something that is not an OpenAI-shaped server
+    except Exception:  # a 200 from something that is not an OpenAI-shaped server
         return LoadedModels(base, False, reason="not_lm_studio")
     if not isinstance(entries, list):
         return LoadedModels(base, False, reason="not_lm_studio")

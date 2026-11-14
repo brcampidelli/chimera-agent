@@ -63,7 +63,7 @@ def contain(pid: int) -> JobObject | None:
         return None
     try:
         return _contain(pid)
-    except Exception as exc:  # noqa: BLE001 - a job object is an improvement, never a requirement
+    except Exception as exc:  # a job object is an improvement, never a requirement
         _log.debug("job object unavailable for pid %s: %s", pid, exc)
         return None
 

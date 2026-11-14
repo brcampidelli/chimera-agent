@@ -722,7 +722,7 @@ def _maybe(registry: ToolRegistry, name: str) -> Any:
     """
     try:
         return registry.get(name)
-    except Exception:  # noqa: BLE001 -- ToolNotFoundError, without importing it into the bench
+    except Exception:  # ToolNotFoundError, without importing it into the bench
         return None
 
 

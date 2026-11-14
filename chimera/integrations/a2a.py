@@ -166,7 +166,7 @@ class A2AServer:
         """Run solve synchronously and fold the result (or failure) into ``task``."""
         try:
             answer = self._solve(text)
-        except Exception as exc:  # noqa: BLE001 — a failed run is a failed task, not a crash
+        except Exception as exc:  # a failed run is a failed task, not a crash
             task.state = "failed"
             task.result_message = _agent_message(f"error: {exc}")
         else:

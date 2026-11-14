@@ -146,7 +146,7 @@ def save(home: Path, name: str, data: bytes) -> Attachment:
             id=ident, name=name, kind="document", path=path,
             note="reading this format needs the `documents` extra — install it to attach this file type",
         )
-    except Exception as exc:  # noqa: BLE001 — an unreadable file is a bad upload, not a crash
+    except Exception as exc:  # an unreadable file is a bad upload, not a crash
         return Attachment(id=ident, name=name, kind="document", path=path, note=f"could not read: {exc}")
 
     if len(text) > _MAX_CHARS:
@@ -224,7 +224,7 @@ def vision_support(model: str) -> str:
         return "unknown"
     try:
         info = litellm.get_model_info(model=model)
-    except Exception:  # noqa: BLE001 — an unknown model raises, and unknown is a real answer here
+    except Exception:  # an unknown model raises, and unknown is a real answer here
         return "unknown"
     return "yes" if info.get("supports_vision") else "no"
 

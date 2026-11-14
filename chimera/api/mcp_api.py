@@ -217,7 +217,7 @@ def _oauth_state(
     try:
         found = mcp_oauth.state(cfg, Path(home))
         stored = mcp_oauth.has_record(cfg, Path(home))
-    except Exception as exc:  # noqa: BLE001 — a locked vault must not fail the server list
+    except Exception as exc:  # a locked vault must not fail the server list
         _log.debug("MCP sign-in state unreadable: %s", type(exc).__name__)
         found, stored = {"connected": False, "identity": None}, False
     rec = tests.get(cfg.name)
@@ -334,7 +334,7 @@ def test_server(home: Path, name: str) -> dict[str, Any]:
         return {"ok": False, "tools": [], "error": "no such server", **_reach(name, home)}
     try:
         tools = _live_test(cfg)
-    except Exception as exc:  # noqa: BLE001 — every failure becomes a short, secret-free error
+    except Exception as exc:  # every failure becomes a short, secret-free error
         _log.warning("MCP test for %r failed: %s", name, type(exc).__name__)
         needs = _needs_sign_in(cfg, exc)
         _remember(home, cfg, ok=False, tool_count=0, needs_sign_in=needs)
@@ -397,7 +397,7 @@ def _reach(name: str, home: Path | None = None) -> dict[str, Any]:
 
     try:
         estado = pool_state(get_settings())
-    except Exception as exc:  # noqa: BLE001 -- a status read must never fail a test
+    except Exception as exc:  # a status read must never fail a test
         _log.debug("MCP reach unknown: %s", type(exc).__name__)
         return {"reaches_agent": None, "reaches_agent_reason": None}
 
@@ -457,7 +457,7 @@ def connect(home: Path, name: str) -> dict[str, Any]:
     except mcp_oauth.OAuthError as exc:
         _log.warning("MCP sign-in for %r failed: %s", name, exc.code)
         return {"ok": False, "error": exc.code, "oauth": _oauth_state(home, cfg, _load_tests(home))}
-    except Exception as exc:  # noqa: BLE001 — a short code, never a trace or a token
+    except Exception as exc:  # a short code, never a trace or a token
         _log.warning("MCP sign-in for %r failed: %s", name, type(exc).__name__)
         return {"ok": False, "error": "discovery", "oauth": _oauth_state(home, cfg, _load_tests(home))}
     return {"ok": True, "error": None, "oauth": state}
@@ -472,7 +472,7 @@ def disconnect(home: Path, name: str) -> dict[str, Any]:
         return {"ok": False, "revoked": False, "error": "not_found", "oauth": None}
     try:
         outcome = mcp_oauth.disconnect(cfg, Path(home))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.warning("MCP sign-out for %r failed: %s", name, type(exc).__name__)
         return {"ok": False, "revoked": False, "error": "storage",
                 "oauth": _oauth_state(home, cfg, _load_tests(home))}

@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The API no longer leaks internal errors, and uploads no longer freeze it.** An uncaught server error now returns a generic 500 with an error id you can find in `backend.log`, large attachments are processed off the main loop so the app keeps answering meanwhile, and log lines written during a turn name that turn. (#1254)
+
 - **Settings:** the search now finds every row (it covered about half), each setting says when a saved change applies (now, next conversation or next launch; the ones not yet traced say nothing), empty Memory, Runs, Decisions and Skills screens offer a first step, the presentation view uses the shared dialog, and reads of `CHIMERA_*` outside `Settings` are pinned by a ratchet. (#1251)
 
 ## [0.89.0] - 2026-11-12

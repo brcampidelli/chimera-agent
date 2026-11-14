@@ -128,7 +128,7 @@ def run_arm() -> None:
                 review = manager.review(row["task"], row["answer"], context=e["context"])
                 verdict = "abstained" if review.abstained else ("approved" if review.approved else "revise")
                 feedback, error = review.feedback[:300], ""
-            except Exception as exc:  # noqa: BLE001 — recorded, never guessed
+            except Exception as exc:  # recorded, never guessed
                 verdict, feedback, error = "error", "", f"{type(exc).__name__}: {str(exc)[:200]}"
             spent += backend.last
             fh.write(json.dumps({"id": rid, "verdict": verdict, "feedback": feedback, "usd": backend.last,

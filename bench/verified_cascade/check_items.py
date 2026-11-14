@@ -32,7 +32,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from bench.verified_cascade.common import (  # noqa: E402
+from bench.verified_cascade.common import (
     RESULTS,
     contains,
     norm,

@@ -521,7 +521,7 @@ class DeviceDoor(GuestServer):
         # A code minted for an open door is for that door: closing it voids them.
         self._registry.codes.clear()
 
-    def urls(self, token: str | None = None) -> list[str]:  # noqa: ARG002 -- the base signature
+    def urls(self, token: str | None = None) -> list[str]:  # the base signature
         if not self.listening or self._port is None:
             return []
         return [f"http://{address}:{self._port}/" for address in lan_addresses()]

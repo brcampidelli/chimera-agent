@@ -20,10 +20,10 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.config import Settings
+from chimera.interface import ChatSession
 
 APP = "http://127.0.0.1:45813"
 OUTRA = "https://qualquer-site.example"

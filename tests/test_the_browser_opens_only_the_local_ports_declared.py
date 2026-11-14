@@ -398,7 +398,7 @@ class _Hits(BaseHTTPRequestHandler):
     def log_message(self, *args: object) -> None:
         return
 
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         self.server.hits.append(self.path)  # type: ignore[attr-defined]
         routes: dict[str, tuple[int, str, dict[str, str]]] = self.server.routes  # type: ignore[attr-defined]
         status, body, headers = routes.get(self.path.split("?")[0], (200, "<p>ok</p>", {}))
@@ -459,7 +459,7 @@ def reach_driver(world: dict[str, Any]) -> Iterator[PlaywrightDriver]:
     )
     try:
         d = PlaywrightDriver(headless=True, reach=reach)
-    except Exception as exc:  # noqa: BLE001 — no Chromium here (CI): these tests need a real browser
+    except Exception as exc:  # no Chromium here (CI): these tests need a real browser
         pytest.skip(f"chromium unavailable: {exc}")
     yield d
     d.close()

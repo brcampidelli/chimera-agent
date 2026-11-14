@@ -262,7 +262,7 @@ def test_a_real_child_gets_the_credential_and_its_starting_environment_never_hel
     env = _child_env()
     assert not any(SCREEN in v or SERVER in v or LAUNCHER in v for v in env.values())
 
-    done = subprocess.run(  # noqa: S603 - the interpreter running this suite, a fixed script
+    done = subprocess.run(  # the interpreter running this suite, a fixed script
         [sys.executable, "-c", _CHILD],
         input=_line(server_token=SERVER, screen_token=SCREEN, launcher_key=LAUNCHER),
         capture_output=True, env=env, cwd=REPO, timeout=120, check=True,
@@ -277,7 +277,7 @@ def test_a_real_child_gets_the_credential_and_its_starting_environment_never_hel
 
 @pytest.mark.parametrize("raw", [b"", b"garbage\n", b"[]\n"], ids=["eof", "bad-json", "array"])
 def test_a_real_backend_whose_line_is_bad_exits_and_never_comes_up(raw: bytes) -> None:
-    done = subprocess.run(  # noqa: S603
+    done = subprocess.run(
         [sys.executable, "-c", _CHILD], input=raw, capture_output=True, env=_child_env(),
         cwd=REPO, timeout=120,
     )
@@ -287,7 +287,7 @@ def test_a_real_backend_whose_line_is_bad_exits_and_never_comes_up(raw: bytes) -
 
 def test_a_real_backend_whose_shell_never_writes_exits_instead_of_hanging() -> None:
     """The deadlock case: real fd 0, a pipe that stays open with nothing on it, a short timeout."""
-    child = subprocess.Popen(  # noqa: S603
+    child = subprocess.Popen(
         [sys.executable, "-c", _CHILD], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, env=_child_env(TEST_TIMEOUT="1"), cwd=REPO,
     )

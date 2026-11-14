@@ -159,7 +159,7 @@ class CloseLoopWiring:
     ) -> None:
         try:
             follow_ci(ws, state, hooks, head=head, gh=gh)
-        except Exception as exc:  # noqa: BLE001 - a watch must never take the server down with it
+        except Exception as exc:  # a watch must never take the server down with it
             state.error = f"the CI watch stopped: {type(exc).__name__}"
             hooks.report(state)
 

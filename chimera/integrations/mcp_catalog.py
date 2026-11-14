@@ -167,7 +167,7 @@ def _fetch_discovery(url: str) -> bool:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
     request = urllib.request.Request(url, headers={"Accept": "application/json"})
     try:
-        with opener.open(request, timeout=_PROBE_DEADLINE_S) as response:  # noqa: S310 — loopback validated above
+        with opener.open(request, timeout=_PROBE_DEADLINE_S) as response:  # loopback validated above
             if response.status != 200:
                 return False
             body = response.read(_PROBE_READ_LIMIT + 1)

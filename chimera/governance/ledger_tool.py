@@ -574,7 +574,7 @@ class LedgeredTool(Tool):
             return True
         try:
             return not bool(probe(failure))
-        except Exception:  # noqa: BLE001 — a probe that breaks says nothing; assume it tried
+        except Exception:  # a probe that breaks says nothing; assume it tried
             return True
 
     def _held_after_failure(self, name: str) -> str | None:

@@ -229,7 +229,7 @@ def test_an_ordinary_run_is_still_counted(tmp_path: Path) -> None:
 
 def test_the_route_joins_them_too(tmp_path: Path) -> None:
     """Through HTTP, because a join the endpoint does not perform is a join nobody performs."""
-    from tests.test_api import _client  # noqa: PLC0415
+    from tests.test_api import _client
 
     client = _client(tmp_path)
     home = tmp_path / "home"
@@ -265,7 +265,7 @@ def test_a_malformed_line_is_skipped_and_the_rest_still_counts(tmp_path: Path) -
 def test_the_route_actually_merges_them(tmp_path: Path) -> None:
     """A summariser that works while the endpoint never calls it is a guard outside the flow — the
     failure mode this repo has hit before, so the assertion goes through the HTTP surface."""
-    from tests.test_api import _client  # noqa: PLC0415
+    from tests.test_api import _client
 
     client = _client(tmp_path)
     home = tmp_path / "home"

@@ -218,7 +218,7 @@ def register_access_api(
         # cannot be read leaves its link listed by id instead of hiding the link.
         try:
             return session_titles()
-        except Exception as exc:  # noqa: BLE001 -- the doors matter more than their labels
+        except Exception as exc:  # the doors matter more than their labels
             _log.warning("could not read conversation titles for the access card: %s", exc)
             return {}
 

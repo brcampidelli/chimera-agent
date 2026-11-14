@@ -133,7 +133,7 @@ def test_draft_spec_makes_exactly_one_model_call() -> None:
     chamadas: list[object] = []
 
     class _Fake:
-        def complete(self, messages, **kwargs):  # noqa: ANN001, ANN202
+        def complete(self, messages, **kwargs):
             chamadas.append(messages)
             return type("R", (), {"content": BOM, "usage": None})()
 
@@ -145,7 +145,7 @@ def test_draft_spec_makes_exactly_one_model_call() -> None:
 
 def test_an_empty_description_never_reaches_the_model() -> None:
     class _Explode:
-        def complete(self, messages, **kwargs):  # noqa: ANN001, ANN202
+        def complete(self, messages, **kwargs):
             raise AssertionError("should not have been called")
 
     with pytest.raises(DraftError):

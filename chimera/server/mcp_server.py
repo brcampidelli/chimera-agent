@@ -127,11 +127,11 @@ class ChimeraMCP:
         server: Any = Server("chimera")
         specs = self.tool_specs()
 
-        @server.list_tools()  # type: ignore[misc, no-untyped-call, untyped-decorator]
+        @server.list_tools()  # type: ignore[untyped-decorator]
         async def _list_tools() -> list[Any]:
             return [types.Tool(**spec) for spec in specs]
 
-        @server.call_tool()  # type: ignore[misc, no-untyped-call, untyped-decorator]
+        @server.call_tool()  # type: ignore[untyped-decorator]
         async def _call_tool(name: str, arguments: dict[str, Any] | None) -> list[Any]:
             text = self.dispatch(name, arguments or {})
             return [types.TextContent(type="text", text=text)]

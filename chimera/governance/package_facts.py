@@ -148,7 +148,7 @@ def _pypi_json(name: str, timeout: float) -> Any:
     could not be reached — the caller turns that into ``unknown``."""
     url = f"https://pypi.org/pypi/{urllib.parse.quote(name)}/json"
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 - fixed https host
+        with urllib.request.urlopen(url, timeout=timeout) as response:  # fixed https host
             return json.loads(response.read().decode("utf-8", "replace"))
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
@@ -181,7 +181,7 @@ def pypi_line(name: str, *, timeout: float = TIMEOUT_S) -> str:
             return unknown
     try:
         data = _pypi_json(name, timeout)
-    except Exception:  # noqa: BLE001 - display only: any failure to reach PyPI reads as unknown
+    except Exception:  # display only: any failure to reach PyPI reads as unknown
         with _lock:  # remembered briefly, not for good: the network may come back
             _unknown_until[key] = time.monotonic() + UNKNOWN_TTL_S
         return unknown

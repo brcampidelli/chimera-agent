@@ -82,7 +82,7 @@ def static_page(html: str, *, width: int, height: int) -> Iterator[Any]:
     _configure_frozen_browser_path()
     try:
         manager = sync_playwright().start()
-    except Exception as exc:  # noqa: BLE001 — a driver that will not start is a refusal, not a crash
+    except Exception as exc:  # a driver that will not start is a refusal, not a crash
         _log.warning("design export: Playwright did not start: %s", exc)
         raise ExportUnavailable(
             f"the PDF/PNG renderer could not start here ({type(exc).__name__})."
@@ -90,7 +90,7 @@ def static_page(html: str, *, width: int, height: int) -> Iterator[Any]:
     try:
         try:
             browser = manager.chromium.launch(headless=True)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise _chromium_unavailable(exc) from None
         try:
             context = browser.new_context(
@@ -116,7 +116,7 @@ def _rendered(work: Callable[[], _T], what: str) -> _T:
         return work()
     except (ExportUnavailable, ExportFailed):
         raise
-    except Exception as exc:  # noqa: BLE001 — the reason goes to the log, a sentence to the caller
+    except Exception as exc:  # the reason goes to the log, a sentence to the caller
         _log.warning("design export (%s) failed: %s", what, exc)
         raise ExportFailed(f"the {what} could not be rendered; try again") from None
 

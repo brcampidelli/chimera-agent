@@ -332,7 +332,7 @@ def _kill_tree(child: subprocess.Popen[bytes]) -> None:
 
         for descendant in psutil.Process(child.pid).children(recursive=True):
             descendant.kill()
-    except Exception:  # noqa: BLE001 - best effort: psutil absent, or the tree already gone
+    except Exception:  # best effort: psutil absent, or the tree already gone
         pass
     child.kill()
 
@@ -471,7 +471,7 @@ def _kill_record_tree(record: ServiceRecord) -> bool:
         process.kill()
         _, alive = psutil.wait_procs([process, *children], timeout=5)
         return not alive
-    except Exception:  # noqa: BLE001 - an unverifiable pid must never be killed
+    except Exception:  # an unverifiable pid must never be killed
         return False
 
 

@@ -99,14 +99,14 @@ class ExecAlertTool(Tool):
         event = _REA_EVENT if self._catalog_id == "rea" else _NEUTRAL_EVENT
         try:
             self._audit.record(event, payload)
-        except Exception:  # noqa: BLE001 — audit failure must not change tool behavior
+        except Exception:  # audit failure must not change tool behavior
             _log.exception("%s audit failed for %s on %s", event, self.name, self._surface)
         if self._alert is not None:
             try:
                 self._alert(
                     f"Chimera ran {self._catalog_id} tool {self.name} on {self._surface} at {at}."
                 )
-            except Exception:  # noqa: BLE001 — notification failure must not change tool behavior
+            except Exception:  # notification failure must not change tool behavior
                 _log.warning("tool execution alert failed for %s on %s", self.name, self._surface)
         else:
             _log.warning("%s tool %s ran on %s at %s", self._catalog_id, self.name, self._surface, at)

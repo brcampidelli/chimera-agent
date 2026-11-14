@@ -19,17 +19,17 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.api import build_api_app  # noqa: E402
-from chimera.api import screen_credential as sc  # noqa: E402
-from chimera.api.code_api import COMMANDS_OFF_OPTIONS, COMMANDS_OFF_QUESTION  # noqa: E402
-from chimera.api.desktop_bridge import asgi_call  # noqa: E402
-from chimera.api.device_door import DeviceGateway  # noqa: E402
-from chimera.api.devices import COOKIE_NAME, shown_code  # noqa: E402
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.governance.pending import ask_user_durably  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.api import build_api_app
+from chimera.api import screen_credential as sc
+from chimera.api.code_api import COMMANDS_OFF_OPTIONS, COMMANDS_OFF_QUESTION
+from chimera.api.desktop_bridge import asgi_call
+from chimera.api.device_door import DeviceGateway
+from chimera.api.devices import COOKIE_NAME, shown_code
+from chimera.config import Settings, get_settings
+from chimera.governance.pending import ask_user_durably
+from chimera.interface import ChatSession
 
 TOKEN = "owner-bearer-for-the-shell-grant-tests"
 TIMEOUT = 10.0

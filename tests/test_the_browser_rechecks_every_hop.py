@@ -179,7 +179,7 @@ class _Site(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         internal = f"http://localhost:{self.port}/internal"
         pages = {
             "/redirect": (302, "", {"Location": internal}),
@@ -208,7 +208,7 @@ def site() -> Iterator[str]:
 def driver() -> Iterator[PlaywrightDriver]:
     try:
         d = PlaywrightDriver(headless=True, allowed=lambda url: urlparse(url).hostname == "127.0.0.1")
-    except Exception as exc:  # noqa: BLE001 — no Chromium here (CI): these tests need a real browser
+    except Exception as exc:  # no Chromium here (CI): these tests need a real browser
         pytest.skip(f"chromium unavailable: {exc}")
     yield d
     d.close()

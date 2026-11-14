@@ -95,15 +95,15 @@ class _Chimera(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"APPROVED-ALL!")
 
-    def do_OPTIONS(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_OPTIONS(self) -> None:  # the stdlib's name
         self.server.asked.append(self.path)  # type: ignore[attr-defined]
         self._answer()
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         self.server.acted.append(f"GET {self.path}")  # type: ignore[attr-defined]
         self._answer()
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         self.server.acted.append(f"POST {self.path}")  # type: ignore[attr-defined]
         self._answer()
 
@@ -148,13 +148,13 @@ class _DevProxy(BaseHTTPRequestHandler):
         else:
             self._own()
 
-    def do_OPTIONS(self) -> None:  # noqa: N802
+    def do_OPTIONS(self) -> None:
         self._route("OPTIONS")
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         self._route("GET")
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         self._route("POST")
 
 
@@ -240,7 +240,7 @@ def relay_driver(relay: dict[str, Any]) -> Iterator[PlaywrightDriver]:
     )
     try:
         d = PlaywrightDriver(headless=True, reach=reach)
-    except Exception as exc:  # noqa: BLE001 — no Chromium here (CI): these tests need a real browser
+    except Exception as exc:  # no Chromium here (CI): these tests need a real browser
         pytest.skip(f"chromium unavailable: {exc}")
     yield d
     d.close()

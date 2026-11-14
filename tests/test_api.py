@@ -14,11 +14,11 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.core.agent import AgentResult, ToolActivity  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.config import Settings, get_settings
+from chimera.core.agent import AgentResult, ToolActivity
+from chimera.interface import ChatSession
 
 # The server token is documented but is a secret the settings screen must never write.
 _NOT_EDITABLE_BUT_DOCUMENTED = frozenset({"CHIMERA_SERVER_TOKEN"})
@@ -1233,8 +1233,14 @@ def test_bearer_token_guards_chat_when_configured(monkeypatch: Any, tmp_path: An
 
 
 def test_reads_require_token_when_configured(monkeypatch: Any, tmp_path: Any) -> None:
+    from chimera.api import version_api
     from chimera.config import get_settings
 
+    # `/api/version` asks GitHub for the latest release. This test is about the token, not about GitHub:
+    # left alone it made a real HTTPS call from a hermetic suite (found when the suite began refusing
+    # sockets that leave the machine), and cached whatever that call returned for every later test.
+    monkeypatch.setattr(version_api, "_get_json", lambda url: None)
+    monkeypatch.setattr(version_api, "_cache", {})
     client = _token_client(monkeypatch, tmp_path, "s3cret")
     # A GET read now requires the token too (transcripts/memory/config must not be readable without it).
     assert client.get("/api/config").status_code == 401

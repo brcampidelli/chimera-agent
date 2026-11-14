@@ -221,7 +221,7 @@ def test_a_tool_call_with_reasoning_is_not_a_filed_answer() -> None:
     fn = SimpleNamespace(name="echo", arguments='{"text": "x"}')
     call = SimpleNamespace(id="c1", function=fn)
     message = SimpleNamespace(content=None, tool_calls=[call], reasoning_content="I should echo x.")
-    result = LLMGateway._normalize(_response(message), "m")  # noqa: SLF001
+    result = LLMGateway._normalize(_response(message), "m")
     assert result.tool_calls is not None
     assert result.answer_in_reasoning is False
 
@@ -230,7 +230,7 @@ def test_the_raw_field_is_read_when_the_renamed_one_is_absent() -> None:
     """litellm keeps OpenRouter's own ``reasoning`` under ``provider_specific_fields`` too."""
     message = SimpleNamespace(content=None, tool_calls=None,
                               provider_specific_fields={"reasoning": REASONING})
-    result = LLMGateway._normalize(_response(message), "m")  # noqa: SLF001
+    result = LLMGateway._normalize(_response(message), "m")
     assert result.answer_in_reasoning is True
     assert result.reasoning == REASONING
 

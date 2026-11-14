@@ -149,7 +149,7 @@ def known_window_tokens(model: str) -> int | None:
         from chimera.providers.listing import known_window
 
         remembered = known_window(slug)
-    except Exception:  # noqa: BLE001 — see below; a look-up that cannot run is a missing answer
+    except Exception:  # see below; a look-up that cannot run is a missing answer
         # NOT for a corrupt cache file: `listing._remembered` already turns that into None, and a
         # sabotage narrowing this catch failed to redden a single test, which is how a guard
         # announces it is guarding nothing. What it does catch is the look-up being unavailable
@@ -176,7 +176,7 @@ def _ollama_window(slug: str) -> int | None:
         from chimera.config import get_settings
 
         num_ctx = int(get_settings().ollama_num_ctx or 0)
-    except Exception:  # noqa: BLE001 — as in `window_tokens`: sizing a context must not end a run
+    except Exception:  # as in `window_tokens`: sizing a context must not end a run
         return None
     return num_ctx if num_ctx > 0 else None
 

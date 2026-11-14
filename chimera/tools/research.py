@@ -143,7 +143,7 @@ class YouTubeTranscriptTool(Tool):
             # raised AttributeError on every invocation — which the `except` below swallowed into
             # "transcript unavailable", making a dead tool look like a flaky one.
             chunks = YouTubeTranscriptApi().fetch(video_id)
-        except Exception as exc:  # noqa: BLE001 - the library raises many types; often unavailable
+        except Exception as exc:  # the library raises many types; often unavailable
             return f"error: transcript unavailable: {exc}"
         text = " ".join(str(chunk.text) for chunk in chunks).strip()
         if len(text) > _MAX_OUTPUT_CHARS:

@@ -112,7 +112,7 @@ def solve(task_id: str, arm: str, replica: int, backend: Any = None) -> dict[str
                 with only_this_origin(origin):
                     try:
                         result = agent.run(task.prompt(origin))
-                    except Exception as exc:  # noqa: BLE001 — the provider's failure, not the arm's
+                    except Exception as exc:  # the provider's failure, not the arm's
                         spend = partial_spend(exc)
                         record["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
                         record["usd"] = spend.usd if spend else None
@@ -144,7 +144,7 @@ def solve(task_id: str, arm: str, replica: int, backend: Any = None) -> dict[str
                     record["error"] = "unpriced: the receipt has no usd"
             finally:
                 driver.close()
-    except Exception as exc:  # noqa: BLE001 — Chromium or the server broke
+    except Exception as exc:  # Chromium or the server broke
         record["error"] = record["error"] or f"{type(exc).__name__}: {str(exc)[:300]}"
         record.setdefault("cap_usd", 0.0)
     finally:

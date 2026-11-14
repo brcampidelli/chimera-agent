@@ -84,7 +84,7 @@ class DownloadMediaTool(Tool):
         before = {p.name for p in out_dir.iterdir()}
         try:
             info = _ytdlp_download(url, str(out_dir / "%(title).80s.%(ext)s"), audio_only)
-        except Exception as exc:  # noqa: BLE001 — a download failure is a tool error, not a crash
+        except Exception as exc:  # a download failure is a tool error, not a crash
             return f"error: download failed: {exc}"
         if info is None:
             return _INSTALL_HINT

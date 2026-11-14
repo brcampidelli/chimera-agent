@@ -335,12 +335,12 @@ def _frontmatter(body: str) -> dict[str, object]:
             "it holds a name and a sentence"
         )
     try:
-        loaded = yaml.load(raw, Loader=_NoAliasLoader)  # noqa: S506 -- a SafeLoader subclass
+        loaded = yaml.load(raw, Loader=_NoAliasLoader)  # a SafeLoader subclass
     except RecursionError as exc:
         raise BundleError("the frontmatter of SKILL.md nests too deeply to read") from exc
     except yaml.YAMLError as exc:
         raise BundleError(f"the frontmatter of SKILL.md is not YAML this app accepts: {exc}") from exc
-    except Exception as exc:  # noqa: BLE001 -- a stranger's file must end in a sentence, not a 500
+    except Exception as exc:  # a stranger's file must end in a sentence, not a 500
         # The parser is not the only thing that raises: SafeLoader BUILDS the scalars it recognises,
         # and building is plain Python. `name: 111…1` past 4300 digits is `int()` refusing a number
         # that long (ValueError), `description: 2026-99-99` is `date()` refusing the day — neither
