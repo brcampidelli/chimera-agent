@@ -1174,6 +1174,7 @@ def recall_facts(
     project: str | None = EVERY_PROJECT,
     cite: bool = False,
     on_tainted: Callable[[Any], None] | None = None,
+    on_items: Callable[[list[Any]], None] | None = None,
 ) -> tuple[list[str], str | None]:
     """Long-term facts relevant to ``message``: gated keyword/semantic hits + graph-linked facts.
 
@@ -1196,6 +1197,10 @@ def recall_facts(
     label is a sentence to the model; this is how the caller's taint ledger learns the same thing
     (study 30 S30-25). Without it a clean run read a poisoned fact, stayed clean, and stored what it
     wrote next as clean: the label was laundered away by one rewrite.
+
+    ``on_items`` is called once with the stored records that reached the prompt (after the gate), so
+    a screen can list WHICH facts a turn used, with their origin and trust label, rather than only
+    how many. Entity-linked facts have no record behind them here and are not in it.
     """
     if gate is _GATE_UNSET:
         gate = MemoryGate()
@@ -1240,6 +1245,8 @@ def recall_facts(
                 )
                 for item in items
             ]
+            if on_items is not None:
+                on_items(list(items))
             if on_tainted is not None:
                 for item in items:
                     if getattr(item, "provenance", "clean") == "tainted":

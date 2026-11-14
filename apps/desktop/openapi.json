@@ -13475,6 +13475,17 @@
             "title": "Content",
             "type": "string"
           },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -18711,6 +18722,44 @@
           "message"
         ],
         "title": "SideChatIn",
+        "type": "object"
+      },
+      "SimilarPairOut": {
+        "description": "Two facts that read alike and were written on different days.",
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/MemoryItemOut"
+          },
+          "b": {
+            "$ref": "#/components/schemas/MemoryItemOut"
+          },
+          "similarity": {
+            "title": "Similarity",
+            "type": "number"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "similarity"
+        ],
+        "title": "SimilarPairOut",
+        "type": "object"
+      },
+      "SimilarPairsOut": {
+        "properties": {
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/SimilarPairOut"
+            },
+            "title": "Pairs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pairs"
+        ],
+        "title": "SimilarPairsOut",
         "type": "object"
       },
       "SkillCostOut": {
@@ -29772,6 +29821,25 @@
           }
         },
         "summary": "Memory Profile"
+      }
+    },
+    "/api/memory/similar": {
+      "get": {
+        "description": "Near-duplicate facts from different days. Read-only; resolving one is the ordinary\n``DELETE /api/memory/{id}`` on whichever the owner picks.",
+        "operationId": "similar_memory_api_memory_similar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarPairsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Similar Memory"
       }
     },
     "/api/memory/{item_id}": {
