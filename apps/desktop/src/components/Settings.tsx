@@ -1875,6 +1875,7 @@ export function Settings({
             and a long General read as a document with a table of contents, not as a menu bar. */}
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <Tabs
+          id={tabsId}
           items={tabs}
           value={tab}
           onChange={(next) => {
