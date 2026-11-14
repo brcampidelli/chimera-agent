@@ -52,6 +52,7 @@ from typing import Any
 
 from chimera.core.conversation_title import clean_title
 from chimera.core.filelock import atomic_write_text
+from chimera.core.redact import redact
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.code_session_marks")
@@ -488,7 +489,7 @@ class CodeSessionMarks:
     def rename(self, session_id: str, title: str) -> ConversationMark:
         """The owner names the conversation; an empty (or all-blank) title gives it back its
         automatic one. Cleaned the same way every title is."""
-        cleaned = clean_title(title)
+        cleaned = clean_title(redact(title))
 
         def change(mark: ConversationMark) -> None:
             mark.title = cleaned
@@ -500,7 +501,7 @@ class CodeSessionMarks:
         nothing written, when it cleans to nothing or says what is already there."""
         if source not in ("caller", "heading"):
             raise ValueError(f"not a title source: {source!r}")
-        cleaned = clean_title(title)
+        cleaned = clean_title(redact(title))
         current = self.get(session_id)
         if not cleaned or (cleaned, source) == (
             current.stamped_title,

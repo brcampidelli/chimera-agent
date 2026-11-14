@@ -187,9 +187,7 @@ def known_secrets() -> list[str]:
     found = [
         value
         for name, value in pairs
-        if value
-        and len(value) >= _MIN_SECRET_LEN
-        and any(marker in name.upper() for marker in _SECRET_MARKERS)
+        if value and len(value) >= _MIN_SECRET_LEN and is_secret_env(name, value)
     ]
     return sorted(set(found), key=len, reverse=True)
 

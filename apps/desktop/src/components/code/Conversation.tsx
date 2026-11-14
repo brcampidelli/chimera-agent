@@ -127,6 +127,7 @@ import { definitionSourceLabel } from "@/lib/definition-source";
 import { recordSuggestion, turnSuggestions, welcomeSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
 import {
+  maskSecrets,
   reconcile,
   toMarkdown,
   transcriptFilename,
@@ -1848,7 +1849,7 @@ export function Conversation({
         setExportNote(t("code.chat.export.storedUnreachable"));
       }
     }
-    const { exchanges: rows, recovered } = reconcile(
+    const { exchanges: rows, recovered, source } = reconcile(
       exchanges as TranscriptExchange[],
       stored,
     );
@@ -1856,10 +1857,14 @@ export function Conversation({
       setExportNote(t("code.chat.export.recovered", { n: recovered }));
 
     const exportedAt = new Date().toISOString();
-    const markdown = toMarkdown(rows, {
+    const built = toMarkdown(rows, {
       workspace: workspace || undefined,
       exportedAt,
     });
+    // The server's copy is masked when it is stored; the one in memory is not. Mask what shape lets
+    // us mask before it leaves the window (`maskSecrets`: best effort, it cannot know the machine's
+    // environment values, which is why the stored copy is preferred above).
+    const markdown = source === "memory" ? maskSecrets(built) : built;
     const name = transcriptFilename(exportedAt);
     try {
       // A Blob download inside the Tauri webview is the uncertain half of this item, so the failure

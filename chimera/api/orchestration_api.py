@@ -29,7 +29,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, HTTPException, params
+from fastapi import Depends, FastAPI, HTTPException, params
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
@@ -1168,7 +1168,15 @@ def register_orchestration_api(
         stop.set()
         return {"ok": True, "cancelled": fresh}
 
-    @app.get("/api/orchestration/runs", dependencies=[guard], response_model=OrchRunsOut)
+    # `GET /runs` prunes old transcripts from disk, so it is a write: refused when a browser says it
+    # came from another site (an `<img src>` there would otherwise empty the history).
+    from chimera.api.host_guard import refuse_cross_site
+
+    no_cross_site = Depends(
+        refuse_cross_site(lambda: [o.strip() for o in (read_settings().allowed_origins or "").split(",") if o.strip()])
+    )
+
+    @app.get("/api/orchestration/runs", dependencies=[guard, no_cross_site], response_model=OrchRunsOut)
     def orch_runs_endpoint() -> dict[str, Any]:
         """The runs whose transcripts are still on disk, newest first.
 

@@ -501,6 +501,9 @@ class BatchCancelRequest(BaseModel):
 
 _MAX_AGENT_TASKS = 8
 
+#: The largest body `/v1/chat/completions` reads: a long conversation, not an upload.
+MAX_OPENAI_BODY_BYTES = 16 * 1024 * 1024
+
 # The honest degradation message when the browser runtime isn't available — the UI surfaces this
 # verbatim; no placeholder image is ever fabricated.
 _BROWSER_MISSING_HINT = "Browser not installed — run: playwright install chromium"
@@ -517,7 +520,7 @@ def _require_token() -> Callable[[Request], None]:
     Reads the token from ``get_settings()`` on each call — NOT a build-time snapshot — so a token set at
     runtime (via ``PATCH /api/config``, which clears the settings cache) takes effect immediately.
     """
-    import hmac
+    from chimera.core.bearer import bearer_matches
 
     def check(request: Request) -> None:
         token = get_settings().server_token
@@ -527,9 +530,7 @@ def _require_token() -> Callable[[Request], None]:
         # (`chimera/api/device_door.py`); what it may reach was decided there.
         if request.scope.get(DEVICE_SCOPE_KEY):
             return
-        header = request.headers.get("authorization", "")
-        expected = f"Bearer {token}"
-        if not hmac.compare_digest(header, expected):
+        if not bearer_matches(request.headers.get("authorization", ""), token):
             raise HTTPException(status_code=401, detail="unauthorized")
 
     return check
@@ -824,7 +825,8 @@ def build_api_app(
         authenticate themselves, and the MCP bridge keeps its own token. Restricting this to `/api`
         left the root page's injected credential reachable to any local process querying an open route.
         """
-        import hmac
+        from chimera.api.host_guard import cross_site_request
+        from chimera.core.bearer import bearer_matches
 
         path = request.url.path
         # A paired device's request (`chimera/api/device_door.py`): the door verified its cookie and
@@ -835,10 +837,23 @@ def build_api_app(
         # not inject its secret into that public HTML; its initialization script supplies it instead.
         if path.startswith("/api/") and not path.startswith("/api/bridge/"):
             token = get_settings().server_token
-            if token and not device:
-                expected = f"Bearer {token}"
-                if not hmac.compare_digest(request.headers.get("authorization", ""), expected):
-                    return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+            if token and not device and not bearer_matches(request.headers.get("authorization", ""), token):
+                return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+            # No token is the desktop default, and then nothing but the network stops a page open in the
+            # owner's browser from POSTing to 127.0.0.1 (a `text/plain` body is a CORS simple request:
+            # no preflight, the browser only hides the answer). A browser always says where a write
+            # came from, so a write from another origin is refused here, for every route. A client that
+            # is not a browser (the CLI, a script) sends neither header and is not turned away.
+            # Not applied with a token: the bearer is not something a cross-site page can attach.
+            if (
+                not token
+                and not device
+                and request.method.upper() not in SAFE_METHODS
+                and cross_site_request(request, lambda: origins, strict_host=False)
+            ):
+                return JSONResponse(
+                    status_code=403, content={"detail": "refusing a write sent from another site"}
+                )
             # Past the owner's token, whether the request also came from the owner's SCREEN — the
             # one thing the approval card's code-less yes needs (`chimera/api/screen_credential.py`).
             # Always written, so a scope can never carry a True it did not earn here. A paired device
@@ -863,6 +878,16 @@ def build_api_app(
             request.scope[screen_credential.SCOPE_KEY] = bool(header_screen or session)
             request.scope[DESKTOP_SCREEN_SCOPE_KEY] = desktop
             request.scope[BROWSER_SCOPE_KEY] = session.id if session is not None else ""
+        # `/v1/*` is the OpenAI-compatible door and is not under `/api/`, so the branch above never saw
+        # it: its bearer was checked by the route's dependency, which FastAPI runs AFTER it has read the
+        # whole body. With a token set, answer 401 before reading anything, and bound the declared size.
+        if path.startswith("/v1/") and request.method.upper() not in SAFE_METHODS:
+            v1_token = get_settings().server_token
+            if v1_token and not device and not bearer_matches(request.headers.get("authorization", ""), v1_token):
+                return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+            declared = request.headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > MAX_OPENAI_BODY_BYTES:
+                return JSONResponse(status_code=413, content={"detail": "the request is too large"})
         return await call_next(request)
 
     @app.exception_handler(Exception)

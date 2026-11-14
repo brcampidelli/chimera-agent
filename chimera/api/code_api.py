@@ -42,7 +42,17 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, params
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    params,
+)
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
@@ -6531,6 +6541,13 @@ def register_code_api(
                 if not _session_exists(session_id):
                     raise LookupError("the conversation no longer exists")
                 req = CodeTurnRequest.model_validate(item.request)
+                if item.ran_without_secret:
+                    # The process restarted after the message was queued: the file kept only the masked
+                    # form. It runs, and the turn says so, so nobody reads its answer as having had it.
+                    req.message += (
+                        "\n\n[Note: this message was queued before a restart. A credential in it was "
+                        "masked when it was saved and is not available to this turn.]"
+                    )
                 req.source = item.source  # type: ignore[assignment]  # queue records are validated against the server-owned source set
                 req.queue_source = item.source  # type: ignore[assignment]  # same persisted source discriminator
                 req._via_screen = item.via_screen
@@ -6887,7 +6904,33 @@ def register_code_api(
 
         return summarize_worth(load_runs(settings.home / "runs.jsonl", workspace=workspace))
 
-    @app.post("/api/attachments", dependencies=[guard], response_model=AttachmentOut)
+    # Both uploads take a multipart body, a CORS "simple request": without a token nothing but the
+    # route class stops another page from sending one. It judges origin and declared size BEFORE the
+    # body is parsed, the way the skill and plugin uploads do. The ceiling is the attachment limit
+    # plus the multipart framing and the `language` field.
+    from chimera.api.attachments import MAX_BYTES as _ATTACHMENT_MAX_BYTES
+    from chimera.api.features import _upload_route
+
+    def _named_origins() -> list[str]:
+        raw = str(getattr(live(), "allowed_origins", "") or "")
+        return [o.strip() for o in raw.split(",") if o.strip()]
+
+    upload_route = _upload_route(_named_origins, _ATTACHMENT_MAX_BYTES + 1024 * 1024)
+
+    def upload_post(path: str, *, response_model: Any) -> Callable[[Any], Any]:
+        # Registered on the app's own router with the route class overridden, not through an
+        # `APIRouter` that is then included: an included router is nested and the schema walks that
+        # list the app's routes (`test_no_two_api_models_share_a_name`) would not see these two.
+        def register(fn: Any) -> Any:
+            app.router.add_api_route(
+                path, fn, methods=["POST"], dependencies=[guard], response_model=response_model,
+                route_class_override=upload_route,
+            )
+            return fn
+
+        return register
+
+    @upload_post("/api/attachments", response_model=AttachmentOut)
     async def upload_attachment(file: UploadFile = _UPLOAD) -> AttachmentOut:
         """Take one file for the agent to look at or read.
 
@@ -6938,7 +6981,7 @@ def register_code_api(
         support, how = dictation_support(settings)
         return DictationOut(support=support, how=how)
 
-    @app.post("/api/transcribe", dependencies=[guard], response_model=TranscriptOut)
+    @upload_post("/api/transcribe", response_model=TranscriptOut)
     async def transcribe_audio(
         file: UploadFile = _UPLOAD, language: str | None = _LANGUAGE_HINT
     ) -> TranscriptOut:
@@ -7114,7 +7157,17 @@ def register_code_api(
                     waiting.add(sid)
         return waiting
 
-    @app.get("/api/code/sessions", dependencies=[guard], response_model=list[CodeSessionMetaOut])
+    # Listing conversations also archives the idle ones and kicks the worktree sweeps, so it is a write
+    # in a GET: refused when a browser says another site sent it (an `<img src>` there would do it).
+    from chimera.api.host_guard import refuse_cross_site
+
+    no_cross_site = Depends(
+        refuse_cross_site(lambda: [o.strip() for o in (live().allowed_origins or "").split(",") if o.strip()])
+    )
+
+    @app.get(
+        "/api/code/sessions", dependencies=[guard, no_cross_site], response_model=list[CodeSessionMetaOut]
+    )
     def list_code_sessions(
         response: Response,
         archived: bool = False,

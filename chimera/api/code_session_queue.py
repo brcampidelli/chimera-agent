@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import builtins
 import contextlib
+import hashlib
 import json
 import os
 import threading
@@ -29,8 +30,20 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from chimera.core.filelock import atomic_write_text
+from chimera.core.redact import redact_json
 
 _SCREEN_QUEUE_IDS: set[str] = set()
+#: The request EXACTLY as it was queued, by item id, for as long as this process holds the item. The
+#: disk keeps only the masked form (a pasted credential must not outlive the turn in a file), so the
+#: turn has to run from here: rebuilding it from the file would run the owner's message with
+#: `[redacted]` where the secret was. Process memory, like the marks beside it.
+_ORIGINAL_REQUESTS: dict[str, dict[str, Any]] = {}
+
+
+def _request_digest(request: dict[str, Any]) -> str:
+    """A hash of the request as sent, so a retry is recognised without the file holding the secret."""
+    canonical = json.dumps(request, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 _SCREEN_QUEUE_LOCK = threading.RLock()
 # The same kind of marker for an item the desktop bridge forwarded (`VIA_BRIDGE_SCOPE_KEY`). Process
 # memory only, so a file that claims it is ignored, and a restart drops it, as for the screen's.
@@ -73,6 +86,9 @@ class QueueItem:
     via_bridge: bool = False
     position: int | None = None
     author: str = ""
+    #: The request on disk is masked and the original is gone (the process restarted): the turn runs
+    #: without the credential, and the caller says so rather than failing it in silence.
+    ran_without_secret: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -103,6 +119,8 @@ def _forget_marks(item_ids: list[str]) -> None:
         _SCREEN_QUEUE_IDS.difference_update(item_ids)
     with _BRIDGE_QUEUE_LOCK:
         _BRIDGE_QUEUE_IDS.difference_update(item_ids)
+    for item_id in item_ids:
+        _ORIGINAL_REQUESTS.pop(item_id, None)
 
 
 class CodeTurnQueue:
@@ -176,7 +194,11 @@ class CodeTurnQueue:
         except FileNotFoundError:
             pass
         with path.open("a", encoding="utf-8", newline="\n") as stream:
-            stream.write(lead + json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
+            # The request carries the owner's message, which may hold a pasted credential, and a
+            # terminal item is kept (KEEP_TERMINAL): masked where a record reaches the disk.
+            stream.write(
+                lead + json.dumps(redact_json(record), ensure_ascii=False, separators=(",", ":")) + "\n"
+            )
             stream.flush()
             os.fsync(stream.fileno())
 
@@ -194,7 +216,7 @@ class CodeTurnQueue:
         if len(lines) <= len(kept):
             return
         text = "".join(
-            json.dumps(r, ensure_ascii=False, separators=(",", ":")) + "\n" for r in kept
+            json.dumps(redact_json(r), ensure_ascii=False, separators=(",", ":")) + "\n" for r in kept
         )
         atomic_write_text(self._path(session_id), text)
         # Items the rewrite dropped are gone from the queue: their process marks go with them.
@@ -233,7 +255,14 @@ class CodeTurnQueue:
                 if existing.get("client_id") == client_id:
                     existing_id = str(existing.get("id", ""))
                     if (
-                        existing.get("request") != request
+                        # By the hash of the original: the file holds the masked form, and two requests
+                        # whose secrets differ would otherwise be the same one. A record from before
+                        # the hash existed is compared as masked.
+                        (
+                            existing.get("request_sha256") != _request_digest(request)
+                            if existing.get("request_sha256")
+                            else existing.get("request") != redact_json(request)
+                        )
                         or existing.get("source") != source
                         or str(existing.get("author", "")) != author
                         # A mark held in memory and not asked for now is a different request.
@@ -261,10 +290,15 @@ class CodeTurnQueue:
                 "source": source,
                 "author": author,
                 "request": request,
+                "request_sha256": _request_digest(request),
+                # Whether masking changed anything: what lets a later process say the turn ran
+                # without a secret, instead of guessing from the text.
+                "masked": redact_json(request) != request,
                 "state": "pending",
                 "created_at": time.time(),
             }
             self._append(path, record)
+            _ORIGINAL_REQUESTS[record_id] = dict(request)
             if via_screen:
                 with _SCREEN_QUEUE_LOCK:
                     _SCREEN_QUEUE_IDS.add(record_id)
@@ -383,12 +417,15 @@ class CodeTurnQueue:
             )
         raw = record.get("state")
         state: QueueState = cast(QueueState, raw) if raw in _STATES else "interrupted"
+        item_id = str(record["id"])
+        original = _ORIGINAL_REQUESTS.get(item_id)
         return QueueItem(
             id=str(record["id"]),
             session_id=str(record["session_id"]),
             client_id=str(record["client_id"]),
             source=str(record["source"]),
-            request=dict(record.get("request", {})),
+            request=dict(original if original is not None else record.get("request", {})),
+            ran_without_secret=original is None and bool(record.get("masked")),
             state=state,
             created_at=float(record.get("created_at", 0)),
             position=position,
