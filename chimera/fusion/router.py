@@ -23,6 +23,7 @@ from typing import Any, Literal
 
 from chimera.core.redact import redact
 from chimera.fusion.engine import FusionFailed
+from chimera.providers.fusion_guard import is_fusion_forbidden
 from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -172,10 +173,15 @@ class RoutedBackend:
         tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> CompletionResult:
-        # Tool-calling turns must go to a single model (fusion doesn't tool-call).
-        if tools:
+        # Tool-calling turns must go to a single model (fusion doesn't tool-call). So must the other
+        # turns of a run that carries tools (see `fusion_forbidden`).
+        if tools or is_fusion_forbidden():
+            if tools:
+                return self.single.complete(
+                    messages, model=model, temperature=temperature, max_tokens=max_tokens, tools=tools
+                )
             return self.single.complete(
-                messages, model=model, temperature=temperature, max_tokens=max_tokens, tools=tools
+                messages, model=model, temperature=temperature, max_tokens=max_tokens
             )
         if self.policy.should_fuse(messages):
             _log.debug("routing turn to fusion")

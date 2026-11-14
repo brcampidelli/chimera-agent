@@ -3492,6 +3492,15 @@ def build_api_app(
                     # the turn is composed panel → judge → synthesizer and carries the trace.
                     agent: Any = getattr(session, "agent", None)
                     swap = bool(req.fuse) and fuse_backend is not None and hasattr(agent, "backend")
+                    # Fusion does not tool-call, and a conversation agent always carries tools: a
+                    # turn that would have fused is answered by ONE model instead, and the `done`
+                    # frame says so (`fuse_downgraded`) rather than reporting a fusion that did not run.
+                    from chimera.providers.fusion_guard import agent_carries_tools
+
+                    fuse_downgraded = swap and agent_carries_tools(agent)
+                    if fuse_downgraded:
+                        swap = False
+                        _log.warning("fuse this turn: the agent carries tools, answering on one model")
                     original = agent.backend if swap else None
                     if swap:
                         agent.backend = fuse_backend
@@ -3532,7 +3541,7 @@ def build_api_app(
                             sink.emit = restore
                     manager.persist(session_id)  # durable transcript now includes this turn
                     _append_usage(report, session_id, settings)
-                emit("done", _report_dict(report, session_id, fused=swap))
+                emit("done", _report_dict(report, session_id, fused=swap, fuse_downgraded=fuse_downgraded))
             except Exception as exc:  # surfaced to the client as an error event
                 _log.warning("chat turn failed: %s", exc)
                 emit("error", {"message": "the agent turn failed"})
@@ -4003,23 +4012,14 @@ def _build_solve_agent(
     # rung (single-model). --cascade takes precedence over --fuse (the cascade's top rung is fusion).
     backend: SupportsComplete = gateway
     planner_backend: SupportsComplete = gateway
-    escalate_backend: SupportsComplete | None = None
     if req.cascade:
-        from chimera.fusion import RoutedBackend, RoutingPolicy
-        from chimera.fusion.factory import fusion_engine
-
         backend = _api_cascade_backend(gateway, settings)
-        escalate_backend = RoutedBackend(
-            gateway, fusion_engine(gateway), RoutingPolicy(mode="always")
-        )
     elif req.fuse:
-        from chimera.fusion import RoutedBackend, RoutingPolicy
+        from chimera.fusion import RoutedBackend
         from chimera.fusion.factory import fusion_engine
 
         engine = fusion_engine(gateway)
         backend = RoutedBackend(gateway, engine)
-        # Observed-difficulty escalation: a retry (the task already proved hard) fuses always.
-        escalate_backend = RoutedBackend(gateway, engine, RoutingPolicy(mode="always"))
         # Planning is a deep, tool-free reasoning turn — route the plan through fusion under --fuse.
         planner_backend = engine
 
@@ -4096,8 +4096,13 @@ def _build_solve_agent(
         trace_path=settings.home / "traces.jsonl",
     )
     worker = Agent(backend, registry, cfg)
-    escalate_worker = (
-        Agent(escalate_backend, registry, cfg) if escalate_backend is not None else None
+    # Observed difficulty: a retry asks for more effort, then the next single model up — never
+    # fusion, which the router would send to the same model for any turn with tools.
+    from chimera.core.escalation import build_escalation
+
+    escalation = build_escalation(
+        gateway, settings, registry, cfg,
+        first_model=settings.tier_ladder().mid if req.cascade else None,
     )
     # Plan mode: an approved/edited plan is injected verbatim (parsed the same way the planner parses
     # its own output), so the run follows the human-reviewed steps and makes no planning call.
@@ -4138,7 +4143,7 @@ def _build_solve_agent(
     return _AutonomousAgent(
         worker,
         should_stop=should_stop,
-        escalate_worker=escalate_worker,
+        escalation=escalation,
         planner=Planner(planner_backend, roles.models.plan or req.model),
         plan=provided_plan,
         # review_model_for refuses to let the reviewer be the model that wrote the patch:
@@ -4274,7 +4279,9 @@ def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
     )
 
 
-def _report_dict(report: Any, session_id: str, *, fused: bool = False) -> dict[str, Any]:
+def _report_dict(
+    report: Any, session_id: str, *, fused: bool = False, fuse_downgraded: bool = False
+) -> dict[str, Any]:
     """Serialize a TurnReport for the ``done`` event (all real signals; ``usd`` may be null).
 
     ``fused`` is not decoration. A fused turn cannot call tools — ``FusionEngine.complete`` drops the
@@ -4287,6 +4294,9 @@ def _report_dict(report: Any, session_id: str, *, fused: bool = False) -> dict[s
     return {
         "session_id": session_id,
         "fused": fused,
+        # True when the client asked to fuse this turn and it was answered by one model instead:
+        # fusion does not tool-call, so a turn that carries tools is never fused.
+        "fuse_downgraded": fuse_downgraded,
         "answer": report.answer,
         "prompt_tokens": report.prompt_tokens,
         "completion_tokens": report.completion_tokens,
