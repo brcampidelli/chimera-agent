@@ -22,6 +22,7 @@ waits for it. See that module for why it is safe under ``exclusive=True``, and
 
 from __future__ import annotations
 
+import sys
 import threading
 from collections.abc import Iterable
 from pathlib import Path
@@ -136,8 +137,55 @@ class TurnFinished(Message):
         super().__init__()
 
 
+class NoTerminalError(RuntimeError):
+    """``chimera tui`` was started where there is no terminal to draw on."""
+
+
+def _is_console(stream: Any) -> bool:
+    """True when ``stream`` is a real terminal, not a pipe, a file or the NUL device."""
+    try:
+        fd = stream.fileno()
+    except (AttributeError, ValueError, OSError):
+        return False
+    if sys.platform == "win32":
+        # ``isatty()`` answers True for the NUL device on Windows, which is exactly the no-terminal
+        # case this refuses (measured: ``</dev/null`` under Git Bash reported stdin as a TTY).
+        # GetConsoleMode succeeds only for a console handle.
+        import ctypes
+        import msvcrt
+
+        try:
+            handle = msvcrt.get_osfhandle(fd)
+        except OSError:
+            return False
+        mode = ctypes.c_uint32()
+        return bool(ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(mode)))
+    return bool(stream.isatty())
+
+
+def _has_terminal() -> bool:
+    """Both stdin and stdout are a terminal. Textual otherwise draws into a pipe and waits for keys
+    that never come (measured: ``chimera tui </dev/null`` ran 61 s until killed, exit 124)."""
+    return _is_console(sys.stdin) and _is_console(sys.stdout)
+
+
 class ChimeraTUI(App[None]):
     """Chat with Chimera in a full-screen terminal app."""
+
+    @staticmethod
+    def require_terminal() -> None:
+        """Raise :class:`NoTerminalError` unless stdin and stdout are a terminal.
+
+        The command calls this before its provider check, so a pipe is told about the terminal first."""
+        if not _has_terminal():
+            raise NoTerminalError("chimera tui needs an interactive terminal (stdin and stdout)")
+
+    def run(self, **kwargs: Any) -> Any:
+        # Textual's ``run`` is keyword-only; we keep its whole surface and add one refusal in front.
+        # ``headless`` is Textual's own test mode, which never touches a terminal.
+        if not kwargs.get("headless"):
+            self.require_terminal()
+        return super().run(**kwargs)
 
     CSS = """
     #body { height: 1fr; }

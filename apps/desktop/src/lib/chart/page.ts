@@ -21,7 +21,9 @@ const EMBEDDED = /<script type="application\/json" id="chimera-chart-spec">([\s\
 const LEGACY =
   /<div id="vis"><\/div>\s*<script>\s*const spec = ([\s\S]*?);\s*vegaEmbed\('#vis', spec\)\.catch\(console\.error\);\s*<\/script>/;
 // Both templates load vega-embed from here; a page that does not is not one of ours.
-const LOADER = /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/vega-embed@\d+"><\/script>/;
+// The tag may carry `integrity` and `crossorigin` (chart.py pins both); a tag without them still matches.
+const LOADER =
+  /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/vega-embed@[\d.]+"(?:\s+[a-z-]+="[^"]*")*><\/script>/;
 
 // The bare words `json.dumps` writes for a float JSON has no spelling for. Longest first.
 const NON_FINITE = ["-Infinity", "Infinity", "NaN"];

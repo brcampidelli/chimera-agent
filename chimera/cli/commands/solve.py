@@ -521,7 +521,7 @@ def solve(
         from chimera.fusion.factory import fusion_engine
 
         escalate_backend = RoutedBackend(gateway, fusion_engine(gateway), RoutingPolicy(mode="always"))
-    # --fuse (explicit) or CHIMERA_AUTO_FUSE (production default) both route the worker
+    # --fuse (explicit) or CHIMERA_AUTO_FUSE (off by default, config.py) both route the worker
     # through the cost-aware router, so deep/error-sensitive turns fuse and cheap/tool
     # turns stay single-model.
     elif fuse or settings.auto_fuse:
