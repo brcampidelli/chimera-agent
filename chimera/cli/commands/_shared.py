@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import contextlib
 import locale
+import os
 import sys
+import tempfile
 from collections.abc import Callable
 from contextvars import ContextVar
 from pathlib import Path
@@ -117,9 +119,13 @@ def _set_env_var(path: Path, key: str, value: str) -> None:
     else:
         lines.append(line_for)
     # Atomic write: a crash mid-write to .env must not truncate the user's secrets/config.
-    tmp = path.parent / (path.name + ".tmp")
-    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    # mkstemp creates the temporary file 0600 from its first byte (O_EXCL, unique name), so the key
+    # is never readable by another account while the file exists, and the replace inherits 0600.
+    # A fixed-name temp written with write_text would take the umask's mode (0644) instead.
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    os.replace(tmp_name, path)
 
 
 def _resolve_cli_roles(profile: str | None, overrides: str | None, settings: Any) -> Any:

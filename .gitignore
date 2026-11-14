@@ -95,3 +95,7 @@ _wsl.sh
 # write its cache into a root `node_modules/`, which nothing ignored: one cache file was committed
 # in #1008 and every test run since rewrote it, dirtying every worktree.
 node_modules/
+
+# Execution logs and captured test output: per-run evidence, never source. Only the ones
+# already tracked (bench run logs) stay in history; new ones are kept out by this rule.
+*.log

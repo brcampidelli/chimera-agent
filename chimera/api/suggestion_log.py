@@ -25,6 +25,8 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
+from chimera.core.filelock import atomic_write_text
+
 SuggestionKind = Literal["fix", "commit", "continue"]
 SuggestionEvent = Literal["shown", "picked", "sent"]
 
@@ -54,7 +56,9 @@ def record(home: Path, *, event: str, kind: str, edited: bool = False) -> None:
             # Only reads back once the file is large enough to be worth trimming.
             if target.stat().st_size > MAX_LINES * 80:
                 lines = target.read_text(encoding="utf-8").splitlines()[-MAX_LINES:]
-                target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                # Atomic: a plain write_text truncates the ledger first, so a crash or a second
+                # writer in the middle of the trim left it empty or half-written.
+                atomic_write_text(target, "\n".join(lines) + "\n")
     except OSError:
         pass
 

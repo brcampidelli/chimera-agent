@@ -35,11 +35,15 @@ from chimera.tools.write_region import WriteRegion, refuse_write
 
 _log = logging.getLogger(__name__)
 
-# Pinned CDN majors — the client-side render path, no Python dep. jsDelivr serves the latest of each.
+# Pinned CDN scripts — the client-side render path, no Python dep. An exact version, not a major: a
+# major pin moves under an exported chart the day its author publishes. Each carries the sha384 of
+# the file jsDelivr serves for that URL (SRI), so a swapped file fails to load instead of running.
+# Re-pin by changing a version and its hash together; both were computed on 2026-11-14 for releases
+# published at least two weeks earlier.
 _VEGA_CDN = (
-    ("vega", "5"),
-    ("vega-lite", "5"),
-    ("vega-embed", "6"),
+    ("vega", "5.33.1", "sha384-NMXhl2TbCXxcN7o4ROC56Funm78m4AylL8gMg/7Kn4YU+wrm23K9l7cY8lDRXQ9d"),
+    ("vega-lite", "5.23.0", "sha384-D9LYH0esGjcxQJsBuxOuXtCDJGXRWW1+KhluzWPqi0rLJmiR/ygPChefaD+rFFDQ"),
+    ("vega-embed", "6.29.0", "sha384-M+Ax7e/WFJpxSOF09HzI+Sj4wg9ottVd/uxmV2ItGGh02fLH28t2FAOJx3TJBap5"),
 )
 
 _INSTALL_HINT = (
@@ -335,7 +339,9 @@ def _html(spec: dict[str, Any]) -> str:
     the CDN or ``'unsafe-eval'``. Opened in a browser, the page draws as it always did.
     """
     scripts = "\n".join(
-        f'  <script src="https://cdn.jsdelivr.net/npm/{name}@{ver}"></script>' for name, ver in _VEGA_CDN
+        f'  <script src="https://cdn.jsdelivr.net/npm/{name}@{ver}" integrity="{sri}" '
+        'crossorigin="anonymous"></script>'
+        for name, ver, sri in _VEGA_CDN
     )
     return (
         "<!doctype html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n"

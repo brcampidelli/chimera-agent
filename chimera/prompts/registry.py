@@ -1,7 +1,8 @@
 """Every prompt the product sends a model, known in one place.
 
 Study 25 (`bench/PLAN-study25-system-prompts.md` §5.3, wave 0) found about ninety prompt texts spread
-across forty modules, with nothing that listed them. That made several defects invisible:
+across forty modules, with nothing that listed them. The count has grown since: `len(SECTIONS)` is
+the number to trust (162 entries at the 2026-11 audit), not the figure in this paragraph. That made several defects invisible:
 - five different fence syntaxes;
 - two opposite language rules;
 - worker prompts that silently replaced the base prompt and lost its untrusted-data sentence.
