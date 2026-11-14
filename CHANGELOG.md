@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Links in a reply can no longer carry the app's credentials away.** The desktop window now stays on its own pages (other sites open in your browser), and the access tokens it holds are given only to the app itself, never to a site it is sent to or to the dev-server and Design previews inside it. (#1259)
+
 - **Memory you can see and trust.** The turn receipt now lists the facts a reply used, with where each came from and an unverified mark, and lets you forget one on the spot; the Memory screen flags near-duplicate facts written on different days so you can keep the right one, and tidying memory no longer risks losing facts or paying for the same merge twice. (#1257)
 
 - **Every HTML page the server hands out now carries a Content-Security-Policy.** FastAPI's `/redoc` and `/docs/oauth2-redirect`, served outside the token guard with no policy and loading a CDN script onto the app's origin, are off; `/api/docs` sends a policy naming exactly what Swagger loads; a stray `.htm` or `.xhtml` at the bundle root is policed like `.html`; and a new test requests every page and enumerates every route outside the API so the next one cannot ship without a policy. (#1248)
