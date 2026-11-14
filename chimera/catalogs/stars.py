@@ -197,7 +197,7 @@ def refresh(
         try:
             body = fetch(f"https://api.github.com/repos/{repo}", _MAX_RESPONSE)
             data = json.loads(body.decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001 -- offline, throttled, refused: end this refresh
+        except Exception as exc:  # offline, throttled, refused: end this refresh
             if isinstance(exc, _NotFoundError):
                 state.misses[repo] = _iso(moment)
                 continue
@@ -226,7 +226,7 @@ def schedule_refresh(home: Path, repos: Iterable[str], *, get: Fetcher | None = 
     try:
         if not due(home, wanted):
             return False
-    except Exception:  # noqa: BLE001 -- a broken cache is "nothing to do now", not a 500
+    except Exception:  # a broken cache is "nothing to do now", not a 500
         return False
     key = str(Path(home).resolve())
     with _LOCK:
@@ -237,7 +237,7 @@ def schedule_refresh(home: Path, repos: Iterable[str], *, get: Fetcher | None = 
     def _run() -> None:
         try:
             refresh(home, wanted, get=get)
-        except Exception as exc:  # noqa: BLE001 -- a background read must not kill anything
+        except Exception as exc:  # a background read must not kill anything
             log.warning("stars refresh failed: %s", exc)
         finally:
             with _LOCK:

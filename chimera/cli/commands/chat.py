@@ -119,7 +119,7 @@ def _run_turn(
         # way; what was lost was every record that it had happened.
         console.print("\n[dim]interrupted — the turn was dropped[/dim]")
         return None, "stop"
-    except Exception as exc:  # noqa: BLE001 — keep the REPL alive on transient errors
+    except Exception as exc:  # keep the REPL alive on transient errors
         console.print(render.error_line(exc))
         return None, "continue"
 
@@ -235,7 +235,7 @@ def _persist_turn(manager: Any, session_id: str) -> None:
     """
     try:
         manager.persist(session_id)
-    except Exception as exc:  # noqa: BLE001 — a thread that cannot be saved is not a dead REPL
+    except Exception as exc:  # a thread that cannot be saved is not a dead REPL
         console.print(f"[yellow]not saved:[/yellow] [dim]{escape(str(exc))}[/dim]")
 
 
@@ -393,7 +393,7 @@ def _approve_plan(task: str, backend: Any) -> tuple[str, str] | None:
     while True:
         try:
             plan = propose(task, backend=backend, context=f"The person asks for these changes to the plan: {feedback}" if feedback else "")
-        except Exception as exc:  # noqa: BLE001 — a planner failure runs nothing
+        except Exception as exc:  # a planner failure runs nothing
             console.print(render.error_line(exc))
             return None
         if not plan.steps:
@@ -583,7 +583,7 @@ def _run_task_command(
     except KeyboardInterrupt:
         console.print("\n[dim]interrupted — the turn was dropped[/dim]")
         return
-    except Exception as exc:  # noqa: BLE001 — keep the REPL alive
+    except Exception as exc:  # keep the REPL alive
         console.print(render.error_line(exc))
         return
     if budget is not None:

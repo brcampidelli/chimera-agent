@@ -272,7 +272,7 @@ class JobRegistry:
             try:
                 raw_out, raw_err = proc.communicate()
                 text = console_text(raw_out) + console_text(raw_err)
-            except Exception as exc:  # noqa: BLE001 - a log that cannot be written is not a crash
+            except Exception as exc:  # a log that cannot be written is not a crash
                 text = f"[the output could not be collected: {exc}]"
             with suppress(OSError):
                 log_path.write_text(text, encoding="utf-8")

@@ -22,12 +22,12 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings  # noqa: E402
-from chimera.core.agent import AgentResult  # noqa: E402
-from chimera.core.context_budget import RunState  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.config import Settings
+from chimera.core.agent import AgentResult
+from chimera.core.context_budget import RunState
+from chimera.interface import ChatSession
 
 _FAILING = "def test_ok():\n    assert True\n\n\ndef test_bug():\n    assert 1 + 1 == 3\n"
 

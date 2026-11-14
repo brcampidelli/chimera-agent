@@ -44,7 +44,7 @@ def extract_by_css(html: str, selectors: dict[str, str]) -> dict[str, Any] | Non
         selector = attr_match.group(1).strip() if attr_match else raw.strip()
         try:
             node = soup.select_one(selector)
-        except Exception:  # noqa: BLE001 — a bad selector yields no value, not a crash
+        except Exception:  # a bad selector yields no value, not a crash
             out[name] = None
             continue
         if node is None:

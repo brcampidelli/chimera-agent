@@ -175,7 +175,7 @@ def listening_ports_of_tree(pid: int) -> frozenset[int]:
             connections = getattr(proc, "net_connections", None) or proc.connections
             for conn in connections(kind="inet"):
                 if conn.status == psutil.CONN_LISTEN and conn.laddr and conn.laddr.ip in {
-                    "127.0.0.1", "::1", "0.0.0.0", "::",  # noqa: S104 — comparing, not binding
+                    "127.0.0.1", "::1", "0.0.0.0", "::",  # comparing, not binding
                 }:
                     ports.add(conn.laddr.port)
         except (OSError, AttributeError, psutil.Error):
@@ -281,7 +281,7 @@ class DevServerManager:
             watch = self._turn_watch.get(str(root.resolve()))
         try:
             return watch() if watch is not None else []
-        except Exception:  # noqa: BLE001 — a warning is never worth failing the listing
+        except Exception:  # a warning is never worth failing the listing
             return []
 
     def running_count(self) -> int:

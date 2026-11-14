@@ -286,7 +286,7 @@ def _append_row(
                 route_kind=kind,
             ),
         )
-    except Exception as exc:  # noqa: BLE001 — recording what a side answer cost is never worth an error
+    except Exception as exc:  # recording what a side answer cost is never worth an error
         _log.debug("side chat usage not recorded: %s", exc)
 
 
@@ -512,7 +512,7 @@ def register_side_chat(
                     pass
                 except MissingCredentialsError as exc:
                     emit("error", {"message": str(exc)})
-                except Exception as exc:  # noqa: BLE001 — surfaced to the screen as one honest line
+                except Exception as exc:  # surfaced to the screen as one honest line
                     _log.warning("side chat failed: %s", exc)
                     emit("error", {"message": "the side question failed"})
                 finally:

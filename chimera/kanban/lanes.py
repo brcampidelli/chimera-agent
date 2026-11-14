@@ -36,7 +36,7 @@ def _refusals(approvals: Any) -> str:
     """
     try:
         denied = [e for e in approvals.entries() if getattr(e, "decision", "") == "deny"]
-    except Exception:  # noqa: BLE001 -- see the docstring
+    except Exception:  # see the docstring
         return ""
     if not denied:
         return ""

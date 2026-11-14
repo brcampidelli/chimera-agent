@@ -1602,14 +1602,14 @@ def assemble_registry(
     if frame_sink is not None:
         for tool in registry.tools():
             if getattr(tool, "name", "") == "browser" and hasattr(tool, "on_frame"):
-                tool.on_frame = frame_sink  # type: ignore[attr-defined]
+                tool.on_frame = frame_sink
     # The same for a chart: `render_chart` tells the screen about each chart it wrote, so the
     # conversation can draw it where it was asked for instead of leaving a file name in a tool row.
     # Bound only where a screen is (`chart_sink`); headless, the tool writes the file and says nothing.
     if chart_sink is not None:
         for tool in registry.tools():
             if getattr(tool, "name", "") == "render_chart" and hasattr(tool, "on_chart"):
-                tool.on_chart = chart_sink  # type: ignore[attr-defined]
+                tool.on_chart = chart_sink
     # The configured MCP servers, HERE and not lower down, because everything below this line has to
     # reach them: the denial list, the trust kernel, and the taint ledger that treats their output as
     # untrusted. The chat path learned this the hard way and says so at its own injection point — "a
@@ -2339,7 +2339,7 @@ def _self_check_of_turn(
             verify_command=verify_command or "",
             incomplete_reason=incomplete_reason_of(change),
         )
-    except Exception as exc:  # noqa: BLE001 — record-only, see above
+    except Exception as exc:  # record-only, see above
         _log.warning("diff self-check failed: %s", exc)
         return SelfCheck(measured=False, measured_reason="the check itself failed")
 
@@ -2362,7 +2362,7 @@ def _preview_check_of_turn(agent: Any, settings: Settings, guard: Any, before: A
             return None
         paths, _ = _measured_turn(guard, before)
         return tool.auto_verify(paths, switch_on=bool(settings.preview_auto_verify), tainted=tainted)
-    except Exception as exc:  # noqa: BLE001 — record-only, see above
+    except Exception as exc:  # record-only, see above
         _log.warning("preview auto-verify failed: %s", exc)
         return None
 
@@ -2375,7 +2375,7 @@ def _measured_turn(guard: Any, before: Any) -> tuple[list[str], str]:
     """
     try:
         change = guard.diff_since(before)
-    except Exception as exc:  # noqa: BLE001 - the loop is off for a turn it cannot measure
+    except Exception as exc:  # the loop is off for a turn it cannot measure
         _log.warning("close loop: could not list the turn's changes: %s", exc)
         return [], "the turn's changes could not be read"
     return [str(path) for path in change.paths], str(incomplete_reason_of(change) or "")
@@ -2778,7 +2778,7 @@ def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> 
                 route_kind=route.get("kind") if isinstance(route, dict) else None,
             ),
         )
-    except Exception as exc:  # noqa: BLE001 — logging what a turn cost is never worth losing it
+    except Exception as exc:  # logging what a turn cost is never worth losing it
         _log.debug("usage logging skipped: %s", exc)
 
 
@@ -2859,7 +2859,7 @@ def _remember_and_tidy(
                   metadata={SENDER_KEY: f"guest:{author}"})
         else:
             return None, 0
-    except Exception as exc:  # noqa: BLE001 -- see the docstring
+    except Exception as exc:  # see the docstring
         _log.debug("remember-from-chat skipped: %s", exc)
         return None, 0
 
@@ -2875,7 +2875,7 @@ def _remember_and_tidy(
         removed = int(
             memory.autoconsolidate(model_summarizer(backend), max_items=settings.memory_budget)
         )
-    except Exception as exc:  # noqa: BLE001 -- see the docstring
+    except Exception as exc:  # see the docstring
         _log.debug("auto-consolidate skipped: %s", exc)
         return fact, 0
     return fact, removed
@@ -2905,7 +2905,7 @@ def _extract_after_turn(
         MemoryExtractor(
             memory, usage_home=Path(settings.home), usage_id=session_id
         ).after_turn(message, answer, tainted=tainted)
-    except Exception as exc:  # noqa: BLE001 -- the turn is over and paid for; memory is extra
+    except Exception as exc:  # the turn is over and paid for; memory is extra
         _log.warning("memory extraction setup failed: %s", type(exc).__name__)
 
 
@@ -2949,7 +2949,7 @@ def _live_memory(settings: Settings, boot: Any, boot_graph: Any, boot_key: Any) 
             graph = build_graph(
                 [i.content for i in manager.store.all() if i.provenance == "clean"]
             )
-        except Exception as exc:  # noqa: BLE001 -- the graph is an optimisation, not the memory
+        except Exception as exc:  # the graph is an optimisation, not the memory
             _log.debug("entity graph skipped for the switched store: %s", exc)
         _switched_memory = (key, manager, graph)
         return manager, graph
@@ -2991,7 +2991,7 @@ def _card_retriever(settings: Settings, gateway: Any) -> Any:
             include_memory=False,
             include_playbook=False,
         ).cards
-    except Exception as exc:  # noqa: BLE001 -- see the docstring
+    except Exception as exc:  # see the docstring
         _log.debug("skill-card retriever unavailable: %s", exc)
     # The flag reads the lessons as well as the cards (`code_turn_learning`): one switch, one question.
     from chimera.evolution.code_turn_learning import CodeTurnRecall
@@ -3108,7 +3108,7 @@ def register_code_api(
                 {"code": code, "text": text, "queue_item_id": item.id, "source": item.source},
                 author=item.author,
             )
-        except Exception as exc:  # noqa: BLE001 - a notice must never cost the queue its state
+        except Exception as exc:  # a notice must never cost the queue its state
             _log.warning("could not announce queue item %s: %s", item.id, exc)
 
     # A command an SSH conversation had started keeps running on the remote host when Chimera stops
@@ -3134,7 +3134,7 @@ def register_code_api(
                 run_session, "notice",
                 {"code": "ssh_run_pending", "text": interrupted_note(run_entries)},
             )
-        except Exception as exc:  # noqa: BLE001 - a notice must never cost startup
+        except Exception as exc:  # a notice must never cost startup
             _log.warning("could not announce a pending ssh run for %s: %s", run_session, exc)
     # The turns running right now, so a screen that left a conversation mid-turn can find its way
     # back: the stored file holds nothing of a turn until the agent finishes.
@@ -4240,7 +4240,7 @@ def register_code_api(
                         return str(payload.get("message") or "") or CHANNEL_FAILED
 
             return loop.run_until_complete(final_answer())
-        except Exception:  # noqa: BLE001 - the chat gets one sentence; the log gets the reason
+        except Exception:  # the chat gets one sentence; the log gets the reason
             _log.exception("linked chat turn failed for %s", session_id)
             return CHANNEL_FAILED
         finally:
@@ -5343,7 +5343,7 @@ def register_code_api(
                                     verify_command=command or "",
                                 )
                             ][:50]
-                        except Exception as exc:  # noqa: BLE001 — record-only, see above
+                        except Exception as exc:  # record-only, see above
                             _log.warning(
                                 "verifier-integrity rule failed, no flags recorded: %s", exc
                             )
@@ -5557,7 +5557,7 @@ def register_code_api(
                                     made_progress = bool(retry_tool_names) or bool(
                                         guard.diff_since(retry_before).paths
                                     )
-                                except Exception as exc:  # noqa: BLE001 — fail closed on comparison
+                                except Exception as exc:  # fail closed on comparison
                                     _log.warning("could not compare repair progress: %s", exc)
                                     made_progress = True
                                 no_progress_repairs = 0 if made_progress else no_progress_repairs + 1
@@ -5575,7 +5575,7 @@ def register_code_api(
                                                 verify_command=command,
                                             )
                                         ][:50]
-                                    except Exception as exc:  # noqa: BLE001 — record-only
+                                    except Exception as exc:  # record-only
                                         _log.warning(
                                             "verifier-integrity rule failed, no flags recorded: %s",
                                             exc,
@@ -5603,7 +5603,7 @@ def register_code_api(
                                         flag.kind == TESTS_REMOVED_OR_SKIPPED
                                         for flag in retry_flags
                                     )
-                                except Exception as exc:  # noqa: BLE001 — record-only
+                                except Exception as exc:  # record-only
                                     _log.warning(
                                         "retry integrity rule failed, no retry flags recorded: %s",
                                         exc,
@@ -5621,7 +5621,7 @@ def register_code_api(
                                             verify_command=command,
                                         )
                                     ][:50]
-                                except Exception as exc:  # noqa: BLE001 — record-only
+                                except Exception as exc:  # record-only
                                     _log.warning(
                                         "verifier-integrity rule failed, no flags recorded: %s", exc
                                     )
@@ -5640,7 +5640,7 @@ def register_code_api(
                                     changed_after_pass = sorted(
                                         snapshot_changed_paths(passed_snapshot, final_snapshot)
                                     )
-                                except Exception as exc:  # noqa: BLE001 — integrity is opt-in
+                                except Exception as exc:  # integrity is opt-in
                                     _log.warning("could not compare the verified workspace: %s", exc)
                                     changed_after_pass = []
                                 if changed_after_pass:
@@ -5859,7 +5859,7 @@ def register_code_api(
                                 session.remember_receipt(receipt)
                                 with live_turns.writing(turn_id):
                                     store_for.save(session)
-                    except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
+                    except OSError as exc:  # a failed record must not fail the turn
                         _log.debug("could not store the turn receipt: %s", exc)
                     # How it ended, for the list's state: the verifier's own verdict and the
                     # agent's own edit list, never a model's reading of the answer.
@@ -5895,7 +5895,7 @@ def register_code_api(
                         )
                     except _Deleted:
                         pass  # deliberately not indexed: its conversation was deleted mid-turn
-                    except Exception as exc:  # noqa: BLE001 — a failed record must not fail the turn
+                    except Exception as exc:  # a failed record must not fail the turn
                         _log.debug("could not index the turn in the history: %s", exc)
                     emit("done", payload)
                     turn_succeeded = True
@@ -5919,7 +5919,7 @@ def register_code_api(
                                 tainted=bool(ledger.run_tainted()),
                                 steps=int(payload.get("steps") or 0),
                             )
-                        except Exception as exc:  # noqa: BLE001 -- the turn is answered; a lesson is extra
+                        except Exception as exc:  # the turn is answered; a lesson is extra
                             _log.warning("could not record the turn's lesson: %s", type(exc).__name__)
                     if background is not None:
                         works.finished(
@@ -5972,7 +5972,7 @@ def register_code_api(
                 fused = bool(req.fuse) and fuse_backend is not None
                 original_backend = getattr(agent, "backend", None) if fused else None
                 if fused:
-                    agent.backend = _cast_for_turn(fuse_backend, req)  # type: ignore[assignment]
+                    agent.backend = _cast_for_turn(fuse_backend, req)
 
                 # BEFORE the branch, so it covers the external providers too — and there it matters
                 # more, not less: somebody else's agent runs its own loop, and the per-action
@@ -6076,7 +6076,7 @@ def register_code_api(
                                               if getattr(approval_sink, "emit", None) is not None else 0.0),
                                 facts={"run_id": turn_id, "surface": "api:turn", "tool": "setup"},
                             )
-                        except Exception as exc:  # noqa: BLE001 — setup is advisory
+                        except Exception as exc:  # setup is advisory
                             _log.warning("project setup approval failed; continuing without setup: %s", exc)
                             approved_setup = False
                         if approved_setup and setup_registry.shell_granted_for(ws):
@@ -6107,7 +6107,7 @@ def register_code_api(
                                         setup_registry.clear_setup_failure(ws, setup_hash)
                                     else:
                                         setup_registry.record_setup_failure(ws, setup_hash)
-                                except Exception as exc:  # noqa: BLE001 — setup is advisory
+                                except Exception as exc:  # setup is advisory
                                     _log.warning("project setup failed; continuing turn: %s", exc)
                                     setup_output = str(exc)[-1500:]
                                     safe_setup_output = fence_safe(setup_output)
@@ -6209,7 +6209,7 @@ def register_code_api(
                             model=turn_model,
                             spend=turn_spend,
                         )
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         _log.warning("idle compaction failed, sending the history as it is: %s", exc)
                         session.idle_view = None
                         idle_compaction = None
@@ -6367,7 +6367,7 @@ def register_code_api(
                     },
                 )
 
-            except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
+            except Exception as exc:  # surfaced to the client as an error event
                 # With the traceback: the backend log on disk is where `_unnamed_failure` sends the
                 # person, and a one-line message there would repeat the sentence they already read.
                 _log.warning("code turn failed: %s", exc, exc_info=True)
@@ -6458,12 +6458,12 @@ def register_code_api(
                         session_id, task_tray.proposed_ids if task_tray is not None else [],
                         tainted=bool(ledger.run_tainted()),
                     )
-                except Exception as exc:  # noqa: BLE001 - the turn is over; the store logs its own failure
+                except Exception as exc:  # the turn is over; the store logs its own failure
                     _log.warning("could not settle the turn's task cards: %s", type(exc).__name__)
                 for temporary_image in temporary_images:
                     try:
                         temporary_image.unlink(missing_ok=True)
-                    except OSError as exc:  # noqa: BLE001 — cleanup must not mask the turn outcome
+                    except OSError as exc:  # cleanup must not mask the turn outcome
                         _log.warning("could not remove temporary resized image: %s", exc)
                 if holds_folder:
                     folder.release()
@@ -6475,7 +6475,7 @@ def register_code_api(
                         # Not `verdict`: that name is the plan gate's PlanVerdict earlier in this scope.
                         verified_state = str((turn_run.get("outcome") or {}).get("verified", ""))
                         recorder(verdict=verified_state, steps=int(turn_run.get("steps") or 0))
-                except Exception as exc:  # noqa: BLE001 -- the turn is over; a credit is extra
+                except Exception as exc:  # the turn is over; a credit is extra
                     _log.debug("could not credit the turn's cards: %s", type(exc).__name__)
                 # Every way out of a turn, so a turn that died still stops being "running".
                 live_turns.finish(turn_id)
@@ -6495,7 +6495,7 @@ def register_code_api(
                             durable_queue.fail(session_id, queue_item_id)
                     if background is None:
                         _request_drain(session_id)
-                except Exception as exc:  # noqa: BLE001 - logged; the stream still ends
+                except Exception as exc:  # logged; the stream still ends
                     _log.warning("queue bookkeeping after turn %s failed: %s", turn_id, exc)
                 finally:
                     if loop is not None and queue is not None:
@@ -6503,9 +6503,13 @@ def register_code_api(
 
         # The worker thread starts with an empty context, so the conversation the browser keys its
         # cookie profile by (`CHIMERA_BROWSER_COOKIE_RETENTION=conversation`) is handed to it here.
+        from chimera.telemetry import bound_to_turn
         from chimera.tools.browser import bound_to_conversation
 
-        threading.Thread(target=bound_to_conversation(session_id, work), daemon=True).start()
+        # Same reason, for the log: a record written anywhere under this turn names the turn.
+        threading.Thread(
+            target=bound_to_turn(turn_id, bound_to_conversation(session_id, work)), daemon=True
+        ).start()
         return session_id, turn_id
 
     def _drain_queue(session_id: str) -> None:
@@ -6556,7 +6560,7 @@ def register_code_api(
                     durable_queue.requeue(session_id, item.id)
                     return
                 _queue_failed(session_id, item, exc)
-            except Exception as exc:  # noqa: BLE001 - one bad item must not block the rest
+            except Exception as exc:  # one bad item must not block the rest
                 _queue_failed(session_id, item, exc)
             if item is None:
                 return  # the queue itself could not be read; trying again now would spin
@@ -6601,7 +6605,7 @@ def register_code_api(
     def _request_drain(session_id: str) -> None:
         try:
             drainer.request(session_id)
-        except Exception as exc:  # noqa: BLE001 - a drain is retried by the next turn's end
+        except Exception as exc:  # a drain is retried by the next turn's end
             _log.warning("could not drain the queue of %s: %s", session_id, exc)
 
     def _work_frame(work: Work, event: str, payload: dict[str, Any]) -> None:
@@ -6896,7 +6900,10 @@ def register_code_api(
 
         data = await file.read()
         try:
-            saved = save_attachment(settings.home, file.filename or "file", data)
+            # Off the event loop: `save` converts a document to text at upload (a 20 MB PDF is seconds
+            # of CPU), and run inline it held every other request (the health probe, the open turn's
+            # stream) for exactly that long.
+            saved = await run_in_threadpool(save_attachment, settings.home, file.filename or "file", data)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return AttachmentOut(
@@ -6954,7 +6961,8 @@ def register_code_api(
         from chimera.api.attachments import transcribe
 
         hint = (language or "").strip().lower()
-        saved = save_attachment(settings.home, file.filename or "speech.webm", await file.read())
+        raw = await file.read()
+        saved = await run_in_threadpool(save_attachment, settings.home, file.filename or "speech.webm", raw)
         text = await run_in_threadpool(
             transcribe, saved.path, hint if _LANGUAGE_CODE.fullmatch(hint) else None
         )
@@ -7744,7 +7752,7 @@ def register_code_api(
             left = PASS_BUDGET - (time.monotonic() - started)
             if left > 0:
                 filled += resolve_missing_bills(receipts, api_key=key, budget_seconds=left)
-        except Exception as exc:  # noqa: BLE001 — a replay must render whatever the router does
+        except Exception as exc:  # a replay must render whatever the router does
             _log.debug("routes not learned for %s: %s", session_id, exc)
             return
         if not filled:

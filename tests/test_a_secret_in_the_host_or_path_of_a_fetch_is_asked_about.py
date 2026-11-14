@@ -118,7 +118,7 @@ def test_a_link_deep_in_a_long_page_is_still_seen() -> None:
 
 
 def test_a_value_the_user_named_is_not_asked_about() -> None:
-    gist = hashlib.md5(b"chimera-test-gist").hexdigest()  # noqa: S324 - a fixture, not a digest
+    gist = hashlib.md5(b"chimera-test-gist").hexdigest()  # a fixture, not a digest
     ledger = TaintLedger(exfil_host_path=True)
     ledger.set_instruction(f"Fetch my gist {gist} and tidy it.")
     assert _verdict(ledger, f"https://gist.github.com/someone/{gist}") is Decision.ALLOW

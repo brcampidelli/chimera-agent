@@ -134,7 +134,7 @@ def converse(gateway: Any, task: Task, arm: str) -> dict[str, Any]:
             answer = session.send(text)
             replies.append({"chars": len(answer), "n_blocks": len(code_blocks(answer)),
                             "empty": not answer.strip(), "head": answer[:400]})
-    except Exception as exc:  # noqa: BLE001 — a provider failure is a halt, not a fail
+    except Exception as exc:  # a provider failure is a halt, not a fail
         return {"halt": f"{type(exc).__name__}: {exc}"[:300], "calls": log, "replies": replies,
                 "usd": _usd(log), "seconds": round(time.time() - t0, 1)}
     truncated = any(c["truncated"] for c in log)
@@ -182,7 +182,7 @@ def execute(out: Path, workers: int, spent_before: float) -> dict[str, Any]:
                 continue
             try:
                 row = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a harness error loses the unit, never the run
+            except Exception as exc:  # a harness error loses the unit, never the run
                 task, rep = futures[fut]
                 print(f"  HARNESS ERROR {task.id} r{rep}: {type(exc).__name__}: {exc}"[:300], flush=True)
                 continue

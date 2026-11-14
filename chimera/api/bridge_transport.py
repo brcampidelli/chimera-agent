@@ -33,7 +33,7 @@ def urllib_call(
     request.add_header("Authorization", f"Bearer {token}")
     request.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 — loopback URL from our own file
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # loopback URL from our own file
             raw = response.read()
             status = int(response.status)
     except urllib.error.HTTPError as exc:

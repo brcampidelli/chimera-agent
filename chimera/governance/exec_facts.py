@@ -478,7 +478,7 @@ def block(command: str, cwd: Path, workspace: Path | None = None) -> str:
     """:func:`render` of :func:`describe`; "" if describing fails (the card is then as it was)."""
     try:
         lines = describe(command, cwd, workspace)
-    except Exception:  # noqa: BLE001 — a card without this note is the card it was before
+    except Exception:  # a card without this note is the card it was before
         return ""
     return render(lines)
 
@@ -539,7 +539,7 @@ def facts_for(name: str, args: Mapping[str, Any], tool: Any) -> list[str]:
         base = workspace or Path.cwd()
         rel = args.get("cwd")
         return describe(command, (base / str(rel)) if rel else base, workspace)
-    except Exception:  # noqa: BLE001 — a card without this note is the card it was before
+    except Exception:  # a card without this note is the card it was before
         return []
 
 

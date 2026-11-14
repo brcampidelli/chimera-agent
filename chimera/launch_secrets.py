@@ -124,7 +124,7 @@ def _parse(raw: bytes) -> dict[str, Any] | None:
 def _stdin_stream() -> BinaryIO | None:
     """Descriptor 0 itself: ``sys.stdin`` may be ``None`` or already wrapped by something else."""
     try:
-        return open(0, "rb", closefd=False)  # noqa: SIM115 - fd 0 is not ours to close
+        return open(0, "rb", closefd=False)  # fd 0 is not ours to close
     except OSError:
         return getattr(sys.stdin, "buffer", None)
 

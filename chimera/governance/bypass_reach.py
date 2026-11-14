@@ -186,7 +186,7 @@ def reaches_outside(
         return True
     try:
         return _reaches_outside(command, workspace=workspace, home=home, cwd=cwd)
-    except Exception:  # noqa: BLE001 - fail closed: a command this rule cannot read is asked about
+    except Exception:  # fail closed: a command this rule cannot read is asked about
         return True
 
 

@@ -111,7 +111,7 @@ def test_a_closing_door_is_reported_open_and_sends_nothing_more_through_it(
     door, bus, token = bare_door
     # Nothing ends the stream (no hook) and the grace is long, so the thread outlives the close.
     monkeypatch.setattr(guest_api, "STOP_WAIT_SECONDS", 0.0)
-    door._server.config.timeout_graceful_shutdown = 30  # noqa: SLF001 -- the running listener's grace
+    door._server.config.timeout_graceful_shutdown = 30  # the running listener's grace
     port = door.port
     lan = _Reader(f"http://127.0.0.1:{port}/api/live", token)
     assert lan.connected()
@@ -147,7 +147,7 @@ def test_a_connection_nothing_ends_is_cut_by_the_grace_and_the_close_finishes(
     door, _bus, token = bare_door
     lan = _Reader(f"http://127.0.0.1:{door.port}/api/live", token)
     assert lan.connected()
-    thread = door._thread  # noqa: SLF001 -- the listener whose end is the claim
+    thread = door._thread  # the listener whose end is the claim
     assert thread is not None
 
     closer = threading.Thread(target=door.stop)

@@ -79,7 +79,7 @@ def maturity_report(
         try:
             # Live and snapshot are identically shaped: both go through build_snapshot.
             return {"available": True, "source": "live", **build_snapshot(live)}
-        except Exception:  # noqa: BLE001 — a live-glob failure falls through to the snapshot
+        except Exception:  # a live-glob failure falls through to the snapshot
             pass
 
     path = snapshot_file if snapshot_file is not None else snapshot_path()
@@ -88,7 +88,7 @@ def maturity_report(
         if not isinstance(data, dict):
             raise ValueError("snapshot is not an object")
         return {"available": True, "source": "snapshot", **data}
-    except Exception:  # noqa: BLE001 — missing/corrupt snapshot is honest "unavailable", not a 500
+    except Exception:  # missing/corrupt snapshot is honest "unavailable", not a 500
         return _unavailable("no test suite and no shipped snapshot were available")
 
 

@@ -433,7 +433,7 @@ def _effective_model(model: str | None) -> str | None:
         from chimera.config import get_settings
 
         default = get_settings().default_model
-    except Exception:  # noqa: BLE001 - unreadable settings: no catalogue fact to use, keep the default budget
+    except Exception:  # unreadable settings: no catalogue fact to use, keep the default budget
         return None
     return base_slug(default) if default else None
 
@@ -472,7 +472,7 @@ def _json_object_mode(model: str | None) -> dict[str, Any]:
     provider = model.split("/", 1)[0] if "/" in model else None
     try:
         supported = get_supported_openai_params(model=model, custom_llm_provider=provider) or []
-    except Exception:  # noqa: BLE001 - a model LiteLLM does not know is no reason to fail a proposal
+    except Exception:  # a model LiteLLM does not know is no reason to fail a proposal
         return {}
     return {"response_format": {"type": "json_object"}} if "response_format" in supported else {}
 

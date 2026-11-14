@@ -137,7 +137,7 @@ def fetch_pinned(
     url = f"https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{urllib.parse.quote(path)}"
     try:
         body = (get or _github_get)(url, MAX_CATALOG_FILE_BYTES)
-    except Exception as exc:  # noqa: BLE001 -- any failure to read is "unreachable", never a crash
+    except Exception as exc:  # any failure to read is "unreachable", never a crash
         message = str(exc)
         if "larger than" in message:
             raise CatalogRefused(f"{path} is larger than the catalogue limit") from exc

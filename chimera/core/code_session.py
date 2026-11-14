@@ -1616,7 +1616,7 @@ class CodeSessionStore:
             from chimera.core.task_cards import CARDS_FILE_NAME, forget_conversation
 
             forget_conversation(self.root.parent / CARDS_FILE_NAME, session_id)
-        except OSError as exc:  # noqa: BLE001 - the cards are a convenience; the delete must go on
+        except OSError as exc:  # the cards are a convenience; the delete must go on
             _log.warning("could not drop the deleted conversation's task cards: %s", exc)
         path = self._path(session_id)
         if not path.is_file():

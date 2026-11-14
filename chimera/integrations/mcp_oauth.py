@@ -377,7 +377,7 @@ class _Loopback:
         listener = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:  # noqa: N802
+            def do_GET(self) -> None:
                 listener._handle(self)
 
             def log_message(self, *_args: Any) -> None:
@@ -896,7 +896,7 @@ def disconnect(cfg: Any, home: Path, *, http: httpx.Client | None = None) -> dic
         try:
             kr.delete_password(config_vault.SERVICE, config_vault._mcp_vault_account(cfg.name))
             deleted = True
-        except Exception:  # noqa: BLE001 — absent is the common case
+        except Exception:  # absent is the common case
             pass
     return {"revoked": revoked, "deleted": deleted}
 

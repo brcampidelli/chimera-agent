@@ -90,7 +90,7 @@ def test_threads_each_building_their_own_log_do_not_collide(tmp_path: Path) -> N
             largada.wait()
             for indice in range(por_fio):
                 log.record("governance", {"decision": "review", "n": indice})
-        except BaseException as exc:  # noqa: BLE001 - re-raised on the main thread below
+        except BaseException as exc:  # re-raised on the main thread below
             falhas.append(exc)
 
     equipe = [threading.Thread(target=trabalhador) for _ in range(fios)]

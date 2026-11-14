@@ -123,7 +123,7 @@ def _call(gateway: Any, prompt: str, text: str) -> dict[str, Any]:
         try:
             result = gateway.complete(messages, model=MODEL, temperature=TEMPERATURE,
                                       max_tokens=MAX_TOKENS, extra_body=extra.get("extra_body"))
-        except Exception as exc:  # noqa: BLE001 — recorded, retried, then a halt
+        except Exception as exc:  # recorded, retried, then a halt
             last_error = f"{type(exc).__name__}: {str(exc)[:200]}"
             time.sleep(2 + 3 * attempt)
             continue

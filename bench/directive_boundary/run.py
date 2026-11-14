@@ -90,7 +90,7 @@ def _turn(backend: _Pinned, arm: str, item: Item) -> dict[str, Any]:
             "tool_calls": result.tool_calls_made, "tools": result.tool_names, "stopped": result.stopped_reason,
             "usd": result.usd,
         }
-    except Exception as exc:  # noqa: BLE001 — a provider failure is counted by the stop rule, not raised
+    except Exception as exc:  # a provider failure is counted by the stop rule, not raised
         return {"error": f"{type(exc).__name__}: {exc}"[:300], "changed": None}
     finally:
         shutil.rmtree(ws, ignore_errors=True)

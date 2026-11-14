@@ -121,13 +121,13 @@ def run_with_indicator(
         # misrepresented as an empty answer.
         try:
             box["reply"] = route(inbound) or "(no reply)"
-        except Exception as exc:  # noqa: BLE001 — carried out of the thread and re-raised after join
+        except Exception as exc:  # carried out of the thread and re-raised after join
             error["exc"] = exc
 
     def _ping() -> None:
         try:
             ping()
-        except Exception as exc:  # noqa: BLE001 — a typing ping must never break the turn
+        except Exception as exc:  # a typing ping must never break the turn
             _log.debug("typing indicator ping failed: %s", exc)
 
     worker = threading.Thread(target=work, daemon=True)
@@ -405,7 +405,7 @@ class MessageGateway:
             return answer
         try:
             audio = self._voice_reply(str(answer), message.voice_language)
-        except Exception as exc:  # noqa: BLE001 — the answer exists; only its audio is lost
+        except Exception as exc:  # the answer exists; only its audio is lost
             _log.warning("voice reply failed, answered as text: %s", type(exc).__name__)
             return answer
         if audio is None:

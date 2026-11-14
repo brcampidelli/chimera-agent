@@ -106,7 +106,7 @@ def generate_one(run_dir: Path, task: str, total: dict[str, int], budget: int | 
         stopped = result.stopped_reason
     except _Budget:
         raise
-    except Exception as exc:  # noqa: BLE001 — a protocol failure is recorded, never replaced (Amendment 1 §3)
+    except Exception as exc:  # a protocol failure is recorded, never replaced (Amendment 1 §3)
         stopped, error = "error", f"{type(exc).__name__}: {exc}"
     meta = {"task": task, "stopped": stopped, "error": error, "calls": backend.calls,
             "seconds": round(time.monotonic() - started, 1)}

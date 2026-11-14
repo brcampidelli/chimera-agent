@@ -233,7 +233,7 @@ def fetch_openrouter_index(
 
     try:
         response = httpx.get(OPENROUTER_MODELS_URL, params=params, timeout=timeout_s)
-    except Exception as exc:  # noqa: BLE001 — no network is a normal state, not a 500
+    except Exception as exc:  # no network is a normal state, not a 500
         _log.debug("openrouter model index unreachable: %s", exc)
         return [], "unreachable"
     if response.status_code >= 400:
@@ -243,7 +243,7 @@ def fetch_openrouter_index(
     try:
         payload = response.json()
         entries = payload["data"]
-    except Exception:  # noqa: BLE001 — a 200 from a captive portal is not the index
+    except Exception:  # a 200 from a captive portal is not the index
         return [], "unreadable"
     if not isinstance(entries, list):
         return [], "unreadable"
@@ -590,7 +590,7 @@ def remember_models(models: Sequence[ModelOption], *, home: Path | None = None) 
         # anyone who has been offline for a while.
         payload = {"fetched_at": _now_iso(), "models": kept}
         path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    except Exception as exc:  # noqa: BLE001 — a read-only home must not break a turn
+    except Exception as exc:  # a read-only home must not break a turn
         _log.debug("could not write the model cache at %s: %s", path, exc)
 
 
@@ -630,7 +630,7 @@ def _remembered(slug: str) -> Remembered | None:
                     table[str(key)] = Remembered(
                         _as_price(value[0]), _as_price(value[1]), None, None, None
                     )
-        except Exception as exc:  # noqa: BLE001 — a truncated cache is a missing cache
+        except Exception as exc:  # a truncated cache is a missing cache
             _log.debug("could not read the model cache at %s: %s", path, exc)
             table = {}
         _index_cache = (path, mtime, table)
@@ -721,5 +721,5 @@ def warm_price_cache(settings: Any) -> None:
         if reason == "":
             # Into the folder of the settings this warm-up was started with, not the current one.
             remember_models(models, home=Path(settings.home))
-    except Exception as exc:  # noqa: BLE001 — a warm-up must never take the process with it
+    except Exception as exc:  # a warm-up must never take the process with it
         _log.debug("price cache warm-up failed: %s", exc)

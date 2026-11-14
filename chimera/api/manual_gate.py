@@ -192,7 +192,7 @@ def proposed_diff(workspace: Path, tool: str, args: dict[str, Any]) -> str:
             return "\n".join(parts)
         keys = ("path", "title")
         return "\n".join(f"{key}: {args[key]}" for key in keys if args.get(key))
-    except Exception:  # noqa: BLE001 - a preview that fails must not stop the question being asked
+    except Exception:  # a preview that fails must not stop the question being asked
         return ""
 
 
@@ -286,7 +286,7 @@ class ManualEditGate(Tool):
         if remote is not None:
             try:
                 preview = remote.remote_preview(kwargs) if spec.diff else ""
-            except Exception:  # noqa: BLE001 - a preview that fails must not stop the question being asked
+            except Exception:  # a preview that fails must not stop the question being asked
                 preview = ""
             diff = _bounded(preview)
             where = f"{self.name} on {remote.remote_host}"

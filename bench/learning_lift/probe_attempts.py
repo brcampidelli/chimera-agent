@@ -50,8 +50,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from run_learning import _ARMS, _MODEL, _fresh_workspace, _grade  # noqa: E402
-from tasks_hard_fix import HARD_FIX_TASKS as TASKS  # noqa: E402
+from run_learning import _ARMS, _MODEL, _fresh_workspace, _grade
+from tasks_hard_fix import HARD_FIX_TASKS as TASKS
 
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "480"))
 _OUT = Path(os.environ.get("PROBE_OUT", str(Path(__file__).resolve().parent / "results_probe")))

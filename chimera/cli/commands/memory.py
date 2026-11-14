@@ -86,7 +86,7 @@ def _maybe_autoconsolidate(
 
         meter = _Meter(LLMGateway(), label="tidy")
         removed = memory.autoconsolidate(model_summarizer(meter), max_items=settings.memory_budget)
-    except Exception as exc:  # noqa: BLE001 — best-effort cleanup, never break exit
+    except Exception as exc:  # best-effort cleanup, never break exit
         _record_tidy_spend(settings, meter, usage_id)
         console.print(f"[dim]auto-consolidate skipped: {exc}[/dim]")
         return

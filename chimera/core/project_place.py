@@ -314,7 +314,7 @@ def _included_payload(repo: Path, worktree: Path, *, home: Path | str) -> dict[s
 
     try:
         report = copy_included(repo, worktree, consent=agreed)
-    except Exception:  # noqa: BLE001 - the worktree exists; a broken copy must not undo it
+    except Exception:  # the worktree exists; a broken copy must not undo it
         _log.warning("worktreeinclude failed in %s", worktree, exc_info=True)
         return {"copied": [], "skipped": [], "invalid": [], "bytes": 0, "error": True}
     return None if report.empty else report.as_payload()

@@ -214,7 +214,7 @@ def kill_tree(proc: subprocess.Popen[Any]) -> None:
         return
     if _POSIX:
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)  # type: ignore[attr-defined]
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             return
         except (ProcessLookupError, PermissionError, OSError):
             pass  # fall through to the single-process kill; better than nothing
@@ -317,7 +317,7 @@ class StdioProcess:
             # guess that gets it wrong turns an argument into a command on the user's machine.
             raise ValueError(f"argument contains shell syntax and cannot be passed safely: {offenders[0]!r}")
 
-        self._proc = subprocess.Popen(  # noqa: S603 — argv list, never a shell string
+        self._proc = subprocess.Popen(  # argv list, never a shell string
             [program, *self.argv[1:]],
             cwd=str(self.cwd) if self.cwd else None,
             env=self.env,
@@ -412,7 +412,7 @@ class StdioProcess:
                     continue
                 try:
                     self._on_message(message)
-                except Exception as exc:  # noqa: BLE001 — a handler must not kill the reader
+                except Exception as exc:  # a handler must not kill the reader
                     _log.warning("%s: message handler failed: %s", self.name, exc)
         except (ValueError, OSError):
             # The pipe was closed under us — a kill, or the child exiting mid-line. Not an error to

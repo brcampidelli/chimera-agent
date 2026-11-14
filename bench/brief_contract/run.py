@@ -176,7 +176,7 @@ def grade(ws: Path, task_id: str) -> dict[str, Any]:
             "tests_ok": False, "check_ok": False,
             "detail": f"grader printed no verdict (exit {proc.returncode}): {proc.stderr.strip()[-300:]}",
         }
-    except Exception as exc:  # noqa: BLE001 — a grader that hangs or crashes fails the run, loudly
+    except Exception as exc:  # a grader that hangs or crashes fails the run, loudly
         got = {"tests_ok": False, "check_ok": False, "detail": f"grader: {type(exc).__name__}: {exc}"[:300]}
     got["success"] = bool(got.get("tests_ok")) and bool(got.get("check_ok"))
     return got
@@ -235,7 +235,7 @@ def run_one(gateway: _Gateway, arm: str, task: Task, replica: int) -> dict[str, 
         specs: list[Any] = []
         try:
             specs = orch.decompose(task.text)
-        except Exception as exc:  # noqa: BLE001 — a provider failure in the manager is a halt
+        except Exception as exc:  # a provider failure in the manager is a halt
             halted = f"decompose: {type(exc).__name__}: {exc}"[:300]
         row["specs"] = [{"objective": s.objective, "output_format": s.output_format, "boundaries": s.boundaries}
                         for s in specs]
@@ -248,7 +248,7 @@ def run_one(gateway: _Gateway, arm: str, task: Task, replica: int) -> dict[str, 
                 answer = result.answer or ""
                 row["fell_back"] = result.fell_back
                 row["envelopes"] = [{"task_id": e.task_id, "status": e.status} for e in result.envelopes]
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 halted = f"run: {type(exc).__name__}: {exc}"[:300]
         if meter.errors and not halted:
             halted = f"{meter.errors} provider call(s) raised"
@@ -264,7 +264,7 @@ def run_one(gateway: _Gateway, arm: str, task: Task, replica: int) -> dict[str, 
         row["grade"] = grade(ws, task.id)
         row["success"] = row["grade"]["success"]
         row["mechanism"] = _mechanism(task, row["specs"])
-    except Exception as exc:  # noqa: BLE001 — a harness failure is a halt, never a result
+    except Exception as exc:  # a harness failure is a halt, never a result
         row["halted"] = f"harness: {type(exc).__name__}: {exc}"[:300]
     finally:
         row.update({

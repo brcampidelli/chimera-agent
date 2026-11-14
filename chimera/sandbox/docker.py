@@ -174,7 +174,7 @@ class DockerSandbox:
              **no_window())
         except subprocess.TimeoutExpired:
             with suppress(OSError, subprocess.SubprocessError):
-                subprocess.run(["docker", "kill", name], capture_output=True, timeout=15, **no_window())  # noqa: S603,S607
+                subprocess.run(["docker", "kill", name], capture_output=True, timeout=15, **no_window())
             return SandboxResult(
                 exit_code=124, stderr=f"command timed out after {timeout}s", timed_out=True
             )

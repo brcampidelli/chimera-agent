@@ -246,8 +246,8 @@ class CodeInterpreterTool(Tool):
         cwd_before = os.getcwd()
         try:
             with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
-                exec(compile(code, "<code_interpreter>", "exec"), self._namespace)  # noqa: S102
-        except Exception as exc:  # noqa: BLE001 - report any error as output, never crash
+                exec(compile(code, "<code_interpreter>", "exec"), self._namespace)
+        except Exception as exc:  # report any error as output, never crash
             # This was `out[:_MAX_OUTPUT_CHARS]`, with no marker: the only tool that cut its output
             # in silence, so 20 000 characters read as a complete answer. Clipping the whole
             # `buffer + exception` head-only then cut the other way: the marker said "clipped" and

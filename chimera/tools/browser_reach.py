@@ -96,7 +96,7 @@ def ascii_host(host: str) -> str:
         import idna  # httpx's own dependency, so always installed beside Chimera
 
         return str(idna.encode(host, uts46=True, transitional=False).decode("ascii"))
-    except Exception:  # noqa: BLE001 — not a name the encoder takes: compare it as written
+    except Exception:  # not a name the encoder takes: compare it as written
         return host
 
 

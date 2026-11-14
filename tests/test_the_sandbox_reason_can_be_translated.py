@@ -26,7 +26,7 @@ CAUSES = ("", "windows", "bwrap_missing", "userns_refused", "seatbelt_missing", 
 
 
 def _sandbox(tmp_path: Path) -> dict[str, Any]:
-    from tests.test_api import _client  # noqa: PLC0415
+    from tests.test_api import _client
 
     return dict(_client(tmp_path).get("/api/governance/sandbox").json())
 

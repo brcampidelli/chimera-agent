@@ -78,7 +78,7 @@ def _browser_fetch(url: str) -> str:
     check_url(url)
     try:
         driver = b._new_playwright_driver(headless=True)
-    except Exception as exc:  # noqa: BLE001 — most likely the Chromium binary isn't downloaded yet
+    except Exception as exc:  # most likely the Chromium binary isn't downloaded yet
         if not (b._missing_browser_binary(exc) and b._auto_install_enabled()):
             raise
         b._install_chromium()
@@ -160,7 +160,7 @@ def _fetch_page(url: str, *, render: str, settings: Settings | None) -> FetchRes
         rendered = _from_html(url, rendered_html, "browser", final_url=final_url())
         if len(rendered.markdown.strip()) > len(result.markdown.strip()):
             result = rendered
-    except Exception:  # noqa: BLE001 — browser unavailable -> keep the HTTP result
+    except Exception:  # browser unavailable -> keep the HTTP result
         pass
 
     # last resort: Firecrawl, only if still thin and a key is set
@@ -169,7 +169,7 @@ def _fetch_page(url: str, *, render: str, settings: Settings | None) -> FetchRes
             md, meta = _firecrawl_fetch(url, fc_key)
             if len(md.strip()) > len(result.markdown.strip()):
                 result = _from_firecrawl(url, md, meta)
-        except Exception:  # noqa: BLE001 — Firecrawl failed -> keep what we have
+        except Exception:  # Firecrawl failed -> keep what we have
             pass
     return result
 

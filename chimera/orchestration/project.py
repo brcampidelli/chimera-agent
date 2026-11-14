@@ -405,7 +405,7 @@ class ProjectOrchestrator:
         self.board.move(card.id, "doing")
         try:
             result = self.solve_card.run(card)
-        except Exception as exc:  # noqa: BLE001 — a lane failure parks the card for review
+        except Exception as exc:  # a lane failure parks the card for review
             _log.warning("solve lane raised on card %s: %s", card.id, exc)
             result = LaneResult(success=False, answer=f"error: {exc}")
         self.board.record_result(card.id, success=result.success, result=result.answer)

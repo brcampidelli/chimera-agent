@@ -99,14 +99,14 @@ def _settle(
     """
     try:
         _clear_junk(worktree.path, runner)
-    except Exception:  # noqa: BLE001 - a cache that would not go is read as work, and keeps it
+    except Exception:  # a cache that would not go is read as work, and keeps it
         _log.warning("cron job %s (%s): could not clear caches in %s", job.name, job.id, worktree.path)
     try:
         results = prune_worktrees(
             worktree.repo_root, [str(worktree.path)], dry_run=False, protect_ignored=True,
             runner=runner,
         )
-    except Exception as exc:  # noqa: BLE001 - in doubt, keep
+    except Exception as exc:  # in doubt, keep
         _note(history, job, worktree, f"branch {worktree.branch}: could not check ({type(exc).__name__})")
         return
     result = results[0] if results else None
@@ -119,13 +119,13 @@ def _settle(
     # either leaves a stray branch or a stale record, never a lost outcome.
     try:
         runner(["git", "branch", "-d", worktree.branch], worktree.repo_root)
-    except Exception:  # noqa: BLE001
+    except Exception:
         _log.warning("cron job %s (%s): could not delete branch %s", job.name, job.id, worktree.branch)
     try:
         from chimera.core.code_projects import AppWorktreeRegistry
 
         AppWorktreeRegistry(worktree.app_registry or _app_registry_path()).remove(worktree.path)
-    except Exception:  # noqa: BLE001
+    except Exception:
         _log.warning("cron job %s (%s): could not update the worktree record", job.name, job.id)
 
 
@@ -135,7 +135,7 @@ def _settle_safely(
     """:func:`_settle`, whatever happens: the run's outcome, or the exception it raised, comes first."""
     try:
         _settle(job, worktree, history, runner)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.warning("cron job %s (%s): worktree not settled (%s); it was kept", job.name, job.id,
                      type(exc).__name__)
         with contextlib.suppress(Exception):

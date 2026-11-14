@@ -21,9 +21,9 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.api.manual_gate import (  # noqa: E402
+from chimera.api.manual_gate import (
     MAX_KEY_CHARS,
     NEEDS_SCREEN,
     ManualAllowances,
@@ -32,9 +32,9 @@ from chimera.api.manual_gate import (  # noqa: E402
     command_key,
     payload_asker,
 )
-from chimera.governance.ledger import WORKSPACE_WRITERS, WRITE_TOOLS  # noqa: E402
-from tests.test_code_permission_screen_security import _bridged, _saved_conversation  # noqa: E402
-from tests.test_manual_mode_asks_before_each_edit_and_command import (  # noqa: E402
+from chimera.governance.ledger import WORKSPACE_WRITERS, WRITE_TOOLS
+from tests.test_code_permission_screen_security import _bridged, _saved_conversation
+from tests.test_manual_mode_asks_before_each_edit_and_command import (
     AUTO,
     MANUAL,
     SCREEN,

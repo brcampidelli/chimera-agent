@@ -24,9 +24,9 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))  # sibling modules (arms/datasets/humaneval/gsm8k)
 
-from arms import Spend  # noqa: E402
+from arms import Spend
 
-from chimera.eval.paired import compare_paired, format_report  # noqa: E402
+from chimera.eval.paired import compare_paired, format_report
 
 RESULTS = Path(__file__).parent / "results"
 

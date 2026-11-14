@@ -27,9 +27,9 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from bench.verified_cascade.backends import Backends, FakeBackends, request_spec  # noqa: E402
-from bench.verified_cascade.common import number_check_fires, sha  # noqa: E402
-from bench.verified_cascade.harness import (  # noqa: E402
+from bench.verified_cascade.backends import Backends, FakeBackends, request_spec
+from bench.verified_cascade.common import number_check_fires, sha
+from bench.verified_cascade.harness import (
     ADMISSION_STOP_USD,
     DRAFT_SYSTEM_SHA,
     GRADER_SYSTEM,
@@ -44,7 +44,7 @@ from bench.verified_cascade.harness import (  # noqa: E402
     run_call,
     wall_violations,
 )
-from bench.verified_cascade.replay import (  # noqa: E402
+from bench.verified_cascade.replay import (
     DRAFT_MODEL,
     GRADERS,
     RunData,

@@ -58,6 +58,6 @@ def chimera_git_sha() -> str:
         wheel_sha = str(values[-1]).strip() if values else ""
     except PackageNotFoundError:
         wheel_sha = ""
-    except Exception:  # noqa: BLE001 — build identity must never make the application fail
+    except Exception:  # build identity must never make the application fail
         wheel_sha = ""
     return wheel_sha or _checkout_sha(Path(__file__).parent)

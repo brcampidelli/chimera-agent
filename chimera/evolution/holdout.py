@@ -166,7 +166,7 @@ class HoldoutGate:
                 if case.canary:
                     canary_total += 1
                     canary_passed += int(case_passed)
-            except Exception as exc:  # noqa: BLE001 — an error is a failure, never a skip
+            except Exception as exc:  # an error is a failure, never a skip
                 per_task_passed[case.task_id] = per_task_passed.get(case.task_id, 0)
                 per_task_total[case.task_id] = per_task_total.get(case.task_id, 0) + 1
                 if case.protected_slice:

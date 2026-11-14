@@ -131,7 +131,7 @@ def run_manager() -> None:
                 review = manager.review(row["task"], row["answer"])
                 verdict = "abstained" if review.abstained else ("approved" if review.approved else "revise")
                 error = ""
-            except Exception as exc:  # noqa: BLE001 — a failed call is recorded, never guessed
+            except Exception as exc:  # a failed call is recorded, never guessed
                 verdict, error = "error", f"{type(exc).__name__}: {str(exc)[:200]}"
             spent += backend.last_usd
             fh.write(json.dumps({"id": row["id"], "verdict": verdict, "usd": backend.last_usd, "error": error,

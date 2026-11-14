@@ -86,7 +86,7 @@ def _retrying(call: Any, *, tries: int = 6, wait: float = 20.0) -> Any:
     for attempt in range(tries):
         try:
             return call()
-        except Exception as exc:  # noqa: BLE001 — only the rate-limit shape is retried
+        except Exception as exc:  # only the rate-limit shape is retried
             text = str(exc)
             if attempt == tries - 1 or ("429" not in text and "rate-limit" not in text.lower()):
                 raise
@@ -126,7 +126,7 @@ def collect(out: Path, *, target: int, cap: int, workers: int) -> int:
             reference = normalise(gsm8k_reference(problem["answer"]))
             try:
                 results = list(pool.map(_ask, [gateway] * 3, WEAK_PANEL, [question] * 3))
-            except Exception as exc:  # noqa: BLE001 — a question the providers could not answer is skipped, not fatal
+            except Exception as exc:  # a question the providers could not answer is skipped, not fatal
                 print(f"  asked {asked:>3} · SKIPPED {type(exc).__name__}: {str(exc)[:90]}", flush=True)
                 continue
             answers = [r[0] for r in results]
@@ -370,7 +370,7 @@ def main() -> int:
             iid, arm, rot, order = futures[fut]
             try:
                 r = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a provider hiccup must not lose the file
+            except Exception as exc:  # a provider hiccup must not lose the file
                 print(f"  {iid:<12} {arm:<6} r{rot} {order:<7} ERROR {type(exc).__name__}: {str(exc)[:100]}", flush=True)
                 continue
             spent += r.usd or 0.0

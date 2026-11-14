@@ -251,7 +251,7 @@ def _run_one(backend: _Pinned, arm: str, task: Any, home: Path) -> dict[str, Any
             "providers": _providers(result), "elapsed_s": round(time.monotonic() - started, 1),
             **grade, **detect.read(answer, list(result.tool_names)),
         }
-    except Exception as exc:  # noqa: BLE001 — a halt, counted by the stop rule and left out of the pairing
+    except Exception as exc:  # a halt, counted by the stop rule and left out of the pairing
         return {"arm": arm, "error": f"{type(exc).__name__}: {exc}"[:400],
                 "elapsed_s": round(time.monotonic() - started, 1)}
     finally:
@@ -652,7 +652,7 @@ def _check_fixtures() -> list[str]:
             graded = _grade(fx, ws)
             if not graded["passed"]:
                 problems.append(f"{fx.id}: the REFERENCE fails the checker: {graded['checker_tail'][-300:]}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             problems.append(f"{fx.id}: the reference raised {type(exc).__name__}: {exc}")
         finally:
             shutil.rmtree(ws, ignore_errors=True)

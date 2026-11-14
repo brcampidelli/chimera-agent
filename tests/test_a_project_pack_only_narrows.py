@@ -32,7 +32,7 @@ from chimera.skills import bundles
 
 pytest.importorskip("fastapi")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)

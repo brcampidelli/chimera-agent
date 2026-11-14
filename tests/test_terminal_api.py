@@ -21,22 +21,22 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.api import build_api_app  # noqa: E402
-from chimera.api import pty_terminal as pt  # noqa: E402
-from chimera.api import screen_credential as sc  # noqa: E402
-from chimera.api.bridge_routes import ROUTES, VIA_BRIDGE_SCOPE_KEY  # noqa: E402
-from chimera.api.browser_screen import BROWSER_SCOPE_KEY, DESKTOP_SCREEN_SCOPE_KEY  # noqa: E402
-from chimera.api.devices import DEVICE_SCOPE_KEY  # noqa: E402
-from chimera.api.terminal_api import (  # noqa: E402
+from chimera.api import build_api_app
+from chimera.api import pty_terminal as pt
+from chimera.api import screen_credential as sc
+from chimera.api.bridge_routes import ROUTES, VIA_BRIDGE_SCOPE_KEY
+from chimera.api.browser_screen import BROWSER_SCOPE_KEY, DESKTOP_SCREEN_SCOPE_KEY
+from chimera.api.devices import DEVICE_SCOPE_KEY
+from chimera.api.terminal_api import (
     COMMANDS_OFF_DETAIL,
     SANDBOX_DETAIL,
     owner_refusal,
 )
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
-from chimera.interface.session import SupportsRun  # noqa: E402
+from chimera.config import Settings, get_settings
+from chimera.interface import ChatSession
+from chimera.interface.session import SupportsRun
 
 TOKEN = "owner-bearer-token-for-terminal-tests-0123456789"
 SCREEN = "desktop-screen-credential-for-terminal-tests-0123456789"

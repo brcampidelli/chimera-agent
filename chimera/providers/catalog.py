@@ -568,7 +568,7 @@ def resolve_tiers(settings: _TierSettings) -> TierLadder:
     yet. The filter only bites when the user has SOME keys and the ladder wants OTHERS.
     """
     mode = settings.cost_mode if settings.cost_mode in _PRESETS else "auto"
-    preset = _PRESETS[mode]  # type: ignore[index]
+    preset = _PRESETS[mode]
     chosen = TierLadder(
         weak=settings.weak_model or preset.weak,
         mid=settings.mid_model or preset.mid,

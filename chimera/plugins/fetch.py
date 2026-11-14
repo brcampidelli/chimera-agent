@@ -283,13 +283,13 @@ class _GitHubRedirects(urllib.request.HTTPRedirectHandler):
 def _download_archive(url: str) -> bytes:
     """One bounded, anonymous GET. A module function so a test replaces the network, not the checks."""
     opener = urllib.request.build_opener(_GitHubRedirects)
-    request = urllib.request.Request(url, headers={"User-Agent": "chimera-agent"})  # noqa: S310 -- host checked by archive_spec
+    request = urllib.request.Request(url, headers={"User-Agent": "chimera-agent"})  # host checked by archive_spec
     try:
         with opener.open(request, timeout=_TIMEOUT) as response:
             body: bytes = response.read(MAX_ARCHIVE_BYTES + 1)
     except FetchError:
         raise
-    except Exception as exc:  # noqa: BLE001 -- shown to a person as a failed download
+    except Exception as exc:  # shown to a person as a failed download
         raise FetchError(f"could not download the archive: {exc}") from exc
     if len(body) > MAX_ARCHIVE_BYTES:
         raise FetchError(f"the archive is larger than {MAX_ARCHIVE_BYTES // (1024 * 1024)} MiB")

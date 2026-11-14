@@ -105,7 +105,7 @@ def test_n_threads_cannot_all_spend_the_last_dollar() -> None:
                 capped.complete([{"role": "user", "content": "hi"}])
         except SpendExceeded:
             pass
-        except BaseException as exc:  # noqa: BLE001 -- reported, not swallowed
+        except BaseException as exc:  # reported, not swallowed
             erros.append(exc)
 
     fios = [threading.Thread(target=bater) for _ in range(8)]

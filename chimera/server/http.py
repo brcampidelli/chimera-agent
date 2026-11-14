@@ -125,7 +125,7 @@ def handle(
             payload = {}
         try:
             results = webhooks(hook, payload if isinstance(payload, dict) else {})
-        except Exception:  # noqa: BLE001 — surface as 500 WITHOUT leaking internals to the caller
+        except Exception:  # surface as 500 WITHOUT leaking internals to the caller
             _log.exception("webhook %r failed", hook)
             return 500, {"error": "internal error"}
         if not results:
@@ -147,7 +147,7 @@ def handle(
         )
         try:
             reply = gateway.on_message(message)
-        except Exception:  # noqa: BLE001 — surface as 500 WITHOUT leaking internals (paths/secrets)
+        except Exception:  # surface as 500 WITHOUT leaking internals (paths/secrets)
             _log.exception("chat handler failed")
             return 500, {"error": "internal error"}
         return 200, {"reply": reply, "chat_id": message.chat_id}
@@ -236,13 +236,13 @@ def make_server(
                 self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
                 self.wfile.flush()
 
-        def do_GET(self) -> None:  # noqa: N802 — http.server's required name
+        def do_GET(self) -> None:  # http.server's required name
             self._respond("GET")
 
-        def do_POST(self) -> None:  # noqa: N802 — http.server's required name
+        def do_POST(self) -> None:  # http.server's required name
             self._respond("POST")
 
-        def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 — overrides stdlib
+        def log_message(self, format: str, *args: Any) -> None:  # overrides stdlib
             pass  # silence default stderr access logging
 
     server = ThreadingHTTPServer((host, port), Handler)

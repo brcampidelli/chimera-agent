@@ -65,7 +65,7 @@ def measure(driver: PlaywrightDriver, url: str) -> dict[str, Any]:
         elements = driver.navigate(url)
         classes = driver._page.evaluate(CLASSIFY)
         text = driver.page_text()
-    except Exception as exc:  # noqa: BLE001 — a page that fails is reported, not replaced
+    except Exception as exc:  # a page that fails is reported, not replaced
         return {"url": url, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
     return {
         "url": url,

@@ -370,7 +370,7 @@ def test_the_network_door_opens_a_real_listener_that_serves_only_the_guest_app_a
             request = urllib.request.Request(base + path, headers=headers or {})
             for _ in range(50):
                 try:
-                    with urllib.request.urlopen(request, timeout=2) as response:  # noqa: S310
+                    with urllib.request.urlopen(request, timeout=2) as response:
                         return response.status, response.read().decode("utf-8")
                 except urllib.error.HTTPError as exc:
                     return exc.code, ""
@@ -397,7 +397,7 @@ def test_the_network_door_opens_a_real_listener_that_serves_only_the_guest_app_a
     assert closed == {"open": False, "port": None, "urls": []}
     assert door.open is False
     with pytest.raises((urllib.error.URLError, ConnectionError, OSError)):
-        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/session", timeout=1)  # noqa: S310
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/session", timeout=1)
 
 
 def test_the_guest_page_is_served_as_a_plain_file_with_no_token_in_it(

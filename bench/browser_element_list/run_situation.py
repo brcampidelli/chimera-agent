@@ -76,7 +76,7 @@ def measure(url: str, expected: str | None) -> dict[str, Any]:
             "handover": wall.kind if wall is not None else "none",
             "evidence": wall.evidence if wall is not None else "",
         })
-    except Exception as exc:  # noqa: BLE001 — a page that fails is reported, not replaced
+    except Exception as exc:  # a page that fails is reported, not replaced
         row["error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
     finally:
         if driver is not None:

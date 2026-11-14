@@ -163,7 +163,7 @@ class CardRetriever:
         if self._embed is not None:
             try:
                 hits = self._semantic_hits(cards, task)
-            except Exception as exc:  # noqa: BLE001 — never hard-fail a run because embeddings are down
+            except Exception as exc:  # never hard-fail a run because embeddings are down
                 _log.warning("semantic card recall failed, falling back to BM25: %s", exc)
         if hits is None:
             with CardIndex(cards) as index:  # close the in-memory SQLite connection after the search

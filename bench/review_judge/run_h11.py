@@ -436,7 +436,7 @@ def call_arm(backend: _Pinned, arm: str, item: rj.Item) -> dict[str, Any]:
                 "attempts": attempt + 1, "started": round(started, 1),
                 "seconds": round(time.time() - started, 1),
             }
-        except Exception as exc:  # noqa: BLE001 — transport, not judgement
+        except Exception as exc:  # transport, not judgement
             last = exc
             if attempt < 2:
                 time.sleep(20 * (attempt + 1))

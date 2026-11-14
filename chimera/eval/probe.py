@@ -70,7 +70,7 @@ class ProbeBestArm:
         if n_reward == 0:
             return ArmEstimate(arm, 0.0, math.inf, 0, n_proxy, 0.0, 0.0)
         pp = [p for p, _ in paired]
-        rr = [float(r) for _, r in paired]  # type: ignore[arg-type]
+        rr = [float(r) for _, r in paired]
         reward_mean = statistics.fmean(rr)
         beta = rho = 0.0
         residual_var = statistics.variance(rr) if n_reward > 1 else 0.0

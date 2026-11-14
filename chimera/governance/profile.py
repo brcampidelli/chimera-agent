@@ -610,7 +610,7 @@ def governed_profile(
                     for name in sorted(selected.intersection(pool.names())):
                         bot_connectors.register(pool.get(name))
                     bot_connectors.into_tool_registry(registry)
-            except Exception as exc:  # noqa: BLE001 — MCP must not prevent a bot from starting
+            except Exception as exc:  # MCP must not prevent a bot from starting
                 _log.warning("bot MCP servers not loaded on %s — %s", surface, type(exc).__name__)
 
     refused = unattended_surface_may_load(settings, surface)
@@ -619,7 +619,7 @@ def governed_profile(
     else:
         try:
             mount_connectors(registry, home, unattended=True)
-        except Exception as exc:  # noqa: BLE001 — a broken connector store must never cost a surface
+        except Exception as exc:  # a broken connector store must never cost a surface
             _log.warning(
                 "connectors: not loaded on %s — %s", surface or "(unnamed)", type(exc).__name__
             )

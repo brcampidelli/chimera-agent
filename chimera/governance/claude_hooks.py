@@ -639,10 +639,10 @@ def _attempt(runner: Any, hook: Any, payload: dict[str, Any], deadline: float = 
             done.error = "skipped: the time budget for this event is spent"
             return done
     try:
-        sandbox = runner._sandbox()  # noqa: SLF001 — the runner owns the factory
+        sandbox = runner._sandbox()  # the runner owns the factory
         done.isolated = sandbox_is_isolated(sandbox)
         done.sandbox = _sandbox_name(sandbox)
-    except Exception as exc:  # noqa: BLE001 — a hook that cannot start is a failed hook
+    except Exception as exc:  # a hook that cannot start is a failed hook
         done.error = f"could not start a sandbox: {type(exc).__name__}: {exc}"
         return done
     if not done.isolated and not may_run_on_host(runner, hook):
@@ -668,7 +668,7 @@ def _attempt(runner: Any, hook: Any, payload: dict[str, Any], deadline: float = 
                 done.error = f"timed out after {remaining}s"
                 with _BREAKER_LOCK:
                     _BREAKER[_breaker_key(hook)] = _BREAKER.get(_breaker_key(hook), 0) + 1
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             done.error = f"could not run: {type(exc).__name__}: {exc}"
     done.duration_ms = (time.perf_counter() - started) * 1000
     return done
@@ -774,7 +774,7 @@ class ClaudeLifecycle:
         base = {"cwd": str(self.runner.workspace)}
         try:
             run_batch(self.runner, picked, claude_event, outcome, {**base, **payload})
-        except Exception:  # noqa: BLE001 — a hook machinery failure must not take the turn down
+        except Exception:  # a hook machinery failure must not take the turn down
             _log.warning("lifecycle hooks for %s failed", claude_event, exc_info=True)
         return outcome
 
@@ -823,7 +823,7 @@ def isolation_hint(settings: Any) -> bool | None:
             from chimera.sandbox.os_sandbox import os_sandbox_available
 
             return bool(os_sandbox_available())
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
     return False
 

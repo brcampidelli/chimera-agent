@@ -138,7 +138,7 @@ def trace_of(exc: BaseException) -> ProviderTrace:
         for name in _TRACE_HEADERS:
             try:
                 value = headers.get(name)
-            except Exception:  # noqa: BLE001 — a header bag that does not behave is not a crash
+            except Exception:  # a header bag that does not behave is not a crash
                 continue
             if value:
                 found[name] = str(value)[:120]

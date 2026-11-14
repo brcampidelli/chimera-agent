@@ -83,10 +83,10 @@ def _kill_run(proc: subprocess.Popen[Any]) -> None:
     if os.name == "posix":
         group = proc.pid
         with suppress(OSError):
-            os.killpg(group, signal.SIGTERM)  # type: ignore[attr-defined]  # POSIX-only names; this branch never runs on Windows
+            os.killpg(group, signal.SIGTERM)  # POSIX-only names; this branch never runs on Windows
         time.sleep(_TERM_WAIT_S)
         with suppress(OSError):
-            os.killpg(group, signal.SIGKILL)  # type: ignore[attr-defined]  # POSIX-only names; this branch never runs on Windows
+            os.killpg(group, signal.SIGKILL)  # POSIX-only names; this branch never runs on Windows
     elif proc.poll() is None:
         # Only while the direct child is alive. Once it is reaped, its pid can be handed to an
         # unrelated process, and taskkill would kill that one. So an orphan whose parent has already

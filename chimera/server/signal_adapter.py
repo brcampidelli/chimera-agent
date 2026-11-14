@@ -94,7 +94,7 @@ class SignalAdapter:
                 f"{self.api_url}/v1/typing-indicator/{self.number}",
                 json={"recipient": chat_id},
             )
-        except Exception as exc:  # noqa: BLE001 — typing is best-effort, never fail the turn
+        except Exception as exc:  # typing is best-effort, never fail the turn
             _log.debug("signal typing indicator failed: %s", exc)
 
     def start(self, route: Callable[[InboundMessage], str]) -> None:
