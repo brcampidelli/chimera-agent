@@ -26,6 +26,9 @@ from collections.abc import Awaitable, Callable, Iterable, MutableMapping
 from typing import Any
 from urllib.parse import urlsplit
 
+from fastapi import HTTPException
+from starlette.requests import Request
+
 # The access card's own rule for "reachable only from this machine" — one answer, not two.
 from chimera.api.access_api import is_loopback_host
 from chimera.api.devices import DEVICE_SCOPE_KEY
@@ -69,6 +72,51 @@ def is_ip_literal(hostname: str) -> bool:
 def unrebindable(hostname: str | None) -> bool:
     """Whether no DNS answer can stand behind this name: an IP literal, or ``localhost``."""
     return hostname is not None and (hostname == "localhost" or is_ip_literal(hostname))
+
+def cross_site_request(
+    request: Any, named: Callable[[], list[str]], *, strict_host: bool = True
+) -> bool:
+    """Whether a browser sent this request from a page that is not this app.
+
+    Without a server token (the desktop default) the bearer guard is a no-op, and a multipart or
+    ``text/plain`` POST is a CORS "simple request": no preflight, so any page open in the owner's
+    browser can send one to 127.0.0.1 and the browser only withholds the ANSWER. For a write the
+    answer is not the point. Browsers say where a request came from (``Origin`` on every cross-site
+    POST, ``Sec-Fetch-Site`` in current ones); a client that is not a browser (the CLI, the MCP
+    bridge, a script) sends neither and is not what this defends against, so it is let through.
+
+    Allowed: no ``Origin`` at all, this app's own origin, or an origin the operator named in
+    ``CHIMERA_ALLOWED_ORIGINS``.
+
+    ``strict_host`` additionally requires the own origin's host to be one no DNS answer stands
+    behind (an IP literal or ``localhost``): "own" is built from the request's ``Host``, which a page
+    that rebound its DNS name to 127.0.0.1 controls. Uploads keep it (one route where the answer is
+    not needed to do harm); the app-wide check relaxes it, because :class:`LoopbackHostGuard`
+    already refuses such a Host on a loopback bind and a named LAN host would otherwise lose its
+    own writes.
+    """
+    origin = request.headers.get("origin")
+    own = f"{request.url.scheme}://{request.url.netloc}"
+    is_own = origin == own and (unrebindable(request.url.hostname) or not strict_host)
+    allowed = origin is not None and (is_own or origin in named())
+    if origin is not None and not allowed:
+        return True
+    fetch_site = request.headers.get("sec-fetch-site", "")
+    # `same-site` is still another page: a dev server on 127.0.0.1:3000 is the same site as :8765.
+    return fetch_site in ("cross-site", "same-site") and not allowed
+
+
+def refuse_cross_site(named: Callable[[], list[str]]) -> Callable[[Request], None]:
+    """A dependency for a GET that does something (prunes, archives, cleans): another site's
+    ``<img src>`` is a GET the browser sends with no preflight and no way to read the answer, which is
+    all such a route needs. A route that only reads does not need this; one that writes should be a
+    POST, and until it is, it refuses what a browser says came from elsewhere."""
+
+    def check(request: Request) -> None:
+        if cross_site_request(request, named, strict_host=False):
+            raise HTTPException(status_code=403, detail="refusing a request sent from another site")
+
+    return check
 
 
 def host_allowed(header: str | None, named: frozenset[str]) -> bool:

@@ -24,7 +24,17 @@ from collections.abc import AsyncIterator, Callable, Coroutine
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, UploadFile, params
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    params,
+)
 from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
 from pydantic import BaseModel, Field
@@ -458,36 +468,10 @@ _SKILL_PATHS = Form(
 
 
 def _cross_site(request: Request, named: Callable[[], list[str]]) -> bool:
-    """Whether a browser sent this request from a page that is not this app.
+    """An upload sent from another page. The rule lives in :func:`~chimera.api.host_guard.cross_site_request`."""
+    from chimera.api.host_guard import cross_site_request
 
-    Without a server token (the desktop default) the bearer guard is a no-op, and a multipart POST
-    is a CORS "simple request": no preflight, so any page open in the owner's browser can send one
-    to 127.0.0.1 and the browser only withholds the ANSWER. For an upload the answer is not the
-    point — the skill would already be on disk, or an approved one replaced. Browsers say where a
-    request came from (`Origin`, and `Sec-Fetch-Site` in current ones); a client that is not a
-    browser sends neither and is not what this defends against.
-
-    Allowed: no Origin at all, this app's own origin, or an origin the operator named in
-    ``CHIMERA_ALLOWED_ORIGINS`` (the desktop pointed at this instance from another machine).
-
-    "Own" is built from the request's ``Host``, which a page that rebound its DNS name to
-    127.0.0.1 controls — its Origin then matches it exactly and ``Sec-Fetch-Site`` says
-    same-origin. So the own origin counts only when its host is one no DNS answer stands behind
-    (an IP literal or ``localhost``, :func:`chimera.api.host_guard.unrebindable`). The app-wide
-    :class:`~chimera.api.host_guard.LoopbackHostGuard` refuses such a Host first on a loopback
-    bind; this holds on any bind, for the one route where an answer is not needed to do harm.
-    """
-    from chimera.api.host_guard import unrebindable
-
-    origin = request.headers.get("origin")
-    own = f"{request.url.scheme}://{request.url.netloc}"
-    is_own = origin == own and unrebindable(request.url.hostname)
-    allowed = origin is not None and (is_own or origin in named())
-    if origin is not None and not allowed:
-        return True
-    fetch_site = request.headers.get("sec-fetch-site", "")
-    # `same-site` is still another page: a dev server on 127.0.0.1:3000 is the same site as :8765.
-    return fetch_site in ("cross-site", "same-site") and not allowed
+    return cross_site_request(request, named)
 
 
 def _upload_route(named: Callable[[], list[str]], max_body: int) -> type[APIRoute]:
@@ -561,7 +545,17 @@ def register_features(
         return settings or get_settings()
 
     # ---- Memory -----------------------------------------------------------------------------------
-    @app.get("/api/memory", dependencies=[guard], response_model=list[MemoryItemOut])
+    # A search asks the embedding provider (paid, and it sends the query out), which an `<img src>` on
+    # another site can trigger with no preflight: refused when a browser says it came from elsewhere.
+    from chimera.api.host_guard import refuse_cross_site
+
+    memory_no_cross_site = Depends(
+        refuse_cross_site(
+            lambda: [o.strip() for o in str(getattr(_settings(), "allowed_origins", "") or "").split(",") if o.strip()]
+        )
+    )
+
+    @app.get("/api/memory", dependencies=[guard, memory_no_cross_site], response_model=list[MemoryItemOut])
     def list_memory(q: str = "", k: int = 30) -> list[dict[str, Any]]:
         k = max(1, min(k, 200))  # clamp: a negative/huge k must not dump the whole store
         mgr = _memory_manager(_settings())
