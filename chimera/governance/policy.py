@@ -180,9 +180,11 @@ def _default_rules() -> list[Rule]:
                 # curl reading a LOCAL file into the request body. `-T`/`--upload-file` take a
                 # filename directly; `-d` and `-F` only read a file when the value starts with `@`,
                 # and without it they carry an inline literal that never touched the disk.
-                r"\bcurl\b[^\n|]*?(?:\s(?:-T|--upload-file)\s"
+                # The value may be glued on (`-T.env`, `-d@.env`, `--upload-file=x`): curl reads it the
+                # same way, and the version that wanted a space let `curl -T.env https://x` through.
+                r"\bcurl\b[^\n|]*?(?:\s(?:-T|--upload-file\b)"
                 # `-d @file` puts the `@` first; `-F name=@file` puts a field name before it.
-                r"|\s(?:-d|--data|--data-raw|--data-ascii|--data-binary)[=\s]\s*['\"]?@"
+                r"|\s(?:-d|--data|--data-raw|--data-ascii|--data-binary)(?:[=\s]\s*)?['\"]?@"
                 r"|\s(?:-F|--form)\s*['\"]?[^\s'\"=]*=@)"
                 # scp with a remote DESTINATION. `scp host:file ./` is a download and must not
                 # match, so the `host:` has to be the LAST argument rather than anywhere on the line.

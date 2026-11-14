@@ -3066,6 +3066,19 @@ class AttemptReceiptOut(BaseModel):
     )
     provider: str = ""
     host: str = ""
+    requested_model: str = Field(
+        default="",
+        description=(
+            "The model slug this attempt SENT, reasoning-effort suffix included only when the effort "
+            "reached the wire (none with thinking off or on a route that drops it). Beside the model "
+            "that answered: two equal answers cannot tell an escalation served by the same route "
+            "from no escalation. Empty before the field."
+        ),
+    )
+    effort: str = Field(
+        default="",
+        description="The reasoning effort actually sent (low|medium|high), empty when none.",
+    )
     system_sha: str = Field(
         default="",
         description=(

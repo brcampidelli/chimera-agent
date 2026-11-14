@@ -1,5 +1,5 @@
 ---
-source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
+source_sha256: ded4f1799194e9f44cf268e7e309fba1b6befe25a2dd3b52fbca4cda40ced559
 ---
 
 # 在服务器（VPS）上部署 Chimera
@@ -55,6 +55,18 @@ docker compose ps          # status + health
 ```bash
 git pull && docker compose up -d --build
 ```
+
+**从以 root 运行的镜像升级：**
+
+镜像现在以非特权用户（uid 10001）运行。旧镜像创建的 `chimera-data` 卷属于 root，因此容器会拒绝启动（退出码 78，并给出此提示），而不是在第一次写入时失败。请在更新前一次性修正所有者：
+
+```bash
+docker compose run --rm --no-deps --user 0 --entrypoint chown chimera -R 10001:10001 /data
+```
+
+Docker Compose 会把卷命名为 `<项目>_chimera-data`（项目即文件夹名），所以 `-v chimera-data:/data` 只会修改一个名字不同的空卷；上面的命令经由 Compose，能到达真正的卷。可用 `docker compose config --volumes` 和 `docker volume ls` 查看卷。如果 `/data` 是 bind mount 而不是卷，请运行 `sudo chown -R 10001:10001 <主机路径>`。
+
+若要继续以 root 运行，请保留之前的镜像标签；当前镜像不会这样做。
 
 ---
 

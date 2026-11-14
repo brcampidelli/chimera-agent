@@ -7212,6 +7212,12 @@ export interface components {
             diffs: components["schemas"]["FileDiffOut"][];
             /** Dropped Tool Calls */
             dropped_tool_calls?: number | null;
+            /**
+             * Effort
+             * @description The reasoning effort actually sent (low|medium|high), empty when none.
+             * @default
+             */
+            effort: string;
             /** Evidence */
             evidence: string;
             /** Feedback */
@@ -7228,6 +7234,12 @@ export interface components {
              * @default
              */
             provider: string;
+            /**
+             * Requested Model
+             * @description The model slug this attempt SENT, reasoning-effort suffix included only when the effort reached the wire (none with thinking off or on a route that drops it). Beside the model that answered: two equal answers cannot tell an escalation served by the same route from no escalation. Empty before the field.
+             * @default
+             */
+            requested_model: string;
             /** Reverted */
             reverted: boolean;
             /** Side Effects */

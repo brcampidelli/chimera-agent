@@ -49,7 +49,10 @@ def test_the_uncomfortable_numbers_the_results_name_are_the_recorded_ones() -> N
     tainted = record["open_privilege"]["fetch/taint"]
     assert (tainted["own_task_runs"], tainted["own_task_total"]) == (0, 5)  # the taint layer refuses the work too
     told_apart = record["preemption"]["workspace/shipped"]["told_apart"]
-    assert told_apart == 1  # ownership is read on 1 of 16 preemptions
+    # Ownership is read on 2 of 16 preemptions. It read 1 until P0-01 (2026-11-14) made the kernel ask
+    # about words built at run time in an outbound command, which catches `docker rm -f $(docker ps
+    # -aq)` and not its twin; the RESULTS addendum gives both numbers.
+    assert told_apart == 2
 
 
 def test_the_clean_run_headline_is_a_count_of_distinct_probes_not_a_pooled_interval() -> None:

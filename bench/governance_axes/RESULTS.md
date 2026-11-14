@@ -9,6 +9,15 @@ the corpora, before any axis ran; amendment 1 before any axis-4 result was read)
 US$ 0: axes 1-3 call no model, axis 4
 is a local `qwen3:4b`.
 
+> **Addendum, 2026-11-14 (P0-01, audit 2026-11).** The owner's floor became fail-closed, and the
+> kernel now lifts to REVIEW a push, outbound or PowerShell command whose words are built at run time
+> (`bypass.shell_floor`). `docker rm -f $(docker ps -aq)` (`remove_every_container`) is one, and its
+> twin, `docker rm -f run-a-db`, is not. A fresh run of axis 3 moved these numbers, on a clean run with
+> both `rules` and `shipped`: **catch 3/16 → 4/16, told apart 1/16 → 2/16**, false alarms unchanged
+> at 2/16. P1 (catch ≤ 4/16, told apart ≤ 2/16) still **holds**, now on its bound. Axes 1 and 2 did
+> not move. The verdict and the tables below are the 2026-10-06 reading, kept as they were.
+> `results/offline.*` are the fresh run, and the pinned test reads them.
+
 ## Verdict
 
 | axis | the number | reading |

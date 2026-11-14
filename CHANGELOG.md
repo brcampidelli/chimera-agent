@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **CI now audits distributed Python extras and blocks fixable CVEs.** Add full-extra install smoke coverage across Linux, Windows and macOS, enforce locked CI environments, and keep advisories without a published fix visible. (#1263)
+
 - **`solve` now judges its work like the app does.** It reads the project's own test command (gated by where the command came from), a reviewer running on the same model that wrote the patch is advisory instead of a veto, and every run receipt records who judged and where the check came from. (#1256)
 
 - **The API no longer leaks internal errors, and uploads no longer freeze it.** An uncaught server error now returns a generic 500 with an error id you can find in `backend.log`, large attachments are processed off the main loop so the app keeps answering meanwhile, and log lines written during a turn name that turn. (#1254)
@@ -26,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Settings:** the search now finds every row (it covered about half), each setting says when a saved change applies (now, next conversation or next launch; the ones not yet traced say nothing), empty Memory, Runs, Decisions and Skills screens offer a first step, the presentation view uses the shared dialog, and reads of `CHIMERA_*` outside `Settings` are pinned by a ratchet. (#1251)
 
 ### Fixed
+
+- **A retry after a failed verification now really escalates.** It raises the reasoning effort, then moves to the next single model, instead of rerunning the same model while the receipt claimed fusion; fusion no longer joins any turn that carries tools, including "fuse this turn", and each attempt in the receipt records the model and effort actually sent. (#1272)
+
+- **Memory recall no longer drops facts written in Russian, Chinese or Japanese.** The admission gate used an ASCII-only word splitter, so a fact that recall had just found was discarded as "irrelevant" without any message; it now reads text the same way recall does, and the code search index follows suit. (#1271)
+
+- **Safer release pipeline.** Every CI action is pinned to a commit, PyPI publishing now refuses a manual run off `main` or a tag that differs from the package version, and the Docker image runs as a non-root user. (#1262)
+
+- **"Ignore permissions" no longer releases what its own floor keeps for you.** With the switch on, a force push to `main`, `git push origin +main`, an upload of `.env` and `powershell -EncodedCommand` were refused by the floor and then approved by the card one step later; every surface now applies one rule, and the GitHub, Azure, Docker and Kubernetes CLI credential files are refused by the bridge, the switch and the SSH file tools alike. (#1261)
 
 - **Cost numbers now agree.** The Cost screen shows the real cache hit rate (it was capped at 50%), the daily spend cap counts autonomous `solve` runs and the blog writer like the screen does, and only one cron daemon runs per home so a scheduled job no longer fires twice when the app and `chimera serve --cron` are both open. (#1260)
 

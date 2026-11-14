@@ -31,6 +31,7 @@ from typing import Any
 
 from chimera.fusion.route_log import RouteRecord, append_route, prompt_fingerprint
 from chimera.fusion.router import RoutingPolicy, _last_user_text
+from chimera.providers.fusion_guard import is_fusion_forbidden
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -148,10 +149,13 @@ class CascadeBackend:
     ) -> CompletionResult:
         # Tool turns: straight to MID single-model (weak/free models are unreliable
         # tool callers; fusion doesn't tool-call at all).
-        if tools:
+        # The other turns of a run that carries tools (closing call, summary) never reach the fusion
+        # rung either: see `fusion_forbidden`.
+        if tools or is_fusion_forbidden():
+            extra: dict[str, Any] = {"tools": tools} if tools else {}
             result = self.gateway.complete(
                 messages, model=self.config.mid, temperature=temperature,
-                max_tokens=max_tokens, tools=tools,
+                max_tokens=max_tokens, **extra,
             )
             self._log_hop(record, "mid", self.config.mid, result)
             self._accept(record, "mid")

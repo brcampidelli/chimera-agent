@@ -22,13 +22,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import sqlite3
 import struct
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from chimera.memory.tokens import fold_for_index, identifier_tokens
 from chimera.rag.chunks import Chunk
 from chimera.telemetry import get_logger
 
@@ -41,8 +41,9 @@ EmbedFn = Callable[[list[str]], list[list[float]]]
 #: that a failure loses seconds rather than the whole index.
 EMBED_BATCH = 64
 
-#: Word tokens for an FTS query. Anything else a person types is punctuation, not syntax.
-_TOKEN = re.compile(r"[A-Za-z0-9_]+")
+#: Version of how text is normalized INTO the FTS table. Bump it when that changes, and every
+#: existing index is rebuilt on open (`ChunkStore._migrate_fts`).
+FTS_NORMALIZATION = "2"
 
 #: Below this bm25 score, the whole result matched only on words common to every document.
 #: Corpus-dependent by nature — bm25 scales with corpus size and document length — but the SEPARATION
@@ -96,6 +97,8 @@ class ChunkStore:
         self._conn = sqlite3.connect(str(self.path))
         self._conn.row_factory = sqlite3.Row
         self.fts_available = self._init_schema()
+        if self.fts_available:
+            self._migrate_fts()
 
     # --- schema ---------------------------------------------------------------------------
 
@@ -121,6 +124,25 @@ class ChunkStore:
             # falls back to LIKE, which is worse and works — the same trade the memory store makes.
             self._conn.commit()
             return False
+
+    def _migrate_fts(self) -> None:
+        """Rebuild the FTS table when it was written by an older normalization.
+
+        An index built before the query and the index shared one fold keeps its text un-folded and
+        its Han unspaced, so a new query cannot match an old document and nothing says so: it simply
+        returns fewer hits. The version lives in ``meta``; a fresh store has nothing to rebuild.
+        """
+        if self.get_meta("fts_normalization") == FTS_NORMALIZATION:
+            return
+        rows = self._conn.execute("SELECT * FROM chunks").fetchall()
+        if rows:
+            chunks = [self._row_to_chunk(r) for r in rows]
+            self._conn.execute("DELETE FROM chunks_fts")
+            self._conn.executemany(
+                "INSERT INTO chunks_fts (ident, label, text) VALUES (?, ?, ?)",
+                [(c.ident, fold_for_index(c.label), fold_for_index(c.text)) for c in chunks],
+            )
+        self.set_meta("fts_normalization", FTS_NORMALIZATION)
 
     def close(self) -> None:
         self._conn.close()
@@ -156,7 +178,9 @@ class ChunkStore:
         if self.fts_available:
             self._conn.executemany(
                 "INSERT INTO chunks_fts (ident, label, text) VALUES (?, ?, ?)",
-                [(c.ident, c.label, c.text) for c in chunks],
+                # Folded and Han-spaced exactly as the query is: the FTS tokenizer keeps a run of
+                # ideographs as one word and folds fewer letters than we do.
+                [(c.ident, fold_for_index(c.label), fold_for_index(c.text)) for c in chunks],
             )
         self._conn.commit()
         return len(rows)
@@ -286,7 +310,9 @@ class ChunkStore:
             # was really "this function is broken". Quoting is still per token, because an
             # unbalanced quote or a bare `AND` in a search box is otherwise a 500, and `NEAR(` is
             # not what someone typing "near the top" is asking for.
-            words = _TOKEN.findall(query)
+            # The memory layer's tokenizer, with `snake_case` kept whole: the old `[A-Za-z0-9_]+` saw
+            # only ASCII, so a query in Russian or Chinese had no words and returned nothing.
+            words = identifier_tokens(query)
             if not words:
                 return []
             phrase = " OR ".join(f'"{w}"' for w in words)

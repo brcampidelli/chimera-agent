@@ -75,20 +75,20 @@ jobs:
       - name: Install dependencies
         # Include the desktop extra so mypy sees FastAPI's real types (without it, strict mode flags
         # every route decorator as untyped) and the desktop API tests actually run instead of skipping.
-        run: uv sync --extra dev --extra desktop
+        run: uv sync --locked --extra dev --extra desktop
 
       - name: Ruff (lint)
         if: matrix.shard == 1
-        run: uv run ruff check .
+        run: uv run --locked ruff check .
 
       - name: Mypy (strict type-check)
         if: matrix.shard == 1
-        run: uv run mypy chimera
+        run: uv run --locked mypy chimera
 
       - name: Pytest (shard ${{ matrix.shard }} of 3)
         env:
           CI_TEST_SHARD: ${{ matrix.shard }}/3
-        run: uv run pytest -q
+        run: uv run --locked pytest -q
 
   quality-windows:
     name: test (windows ${{ matrix.shard }}/5)
@@ -104,10 +104,10 @@ jobs:
     # Five since 2026-11-12: with four, the shards of #1221 took 17, 21, 26 and 30+ minutes (shards
     # balance by test count, not time) and 4/4 was cancelled at 30:00 with nothing failed.
     #
-    # Each shard runs whole test FILES chosen by `tests/shards.py` from `CI_TEST_SHARD`; the three
+    # Each shard runs whole test FILES chosen by `tests/shards.py` from `CI_TEST_SHARD`; the five
     # together run every file once (`test_the_ci_shards_cover_every_test_file_once.py` pins that,
-    # including the matrix and the "/3" below agreeing). The id stays `quality-windows`, so
-    # `verdict` — the only check branch protection requires — still sees one result for all three.
+    # including the matrix and the "/5" below agreeing). The id stays `quality-windows`, so
+    # `verdict` — the only check branch protection requires — still sees one result for all five.
     # 30 per shard: about a third of 45 plus the install, with the same headroom the old limit had.
     timeout-minutes: 30
     runs-on: windows-latest
@@ -145,12 +145,12 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra desktop
+        run: uv sync --locked --extra dev --extra desktop
 
-      - name: Pytest (shard ${{ matrix.shard }} of 3)
+      - name: Pytest (shard ${{ matrix.shard }} of 5)
         env:
           CI_TEST_SHARD: ${{ matrix.shard }}/5
-        run: uv run pytest -q
+        run: uv run --locked pytest -q
 
   integration:
     name: live integration (real provider)
@@ -175,15 +175,15 @@ jobs:
         # `desktop` is needed even though this job only runs `-m integration`: pytest IMPORTS every
         # test module before the marker filter selects any, so the FastAPI-dependent suites make
         # collection die with ModuleNotFoundError before a single integration test is chosen.
-        run: uv sync --extra dev --extra mcp --extra desktop
+        run: uv sync --locked --extra dev --extra mcp --extra desktop
 
       - name: Integration smoke test
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: uv run pytest -m integration -q
+        run: uv run --locked pytest -m integration -q
 
   install-smoke:
-    name: clean pip install (${{ matrix.os }} · py${{ matrix.python-version }})
+    name: clean pip install (${{ matrix.os }} · py${{ matrix.python-version }} · ${{ matrix.extra }})
     # `quality` uses `uv sync` against the committed uv.lock — a pinned resolution, identical on every
     # run. This job instead does a FRESH `pip install`, which re-resolves from PyPI and can land on a
     # version lacking a wheel for this OS/Python, falling to an sdist that needs a compiler. That is not
@@ -198,19 +198,26 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.11", "3.13"]
+        extra: [desktop, full]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Fresh pip install of the desktop extra (no uv, no lockfile)
+      - name: Fresh pip install of the ${{ matrix.extra }} extra (no uv, no lockfile)
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[desktop]"
-      - name: Import smoke (core + desktop API) + CLI entrypoint
+          python -m pip install ".[${{ matrix.extra }}]"
+      - name: Import smoke (core + CLI entrypoint)
         run: |
-          python -c "import chimera, chimera.api.app; print('chimera', chimera.__version__, 'import OK')"
+          python -c "import chimera; print('chimera', chimera.__version__, 'import OK')"
           chimera --help
+      - name: Import desktop API
+        if: matrix.extra == 'desktop'
+        run: python -c "import chimera.api.app"
+      - name: Import full extras
+        if: matrix.extra == 'full'
+        run: python -c "import discord, mcp, markitdown, docx, yt_dlp, faster_whisper, pandas, sklearn, matplotlib, seaborn, plotly, youtube_transcript_api, keyring"
 
   desktop:
     name: desktop app (API types drift + tests + build)
@@ -229,7 +236,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install Python deps (the desktop extra provides FastAPI for the schema)
-        run: uv sync --extra dev --extra desktop
+        run: uv sync --locked --extra dev --extra desktop
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -244,7 +251,7 @@ jobs:
 
       - name: Regenerate the OpenAPI schema + TypeScript types
         run: |
-          uv run python -m chimera.api.schema_dump > apps/desktop/openapi.json
+          uv run --locked python -m chimera.api.schema_dump > apps/desktop/openapi.json
           npm --prefix apps/desktop run gen:api
 
       # The same idea one layer out: the documentation site renders the command reference from
@@ -261,12 +268,15 @@ jobs:
       # stops a build over a shortened link in a comment is a gate somebody switches off.
       - name: What this diff brings in
         if: github.event_name == 'pull_request'
+        # Through env: a branch name is text someone chose, and `${{ }}` pastes it into the script.
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          uv run python scripts/pr_intent_scan.py --base "origin/${{ github.base_ref }}" --fail-on high
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          uv run --locked python scripts/pr_intent_scan.py --base "origin/$BASE_REF" --fail-on high
 
       - name: Regenerate the CLI snapshot
-        run: uv run python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json
+        run: uv run --locked python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json
 
       - name: Fail if the CLI snapshot is stale
         run: |
@@ -284,7 +294,7 @@ jobs:
       # completeness on the pull request that adds the command; this asserts the file the site
       # actually reads is what the module says.
       - name: Regenerate the CLI theme grouping
-        run: uv run python -m chimera.cli.themes_dump > chimera/_cli_themes.json
+        run: uv run --locked python -m chimera.cli.themes_dump > chimera/_cli_themes.json
 
       - name: Fail if the CLI theme grouping is stale
         run: |
@@ -341,7 +351,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@c8037a86dde8214a8310e9f54a8fc61ab362aa31 # v2
@@ -393,17 +403,17 @@ jobs:
         run: mkdir -p apps/desktop/dist && touch apps/desktop/dist/.gitkeep
 
       - name: Install deps (dev provides mutmut; desktop provides FastAPI for the api modules)
-        run: uv sync --extra dev --extra desktop
+        run: uv sync --locked --extra dev --extra desktop
 
       - name: Run mutmut on the critical modules
         # Mutates only the modules in [tool.mutmut].only_mutate, against the tests selected for them.
         # mutmut always exits 0 — the gate below is what turns survivors into a failure.
-        run: uv run mutmut run
+        run: uv run --locked mutmut run
 
       - name: Gate — every survivor must be a justified allowlist entry
         # An allowlisted mutant that timed out is re-run alone by the gate; one that still times out
         # is a warning, not a stale entry (a timeout says the runner was slow, not that a test caught it).
-        run: uv run python scripts/mutation_gate.py
+        run: uv run --locked python scripts/mutation_gate.py
 
   supply-chain:
     name: supply chain (secrets · known CVEs)
@@ -447,7 +457,7 @@ jobs:
       # green. A gate named for a property it covers one third of is worse than no gate: it is a
       # green light for the two thirds nobody is checking.
       #
-      # Python and npm are ADVISORY, for the reason pip-audit already gave: they fail on any CVE in any
+      # npm remains ADVISORY: it fails on any CVE in any
       # transitive package, including ones with no fix released, which would make red the normal
       # state and teach everyone to ignore it. Dependabot moves versions; this makes what is known
       # visible in the run instead of discovered by a user.
@@ -460,8 +470,8 @@ jobs:
       # crates, proc-macro-error, glib) are warnings that do not fail it. So red means a known
       # vulnerability, and the answer is a version bump or a written `--ignore` with the reason.
       #
-      # Advisory via `continue-on-error` ALONE, with no trailing `|| true`. Both together is one too
-      # many: `continue-on-error` already keeps the job green, and the `|| true` on top additionally
+      # npm is advisory via `continue-on-error` ALONE, with no trailing `|| true`. Both together
+      # is one too many: `continue-on-error` already keeps the job green, and `|| true` additionally
       # hides the step, so a misspelled flag or a missing binary renders exactly like a clean audit.
       # A scanner that cannot fail cannot report either, and the whole point of this job is that
       # somebody sees the output.
@@ -482,12 +492,17 @@ jobs:
       #   neither of which is on the default install path; Chimera runs a diffusion model and does not
       #   train one. Nothing to bump; revisit when upstream ships a fix, or when the `train` extra is
       #   reconsidered.
-      - name: Known vulnerabilities — Python (pip-audit)
-        continue-on-error: true
+      # Audit every published extra (including full, desktop and the opt-in GPU extras). A base
+      # export misses the dependencies users opt into. No installation or re-resolution is needed.
+      # Only advisories with no published fix remain consultative; scanner failures also block.
+      - name: Check the committed Python lock
+        run: uv lock --check
+
+      - name: Known vulnerabilities — Python (block fixable CVEs)
         run: |
           uvx pip-audit --version
-          uv export --format requirements-txt --no-hashes --no-emit-project > /tmp/reqs.txt
-          uvx pip-audit --requirement /tmp/reqs.txt --strict
+          uv export --locked --all-extras --no-dev --format requirements-txt --no-hashes --no-emit-project > /tmp/reqs.txt
+          python scripts/ci_pip_audit.py /tmp/reqs.txt
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -508,10 +523,11 @@ jobs:
         # pass, which is the right failure, but it still has to actually run to be worth having.
         run: npm ci
 
-      # NOT advisory, unlike the three above, and the difference is the point.
+      # Registry signature failures always block, regardless of vulnerability fix availability.
       #
       # A CVE advisory can appear on a package with no fix released — nothing the repository can do
-      # that day, which is why those three only report. A signature mismatch is different in kind:
+      # that day, which is why advisories without a fix can remain consultative. A signature
+      # mismatch is different in kind:
       # it says the tarball in the registry is not the one its publisher signed, and there is no
       # version of that which is acceptable to build on.
       #
@@ -529,7 +545,7 @@ jobs:
         run: npm audit signatures --omit=dev
 
       - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@c8037a86dde8214a8310e9f54a8fc61ab362aa31 # v2
@@ -557,6 +573,38 @@ jobs:
           cargo audit --file apps/desktop/src-tauri/Cargo.lock \
             --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
 
+  # The Dockerfile used to be built only by whoever ran `docker compose up`, so a base-image digest
+  # that stopped resolving, a missing system package or a `USER` the browser cannot run under broke
+  # the deployment path with nothing in CI to say so. This builds the image and stops there: no
+  # `push`, no `load` into a registry, no login, no secret — the job reads the tree and nothing else,
+  # which is what lets it run on a fork's pull request. `if` below keeps schedule runs out.
+  docker-build:
+    name: docker build (no push)
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: docker build -t chimera-agent:ci .
+      # Running as the non-root user is a property of the image, so it is asserted on the image.
+      - name: The image runs as a non-root user that can write its state directory
+        run: |
+          test "$(docker run --rm --entrypoint id chimera-agent:ci -u)" != "0"
+          docker run --rm --entrypoint sh chimera-agent:ci -c 'touch "$CHIMERA_HOME/.w" && chimera --help >/dev/null'
+      # A state directory the user cannot write (an old root-owned volume, a host dir) must stop the
+      # container with a message, not let it fail later inside the first write.
+      - name: The entrypoint refuses an unwritable state directory
+        run: |
+          d="$(mktemp -d)"
+          if docker run --rm -v "$d:/data" chimera-agent:ci --help >/dev/null 2>"$d.err"; then
+            echo "expected the entrypoint to refuse"; exit 1
+          fi
+          grep -q "chown" "$d.err"
   verdict:
     name: verdict (what red actually means)
     timeout-minutes: 5
@@ -572,6 +620,7 @@ jobs:
         desktop-shell,
         mutation,
         supply-chain,
+        docker-build,
       ]
     steps:
       # A run can go red without anything failing. On 2026-08-06 two of the three `quality` matrix

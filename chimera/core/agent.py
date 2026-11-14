@@ -22,6 +22,7 @@ import time
 import uuid
 from collections import Counter
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
@@ -40,6 +41,7 @@ from chimera.orchestration.budget import (
     worst_case_usd,
 )
 from chimera.providers.failover import FailoverReason, classify, is_transient_network
+from chimera.providers.fusion_guard import carries_tools, fusion_forbidden
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import is_refusal, tool_raised
@@ -1477,6 +1479,10 @@ class Agent:
             _log.debug("project instructions skipped: %s", exc)
             return ""
 
+    def _fence(self) -> AbstractContextManager[None]:
+        """Keeps fusion out of every model call this agent makes while it carries tools."""
+        return fusion_forbidden() if carries_tools(self.tools) else nullcontext()
+
     def run(
         self,
         task: str,
@@ -1558,7 +1564,10 @@ class Agent:
         # trace is promised goes with it, so a run that raises reads as "trace missing", not as noise.
         wire_scope = wire_context.wire_run(uuid.uuid4().hex, traced=self.config.trace_path is not None)
         try:
-            with wire_scope:
+            # An agent that carries tools never fuses, on ANY of its calls: the steps already could
+            # not (they carry `tools`), and this closes the closing call, the empty-reply retry and
+            # the compaction summary, which carry none and used to be routed by that absence.
+            with wire_scope, self._fence():
                 result = self._run(
                     task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
                     on_tool_start=on_tool_start, on_context=on_context, on_edit=on_edit,
@@ -2756,12 +2765,15 @@ class Agent:
         """
         usage = _UsageTally()
         state = replace(self.run_state, task="", latest_request="")
-        compacted, changed = compact(
-            messages,
-            keep_recent=self.config.keep_recent,
-            state=state,
-            summarise=self._metered_summariser(usage, spend) if summarise else None,
-        )
+        # Outside `run`, so outside its fence: the summariser is a model call of a tool run too, and
+        # a router in `always` mode would otherwise send it to fusion.
+        with self._fence():
+            compacted, changed = compact(
+                messages,
+                keep_recent=self.config.keep_recent,
+                state=state,
+                summarise=self._metered_summariser(usage, spend) if summarise else None,
+            )
         self.last_compaction_usd = None if usage.unpriced is not None else round(usage.usd, 6)
         if changed:
             self._pre_compact("auto")
