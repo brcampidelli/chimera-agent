@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Safer release pipeline.** Every CI action is pinned to a commit, PyPI publishing now refuses a manual run off `main` or a tag that differs from the package version, and the Docker image runs as a non-root user. (#1262)
+
+- **"Ignore permissions" no longer releases what its own floor keeps for you.** With the switch on, a force push to `main`, `git push origin +main`, an upload of `.env` and `powershell -EncodedCommand` were refused by the floor and then approved by the card one step later; every surface now applies one rule, and the GitHub, Azure, Docker and Kubernetes CLI credential files are refused by the bridge, the switch and the SSH file tools alike. (#1261)
+
 - **Cost numbers now agree.** The Cost screen shows the real cache hit rate (it was capped at 50%), the daily spend cap counts autonomous `solve` runs and the blog writer like the screen does, and only one cron daemon runs per home so a scheduled job no longer fires twice when the app and `chimera serve --cron` are both open. (#1260)
 
 - **Keyboard focus is now easy to see.** The focus ring is a solid outline that reaches 3:1 against every surface in every theme and accent, gets thicker in High contrast and stays visible in Windows High Contrast, and tabs now correctly name the panels they control for screen readers. (#1258)
