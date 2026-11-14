@@ -93,8 +93,16 @@ def test_the_pipeline_checks_the_version_it_is_building_not_merely_a_nonzero_one
     # `github.event.release.tag_name` anywhere in the step — and a sabotage that replaced the whole
     # condition with `if false` left that line untouched and sailed through. Naming the input is not
     # the property; using it to refuse is.
-    esperada = re.search(r'ESPERADA="\$\{\{ github\.event\.release\.tag_name \}\}"', corpo)
-    assert esperada, "the expected version is no longer taken from the release tag"
+    # The tag reaches the script through `env`, never by `${{ }}` pasted into `run`: text a release
+    # author chooses, interpolated into the script, ran as shell in a job holding a write token
+    # (audit plan P0-05). So the property is now two lines — the env binding and its use.
+    assert re.search(r"RELEASE_TAG:\s*\$\{\{ github\.event\.release\.tag_name \}\}", corpo), (
+        "the expected version is no longer taken from the release tag"
+    )
+    esperada = re.search(r'ESPERADA="\$\{RELEASE_TAG#v\}"', corpo)
+    assert esperada, "the expected version is no longer derived from the release tag"
+    run = corpo.split("run: |", 1)[1]
+    assert "github.event.release" not in run, "the release tag is interpolated into the shell again"
 
     comparacao = re.search(r'"\$VERSION" != "\$ESPERADA"', corpo)
     assert comparacao, (
