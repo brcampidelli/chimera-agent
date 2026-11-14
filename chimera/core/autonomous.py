@@ -2314,6 +2314,9 @@ class AutonomousAgent:
                 "attempts": [
                     {
                         "index": int(getattr(a, "index", 0) or 0),
+                        # The id the scheduler's usage row is keyed by: without it the Cost ledger
+                        # cannot tell this receipt is that row's own money and counts it twice.
+                        "run_id": str(getattr(a, "run_id", "") or ""),
                         "success": bool(getattr(a, "success", False)),
                         "prompt_tokens": int(getattr(a, "prompt_tokens", 0) or 0),
                         "completion_tokens": int(getattr(a, "completion_tokens", 0) or 0),

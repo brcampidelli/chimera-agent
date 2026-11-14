@@ -2994,7 +2994,7 @@ class UsageSummaryOut(BaseModel):
     by_day: list[UsageDayOut]
     by_model: list[UsageModelOut]
     by_session: list[UsageSessionOut]
-    cache_hit_pct: float | None  # cache_read / (prompt + cache_read), or None when the denominator is 0
+    cache_hit_pct: float | None  # cache_read / prompt (cache is part of the prompt), or None when no row reported cache
     cache_write_tokens: int | None = None
     route_mix: dict[str, int]  # {"single", "fusion", "cascade"} turn counts
 

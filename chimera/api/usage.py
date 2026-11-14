@@ -9,6 +9,9 @@ separately, so an unknown price can never be laundered into a fake $0.
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -90,8 +93,6 @@ def record_turn(home: Path, session_id: str, report: Any) -> None:
     terminal wrote NOTHING to this file until now, on any of its three surfaces, so the Cost screen
     and every self-measurement this project runs excluded the surface it is used from most.
     """
-    from datetime import UTC, datetime
-
     try:
         route_meta = getattr(report, "route_meta", None)
         append_usage(
@@ -143,8 +144,6 @@ def record_spend(
     Best-effort in the same way every other logging call here is: failing to record what a run cost
     must never be the reason the run fails. The answer is the product.
     """
-    from datetime import UTC, datetime
-
     try:
         append_usage(
             Path(home) / "usage.jsonl",
@@ -197,7 +196,75 @@ def _already_counted(records: list[UsageRecord]) -> set[str]:
     return seen
 
 
-def usage_from_runs(path: Path, *, already: set[str] | None = None) -> list[UsageRecord]:
+def _utc(ts: str) -> datetime | None:
+    """An ISO timestamp as an aware UTC datetime (naive read as UTC), or None when unreadable.
+
+    The one conversion the ledger's day boundaries use — the weekly review's ``_when`` does the
+    same. Comparing the string PREFIX instead put ``2026-11-12T23:30:00-04:00`` (13 Nov, 03:30 UTC)
+    on the 12th, and a cap that thinks it is yesterday lets today's spend through.
+    """
+    try:
+        parsed = datetime.fromisoformat(str(ts).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+_TS_DATE = re.compile(r'"ts"\s*:\s*"([0-9]{4}-[0-9]{2}-[0-9]{2})')
+
+
+def _lines(path: Path, near: str | None) -> Iterator[str]:
+    """Non-empty lines of a JSONL log; with ``near`` (a UTC day) only those that could be that day.
+
+    The cap asks about ONE day on every dispatch, and the receipts log grows for months: parsing
+    every line of it per check is the cost this filter avoids. A line whose ``"ts"`` date is more
+    than two days from ``near`` cannot fall on it (offsets are under one day) and is skipped before
+    any JSON is read; a line whose date cannot be read at all is KEPT, so the filter only ever drops
+    what it is sure about.
+    """
+    lo = hi = None
+    if near is not None:
+        try:
+            day = datetime.strptime(near, "%Y-%m-%d").date()
+            lo, hi = (day - timedelta(days=2)).isoformat(), (day + timedelta(days=2)).isoformat()
+        except ValueError:
+            pass
+    with path.open(encoding="utf-8", errors="replace") as arquivo:
+        for line in arquivo:
+            if not line.strip():
+                continue
+            if lo is not None and hi is not None:
+                found = _TS_DATE.search(line)
+                if found and not lo <= found.group(1) <= hi:
+                    continue
+            yield line
+
+
+def _cron_totals(records: list[UsageRecord]) -> list[tuple[float, float]]:
+    """``(epoch, usd)`` of the scheduler's priced usage rows, for matching receipts with no run id."""
+    out: list[tuple[float, float]] = []
+    for r in records:
+        if str(r.session_id).startswith("cron:") and r.usd is not None:
+            when = _utc(r.ts)
+            if when is not None:
+                out.append((when.timestamp(), r.usd))
+    return out
+
+
+def _unknown(ts: str, key: str) -> UsageRecord:
+    """A run row that could not be read: one UNPRICED record, so the total says "unknown"."""
+    return UsageRecord(ts=ts, session_id=RUN_SESSION_PREFIX + key, usd=None)
+
+
+def usage_from_runs(
+    path: Path,
+    *,
+    already: set[str] | None = None,
+    cron_rows: list[tuple[float, float]] | None = None,
+    near: str | None = None,
+) -> list[UsageRecord]:
     """One record per ATTEMPT of every autonomous run, so the Cost screen counts them too.
 
     ``record_spend`` has exactly two callers — a chat turn and an orchestration run — and the
@@ -211,74 +278,150 @@ def usage_from_runs(path: Path, *, already: set[str] | None = None) -> list[Usag
     already the record. ``usd`` is the attempt's own total — ``overhead_usd`` is a share of it, not
     an addition — and stays None when the price is unknown, which `summarize_usage` counts as an
     unpriced turn rather than laundering into $0.
+
+    Tolerant line by line: a historical row that is not shaped as expected (``attempts: 1``, a
+    token count that is text) becomes ONE unpriced record carrying the row's own ``ts``, never an
+    exception — the cap reads this on every dispatch, and a bad line from last spring must not stop
+    today's jobs. Unpriced, not skipped: if it falls on the day being asked about, that day's total
+    is unknown, which is what it is.
+
+    ``cron_rows`` are the scheduler's usage rows. A receipt with no run id at all (an old minimal
+    receipt, written when the full one failed) cannot be joined by id; it is the same money as a
+    cron row of the same total written within :data:`_NO_ID_MATCH_S`, and each cron row is matched
+    once. ``near`` limits the read to lines that could fall on that UTC day (:func:`_lines`).
     """
     path = Path(path)
     if not path.exists():
         return []
     contadas = already or set()
+    sem_id = list(cron_rows or [])
     out: list[UsageRecord] = []
     # Streamed for the reason spelled out in `chimera.api.runs.load_runs`: the whole-file read
     # peaks at four times the file, and this is the same file.
-    with path.open(encoding="utf-8", errors="replace") as arquivo:
-        for line in arquivo:
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except ValueError:
-                _log.warning("skipping malformed run record line")
-                continue
-            if not isinstance(row, dict):
-                continue
-            run_ts = str(row.get("ts") or "")
-            tentativas = [a for a in (row.get("attempts") or []) if isinstance(a, dict)]
-            # The WHOLE run, not the one attempt whose id matched. A scheduled dispatch writes ONE
-            # usage row holding the total across every attempt, keyed by the LAST attempt's id — so
-            # skipping only that attempt left the earlier ones to be added on top of a total that
-            # already contained them. Measured on a real job: two attempts of $0.004247 and $0.006598
-            # against a $0.010845 row, counted as $0.015092. The first version of this join fixed half
-            # the double-count and the arithmetic said so.
-            if any(str(a.get("run_id") or "") in contadas for a in tentativas):
-                continue
-            for attempt in tentativas:
-                usd = attempt.get("usd")
-                out.append(
-                    UsageRecord(
-                        ts=run_ts,
-                        # The attempt carries the run id; the run row itself does not.
-                        session_id=RUN_SESSION_PREFIX + str(attempt.get("run_id") or run_ts),
-                        model=str(attempt.get("model") or ""),
-                        provider=str(attempt.get("provider") or ""),
-                        host=str(attempt.get("host") or ""),
-                        prompt_tokens=int(attempt.get("prompt_tokens") or 0),
-                        completion_tokens=int(attempt.get("completion_tokens") or 0),
-                        usd=float(usd) if isinstance(usd, int | float) else None,
-                        tools=len(attempt.get("tool_names") or []),
-                    )
-                )
+    for line in _lines(path, near):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            _log.warning("skipping malformed run record line")
+            continue
+        if not isinstance(row, dict):
+            continue
+        run_ts = str(row.get("ts") or "")
+        try:
+            records = _row_records(row, run_ts, contadas, sem_id)
+        except (TypeError, ValueError, AttributeError, OverflowError):
+            _log.warning("run record line is not shaped as expected; counted as unknown")
+            records = [_unknown(run_ts, run_ts)] if _utc(run_ts) is not None else []
+        out.extend(records)
     return out
 
 
-def load_usage(path: Path) -> list[UsageRecord]:
-    """Load persisted usage records; malformed lines are skipped."""
+#: How far apart a usage row and an id-less receipt of the same run can be written, in seconds.
+_NO_ID_MATCH_S = 300.0
+
+
+def _row_records(
+    row: dict[str, Any], run_ts: str, contadas: set[str], sem_id: list[tuple[float, float]]
+) -> list[UsageRecord]:
+    raw = row.get("attempts") or []
+    if not isinstance(raw, list):
+        raise TypeError("attempts is not a list")
+    tentativas = [a for a in raw if isinstance(a, dict)]
+    # The WHOLE run, not the one attempt whose id matched. A scheduled dispatch writes ONE
+    # usage row holding the total across every attempt, keyed by the LAST attempt's id — so
+    # skipping only that attempt left the earlier ones to be added on top of a total that
+    # already contained them. Measured on a real job: two attempts of $0.004247 and $0.006598
+    # against a $0.010845 row, counted as $0.015092. The first version of this join fixed half
+    # the double-count and the arithmetic said so.
+    if any(str(a.get("run_id") or "") in contadas for a in tentativas):
+        return []
+    if tentativas and not any(a.get("run_id") for a in tentativas) and _matches_cron_row(
+        tentativas, run_ts, sem_id
+    ):
+        return []
+    out: list[UsageRecord] = []
+    for attempt in tentativas:
+        key = str(attempt.get("run_id") or run_ts)
+        try:
+            usd = attempt.get("usd")
+            out.append(
+                UsageRecord(
+                    ts=run_ts,
+                    # The attempt carries the run id; the run row itself does not.
+                    session_id=RUN_SESSION_PREFIX + key,
+                    model=str(attempt.get("model") or ""),
+                    provider=str(attempt.get("provider") or ""),
+                    host=str(attempt.get("host") or ""),
+                    prompt_tokens=int(attempt.get("prompt_tokens") or 0),
+                    completion_tokens=int(attempt.get("completion_tokens") or 0),
+                    usd=float(usd) if isinstance(usd, int | float) else None,
+                    tools=len(attempt.get("tool_names") or []),
+                )
+            )
+        except (TypeError, ValueError, OverflowError):
+            out.append(_unknown(run_ts, key))
+    return out
+
+
+def _matches_cron_row(
+    attempts: list[dict[str, Any]], run_ts: str, sem_id: list[tuple[float, float]]
+) -> bool:
+    """True (and the cron row is consumed) when an id-less receipt is a cron row's own money."""
+    when = _utc(run_ts)
+    usds = [a.get("usd") for a in attempts]
+    if when is None or not all(isinstance(u, int | float) for u in usds):
+        return False
+    total = float(sum(usds))  # type: ignore[arg-type]  # all numbers, checked above
+    for i, (stamp, usd) in enumerate(sem_id):
+        if abs(stamp - when.timestamp()) <= _NO_ID_MATCH_S and abs(usd - total) < 1e-9:
+            del sem_id[i]
+            return True
+    return False
+
+
+def load_usage(path: Path, *, near: str | None = None) -> list[UsageRecord]:
+    """Load persisted usage records; malformed lines are skipped. ``near``: see :func:`_lines`."""
     path = Path(path)
     if not path.exists():
         return []
     out: list[UsageRecord] = []
     # Streamed for the same reason as the run log above.
-    with path.open(encoding="utf-8", errors="replace") as arquivo:
-        for line in arquivo:
-            if not line.strip():
-                continue
-            try:
-                out.append(UsageRecord.model_validate_json(line))
-            except ValueError:  # pragma: no cover - defensive
-                _log.warning("skipping malformed usage record line")
+    for line in _lines(path, near):
+        try:
+            out.append(UsageRecord.model_validate_json(line))
+        except ValueError:  # pragma: no cover - defensive
+            _log.warning("skipping malformed usage record line")
     return out
+
+
+def ledger_rows(home: Path) -> list[UsageRecord]:
+    """EVERY row of spend under ``home``, counted once: ``usage.jsonl`` plus the receipts it lacks.
+
+    The one answer to "what has been spent". The Cost screen, the weekly review and the daily cap
+    each read their own subset of the two logs — the cap only ``usage.jsonl`` — so a ``chimera solve``
+    that cost real money the same day did not slow the cron at all, while the screen showed it. Three
+    readers of one number drift; one function cannot.
+
+    The join is :func:`_already_counted`: a scheduled run writes a usage row AND a receipt, and only
+    the run id says they are the same money.
+    """
+    home = Path(home)
+    return _ledger(home / "usage.jsonl", home / "runs.jsonl")
+
+
+def _ledger(usage_path: Path, runs_path: Path, *, near: str | None = None) -> list[UsageRecord]:
+    turnos = load_usage(usage_path, near=near)
+    return turnos + usage_from_runs(
+        runs_path, already=_already_counted(turnos), cron_rows=_cron_totals(turnos), near=near
+    )
 
 
 def spent_today(path: Path, *, today: str) -> tuple[float, bool]:
     """What has been spent on ``today`` (an ISO ``YYYY-MM-DD``), and whether any of it is unknown.
+
+    ``path`` is the ``usage.jsonl`` of a home, and the receipts beside it (``runs.jsonl``) are read
+    too — the same ledger :func:`ledger_rows` gives the screen, so the cap is compared against the
+    same total the screen shows, to the cent.
 
     Returns ``(usd, has_unpriced)``. The second value is not a detail: a day containing one unpriced
     turn has an unknown total, and a cap compared against the known part alone would be comparing
@@ -291,8 +434,12 @@ def spent_today(path: Path, *, today: str) -> tuple[float, bool]:
     """
     total = 0.0
     unpriced = False
-    for record in load_usage(path):
-        if not record.ts.startswith(today):
+    path = Path(path)
+    for record in _ledger(path, path.with_name("runs.jsonl"), near=today):
+        when = _utc(record.ts)
+        # By the UTC day, not the prefix of the string: see `_utc`. A row whose date cannot be read
+        # is not placed in any day (the weekly review does the same and reports it as undated).
+        if when is None or when.strftime("%Y-%m-%d") != today:
             continue
         if record.usd is None:
             unpriced = True
@@ -358,7 +505,10 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
         totals["completion_tokens"] += r.completion_tokens
         if r.cache_read_tokens is not None:
             totals["cache_read_tokens"] += r.cache_read_tokens
-            cache_read_total += r.cache_read_tokens
+            # Clamped to the row's own prompt: the gateway's response cache answers with
+            # ``prompt_tokens=0`` and the original count under ``cache_read_tokens`` — a call nobody
+            # billed, and not a prefix-cache hit either, so it must not push the rate past 100%.
+            cache_read_total += min(r.cache_read_tokens, r.prompt_tokens)
             cache_prompt_total += r.prompt_tokens
         if r.cache_write_tokens is not None:
             totals["cache_write_tokens"] += r.cache_write_tokens
@@ -385,8 +535,12 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
 
     # Compare cache reads only against prompts whose route actually reported cache telemetry.
     # Including silent routes in the denominator turns missing data into apparent cache misses.
-    denom = cache_prompt_total + cache_read_total
-    cache_hit_pct = (cache_read_total / denom) if denom else None
+    #
+    # ``read / prompt``, not ``read / (prompt + read)``: cache tokens are a PART of ``prompt_tokens``
+    # (see `chimera.fusion.receipts.cost_usd`), and `StepLog.cache_hit_rate` already divides this
+    # way. Adding the read to the denominator counted it twice and capped the screen at 50% — a
+    # cache serving 84% of its prompt read as 46%, an invitation to "fix" a cache that works.
+    cache_hit_pct = (cache_read_total / cache_prompt_total) if cache_prompt_total else None
     totals["cache_write_tokens"] = cache_write_total if cache_write_reported else None
 
     return {

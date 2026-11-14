@@ -889,6 +889,7 @@ def _start_cron_daemon(
 
     from chimera.core import Agent, AgentConfig
     from chimera.scheduler import CronDaemon, Scheduler, make_agent_dispatch
+    from chimera.scheduler.daemon import start_unless_running
     from chimera.scheduler.delivery import make_deliver, make_failure_notifier
     from chimera.scheduler.job_runner import make_run_job
     from chimera.tools import default_registry
@@ -968,7 +969,12 @@ def _start_cron_daemon(
         tick_seconds=tick,
         on_outcome=notices,
     )
-    _thread, stop = daemon.start()
+    started = start_unless_running(
+        daemon, lambda linha: console.print(f"[yellow]{linha}[/yellow]")
+    )
+    if started is None:
+        return None
+    _thread, stop = started
     keep_awake_service().add_probe("cron", cron_due_probe(scheduler))
     jobs = len(scheduler.store.list())
     console.print(f"[dim]cron daemon on (tick {tick}s, {jobs} job(s) scheduled)[/dim]")

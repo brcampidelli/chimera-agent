@@ -162,11 +162,9 @@ from chimera.api.screen_credential import ScreenCredential
 from chimera.api.sessions import SessionManager, SessionStore
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.usage import (
-    _already_counted,
-    load_usage,
+    ledger_rows,
     record_turn,
     summarize_usage,
-    usage_from_runs,
 )
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
@@ -1574,16 +1572,9 @@ def build_api_app(
 
     @app.get("/api/usage", dependencies=[guard], response_model=UsageSummaryOut)
     def usage_endpoint() -> dict[str, Any]:
-        # BOTH logs. `usage.jsonl` holds chat turns and orchestration; runs write their receipts to
-        # `runs.jsonl` and were simply missing from this screen — see `usage_from_runs`.
-        # BOTH logs, joined on the run id. `usage.jsonl` holds chat turns and orchestration;
-        # runs write their receipts to `runs.jsonl` and were missing from this screen entirely.
-        # A SCHEDULED run writes to both, so the merge has to subtract what is already counted —
-        # see `_already_counted`, and the measured $0.049 it was billing twice.
-        turnos = load_usage(settings.home / "usage.jsonl")
-        return summarize_usage(
-            turnos + usage_from_runs(settings.home / "runs.jsonl", already=_already_counted(turnos))
-        )
+        # One ledger for the screen, the weekly review and the daily cap — see `ledger_rows`: both
+        # logs, joined on the run id so a scheduled run (which writes to both) is billed once.
+        return summarize_usage(ledger_rows(settings.home))
 
     @app.get("/api/runs", dependencies=[guard], response_model=list[RunReceiptOut])
     def runs_endpoint(workspace: str | None = None) -> list[Any]:
