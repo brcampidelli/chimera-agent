@@ -297,10 +297,15 @@ def register_design_api(
     @app.get("/api/design/{design_id}/check", dependencies=[guard], response_model=DesignCheckOut)
     def check_design(design_id: str) -> dict[str, Any]:
         """The deterministic checks against the document's own tokens. No model is called."""
-        from chimera.design.export_html import check_against_tokens
+        from chimera.design.export_html import check_report
 
         doc = load(design_id)
-        return {"revision": doc.revision, "findings": [_finding(f) for f in check_against_tokens(doc)]}
+        report = check_report(doc)
+        return {
+            "revision": doc.revision,
+            "findings": [_finding(f) for f in report.findings],
+            "unchecked": [_unchecked(u) for u in report.unchecked],
+        }
 
     # ---- the model calls ----------------------------------------------------------------------
 
@@ -526,6 +531,7 @@ def register_design_api(
             "ok": result is not None,
             "revision": doc.revision,
             "findings": [_finding(f) for f in outcome.findings],
+            "unchecked": [_unchecked(u) for u in outcome.unchecked],
             "unverifiable": outcome.unverifiable,
             "error": outcome.error,
             "attempts": outcome.attempts,
@@ -620,6 +626,10 @@ def _saving() -> Iterator[None]:
     except OSError as exc:
         _log.warning("design write failed: %s", exc)
         raise HTTPException(status_code=500, detail="the design could not be saved") from None
+
+
+def _unchecked(gap: Any) -> dict[str, Any]:
+    return {"artboard_id": gap.artboard_id, "reason": gap.reason, "message": gap.message}
 
 
 def _finding(issue: Any) -> dict[str, Any]:

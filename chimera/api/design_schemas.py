@@ -151,9 +151,18 @@ class DesignFindingOut(BaseModel):
     message: str
 
 
+class DesignUncheckedOut(BaseModel):
+    """A part of the design the checks did not cover. "Not checked" is not "no findings"."""
+
+    artboard_id: str | None = None
+    reason: str
+    message: str
+
+
 class DesignCheckOut(BaseModel):
     revision: int
     findings: list[DesignFindingOut]
+    unchecked: list[DesignUncheckedOut] = Field(default_factory=list)
 
 
 class DesignAuditIssueOut(BaseModel):
@@ -170,6 +179,7 @@ class DesignAuditOut(BaseModel):
     passed_checks: list[str] = Field(default_factory=list)
     needs_user_decision: list[str] = Field(default_factory=list)
     findings: list[DesignFindingOut] = Field(default_factory=list)
+    unchecked: list[DesignUncheckedOut] = Field(default_factory=list)
     unverifiable: int = 0
     """Issues the model pinned on an element the document does not have — dropped, counted."""
     error: str | None = None

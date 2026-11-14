@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The Design check measures HTML artboards.** Colours, fonts, spacing and text contrast are checked against the tokens, and anything the check could not measure is listed as "not checked" instead of reading as "no findings". (#1277)
+
 - **The app's agent now knows who you are.** The profile you fill in (stored profile and remembered facts about you) is added to the agent's instructions in the same place in the desktop Code turn, the terminal and the bots, and stays identical between turns so prompt caching keeps working. (#1275)
 
 - **Pasted credentials no longer sit in chat session files, and a web page can no longer POST to a token-less local server.** Chat transcripts are masked on disk, writes from another origin are refused when no server token is set, the attachment and dictation uploads get the same origin check as skill uploads, and a non-ASCII bearer header now gets a 401 instead of a 500. (#1274)
