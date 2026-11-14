@@ -63,7 +63,9 @@ def test_every_query_shares_a_word_with_its_fact() -> None:
     # The relevance floor is met by construction, so a loss can only be the regex's or recall's —
     # and the runner still records which. Read with the gate's OWN tokenizer, since that is the one
     # whose floor has to be met.
-    from chimera.memory.gate import _tokens
+    from chimera.memory.gate import (
+        _terms as _tokens,  # renamed 2026-11 (P0-07): same role, Unicode-aware
+    )
 
     frame = _tokens("what do the docs say about")
     for row in _rows():
