@@ -1161,13 +1161,17 @@ def register_bridge_api(
                 continue
             target = base.expanduser() / f
             try:
-                opened = normal_name(target.resolve().name)
+                resolved = str(target.resolve())
+                opened = normal_name(Path(resolved).name)
             except (OSError, ValueError):
-                opened = ""
+                resolved, opened = "", ""
             # The name the path OPENS, not the text: an 8.3 short name (`ENV~1`) resolves to `.env`
             # on a file system that keeps them, and no pattern over the typed text could see that.
-            # And Chimera's own `.env` by identity, whatever it is called on the way.
-            if (opened and is_secret_file(opened)) or is_own_env(target):
+            # And the WHOLE resolved path, workspace included: with `workspace=~/.config/gh` and
+            # `path=hosts.yml` neither the typed path nor the last name says `gh/hosts.yml`, and the
+            # GitHub token was read (review of the P0-02 fix). And Chimera's own `.env` by identity,
+            # whatever it is called on the way.
+            if (opened and is_secret_file(opened)) or (resolved and is_secret_file(resolved)) or is_own_env(target):
                 raise HTTPException(
                     status_code=403,
                     detail="credential files are not reachable through the bridge",

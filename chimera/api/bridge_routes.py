@@ -1314,35 +1314,23 @@ _SECRET_FIELD = re.compile(
 MASK = "[redacted]"
 
 
-#: File names that hold credentials. A bridge call that names one — to read, write, diff, commit or
-#: search — is refused at every tier: the settings screen masks keys, and a file view that returned
-#: the `.env` beside it would be the same key by a side door. The service's record and token are the
-#: owner's whole API (`chimera/core/service_record.py`), and the launcher record names the
-#: environment the service starts with.
-_SECRET_FILE = re.compile(
-    r"^(\.env.*|.*\.(pem|key|p12|pfx|keystore|jks)|id_(rsa|dsa|ecdsa|ed25519).*|"
-    r"\.ssh|credentials.*|\.netrc|\.pypirc|\.npmrc|\.git-credentials|secrets?(\..*)?|"
-    r"desktop-bridge\.json|service-(stable|dev)\.json|service\.token|desktop-install\.json)$",
-    re.IGNORECASE,
-)
-
-
 def is_secret_file(path: str) -> bool:
     """Whether any component of ``path`` names a credential file (``.env``, a private key, ...).
 
-    Each component as Windows OPENS it (:func:`chimera.core.own_files.normal_name`): ``.env ``,
-    ``.env.`` and ``.env::$DATA`` are the file ``.env``, and matching the raw text let all three read
-    and write it through the bridge at the operate tier (review of 2026-10-04). An 8.3 short name
-    (``ENV~1``) has no text to match; the bridge also checks the name the path RESOLVES to.
-    """
-    from chimera.core.own_files import normal_name
+    A bridge call that names one — to read, write, diff, commit or search — is refused at every tier:
+    the settings screen masks keys, and a file view that returned the `.env` beside it would be the
+    same key by a side door.
 
-    parts = re.split(r"[\\/]+", str(path))
-    return any(
-        _SECRET_FILE.match(part) or _SECRET_FILE.match(normal_name(part))
-        for part in parts
-        if part
-    )
+    The list is :mod:`chimera.core.credential_files`, the one the permission switch and the SSH file
+    tools read too (audit 2026-11, a07-02: three lists had drifted apart, and the GitHub CLI's token
+    was in none). Each component is also read as Windows OPENS it: ``.env ``, ``.env.`` and
+    ``.env::$DATA`` are the file ``.env``, and matching the raw text let all three read and write it
+    through the bridge at the operate tier (review of 2026-10-04). An 8.3 short name (``ENV~1``) has
+    no text to match; the bridge also checks the name the path RESOLVES to.
+    """
+    from chimera.core.credential_files import is_credential_path
+
+    return is_credential_path(path)
 
 
 def is_secret_setting(name: str) -> bool:

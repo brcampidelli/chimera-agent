@@ -33,7 +33,6 @@ module says the same of commands).
 from __future__ import annotations
 
 import base64
-import fnmatch
 import hashlib
 import posixpath
 import re
@@ -42,6 +41,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from chimera.core.credential_files import (
+    CREDENTIAL_NAME_GLOBS,
+    CREDENTIAL_PATH_SEQUENCES,
+    credential_sequence_part,
+    is_credential_name,
+)
 from chimera.sandbox.base import SandboxResult
 
 #: A file bigger than this is not read over ssh (it would have to be base64'd through one pipe).
@@ -50,23 +55,13 @@ MAX_PATH = 1024
 #: What `find` may list before it is cut: the cap is on the host's side, not on the answer.
 MAX_FIND_LINES = 200_000
 
-#: File names that hold credentials. The same list as the bridge's (``_SECRET_FILE`` in
-#: ``chimera/api/bridge_routes.py``: a file view that returned the ``.env`` would be the key by a side
-#: door), as globs so that the ``grep``/``find`` run on the host can be told to skip them too and a
-#: secret is never even read. A test holds the shared part of the two lists in step. Remote only, and
-#: not in the bridge's list: ``.gnupg``, ``.aws``, ``.kube`` and ``.docker`` (cloud and cluster
-#: credentials live in ``.aws/credentials``, ``.kube/config``, ``.docker/config.json``; the whole folder
-#: is refused because a glob here names one path COMPONENT), shell and language histories (they hold
-#: whatever was typed, passwords included) and Terraform state (it stores secrets in clear).
-#: Lower case: names are compared lower-cased, here and on the host.
-SECRET_NAME_GLOBS: tuple[str, ...] = (
-    ".env*", "*.pem", "*.key", "*.p12", "*.pfx", "*.keystore", "*.jks",
-    "id_rsa*", "id_dsa*", "id_ecdsa*", "id_ed25519*",
-    ".ssh", "credentials*", ".netrc", ".pypirc", ".npmrc", ".git-credentials",
-    "secret", "secrets", "secret.*", "secrets.*",
-    ".gnupg", ".aws", ".kube", ".docker", ".bash_history", ".zsh_history", ".python_history",
-    "*.tfstate", "*.tfstate.backup",
-)
+#: File names that hold credentials: :data:`chimera.core.credential_files.CREDENTIAL_NAME_GLOBS`, the
+#: one list the bridge and the permission switch read too (audit 2026-11, a07-02: this module had its
+#: own copy, and ``service.token`` was refused by the bridge and not here, ``.kube`` the other way
+#: round). As globs, so that the ``grep``/``find`` run on the host can be told to skip them too and a
+#: secret is never even read. A folder named here is refused whole, because a glob names one path
+#: COMPONENT. Lower case: names are compared lower-cased, here and on the host.
+SECRET_NAME_GLOBS: tuple[str, ...] = CREDENTIAL_NAME_GLOBS
 assert all(re.fullmatch(r"[a-z0-9._*-]+", g) for g in SECRET_NAME_GLOBS)  # safe to put in a `case`
 
 
@@ -92,6 +87,11 @@ _NO_ROOT, _ESCAPES, _NO_REALPATH, _NOT_THERE, _TOO_BIG, _NO_DIR, _NO_TMP, _NO_WR
 )
 _SHORT, _DENIED_HOST, _NO_READ = 101, 102, 103
 _DENY_CASE = "|".join(SECRET_NAME_GLOBS)
+#: The runs of components (``gh/hosts.yml``) as one ``case`` over the whole lower-cased path, each
+#: component quoted so a name with a space stays one literal.
+_DENY_SEQUENCE_CASE = "|".join(
+    "*/" + "/".join(shlex.quote(part) for part in sequence) + "/*" for sequence in CREDENTIAL_PATH_SEQUENCES
+)
 
 
 class RemoteFileError(Exception):
@@ -114,13 +114,25 @@ class ScriptRunner(Protocol):
 def is_secret_name(name: str) -> bool:
     """Whether one path component names a credential file. Case-insensitive; trailing dots and spaces
     are dropped, as Windows opens ``.env `` as ``.env`` (a remote host may be a Windows OpenSSH too)."""
-    lowered = name.lower().rstrip(" .") or name.lower()
-    return any(fnmatch.fnmatchcase(lowered, glob) for glob in SECRET_NAME_GLOBS)
+    return is_credential_name(name)
 
 
 def secret_component(path: str) -> str | None:
-    """The first component of ``path`` that names a credential file, or None."""
-    return next((part for part in path.split("/") if part and is_secret_name(part)), None)
+    """The first component of ``path``, or run of components (``gh/hosts.yml``), that names a credential."""
+    return next(
+        (part for part in path.split("/") if part and is_secret_name(part)), None
+    ) or credential_sequence_part(path)
+
+
+def secret_in(rel: str, absolute: str) -> str | None:
+    """What names a credential in a target, read on the ``absolute`` path as well as on ``rel``.
+
+    The absolute path, because the configured folder is not a place where the list stops applying:
+    with ``remote_path`` set to ``/home/me/.kube`` the relative path of the cluster token is just
+    ``config``, and reading only ``rel`` handed it over (review of the P0-01/02 fix). A folder that is
+    itself a credential folder refuses everything under it, which is what it holds.
+    """
+    return secret_component(rel) or secret_component(absolute)
 
 
 def within(root: str, path: str) -> bool:
@@ -143,7 +155,7 @@ def lexical_target(remote_path: str, requested: str) -> str:
             f"error: path {requested!r} escapes {remote_path} on the remote host. Only that folder "
             "is reachable with this tool; use run_shell for anything else. Do not retry."
         )
-    if (secret := secret_component(posixpath.relpath(normal, remote_path))) is not None:
+    if (secret := secret_in(posixpath.relpath(normal, remote_path), normal)) is not None:
         raise RemoteFileError(_denied(requested, secret))
     return normal
 
@@ -193,7 +205,7 @@ def _denied(path: str, component: str) -> str:
 
 #: Shared by every action. $1 is the real folder and $2 the real target as :data:`RESOLVE` returned them;
 #: both are checked again on the host, because a link could have been swapped in between the two calls,
-#: and so is the credential denylist, on every component of the real path (case-insensitively).
+#: and so is the credential denylist, on every component of the whole real path, folder included (case-insensitively).
 #: ``rootp`` drops a trailing slash so the root folder ``/`` still has a prefix to match.
 _GUARD = f"""\
 root=$(cd -- "$1" 2>/dev/null && pwd -P) || exit {_NO_ROOT}
@@ -207,12 +219,13 @@ done
 r=$(realpath -- "$a" 2>/dev/null || readlink -f -- "$a" 2>/dev/null) || exit {_NO_REALPATH}
 case "$r" in "$root"|"$rootp"/*) ;; *) exit {_ESCAPES};; esac
 chk() {{
-  [ "$1" = "$root" ] && return 0
   oi=$IFS; IFS=/; set -f
-  for c in $(printf '%s' "${{1#"$rootp"/}}" | tr 'A-Z' 'a-z'); do
+  for c in $(printf '%s' "$1" | tr 'A-Z' 'a-z'); do
     case "$c" in {_DENY_CASE}) IFS=$oi; set +f; return 1;; esac
   done
-  IFS=$oi; set +f; return 0
+  IFS=$oi; set +f
+  case "$(printf '%s' "$1" | tr 'A-Z' 'a-z')/" in {_DENY_SEQUENCE_CASE}) return 1;; esac
+  return 0
 }}
 chk "$t" && chk "$r" || exit {_DENIED_HOST}
 printf '@@chimera-begin@@\\n'
@@ -436,7 +449,7 @@ class RemoteFiles:
                 f"error: path {requested!r} resolves outside {root_cfg} on the remote host (a link "
                 "leaves it). Do not retry."
             )
-        if (secret := secret_component(posixpath.relpath(dest, root))) is not None:
+        if (secret := secret_in(posixpath.relpath(dest, root), dest)) is not None:
             raise RemoteFileError(_denied(requested, secret))
         shown = {"d": "dir", "f": "file"}.get(kind, "none") if exists else "none"
         return Resolved(root=root, real=dest, kind=shown)

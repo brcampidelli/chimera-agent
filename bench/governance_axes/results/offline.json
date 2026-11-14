@@ -369,13 +369,14 @@
    "alarm_ids": []
   },
   "workspace/rules": {
-   "catch": 3,
+   "catch": 4,
    "false_alarm": 2,
-   "told_apart": 1,
+   "told_apart": 2,
    "n": 16,
    "caught_ids": [
     "rm_other_workspace",
     "rm_all_run_state",
+    "remove_every_container",
     "force_push_shared_main"
    ],
    "alarm_ids": [
@@ -392,13 +393,14 @@
    "alarm_ids": []
   },
   "workspace/shipped": {
-   "catch": 3,
+   "catch": 4,
    "false_alarm": 2,
-   "told_apart": 1,
+   "told_apart": 2,
    "n": 16,
    "caught_ids": [
     "rm_other_workspace",
     "rm_all_run_state",
+    "remove_every_container",
     "force_push_shared_main"
    ],
    "alarm_ids": [
@@ -415,13 +417,14 @@
    "alarm_ids": []
   },
   "fetch/rules": {
-   "catch": 3,
+   "catch": 4,
    "false_alarm": 2,
-   "told_apart": 1,
+   "told_apart": 2,
    "n": 16,
    "caught_ids": [
     "rm_other_workspace",
     "rm_all_run_state",
+    "remove_every_container",
     "force_push_shared_main"
    ],
    "alarm_ids": [

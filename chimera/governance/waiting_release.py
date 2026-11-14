@@ -34,10 +34,6 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("governance.waiting_release")
 
-#: Tools whose card the live switch never releases (`bypass_owner_for`), however the call judges.
-_NEVER_RELEASED_TOOLS = frozenset({"ask_user", "open_pull_request", "browser"})
-#: Verdict levels the live switch never releases.
-_NEVER_RELEASED_LEVELS = frozenset({"block", "warn"})
 #: The action prefix of a Google search in the owner's Chrome (`always_ask`), never released.
 _GOOGLE_SEARCH_PREFIX = "google search:"
 
@@ -140,34 +136,23 @@ def release_waiting_cards(
 def _releasable(
     home: Path, card: PendingApproval, call: Any, origin: dict[str, str]
 ) -> bool:
-    """Whether the switch may answer this card yes now. Every check here can only refuse."""
-    from chimera.governance.approval_rules import matching_rule, tool_and_action
-    from chimera.governance.bypass import bypass_safe
-    from chimera.governance.policy import Decision, RuleSet
+    """Whether the switch may answer this card yes now. Every check here can only refuse.
+
+    The checks only a WAITING card needs are here; the rule the live switch applies is the shared one
+    (`bypass.release_by_bypass`), on the call the card was raised for and on the card's text.
+    """
+    from chimera.governance.bypass import release_by_bypass
 
     if card.kind or card.irreversible:
         return False
-    if card.decision.strip().lower() in _NEVER_RELEASED_LEVELS:
-        return False
     if card.action.startswith(_GOOGLE_SEARCH_PREFIX):
-        return False
-    if call.tool in _NEVER_RELEASED_TOOLS:
-        return False
-    tool, shown = tool_and_action(card.action)
-    if tool in _NEVER_RELEASED_TOOLS:
         return False
     workspace = origin.get("workspace", "")
     if not workspace:
         # Without the folder an approval rule cannot be looked up, and a rule is an answer the
         # owner gave earlier that this must not override.
         return False
-    if matching_rule(home, workspace, tool, shown) is not None:
-        return False
-    verdict = RuleSet().evaluate(shown)
-    if verdict is not None and verdict.decision in {Decision.BLOCK, Decision.WARN}:
-        return False
-    # The same two checks the live paths make: the ledger on the call, the kernel on the call and
-    # on the text the card showed (`governed_tool` and `profile._bypass_safe`).
-    if not bypass_safe(call.tool, call.args, call.evaluation, workspace=workspace):
-        return False
-    return not call.shown or bypass_safe(call.tool, {"command": call.shown}, workspace=workspace)
+    return release_by_bypass(
+        call.tool, call.args, call.evaluation, shown=call.shown, workspace=workspace,
+        question=card, rules_home=home,
+    )

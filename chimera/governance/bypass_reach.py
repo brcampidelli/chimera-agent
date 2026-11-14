@@ -502,6 +502,13 @@ def is_wrapper_word(token: str) -> bool:
     return _exe(token) in _PREFIXES
 
 
+def may_wrap(token: str) -> bool:
+    """Whether :func:`nested_script` could find a script after ``token``: a cheap test, so a caller
+    walking every token of a long command does not slice the rest of it at each one."""
+    exe = _exe(token)
+    return exe in _PREFIXES or exe in _POSIX_SHELLS or exe in {"eval", "cmd", "powershell", "pwsh"}
+
+
 def nested_script(tokens: list[str]) -> str:
     """The script a shell wrapper at ``tokens[0]`` runs, or ''.
 
