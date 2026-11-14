@@ -60,9 +60,11 @@ jobs:
         # Without `notify` this asks the API to reject a MALFORMED body: a 422 means the request was
         # authorised and only then found invalid, which is exactly the fact being tested; a 403 means
         # the token would have been refused on a real release too.
+        env:
+          NOTIFY: ${{ inputs.notify }}
         run: |
           set -euo pipefail
-          if [ "${{ inputs.notify }}" = "true" ]; then
+          if [ "$NOTIFY" = "true" ]; then
             body='{"event_type":"chimera-release","client_payload":{"tag":"manual-verification"}}'
           else
             body='{}'   # no event_type — valid JSON, invalid payload

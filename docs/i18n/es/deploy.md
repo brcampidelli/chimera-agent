@@ -1,5 +1,5 @@
 ---
-source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
+source_sha256: ded4f1799194e9f44cf268e7e309fba1b6befe25a2dd3b52fbca4cda40ced559
 ---
 
 # Desplegar Chimera en un servidor (VPS)
@@ -59,6 +59,18 @@ respectivas flags; cada una necesita su token `CHIMERA_*` correspondiente — co
 ```bash
 git pull && docker compose up -d --build
 ```
+
+**Actualizar desde una imagen que corría como root:**
+
+La imagen ahora corre como usuario sin privilegios (uid 10001). Un volumen `chimera-data` creado por una imagen anterior pertenece a root, así que el contenedor se niega a arrancar (código 78, con este mensaje) en vez de fallar en la primera escritura. Corrige el propietario una vez, antes de actualizar:
+
+```bash
+docker compose run --rm --no-deps --user 0 --entrypoint chown chimera -R 10001:10001 /data
+```
+
+Docker Compose nombra el volumen `<proyecto>_chimera-data` (el proyecto es el nombre de la carpeta), así que `-v chimera-data:/data` cambiaría el propietario de un volumen vacío con otro nombre; el comando de arriba pasa por Compose y llega al real. Para ver los volúmenes usa `docker compose config --volumes` y `docker volume ls`. Si `/data` es un bind mount en vez de un volumen, ejecuta `sudo chown -R 10001:10001 <ruta del host>`.
+
+Para seguir como root, quédate en la etiqueta de imagen anterior; la actual no lo hará.
 
 ---
 

@@ -268,9 +268,12 @@ jobs:
       # stops a build over a shortened link in a comment is a gate somebody switches off.
       - name: What this diff brings in
         if: github.event_name == 'pull_request'
+        # Through env: a branch name is text someone chose, and `${{ }}` pastes it into the script.
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          uv run --locked python scripts/pr_intent_scan.py --base "origin/${{ github.base_ref }}" --fail-on high
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          uv run --locked python scripts/pr_intent_scan.py --base "origin/$BASE_REF" --fail-on high
 
       - name: Regenerate the CLI snapshot
         run: uv run --locked python -m chimera.cli.schema_dump > chimera/_cli_snapshot.json
@@ -348,7 +351,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@c8037a86dde8214a8310e9f54a8fc61ab362aa31 # v2
@@ -542,7 +545,7 @@ jobs:
         run: npm audit signatures --omit=dev
 
       - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@c8037a86dde8214a8310e9f54a8fc61ab362aa31 # v2
@@ -570,6 +573,38 @@ jobs:
           cargo audit --file apps/desktop/src-tauri/Cargo.lock \
             --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
 
+  # The Dockerfile used to be built only by whoever ran `docker compose up`, so a base-image digest
+  # that stopped resolving, a missing system package or a `USER` the browser cannot run under broke
+  # the deployment path with nothing in CI to say so. This builds the image and stops there: no
+  # `push`, no `load` into a registry, no login, no secret — the job reads the tree and nothing else,
+  # which is what lets it run on a fork's pull request. `if` below keeps schedule runs out.
+  docker-build:
+    name: docker build (no push)
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: docker build -t chimera-agent:ci .
+      # Running as the non-root user is a property of the image, so it is asserted on the image.
+      - name: The image runs as a non-root user that can write its state directory
+        run: |
+          test "$(docker run --rm --entrypoint id chimera-agent:ci -u)" != "0"
+          docker run --rm --entrypoint sh chimera-agent:ci -c 'touch "$CHIMERA_HOME/.w" && chimera --help >/dev/null'
+      # A state directory the user cannot write (an old root-owned volume, a host dir) must stop the
+      # container with a message, not let it fail later inside the first write.
+      - name: The entrypoint refuses an unwritable state directory
+        run: |
+          d="$(mktemp -d)"
+          if docker run --rm -v "$d:/data" chimera-agent:ci --help >/dev/null 2>"$d.err"; then
+            echo "expected the entrypoint to refuse"; exit 1
+          fi
+          grep -q "chown" "$d.err"
   verdict:
     name: verdict (what red actually means)
     timeout-minutes: 5
@@ -585,6 +620,7 @@ jobs:
         desktop-shell,
         mutation,
         supply-chain,
+        docker-build,
       ]
     steps:
       # A run can go red without anything failing. On 2026-08-06 two of the three `quality` matrix
