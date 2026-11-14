@@ -312,7 +312,7 @@ def build_guest_app(
         return {
             "session_id": share.session_id,
             "workspace_name": folder,
-            "exchanges": view.get("exchanges", []),
+            "exchanges": [_exchange_for_a_guest(e) for e in view.get("exchanges", [])],
             "presence": bus.presence(share.session_id),
             "seq": bus.seq(share.session_id),
         }
@@ -347,6 +347,7 @@ def build_guest_app(
             still_open=still_open,
             share_id=share.id,
             door=LAN_DOOR if door is not None else "",
+            frame_filter=_for_a_guest,
         )
 
     @guest.post("/api/turn", responses=SSE_RESPONSE)
@@ -404,6 +405,28 @@ def _open_always() -> bool:
     return True
 
 
+#: Payload fields that hold the owner's private memory. The bus carries every frame of the
+#: conversation, the owner's turns included, so what a guest may see is decided where the frame
+#: leaves for the guest and not where it is made.
+PRIVATE_PAYLOAD_KEYS = ("memory_facts",)
+
+
+def _for_a_guest(frame: dict[str, Any]) -> dict[str, Any]:
+    """The frame as a guest may see it: the receipt's recalled memory records are removed."""
+    payload = frame.get("payload")
+    if not isinstance(payload, dict) or not any(k in payload for k in PRIVATE_PAYLOAD_KEYS):
+        return frame
+    return {**frame, "payload": {k: v for k, v in payload.items() if k not in PRIVATE_PAYLOAD_KEYS}}
+
+
+def _exchange_for_a_guest(exchange: Any) -> Any:
+    """A stored exchange as a guest may read it: its receipt without the recalled memory records."""
+    done = exchange.get("done") if isinstance(exchange, dict) else None
+    if not isinstance(done, dict) or not any(k in done for k in PRIVATE_PAYLOAD_KEYS):
+        return exchange
+    return {**exchange, "done": {k: v for k, v in done.items() if k not in PRIVATE_PAYLOAD_KEYS}}
+
+
 async def live_frames(
     bus: SessionBus,
     session_id: str,
@@ -415,6 +438,7 @@ async def live_frames(
     still_open: Callable[[], bool] = _open_always,
     share_id: str = "",
     door: str = "",
+    frame_filter: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> AsyncIterator[dict[str, str]]:
     """Replay what the viewer missed, then everything as it happens, until they leave.
 
@@ -430,11 +454,15 @@ async def live_frames(
     """
     loop = asyncio.get_running_loop()
     sub = bus.subscribe(session_id, name=name, loop=loop, share_id=share_id, door=door)
+
+    def shown(frame: dict[str, Any]) -> dict[str, Any]:
+        return frame if frame_filter is None else frame_filter(frame)
+
     try:
         for frame in bus.replay(session_id, since):
             if not still_open():
                 return
-            yield {"event": frame["event"], "data": json.dumps(frame)}
+            yield {"event": frame["event"], "data": json.dumps(shown(frame))}
         while True:
             if await disconnected() or not still_open():
                 break
@@ -450,7 +478,7 @@ async def live_frames(
                 continue
             if item is None or not still_open():
                 break
-            yield {"event": item["event"], "data": json.dumps(item)}
+            yield {"event": item["event"], "data": json.dumps(shown(item))}
     finally:
         bus.unsubscribe(session_id, sub.id)
 
@@ -465,6 +493,7 @@ def live_stream(
     still_open: Callable[[], bool] = _open_always,
     share_id: str = "",
     door: str = "",
+    frame_filter: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> EventSourceResponse:
     return EventSourceResponse(
         live_frames(
@@ -476,6 +505,7 @@ def live_stream(
             still_open=still_open,
             share_id=share_id,
             door=door,
+            frame_filter=frame_filter,
         )
     )
 

@@ -167,13 +167,22 @@ def references_prompt(home: Path) -> str:
     )
 
 
-def foreground_instructions(home: Path) -> str:
-    """Combine the owner's identity with reference directions on desktop and terminal agents."""
-    from chimera.core.instructions import for_home
+def foreground_instructions(
+    home: Path, memory: object | None = None, *, profile: bool = False
+) -> str:
+    """The owner's identity, then the reference directions, for the agents a person talks to.
 
-    identity = for_home(home)
-    guidance = references_prompt(home)
-    return "\n\n".join(part for part in (identity, guidance) if part)
+    ``profile=True`` adds the profile block between the two (stored profile.json plus the persona
+    facts ``memory`` supplies). Only the terminal chat surfaces ask for it: the others that call
+    this (``solve``) were never given the owner's profile and are not changed by this function.
+    """
+    from chimera.core.instructions import for_home
+    from chimera.interface.profile import owner_instructions
+
+    if profile:
+        return owner_instructions(home, memory, extra=references_prompt(home))
+    parts = (for_home(home), references_prompt(home))
+    return "\n\n".join(part for part in parts if part)
 
 
 def bind_references(registry: Any, home: Path) -> None:

@@ -665,19 +665,20 @@ profile_app = typer.Typer(help="Persistent user profile — the assistant's stab
 
 @profile_app.command("show")
 def profile_show() -> None:
-    """Show the stored profile and the exact preamble sessions will receive."""
-    from chimera.interface.profile import load_profile, profile_path, render_profile
+    """Show the exact profile block the agent receives: the stored profile and the persona facts."""
+    from chimera.evolution.wiring import build_memory_manager
+    from chimera.interface.profile import profile_block
 
     settings = get_settings()
-    stored = load_profile(profile_path(settings.home))
-    if stored.is_empty():
+    block = profile_block(settings.home, build_memory_manager(settings))
+    if not block:
         console.print(
             "[dim]No profile yet — add facts with "
             "`chimera profile set <preference|project|context> \"...\"` "
             "or `chimera profile set name \"...\"`.[/dim]"
         )
         return
-    console.print(Panel.fit(render_profile(stored), title="session preamble (stable prefix)"))
+    console.print(Panel.fit(block, title="profile block (system prompt, after the instructions)"))
 
 
 @profile_app.command("set")

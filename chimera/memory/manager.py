@@ -141,7 +141,7 @@ class MemoryManager:
         )
         return item
 
-    def update(self, item_id: str, content: str) -> MemoryItem:
+    def update(self, item_id: str, content: str, *, provenance: str | None = None) -> MemoryItem:
         """Rewrite one fact in place — the writer's own path, after it has masked the text.
 
         The previous text is kept on the record (``metadata["supersedes"]``) rather than dropped
@@ -152,10 +152,17 @@ class MemoryManager:
 
         The date is the new statement's, as before: the record keeps its identity, and the
         correction is what recency should rank.
+
+        ``provenance``, when given, is written WITH the new text in the same store operation. It used
+        to be set by a second ``store.add`` after the first one, which left a window (and, if the
+        second write failed, a permanent state) where text from an untrusted turn sat under the
+        old ``clean`` label.
         """
         item = self.store.get(item_id)
         previous = item.content
         item.content = content
+        if provenance is not None:
+            item.provenance = provenance
         item.created_at = self._clock()
         item.metadata = {**item.metadata, "supersedes": previous}
         self.store.add(item)
@@ -274,10 +281,9 @@ class MemoryManager:
             self.store.add(duplicate)
             self._chain("memory_supersede", {"id": successor.id, "supersedes_id": duplicate.id})
             return "UPDATE", successor
-        updated = self.update(duplicate.id, content)
-        if provenance == "tainted":
-            updated.provenance = "tainted"
-            self.store.add(updated)
+        updated = self.update(
+            duplicate.id, content, provenance="tainted" if provenance == "tainted" else None
+        )
         return "UPDATE", updated
 
     def merge(self, items: list[MemoryItem]) -> dict[str, int]:
@@ -558,6 +564,23 @@ class MemoryManager:
             + (" [unverified: learned from untrusted content]" if item.provenance == "tainted" else "")
             for _, item in rank(personas)[:max_items]
         ]
+
+    def stable_profile_facts(self, *, max_items: int = 12) -> list[str]:
+        """The persona facts fit for the SYSTEM-level profile block: clean ones, plainly.
+
+        A persona fact learned from untrusted content (a fetched page, a non-owner's message) is
+        left out rather than labelled: the block outranks the project's instructions, and a label
+        is a sentence the model may weigh and a fence is not available inside a standing block. They
+        are not lost: retrieval still recalls them for the turns they match, fenced and arming the
+        taint ledger, which is where untrusted text belongs.
+
+        Ranked, then cut at ``max_items``; the renderer sorts, so the same store gives the same
+        bytes on every turn until somebody edits it.
+        """
+        from chimera.memory.value import rank
+
+        personas = [i for i in self.store.by_kind("persona") if i.provenance == "clean"]
+        return [item.content for _, item in rank(personas)[:max_items]]
 
     def _in_scope(self, project: str | None) -> list[MemoryItem]:
         """The facts a turn in ``project`` may recall: that project's, plus the global ones.

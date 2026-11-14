@@ -665,7 +665,7 @@ def _cast_for_turn(backend: Any, req: CodeSeams) -> Any:
     )
 
 
-def _native_failure(exc: Exception) -> str:
+def _native_failure(exc: Exception, *, show_log: bool = True) -> str:
     """What to tell the user when Chimera's own loop failed.
 
     "the coding turn failed" used to be the whole answer, on the reasoning that a native failure is
@@ -679,10 +679,10 @@ def _native_failure(exc: Exception) -> str:
     """
     text = str(exc).strip()
     if not text:
-        return _unnamed_failure(exc)
+        return _unnamed_failure(exc, show_log=show_log)
     first = text.splitlines()[0].strip()
     if not any(marker in first.lower() for marker in _ACTIONABLE):
-        return _unnamed_failure(exc)
+        return _unnamed_failure(exc, show_log=show_log)
 
     # The provider's sentence, without the wrapping. LiteLLM stacks its own class names in front of
     # the body and the body is usually JSON, so the raw string reads
@@ -702,7 +702,7 @@ def _native_failure(exc: Exception) -> str:
     return first if len(first) <= 300 else f"{first[:297]}…"
 
 
-def _unnamed_failure(exc: Exception) -> str:
+def _unnamed_failure(exc: Exception, *, show_log: bool = True) -> str:
     """The sentence for a failure no provider explained: its kind, and where the details are.
 
     Still no message text and no stack trace: those are internal, and a path or a request body in
@@ -721,7 +721,9 @@ def _unnamed_failure(exc: Exception) -> str:
         sentence = f"the coding turn failed: the model provider could not be reached ({kind})"
     else:
         sentence = f"the coding turn failed ({kind})"
-    log = file_log_path()
+    # The path is the owner's own disk layout, so a guest's frame never carries it; the log still
+    # holds the traceback.
+    log = file_log_path() if show_log else None
     return f"{sentence}; the details are in {log}" if log is not None else sentence
 
 
@@ -3097,6 +3099,7 @@ def register_code_api(
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.core.jobs import finished_note
+    from chimera.interface.profile import owner_instructions
     from chimera.interface.session import recall_facts
     from chimera.memory.history import files_of_exchange, history_for
     from chimera.memory.models import project_key
@@ -3533,13 +3536,19 @@ def register_code_api(
                 project_root=ws,
                 # Read per turn, so editing the identity applies to the next question rather than
                 # to the next launch.
-                instructions="\n\n".join(
-                    part
-                    for part in (
-                        render_identity(load_identity(settings.home)),
-                        reference_guidance if not guest else "",
+                #
+                # The owner's identity, then the profile block (stored profile and persona facts),
+                # then the reference folders: the order the terminal and the bots use, from the same
+                # function. A shared-link guest gets the identity only, as before, and never the
+                # owner's profile: those are facts about a person, not about the app.
+                instructions=(
+                    render_identity(load_identity(settings.home))
+                    if guest
+                    else owner_instructions(
+                        settings.home,
+                        _live_memory(live(), memory, graph, boot_memory_key)[0],
+                        extra=reference_guidance,
                     )
-                    if part
                 ),
                 trace_path=settings.home / "traces.jsonl",
             ),
@@ -4698,14 +4707,25 @@ def register_code_api(
         # The records themselves, for the `done` frame: the receipt used to say how many facts a turn
         # used and nothing about which, so a wrong fact steering an answer could not be found.
         recalled_items: list[Any] = []
-        facts, memory_layer = recall_facts(
-            req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws),
-            # Quoted with source and date under the same switch that writes extracted facts
-            # (study 25 S13): a fact the model did not see being written is shown with its age.
-            cite=bool(getattr(live(), "memory_extract", False)),
-            on_tainted=recalled_tainted.append,
-            on_items=recalled_items.extend,
-        )
+        # Decided before the recall, because the recall is where the owner's private memory enters
+        # the turn. A guest (a share link's turn) is not the owner: the memory holds the owner's
+        # facts and nothing in it is marked as shared, so a guest's turn recalls none of it, and
+        # the receipt it streams carries no facts either.
+        guest_turn = bool(author) and not req.channel_origin
+        facts: list[str]
+        memory_layer: str | None
+        if guest_turn:
+            facts, memory_layer = [], ""
+        else:
+            facts, recalled_layer = recall_facts(
+                req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws),
+                # Quoted with source and date under the same switch that writes extracted facts
+                # (study 25 S13): a fact the model did not see being written is shown with its age.
+                cite=bool(getattr(live(), "memory_extract", False)),
+                on_tainted=recalled_tainted.append,
+                on_items=recalled_items.extend,
+            )
+            memory_layer = recalled_layer
         # Created before the agent so approval and question cards can be routed after `emit`
         # exists. Questions are registered only for this attended desktop turn; their text answer
         # has its own typed route and cannot authorize anything.
@@ -4723,7 +4743,6 @@ def register_code_api(
         # bot's variant, which never hands HTML to a chat.
         from chimera.design.intent import detect as detect_design
 
-        guest_turn = bool(author) and not req.channel_origin
         # A card needs a screen that can show it: never a guest's, a linked chat's or a headless turn's.
         # A card needs a turn whose screen is watching it: not a background work, a linked chat, a guest
         # or a headless run. Only then is the card store bound to the turn.
@@ -6476,7 +6495,7 @@ def register_code_api(
                     if isinstance(exc, _StoppedWhileWaiting)
                     else failure_message(exc)
                     if (req.provider or "").strip()
-                    else _native_failure(exc)
+                    else _native_failure(exc, show_log=not guest_turn)
                 )
                 frame: dict[str, Any] = {"message": message_out}
                 # A refusal on content policy is said as one, with what identifies it, so the

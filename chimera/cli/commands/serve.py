@@ -23,7 +23,6 @@ from chimera.cli.commands._shared import (
     _apply_tool_allowlist,
     _cascade_backend,
     _require_valid_policy,
-    _session_profile,
     app,
     console,
     owner_identity,
@@ -1321,6 +1320,8 @@ def _serve_platform(
                 workspace=workspace_path,
                 approve=always_ask(get_settings().home),
             ))
+        from chimera.interface.profile import owner_instructions
+
         runner = Agent(
             backend, registry,
             # A person is waiting on the other end of the chat, as at the terminal: see `attended`.
@@ -1329,7 +1330,7 @@ def _serve_platform(
                 # The same identity the app's own bot and the coding turn apply. Without it the
                 # bot `serve --discord` starts answered as a different agent from the one the
                 # owner configured, in whatever language the message happened to be in.
-                instructions=owner_identity(get_settings().home),
+                instructions=owner_instructions(get_settings().home, memory),
                 turn_context=True,
             )),
         )
@@ -1338,13 +1339,13 @@ def _serve_platform(
             runner,
             memory=memory,
             graph=graph,
-            # The three things the terminal gives its session and this one did not: who the owner
-            # is (the stored profile and memory's persona), recalled facts quoted with their source
-            # and date under the "possibly stale" header, and the owner's own "remember that…"
-            # switch. The production bot was the one surface answering the owner without them.
+            # What the terminal gives its session and this one did not: recalled facts quoted with
+            # their source and date under the "possibly stale" header, and the owner's own
+            # "remember that…" switch. Who the owner is (the stored profile and memory's persona)
+            # is in the system prompt now, after the owner's identity, as on every surface; it was
+            # a chat preamble here and the production bot was the one surface without it.
             # `remember_from_chat` is passed through as set, never turned on here; and there is
             # still no `extractor`: anyone who can reach a bot would be writing the owner's memory.
-            profile=_session_profile(memory),
             cite_facts=live.memory_extract,
             remember_from_chat=live.remember_from_chat,
             # The path `serve --discord` runs, which is the production bot.
