@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Memory recall no longer drops facts written in Russian, Chinese or Japanese.** The admission gate used an ASCII-only word splitter, so a fact that recall had just found was discarded as "irrelevant" without any message; it now reads text the same way recall does, and the code search index follows suit. (#1271)
+
 - **Safer release pipeline.** Every CI action is pinned to a commit, PyPI publishing now refuses a manual run off `main` or a tag that differs from the package version, and the Docker image runs as a non-root user. (#1262)
 
 - **"Ignore permissions" no longer releases what its own floor keeps for you.** With the switch on, a force push to `main`, `git push origin +main`, an upload of `.env` and `powershell -EncodedCommand` were refused by the floor and then approved by the card one step later; every surface now applies one rule, and the GitHub, Azure, Docker and Kubernetes CLI credential files are refused by the bridge, the switch and the SSH file tools alike. (#1261)
