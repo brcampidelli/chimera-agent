@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Cost numbers now agree.** The Cost screen shows the real cache hit rate (it was capped at 50%), the daily spend cap counts autonomous `solve` runs and the blog writer like the screen does, and only one cron daemon runs per home so a scheduled job no longer fires twice when the app and `chimera serve --cron` are both open. (#1260)
+
 - **Keyboard focus is now easy to see.** The focus ring is a solid outline that reaches 3:1 against every surface in every theme and accent, gets thicker in High contrast and stays visible in Windows High Contrast, and tabs now correctly name the panels they control for screen readers. (#1258)
 
 - **Links in a reply can no longer carry the app's credentials away.** The desktop window now stays on its own pages (other sites open in your browser), and the access tokens it holds are given only to the app itself, never to a site it is sent to or to the dev-server and Design previews inside it. (#1259)
