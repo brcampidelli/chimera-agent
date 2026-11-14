@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The Design check measures HTML artboards.** Colours, fonts, spacing and text contrast are checked against the tokens, and anything the check could not measure is listed as "not checked" instead of reading as "no findings". (#1277)
+
 - **A retry after a failed verification now really escalates.** It raises the reasoning effort, then moves to the next single model, instead of rerunning the same model while the receipt claimed fusion; fusion no longer joins any turn that carries tools, including "fuse this turn", and each attempt in the receipt records the model and effort actually sent. (#1272)
 
 - **Memory recall no longer drops facts written in Russian, Chinese or Japanese.** The admission gate used an ASCII-only word splitter, so a fact that recall had just found was discarded as "irrelevant" without any message; it now reads text the same way recall does, and the code search index follows suit. (#1271)
