@@ -28,8 +28,16 @@ REPS = 20
 # One worker process serves every repetition (a fresh interpreter per repetition would be ~1 s of
 # imports each). Per repetition: announce ready, wait for the parent's `go`, then behave exactly as
 # a second `serve` would: build a Scheduler on the shared jobs.json, try to start the daemon, run
-# for a short window. The dispatch sleeps so that, without the lock, both processes are inside it
-# at once — which is what a real agent job (seconds long) gives the race for free.
+# until the work is done. The dispatch sleeps so that, without the lock, both processes are inside
+# it at once - which is what a real agent job (seconds long) gives the race for free.
+#
+# The loop ends on PROGRESS, not on a fixed wall-clock window. It used to stop 0.7 s after `go`, with
+# the job due at 0.2 s; on a loaded machine a worker was frozen for longer than that (measured: ticks
+# at 0.00-0.14 s, then nothing until the timer fired), so the winner held the lock, never saw the job
+# come due, and the count read 0 - a failure of the test's clock, not of the lock. Now the loop runs
+# until SETTLE seconds after its own dispatch finished (long enough for a rival with no lock to have
+# dispatched too), with a ceiling that only matters when nothing was dispatched at all, and that
+# case still reads 0 and fails: the assertion is not loosened.
 _WORKER = textwrap.dedent(
     """
     import sys, threading, time
@@ -37,24 +45,27 @@ _WORKER = textwrap.dedent(
     from chimera.scheduler import CronDaemon, CronStore, Scheduler
 
     root, ident, reps, mode = Path(sys.argv[1]), sys.argv[2], int(sys.argv[3]), sys.argv[4]
+    SETTLE, CEILING = float(sys.argv[5]), float(sys.argv[6])
     for rep in range(reps):
         sync = root / f"rep{rep}"
         (sync / f"ready_{ident}").write_text("1")
         while not (sync / "go").exists():
             time.sleep(0.002)
 
-        def dispatch(job, _sync=sync):
+        stop = threading.Event()
+
+        def dispatch(job, _sync=sync, _stop=stop):
             with open(_sync / "dispatches.log", "a") as fh:
                 fh.write(ident + " ")  # split() on whitespace counts the entries
             time.sleep(0.25)
+            threading.Timer(SETTLE, _stop.set).start()  # ticks keep going: a rival gets its chance
 
         daemon = CronDaemon(
             Scheduler(CronStore(sync / "scheduler" / "jobs.json")), dispatch, tick_seconds=0.02
         )
         if mode == "nolock":
             daemon.claim = lambda: True  # the behaviour before P0-12
-        stop = threading.Event()
-        threading.Timer(0.7, stop.set).start()
+        threading.Timer(CEILING, stop.set).start()
         daemon.run_forever(stop=stop)
         (sync / f"done_{ident}").write_text("1")
     """
@@ -80,7 +91,7 @@ def _dispatches_per_rep(tmp_path: Path, mode: str) -> list[int]:
         (tmp_path / f"rep{rep}").mkdir()
     procs = [
         subprocess.Popen(
-            [sys.executable, "-c", _WORKER, str(tmp_path), ident, str(REPS), mode],
+            [sys.executable, "-c", _WORKER, str(tmp_path), ident, str(REPS), mode, "0.3", "5"],
             env=_env(), cwd=REPO, stderr=subprocess.PIPE,
         )
         for ident in ("a", "b")

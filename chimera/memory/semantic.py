@@ -129,6 +129,14 @@ class VectorCache:
             return
 
 
+#: Below this cosine a hit is not "similar", it is merely the least dissimilar of what is stored.
+#: ``search`` used to return the top-k whatever their score, which was harmless while a lexical floor
+#: stood behind it and is not once the gate trusts the layer (P0-07): an orthogonal fact entered the
+#: prompt. A conservative, UNMEASURED floor: it drops the clearly unrelated, and a store whose
+#: embedder scores real paraphrases lower than this can lower it per index (``min_similarity``).
+DEFAULT_MIN_SIMILARITY = 0.2
+
+
 class SemanticIndex:
     """Ranks memory items against a query by embedding cosine similarity.
 
@@ -138,9 +146,15 @@ class SemanticIndex:
     """
 
     def __init__(
-        self, embed: EmbedFn, *, cache_path: Path | None = None, namespace: str = ""
+        self,
+        embed: EmbedFn,
+        *,
+        cache_path: Path | None = None,
+        namespace: str = "",
+        min_similarity: float = DEFAULT_MIN_SIMILARITY,
     ) -> None:
         self._embed = embed
+        self._min_similarity = min_similarity
         self._cache: dict[str, list[float]] = {}
         self._disk = VectorCache(cache_path, namespace) if cache_path is not None else None
 
@@ -172,14 +186,14 @@ class SemanticIndex:
         return item if score >= threshold else None
 
     def search(self, query: str, items: list[MemoryItem], k: int) -> list[MemoryItem]:
-        """Top-``k`` items by cosine similarity to ``query`` (empty list if no items)."""
+        """Top-``k`` items by cosine similarity to ``query``, keeping only those at or above the floor."""
         if not items:
             return []
         item_vecs = self._vectors([item.content for item in items])
         query_vec = self._vectors([query])[0]
         scored = sorted(
-            zip(items, item_vecs, strict=True),
-            key=lambda pair: cosine(query_vec, pair[1]),
+            ((cosine(query_vec, vec), item) for item, vec in zip(items, item_vecs, strict=True)),
+            key=lambda pair: pair[0],
             reverse=True,
         )
-        return [item for item, _ in scored[:k]]
+        return [item for score, item in scored[:k] if score >= self._min_similarity]

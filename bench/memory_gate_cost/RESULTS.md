@@ -60,3 +60,12 @@ amendment says so in v1's RESULTS.
 - **Whether a model discounts a labelled fact** (S30-21(g)), and the semantic recall path — as in v1.
 - **S30-25.** Not in this tree. It changes what a run does after a tainted fact is recalled, not any
   number above.
+
+## Amendment 2026-11-14 — what "0 of 120 lost" could not see
+
+Everything above stands for the population it was measured on: English documentation read with an
+English query. That is the one condition under which the gate's old ASCII tokenizer cannot fail, and
+the same gate dropped 77–87% of recalled Russian facts and 60–70% of Chinese ones in silence. The
+reading, the prediction that missed, and the change are in [`RESULTS-nonlatin.md`](RESULTS-nonlatin.md)
+(registered in [`PREREGISTRATION-nonlatin.md`](PREREGISTRATION-nonlatin.md)). The verdict above
+("the gate's cost is below the bar") is a statement about English text.

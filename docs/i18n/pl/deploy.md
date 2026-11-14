@@ -1,5 +1,5 @@
 ---
-source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
+source_sha256: ded4f1799194e9f44cf268e7e309fba1b6befe25a2dd3b52fbca4cda40ced559
 ---
 
 # Wdrażanie Chimery na serwerze (VPS)
@@ -58,6 +58,18 @@ każdy potrzebuje swojego dopasowanego tokenu `CHIMERA_*` — zobacz `.env.examp
 ```bash
 git pull && docker compose up -d --build
 ```
+
+**Aktualizacja z obrazu, który działał jako root:**
+
+Obraz działa teraz jako użytkownik bez uprawnień (uid 10001). Wolumin `chimera-data` utworzony przez starszy obraz należy do roota, więc kontener odmawia startu (kod 78, z tym komunikatem) zamiast zawieść przy pierwszym zapisie. Zmień właściciela raz, przed aktualizacją:
+
+```bash
+docker compose run --rm --no-deps --user 0 --entrypoint chown chimera -R 10001:10001 /data
+```
+
+Docker Compose nazywa wolumin `<projekt>_chimera-data` (projekt to nazwa folderu), więc `-v chimera-data:/data` zmieniłby właściciela pustego woluminu o złej nazwie; powyższe polecenie idzie przez Compose i trafia we właściwy. Woluminy pokażą `docker compose config --volumes` i `docker volume ls`. Jeśli `/data` to bind mount, a nie wolumin, uruchom `sudo chown -R 10001:10001 <ścieżka hosta>`.
+
+Aby dalej działać jako root, zostań przy poprzednim tagu obrazu; obecny tego nie zrobi.
 
 ---
 

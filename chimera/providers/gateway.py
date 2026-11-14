@@ -548,6 +548,18 @@ class _KeyRotator:
 _NO_ENDPOINT_KEY = "no-key-configured"
 
 
+
+def thinking_overrides_effort(resolved: str, thinking: bool | None) -> bool:
+    """Whether ``thinking=False`` replaces a reasoning effort on this route.
+
+    The one place that decides it: the request builder applies it and the escalation ladder and the
+    run receipt ask it, so what a receipt says was sent cannot drift from what was sent. Only
+    OpenRouter has it: its `reasoning` object carries both the effort and the switch, and the switch
+    is written last. An OpenAI route sends `reasoning_effort` whatever `thinking` says.
+    """
+    return thinking is False and resolved.startswith("openrouter/")
+
+
 class LLMGateway:
     """Calls LLMs through LiteLLM with Chimera's defaults.
 
@@ -724,12 +736,7 @@ class LLMGateway:
         """
         if not effort:
             return None
-        custom_base = bool(self.settings.api_base)
-        if resolved.startswith("openrouter/") and not custom_base:
-            return effort
-        if resolved.startswith("openai/") and not (
-            custom_base or os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL")
-        ):
+        if self._route_takes_effort(resolved):
             return effort
         with self._warn_lock:
             warn = not self._warned_effort_unsupported
@@ -740,6 +747,28 @@ class LLMGateway:
                 resolved,
             )
         return None
+
+    def _route_takes_effort(self, resolved: str) -> bool:
+        """Whether this route is sent a reasoning effort at all (the rule :meth:`_effort_for_route` applies)."""
+        custom_base = bool(self.settings.api_base)
+        if resolved.startswith("openrouter/") and not custom_base:
+            return True
+        return resolved.startswith("openai/") and not (
+            custom_base or os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL")
+        )
+
+    def takes_effort(self, model: str | None, *, thinking: bool | None = None) -> bool:
+        """Whether a ``#low|#medium|#high`` variant of ``model`` would actually be sent, quietly.
+
+        The escalation ladder asks before it climbs effort: a route that drops the variant would turn
+        "raise effort" into a retry that changes nothing, and the receipt would name a step that
+        never ran. Unlike :meth:`_effort_for_route` this never warns — asking is not using.
+
+        ``thinking`` is the run's own setting: ``False`` cancels the effort on the routes where
+        :func:`thinking_overrides_effort` says the request overwrites it, and only on those.
+        """
+        resolved = self._resolve_model(model)
+        return self._route_takes_effort(resolved) and not thinking_overrides_effort(resolved, thinking)
 
     def _receipt_model(self, resolved: str, effort: str | None) -> str:
         """The slug a receipt names: the variant only when :meth:`_effort_for_route` sent it."""
@@ -855,7 +884,7 @@ class LLMGateway:
             kwargs.setdefault("extra_body", {})["reasoning"] = {"effort": effort}
         elif effort:
             kwargs["reasoning_effort"] = effort
-        if thinking is False and resolved.startswith("openrouter/"):
+        if thinking_overrides_effort(resolved, thinking):
             kwargs.setdefault("extra_body", {})["reasoning"] = {"enabled": False}
         # The context window an Ollama chat or generate call asks for. Without it Ollama serves the
         # machine's default (4,096 here) and cuts a longer prompt to about half of it, silently: the

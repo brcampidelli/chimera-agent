@@ -53,6 +53,18 @@ needs its matching `CHIMERA_*` token — see `.env.example`.)
 git pull && docker compose up -d --build
 ```
 
+**Upgrading from an image that ran as root:**
+
+The image now runs as an unprivileged user (uid 10001). A `chimera-data` volume created by an older image is owned by root, so the container refuses to start (exit 78, with this message) instead of failing on its first write. Fix the owner once, before updating:
+
+```bash
+docker compose run --rm --no-deps --user 0 --entrypoint chown chimera -R 10001:10001 /data
+```
+
+Docker Compose names the volume `<project>_chimera-data` (the project is the folder name), so `-v chimera-data:/data` would chown an empty volume of the wrong name; the command above goes through Compose and reaches the real one. To see the volumes, use `docker compose config --volumes` and `docker volume ls`. If `/data` is a bind mount instead of a volume, run `sudo chown -R 10001:10001 <host path>`.
+
+To keep running as root instead, stay on the previous image tag; the current one will not.
+
 ---
 
 ## 2. systemd (no Docker)

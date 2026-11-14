@@ -38,6 +38,7 @@ from chimera.cli.commands._shared import (
 from chimera.cli.commands.learning import _curation_outcome, _load_playbook, _save_playbook
 from chimera.cli.commands.memory import _memory_manager
 from chimera.config import get_settings
+from chimera.core.escalation import build_escalation
 
 if TYPE_CHECKING:
     from chimera.core.autonomous import AutonomousResult
@@ -512,30 +513,21 @@ def solve(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     planner_backend: SupportsComplete = gateway
-    escalate_backend: SupportsComplete | None = None
     # --cascade (or CHIMERA_CASCADE): tiered routing weak -> gate -> mid -> gate -> fusion.
     # Takes precedence over --fuse (the cascade already has fusion as its top rung).
     if cascade or settings.cascade:
         backend = _cascade_backend(gateway, settings)
-        from chimera.fusion import RoutedBackend, RoutingPolicy
-        from chimera.fusion.factory import fusion_engine
-
-        escalate_backend = RoutedBackend(gateway, fusion_engine(gateway), RoutingPolicy(mode="always"))
     # --fuse (explicit) or CHIMERA_AUTO_FUSE (production default) both route the worker
     # through the cost-aware router, so deep/error-sensitive turns fuse and cheap/tool
     # turns stay single-model.
     elif fuse or settings.auto_fuse:
-        from chimera.fusion import RoutedBackend, RoutingPolicy
+        from chimera.fusion import RoutedBackend
         from chimera.fusion.factory import fusion_engine
 
         engine = fusion_engine(gateway)
         # --agreement K: sample K cheap answers per turn; disagreement escalates to fusion
         # (a free confidence signal). K=1 (default) keeps the a-priori routing unchanged.
         backend = RoutedBackend(gateway, engine, agreement_k=agreement)
-        # Observed-difficulty escalation (issue #3): a fusion-forced backend for retrying a
-        # task that already failed verification — "the review surface is where the difficulty
-        # signal lives". The AutonomousAgent uses it only after an attempt fails.
-        escalate_backend = RoutedBackend(gateway, engine, RoutingPolicy(mode="always"))
         # Planning is a deep, tool-free reasoning turn — exactly where fusion pays off —
         # so an explicit --fuse routes the plan through fusion directly. Auto-fuse keeps
         # planning single unless asked, to bound cost.
@@ -804,10 +796,12 @@ def solve(
             snapshot_on_tool_loop=Path(snapshot_at_tool_loop) if snapshot_at_tool_loop else None,
         )
         worker = Agent(backend, registry, _worker_cfg)
-        escalate_worker = (
-            Agent(escalate_backend, registry, _worker_cfg)
-            if escalate_backend is not None
-            else None
+        # Observed difficulty (issue #3): a retry asks for more effort, then the next single model
+        # up. It used to run on a fusion-forced backend, which the router sends to the SAME model
+        # for any turn with tools, so the retry was identical and the receipt said it escalated.
+        escalation = build_escalation(
+            gateway, settings, registry, _worker_cfg,
+            first_model=settings.tier_ladder().mid if (cascade or settings.cascade) else None,
         )
         from chimera.api.roles import review_model_for
         from chimera.evolution import StagnationDetector
@@ -836,7 +830,7 @@ def solve(
         run_verifier, verify_origin = cli_verifier(verify, ws, gen_tests=gen_tests)
         auto = AutonomousAgent(
             worker,
-            escalate_worker=escalate_worker,
+            escalation=escalation,
             # Pivot the retry when attempts keep failing the same way (short budget → window 2).
             # --stagnation-fuzzy loosens the match: byte-identical signatures are strict enough to
             # miss two attempts failing from the same cause with different assertion text, so the

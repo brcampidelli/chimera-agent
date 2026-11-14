@@ -476,6 +476,9 @@ export function attempt(over: Partial<AttemptReceipt> = {}): AttemptReceipt {
     system_sha: "",
     provider: "",
     host: "",
+    // Empty, as in a receipt written before the escalation ladder recorded what each attempt sent.
+    requested_model: "",
+    effort: "",
     ...over,
   };
 }

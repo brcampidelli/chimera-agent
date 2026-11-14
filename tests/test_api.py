@@ -763,8 +763,8 @@ def test_run_request_plan_injection_skips_the_planner(tmp_path: Any) -> None:
 
 
 def test_build_solve_agent_default_path_and_model_mode_plumbing(tmp_path: Any) -> None:
-    """The default (no flags) build is a plain single-model loop — no escalate worker, no injected
-    plan; model/plan plumb through, and --fuse/--cascade each wire a fusion escalate worker."""
+    """The default (no flags) build plans for itself; model/plan plumb through. Every mode, --fuse and
+    --cascade included, retries on the single-model escalation ladder: fusion never joins a retry."""
     from chimera.api.app import RunRequest, _build_solve_agent
 
     ws = tmp_path / "ws"
@@ -775,14 +775,15 @@ def test_build_solve_agent_default_path_and_model_mode_plumbing(tmp_path: Any) -
         return None
 
     default_agent = _build_solve_agent(RunRequest(task="t"), ws, _sink, settings)
-    assert default_agent.escalate_worker is None  # single-model: no fusion retry path
+    assert default_agent.escalate_worker is None  # no fusion-forced worker exists any more
+    assert default_agent.escalation is not None  # the retry asks for more effort, then a bigger model
     assert default_agent.provided_plan is None  # plans for itself, as before
 
     fuse_agent = _build_solve_agent(RunRequest(task="t", fuse=True), ws, _sink, settings)
-    assert fuse_agent.escalate_worker is not None  # fusion escalate worker wired
+    assert fuse_agent.escalate_worker is None and fuse_agent.escalation is not None
 
     cascade_agent = _build_solve_agent(RunRequest(task="t", cascade=True), ws, _sink, settings)
-    assert cascade_agent.escalate_worker is not None  # cascade tops out in fusion too
+    assert cascade_agent.escalate_worker is None and cascade_agent.escalation is not None
 
     planned = _build_solve_agent(
         RunRequest(task="t", model="vendor/model", plan="1. do it\n2. verify it"), ws, _sink, settings

@@ -89,7 +89,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`manager_p`](manager_p/) | with result | 1 | 1 |
 | [`mcp_error_text`](mcp_error_text/) | with result | 1 | 1 |
 | [`memory_extraction`](memory_extraction/) | with result | 1 | 1 |
-| [`memory_gate_cost`](memory_gate_cost/) | with result | 1 | 1 |
+| [`memory_gate_cost`](memory_gate_cost/) | with result | 2 | 2 |
 | [`memory_graph`](memory_graph/) | with result | 1 | 1 |
 | [`memory_poison`](memory_poison/) | with result | 1 | 1 |
 | [`memory_prune`](memory_prune/) | with result | 1 | 1 |

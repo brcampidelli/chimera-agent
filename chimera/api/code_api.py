@@ -6022,7 +6022,13 @@ def register_code_api(
                 # fusion engine for this call and restore it in `finally`. Fusion ignores tools, so
                 # this turn will not touch a file — reported as `fused` rather than left to look like
                 # a turn that simply did not need to.
-                fused = bool(req.fuse) and fuse_backend is not None
+                from chimera.providers.fusion_guard import agent_carries_tools
+
+                # Fusion does not tool-call, and a coding agent always carries tools: the turn is
+                # answered by one model and says so (`fuse_downgraded`), never as a fusion that
+                # did not run.
+                fuse_downgraded = bool(req.fuse) and fuse_backend is not None and agent_carries_tools(agent)
+                fused = bool(req.fuse) and fuse_backend is not None and not fuse_downgraded
                 original_backend = getattr(agent, "backend", None) if fused else None
                 if fused:
                     agent.backend = _cast_for_turn(fuse_backend, req)
@@ -6082,7 +6088,7 @@ def register_code_api(
                             "memory_facts_used": len(facts),
                             "memory_layer": memory_layer,
                             "memory_facts": _recalled_rows(recalled_items),
-                            "fused": fused,
+                            "fused": fused, "fuse_downgraded": fuse_downgraded,
                         })
                         return
                     if verdict.plan is not None:
@@ -6403,7 +6409,7 @@ def register_code_api(
                         "memory_facts": _recalled_rows(recalled_items),
                         # This turn could not use tools, and a reader cannot tell that from a zero
                         # tool count alone — the same count a turn that needed none reports.
-                        "fused": fused,
+                        "fused": fused, "fuse_downgraded": fuse_downgraded,
                         # The cache's side of the bill, and why it did not answer. `cache_miss_cause`
                         # is one of the fixed causes in `chimera/core/cache_miss.py`, or None when the
                         # provider was silent; `none` means the cache answered this turn.

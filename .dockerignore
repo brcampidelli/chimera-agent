@@ -22,3 +22,7 @@ docs
 assets
 *.md
 !README.md
+
+# The benchmarks are large, carry results and pre-registrations that are not part of the product,
+# and bench/ trees have held run logs. None of it belongs in the image.
+bench
