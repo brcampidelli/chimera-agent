@@ -2255,6 +2255,8 @@ class MemoryItemOut(BaseModel):
     #: the default is now to save into the project you are in: unshown, a fact meant for every
     #: project gets quietly filed under one, stops arriving elsewhere, and nothing says why.
     project: str | None = None
+    #: When the fact was written (epoch seconds), or None for one that predates the field.
+    created_at: float | None = None
 
 
 class MemoryProfileOut(BaseModel):
@@ -2329,6 +2331,18 @@ class ConsolidateGroupOut(BaseModel):
     unverified: bool = False
     """A member is unverified, so the merged fact will be too — including the members that were not."""
     items: list[MemoryItemOut]
+
+
+class SimilarPairOut(BaseModel):
+    """Two facts that read alike and were written on different days."""
+
+    a: MemoryItemOut
+    b: MemoryItemOut
+    similarity: float
+
+
+class SimilarPairsOut(BaseModel):
+    pairs: list[SimilarPairOut]
 
 
 class ConsolidatePreviewOut(BaseModel):

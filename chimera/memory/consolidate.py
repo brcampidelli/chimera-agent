@@ -9,7 +9,11 @@ supplies the real, model-backed one. A merge is a write, so it's opt-in (``memor
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import hashlib
+import json
+import threading
+from collections.abc import Callable, Iterable
+from pathlib import Path
 
 from chimera.memory.models import MemoryItem
 
@@ -83,3 +87,58 @@ def model_summarizer(backend: object, model: str | None = None) -> Summarizer:
         return merged
 
     return summarize
+
+
+def cluster_signature(items: Iterable[MemoryItem]) -> str:
+    """A fingerprint of one cluster: its member ids and the exact text of each.
+
+    Content is in it, not only ids: an edited member is a different question to put to the
+    summarizer, and a blank answer remembered against the old text must not silence the new one.
+    """
+    parts = sorted(f"{item.id}\x00{' '.join(item.content.lower().split())}" for item in items)
+    return hashlib.sha256("\x01".join(parts).encode("utf-8")).hexdigest()
+
+
+class ConsolidationLedger:
+    """Which clusters the summarizer was already asked about, so nothing is paid for twice.
+
+    Consolidation used to re-cluster the whole store on every pass and ask the model about every
+    cluster again, including the ones it had answered with nothing last time: the same blank call
+    billed on each session end, forever, because nothing recorded that it had been made. A cluster
+    whose members and text are unchanged since it was settled is skipped; any change makes a new
+    signature, so only what changed is processed.
+
+    With a ``path`` the memory survives the process (it lives beside the store); without one it
+    lasts as long as the manager, which is still enough for a pass and its immediate repeat.
+    A file that cannot be read starts an empty ledger: the cost of forgetting is one repeated call,
+    never a lost fact.
+    """
+
+    def __init__(self, path: Path | None = None) -> None:
+        self._path = Path(path) if path is not None else None
+        self._lock = threading.Lock()
+        self._settled: set[str] = set()
+        if self._path is not None:
+            try:
+                data = json.loads(self._path.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    self._settled = {str(entry) for entry in data}
+            except (OSError, ValueError):
+                self._settled = set()
+
+    def settled(self, signature: str) -> bool:
+        with self._lock:
+            return signature in self._settled
+
+    def settle(self, signature: str) -> None:
+        with self._lock:
+            self._settled.add(signature)
+            if self._path is None:
+                return
+            try:
+                from chimera.core.filelock import atomic_write_text
+
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(self._path, json.dumps(sorted(self._settled)))
+            except OSError:
+                pass  # in-memory still holds; a lost write costs one repeated call, nothing else

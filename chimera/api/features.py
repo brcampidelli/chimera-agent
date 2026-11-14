@@ -58,6 +58,7 @@ from chimera.api.schemas import (
     ProjectStartIn,
     ProjectStateOut,
     RetiredOut,
+    SimilarPairsOut,
     SkillDoctorOut,
     SkillsOut,
     SpecDraftIn,
@@ -146,6 +147,7 @@ def _item_dict(item: Any) -> dict[str, Any]:
         # now to save into the project you are in: without it shown, a fact meant for every project
         # gets quietly filed under one and stops arriving, and nothing on the screen says why.
         "project": getattr(item, "project", None),
+        "created_at": getattr(item, "created_at", None),
     }
 
 
@@ -703,6 +705,18 @@ def register_features(
             "written": sum(counts.values()),
             "ignored": len(chosen - candidates),
             "counts": counts,
+        }
+
+    @app.get("/api/memory/similar", dependencies=[guard], response_model=SimilarPairsOut)
+    def similar_memory() -> dict[str, Any]:
+        """Near-duplicate facts from different days. Read-only; resolving one is the ordinary
+        ``DELETE /api/memory/{id}`` on whichever the owner picks."""
+        pairs = _memory_manager(_settings()).similar_pairs()
+        return {
+            "pairs": [
+                {"a": _item_dict(a), "b": _item_dict(b), "similarity": round(score, 3)}
+                for a, b, score in pairs
+            ]
         }
 
     @app.post(

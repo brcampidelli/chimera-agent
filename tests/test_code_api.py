@@ -476,6 +476,11 @@ def test_a_coding_turn_reads_memory_and_reports_what_it_recalled(
     )
     assert done["memory_facts_used"] == 1
     assert done["memory_layer"] == "keyword"
+    # Which fact, not only how many: the receipt lists them, with the trust label.
+    assert done["memory_facts"] == [
+        {"id": "", "content": "the parser lives in src/parse.py", "source": "", "kind": "",
+         "unverified": False}
+    ]
 
 
 def test_a_fused_coding_turn_declares_that_it_touched_nothing(

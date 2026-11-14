@@ -89,6 +89,7 @@ import type {
   MemoryExport,
   MemoryItem,
   MemoryLayers,
+  SimilarMemory,
   MemoryProfile,
   ModelListing,
   KeepAwakeState,
@@ -931,6 +932,8 @@ export const testProviderKey = (model?: string) =>
 // --- Memory ---
 export const getMemory = (q = "") =>
   json<MemoryItem[]>(`/api/memory${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+/** Near-duplicate facts written on different days: the pairs worth a look. */
+export const getSimilarMemory = () => json<SimilarMemory>("/api/memory/similar");
 export const getMemoryLayers = () => json<MemoryLayers>("/api/memory/layers");
 // The agent's learned picture of you. The UI could WRITE persona facts (addMemory with
 // kind: "persona") but had no way to read them back — you fed a store you could never inspect.
@@ -1805,6 +1808,16 @@ export interface CodeToolEvent {
   duration_seconds?: number;
 }
 
+/** One fact a turn recalled, as the `done` frame lists it. `id` is the store's, so "forget" can
+ *  reuse the Memory screen's delete route. */
+export interface RecalledFact {
+  id: string;
+  content: string;
+  source: string;
+  kind: string;
+  unverified: boolean;
+}
+
 /** The terminal `done` payload of a coding turn — what it did, what it cost, how close to the wall. */
 export interface CodeTurnDone {
   answer: string;
@@ -1890,6 +1903,9 @@ export interface CodeTurnDone {
    *  Never guessed: a layer that returned nothing is not named. */
   memory_facts_used?: number;
   memory_layer?: string | null;
+  /** WHICH facts those were, with where each came from and whether it is unverified. Entity-linked
+   *  facts have no stored record and are counted above but not listed here. */
+  memory_facts?: RecalledFact[];
   /** The durable fact this turn SAVED, from an explicit "remember that…" the user typed, or null.
    *  Reported rather than silent: a fact saved without a word changes every future conversation,
    *  and the person who caused it never saw it happen. */
