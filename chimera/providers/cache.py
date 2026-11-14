@@ -20,6 +20,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from chimera.core.redact import redact_json
+
 
 class CompletionCache:
     """A JSON-file cache of completions keyed by the request hash.
@@ -83,6 +85,10 @@ class CompletionCache:
             return self._data.get(key)
 
     def put(self, key: str, value: dict[str, Any]) -> None:
+        # A completion that carries a secret is not cached: serving it back masked would be a wrong
+        # answer, and storing it in clear would keep the secret in a file nobody thinks of as a record.
+        if redact_json(value) != value:
+            return
         with self._lock:
             self._data[key] = value
             self._save()
