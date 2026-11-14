@@ -72,6 +72,39 @@ export function toMarkdown(exchanges: TranscriptExchange[], meta: TranscriptMeta
   return `${header.join("\n")}\n${exchanges.map(exchangeToMarkdown).join("\n\n---\n\n")}\n`;
 }
 
+/** Best-effort masking of credential-shaped text, for an export built from this window's memory.
+ *
+ *  The server masks every transcript it stores (`chimera/core/redact.py`), and that copy is what an
+ *  export prefers. When it cannot be had (unreachable, empty, shorter) the export falls back to what
+ *  is in memory, which is NOT masked. This mirrors the server's SHAPES (credential headers, `Bearer`,
+ *  `sk-`/`ghp_`/`xox`/JWT, URL passwords, `name=value` for a sensitive name). It cannot know the
+ *  values of the machine's environment variables, which is why the server copy is preferred and why
+ *  the export says when it fell back.
+ */
+const MASK = "[redacted]";
+const SENSITIVE = String.raw`(?:[\w-]*(?:api[_-]?key|secret|token|passw(?:or)?d|credential|private[_-]?key)[\w-]*|authorization)`;
+const MASK_RULES: [RegExp, string][] = [
+  [/(:\/\/[^\s:/@]+:)[^\s@/]+(@)/g, `$1${MASK}$2`],
+  [new RegExp(String.raw`([?&]${SENSITIVE}=)[^\s&#"']+`, "gi"), `$1${MASK}`],
+  [
+    new RegExp(
+      String.raw`(^[ \t]*(?:${SENSITIVE}|x-api-key|cookie|proxy-authorization)[ \t]*:[ \t]*)\S.*$`,
+      "gim",
+    ),
+    `$1${MASK}`,
+  ],
+  [new RegExp(String.raw`(\b${SENSITIVE}[ \t]*[=:][ \t]*["']?)[^\s"',;]{6,}`, "gi"), `$1${MASK}`],
+  [/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}/g, MASK],
+  [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, MASK],
+  [/\bxox[baprs]-[A-Za-z0-9-]{10,}/g, MASK],
+  [/\bBearer\s+[A-Za-z0-9._~+/=-]{20,}/gi, MASK],
+  [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, MASK],
+];
+
+export function maskSecrets(text: string): string {
+  return MASK_RULES.reduce((out, [rule, to]) => out.replace(rule, to), text);
+}
+
 /** Which of two versions of the same conversation to export, and whether they disagreed.
  *
  *  The live `Exchange[]` is not always the whole story: a session that was replayed after a reload,
@@ -87,7 +120,9 @@ export function reconcile<T>(
   inMemory: T[],
   stored: T[] | null,
 ): { exchanges: T[]; source: "memory" | "stored"; recovered: number } {
-  if (stored && stored.length > inMemory.length) {
+  // `>=`, not `>`: the stored copy is masked by the server (`redact_json` on every write) and the one
+  // in memory is not, so an export that has both and is not missing anything takes the stored one.
+  if (stored && stored.length > 0 && stored.length >= inMemory.length) {
     return { exchanges: stored, source: "stored", recovered: stored.length - inMemory.length };
   }
   return { exchanges: inMemory, source: "memory", recovered: 0 };

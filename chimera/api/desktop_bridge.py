@@ -49,10 +49,9 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlencode
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-# The discovery file is read by `chimera mcp desktop`, which runs with the `mcp` extra only and so
-# has no FastAPI. Its helpers live in a stdlib-only module and are re-exported here unchanged.
 from chimera.api.bridge_discovery import (
     bridge_path,
     read_discovery,
@@ -83,12 +82,18 @@ from chimera.api.bridge_routes import (
     without_plugin_text,
 )
 
+# The discovery file is read by `chimera mcp desktop`, which runs with the `mcp` extra only and so
+# has no FastAPI. Its helpers live in a stdlib-only module and are re-exported here unchanged.
+from chimera.core.bearer import bearer_matches
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
 
 _log = logging.getLogger(__name__)
 
 #: The longest a single call may hold a request before it answers — a job keeps running after it.
+#: What a bridge call may declare before the app refuses to read it: a route id and its arguments.
+MAX_BRIDGE_BODY_BYTES = 1024 * 1024
 MAX_WAIT_SECONDS = 300.0
 DEFAULT_WAIT_SECONDS = 60.0
 #: A non-streaming route that has not answered in this long is reported as timed out, not awaited.
@@ -258,7 +263,7 @@ class DesktopBridge:
         if token is None:
             return
         on_disk = read_discovery(self.path)
-        if on_disk is not None and hmac.compare_digest(str(on_disk["token"]), token):
+        if on_disk is not None and hmac.compare_digest(str(on_disk["token"]).encode(), token.encode()):
             with contextlib.suppress(OSError):
                 self.path.unlink()
 
@@ -295,8 +300,7 @@ class DesktopBridge:
             raise HTTPException(
                 status_code=403, detail="the desktop bridge is off (Settings > Allow Claude)"
             )
-        header = request.headers.get("authorization", "")
-        if not hmac.compare_digest(header.encode(), f"Bearer {self.token}".encode()):
+        if not bearer_matches(request.headers.get("authorization", ""), self.token):
             raise HTTPException(status_code=401, detail="unauthorized")
         if TIER_RANK[tier] < TIER_RANK[need]:
             if need == "full":
@@ -1579,6 +1583,31 @@ def register_bridge_api(
                 hidden(),
             )
         )
+
+    @app.middleware("http")
+    async def bridge_answers_before_it_reads(request: Request, call_next: Callable[..., Any]) -> Any:
+        """Authorise a bridge write, and bound its declared size, BEFORE FastAPI reads the body.
+
+        FastAPI parses the body model ahead of the handler, so the handler's own ``authorize`` ran
+        after the whole body had been read: a caller with no bearer could make the app buffer any
+        amount. The check here is the same ``authorize`` (bearer, then whether the bridge is on), and a
+        body that declares more than a bridge call ever carries is refused without being read.
+        """
+        path = request.url.path
+        # Exactly the two routes that take a body. An unknown `/api/bridge/...` path keeps answering 404
+        # to anybody, which is what the tests that probe for a public endpoint rely on.
+        takes_body = path == "/api/bridge/call" or (
+            path.startswith("/api/bridge/jobs/") and path.endswith("/stop")
+        )
+        if request.method != "GET" and takes_body:
+            try:
+                bridge.authorize(request)
+            except HTTPException as refusal:
+                return JSONResponse(status_code=refusal.status_code, content={"detail": refusal.detail})
+            declared = request.headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > MAX_BRIDGE_BODY_BYTES:
+                return JSONResponse(status_code=413, content={"detail": "the bridge call is too large"})
+        return await call_next(request)
 
     @app.post("/api/bridge/call", response_model=BridgeCallOut, tags=["bridge"])
     async def bridge_call(req: BridgeCallIn, request: Request) -> dict[str, Any]:

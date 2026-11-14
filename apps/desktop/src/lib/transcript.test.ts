@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exchangeToMarkdown, reconcile, toMarkdown, transcriptFilename } from "@/lib/transcript";
+import { exchangeToMarkdown, maskSecrets, reconcile, toMarkdown, transcriptFilename } from "@/lib/transcript";
 
 /**
  * A record of what an agent did to a repository could not leave the window it happened in.
@@ -94,6 +94,15 @@ describe("transcript", () => {
     expect(reconcile(memory, null).recovered).toBe(0);
   });
 
+  it("prefers the stored copy when it is as long as memory, because the server masked it", () => {
+    const memory = [{ you: "key sk-live", answer: "1" }];
+    const stored = [{ you: "key [redacted]", answer: "1" }];
+    const out = reconcile(memory, stored);
+    expect(out.source).toBe("stored");
+    expect(out.recovered).toBe(0);
+    expect(out.exchanges[0].you).toBe("key [redacted]");
+  });
+
   it("produces a filename that saves on Windows", () => {
     // Colons are legal on POSIX and forbidden on Windows, and an ISO timestamp is full of them. A
     // download that silently fails to save is the kind of bug nobody reports — they just stop using
@@ -114,5 +123,26 @@ describe("transcript", () => {
     // An empty answer next to a heading reads as "it said nothing worth keeping". It usually means
     // the turn failed, and the export should not quietly agree that nothing happened.
     expect(exchangeToMarkdown({ you: "q", answer: "" })).toContain("(no answer)");
+  });
+});
+
+describe("maskSecrets", () => {
+  it("masks the credential shapes the server masks, and leaves ordinary text alone", () => {
+    const key = "sk-" + "or-v1-0123456789abcdef0123";
+    const input = [
+      `Authorization: Bearer ${"a".repeat(24)}`,
+      `curl "https://x.test/api?api_key=hunter2hunter2"`,
+      `postgres://app:hunter2@db.test/app`,
+      `STRIPE_SECRET=opaque0123456789`,
+      `my key is ${key}`,
+      "plain sentence about a token bucket and 12 apples",
+    ].join("\n");
+    const out = maskSecrets(input);
+    expect(out).not.toContain("hunter2");
+    expect(out).not.toContain(key);
+    expect(out).not.toContain("opaque0123456789");
+    expect(out).not.toContain("a".repeat(24));
+    expect(out).toContain("plain sentence about a token bucket and 12 apples");
+    expect(out).toContain("db.test/app");
   });
 });

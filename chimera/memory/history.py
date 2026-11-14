@@ -20,7 +20,7 @@ turn's own finishing code, never by the model. ``recall_history`` says which of 
 
 Three things are deliberate:
 
-* **Written through ``redact``**, as the session file is and for the same reason: a credential the
+* **Written through ``redact``**, as the chat session file (``api/sessions.py``) is, and for the same reason: a credential the
   person pasted into the chat outlives the session here, and an index of one's own conversations
   must not be the place a key is found in clear.
 * **A turn that ran tainted stays marked.** Its answer may carry text an untrusted page put there,
@@ -164,8 +164,8 @@ class HistoryIndex:
             project or "",
             float(asked_at if asked_at is not None else time.time()),
             1 if tainted else 0,
-            redact(asked[:TEXT_CAP]),
-            redact(answered[:TEXT_CAP]),
+            redact(asked)[:TEXT_CAP],
+            redact(answered)[:TEXT_CAP],
             _join(files or []),
             _join(edited or []),
             _join(tools or []),

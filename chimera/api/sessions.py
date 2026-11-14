@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from chimera.core.redact import redact, redact_json
 from chimera.interface import ChatSession
 from chimera.interface.session import ChatTurn, read_provenance
 from chimera.telemetry import get_logger
@@ -49,7 +50,8 @@ def _title_from_turns(turns: list[ChatTurn]) -> str:
     for turn in turns:
         text = turn.user.strip().replace("\n", " ")
         if text:
-            return text[:60]
+            # Masked BEFORE the cut: cutting first leaves the front of a pasted key as the title.
+            return redact(text)[:60]
     return "New chat"
 
 
@@ -126,6 +128,10 @@ class SessionStore:
         ``restored`` is deliberately NOT written. It describes how a turn reached the session in
         memory, not what the turn is, and persisting it would make the second save of a resumed
         thread claim the turns were restored from a file that had not been read yet.
+
+        Every string goes through ``redact_json`` before it is serialised: a credential pasted into
+        the chat would otherwise sit in clear in this file indefinitely, and ``memory/history.py``
+        said it did not. Redacting each string (not the serialised text) keeps the file valid JSON.
         """
         path = self._path(session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -139,7 +145,7 @@ class SessionStore:
         }
         tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
         try:
-            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            tmp.write_text(json.dumps(redact_json(data), indent=2), encoding="utf-8")
             tmp.replace(path)
         finally:
             tmp.unlink(missing_ok=True)
