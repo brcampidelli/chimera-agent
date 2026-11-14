@@ -933,9 +933,9 @@ def render(art: dict, day: str, category: str, items: list[dict], dropped: str, 
 
 
 def compose(art_en: dict, items: list[dict], day: str, slug: str, category: str, dropped: str, version: str) -> dict[str, str] | None:
-    """Os nove arquivos, ou None.
+    """Os arquivos de todos os idiomas de ``LANGS`` (o inglês e as traduções), ou None.
 
-    Nove ou nenhum, e o portão do site também exige isso. Uma rodada que escreve cinco idiomas e
+    Todos ou nenhum, e o portão do site também exige isso. Uma rodada que escreve cinco idiomas e
     perde quatro deixa um site que parece deliberado: quatro línguas cujo blog simplesmente tem
     menos coisa. O leitor não tem como saber que houve uma falha, então quem sabe é este `return`.
     """
@@ -1036,7 +1036,7 @@ def checks_pass(number: int, sha: str, timeout_s: int = CHECKS_TIMEOUT_S) -> boo
 
 
 def publish(files: dict[str, str], slug: str, day: str, category: str) -> bool:
-    """Branch, nove arquivos, PR, merge. Nunca commit direto na main: o rastro do PR é o que torna
+    """Branch, um arquivo por idioma de ``LANGS``, PR, merge. Nunca commit direto na main: o rastro do PR é o que torna
     auditável um post que ninguém leu antes de publicar."""
     import base64
 

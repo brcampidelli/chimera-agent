@@ -52,3 +52,15 @@ would need tasks the model completes reliably in the control arm and that cannot
 `CHIMERA_DEFER_TOOLS` stays **off by default**. The token half is settled (arithmetic in
 `break_even.py`, −26% measured here); the selection-accuracy half is still unmeasured — not for want
 of trying, but because this instrument lacked the power to answer.
+
+## Emenda, 2026-11-14 (auditoria a06-01)
+
+The standing recommendation above, "`CHIMERA_DEFER_TOOLS` stays **off by default**", is no longer what
+the code does. `chimera/config.py` declares `defer_tools` with `default=True` (switched on in #1210),
+so a fresh install defers the tools the core does not use. That decision was taken against this
+verdict and is registered as a decision of the owner, not as a result of this bench.
+
+Nothing above is changed. The counts, the McNemar p = 0.125 and the −26% token figure stand as
+measured on 2026-09-02. What this amendment adds is the state of the question: the selection-accuracy
+half is still unmeasured, the second measurement (`PREREGISTRATION_2.md`) has not been run, and the
+default and this recommendation now disagree.

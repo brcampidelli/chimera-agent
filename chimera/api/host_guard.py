@@ -1,7 +1,7 @@
 """Which ``Host`` a request to the loopback app may carry — the answer to DNS rebinding.
 
-Without a server token (the desktop default) the API trusts whoever reaches 127.0.0.1, on the
-reasoning that only this machine can. A browser on this machine can, on behalf of any page: the
+Without a server token (a bare ``chimera serve``; the desktop shell hands every launch a per-launch
+bearer token) the API trusts whoever reaches 127.0.0.1, on the reasoning that only this machine can. A browser on this machine can, on behalf of any page: the
 page at ``attacker.example`` re-points that name to 127.0.0.1 (a short TTL is enough) and fetches
 ``http://attacker.example:8765/api/...``. To the browser that is the page's own origin — no
 preflight, and the answer is readable. Nothing about the request is foreign except one header the

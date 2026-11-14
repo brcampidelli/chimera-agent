@@ -4,9 +4,9 @@ The gateway captures provider cache-token reports; this module adds explicit bre
 Anthropic/Claude. Automatic-cache providers receive messages unchanged. The original
 :func:`apply_cache_control` marks only the last system message; the gateway uses
 :func:`apply_rolling_cache_control` to additionally mark the history tail, within Anthropic's
-four-block limit. The Code-turn system prompt is not stable across turns because it carries recalled
-facts and notes, so a system-only marker has little value there; the rolling marker covers steps
-within the turn.
+four-block limit. Recalled facts and cards travel in the turn context (``turn_context=True`` in
+``code_api``), not in the system prompt, so the Code-turn system prompt is stable across turns; the
+rolling marker still covers the history tail within a turn.
 
 Honest status (probe measured 2026-10-24): with prompt-cache markers enabled, the second
 identical call read about 26.5k tokens from cache on ``openrouter/anthropic/claude-haiku-5.5``

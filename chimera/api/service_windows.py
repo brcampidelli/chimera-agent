@@ -17,8 +17,10 @@ The two are not authorised the same way, on purpose:
   bridge file being written while the owner's "Allow Claude" switch is on, and a holder of the
   owner's token can already do anything the bridge's narrower token can.
 * **The screen lease** takes the token AND the **launcher key**: the secret the desktop shell drew
-  for this launch and handed to the service it spawned, in the environment of the child, never on
-  disk (:data:`chimera.api.screen_credential.LAUNCHER_ENV`). ``service.token`` is a file, and the
+  for this launch and handed to the service it spawned on its stdin, one JSON line, never in the
+  environment (where ``/proc/<pid>/environ`` would show it) and never on disk. The environment
+  variable :data:`chimera.api.screen_credential.LAUNCHER_ENV` is only the fallback for a launch that
+  did not open that channel. ``service.token`` is a file, and the
   agent's own shell can read it; if the token alone could lease a screen credential, a ``cat`` and
   two ``curl`` calls would approve the agent's own questions without a code — exactly the hole the
   screen credential exists to close (#950). A service the current shell did not spawn (a terminal's
