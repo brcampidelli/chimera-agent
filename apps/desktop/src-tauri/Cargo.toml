@@ -47,7 +47,7 @@ tauri-plugin-single-instance = "2"
 # Both are held below the releases that require Tauri 2.12 (autostart 2.6, global-shortcut 2.4): this
 # tree is on Tauri 2.11.5, and moving Tauri is a desktop-build change with its own installer smoke
 # test (see the glib note in ci.yml), not something to ride in on a tray feature.
-tauri-plugin-autostart = "~2.5.1"
+tauri-plugin-autostart = "~2.7.0"
 # The quick-entry shortcut (study 29, P2.6, OFF by default): a system-wide chord that brings the
 # window forward on the Code screen. Registered from Rust for the same reason as above.
-tauri-plugin-global-shortcut = "~2.3.2"
+tauri-plugin-global-shortcut = "~2.4.1"
