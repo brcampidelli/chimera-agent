@@ -1,5 +1,5 @@
 ---
-source_sha256: 7f5fca41b1aee08855e7e093378dcbb321639030f29b4fc89c219aaf65167e16
+source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -325,6 +325,12 @@ Most pulpitu (`chimera mcp desktop`) ma trzy przełączniki, każdy bez znaczeni
   (`platform:discord` to bot); test zawodzi, jeśli jakiś moduł znów napisze własną listę.
 
 **Pętla zamknięcia wypycha sama.** Gdy weryfikacja tury kodu przechodzi, a sprawdzenie diffu jest czyste, Chimera robi commit zmian tury na gałęzi obszaru roboczego i wysyła tę gałąź do `origin`, aby otworzyć pull request. Nigdy nie wysyła na gałąź domyślną i nigdy nie wymusza wysyłki. Scala tylko wtedy, gdy właściciel włączył `CHIMERA_CLOSE_LOOP_MERGE`, i wtedy nigdy pull request dotykającego rozliczeń, destrukcyjnej migracji, RLS, grantu ani sekretu. Uruchamia ją tylko ekran właściciela; mostek, kanały i praca w tle nie.
+
+### Modele wymagające przechowywania danych
+
+Niektóre modele są obsługiwane tylko wtedy, gdy dostawca przechowuje prompt. **Claude Fable 5.2 wymaga 30-dniowego przechowywania danych i nie jest dostępny przy zerowej retencji danych (ZDR)**, chyba że Anthropic wyraźnie na to zezwoli (strona modelu Anthropic, odczytana 2026-11-14). Wybranie go jako domyślnego, jako tieru, roli fuzji lub w jakimkolwiek innym ustawieniu modelu wysyła prompty, wraz z przywołaną pamięcią, trasą, która przechowuje je 30 dni, niezależnie od tego, o co właściciel poprosił dla trasy.
+
+Koliduje to także z dwoma przełącznikami OpenRoutera, a to, co się dzieje, zależy od trasy. Przez OpenRouter (`openrouter/anthropic/claude-fable-5.2`) bramka wysyła z każdym wywołaniem `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` lub `CHIMERA_OPENROUTER_ZDR=true`, więc żadna trasa nie może obsłużyć Fable 5.2: preferencja jest dotrzymana, a model jest na tej trasie niedostępny. Tura kończy się niepowodzeniem tylko wtedy, gdy wyczerpią się także skonfigurowane modele zapasowe; przy skonfigurowanym modelu zapasowym może na nim dokończyć. Przy dostępie bezpośrednim (`anthropic/claude-fable-5-2`) preferencja nigdy nie jest wysyłana, więc model działa, a Anthropic przechowuje prompt 30 dni niezależnie od przełącznika: nic nie jest blokowane i nic nie jest dotrzymywane. Karta prywatności na ekranie Bezpieczeństwa wymienia każdy skonfigurowany model wymagający przechowywania, wraz z rolami, które go używają, i oznacza te, które przeczą obowiązującej preferencji, podając, czy preferencja jest egzekwowana na trasie modelu (model jest tam niedostępny), czy nie (model działa, a prompt jest przechowywany). Katalog zapisuje wymóg dla każdego modelu (`ModelCaps.retention_days` w `chimera/providers/catalog.py`), a żaden preset ani wartość domyślna nie używa takiego modelu.
 
 ## Uczciwe granice
 

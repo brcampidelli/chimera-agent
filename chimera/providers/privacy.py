@@ -38,6 +38,53 @@ def openrouter_privacy(settings: Settings) -> dict[str, Any]:
     return fields
 
 
+def retention_required(settings: Settings) -> list[dict[str, Any]]:
+    """Configured models whose provider REQUIRES data retention, with the roles that use each.
+
+    Fable 5.2 "requires 30-day data retention and isn't available under zero data retention" (Anthropic's
+    model page, read 2026-11-14), so a prompt sent there is kept for 30 days whatever the owner asked
+    of the route. Two different facts, kept apart because only the second is a promise about behaviour:
+
+    - ``conflicts``: the owner HAS asked for less than the model needs (``deny`` or ``zdr``).
+    - ``enforced``: that preference is actually SENT on this model's route. The gateway attaches it
+      only to ``openrouter/`` slugs (``openrouter_privacy``); a model reached directly
+      (``anthropic/claude-fable-5-2``) never carries it, so there it is neither honoured nor a reason
+      for the call to fail: the model runs and the provider keeps the prompt.
+    - ``fallback``: a configured fallback model exists that does NOT itself require retention. With
+      one, an unavailable model costs a different model and the turn can still finish; without one,
+      the turn fails once that model is refused. The card words the two cases differently.
+
+    Read from configuration like :func:`prompt_routes`: a role nobody exercises still counts.
+    """
+    from chimera.providers.catalog import base_slug, caps_for
+
+    asked = settings.openrouter_data_collection == "deny" or bool(settings.openrouter_zdr)
+    fallback = any(
+        caps_for(base_slug(str(f).strip())).retention_days is None
+        for f in settings.fallback_models
+        if str(f).strip()
+    )
+    found: dict[str, dict[str, Any]] = {}
+    for role, model in _model_roles(settings) + _surface_roles(settings):
+        slug = base_slug((model or "").strip())
+        days = caps_for(slug).retention_days if slug else None
+        if days:
+            row = found.setdefault(
+                slug,
+                {
+                    "model": slug,
+                    "days": days,
+                    "roles": [],
+                    "conflicts": asked,
+                    "enforced": asked and slug.startswith("openrouter/"),
+                    "fallback": fallback,
+                },
+            )
+            if role not in row["roles"]:
+                row["roles"].append(role)
+    return list(found.values())
+
+
 def _provider_of(model: str) -> str:
     """The route a model slug is sent to: the part before the first ``/``.
 
@@ -259,6 +306,8 @@ def privacy_snapshot(settings: Settings) -> dict[str, Any]:
         # Whether the agent's read tools may read Chimera's own `.env` (its keys reach the model).
         "agent_reads_own_env": bool(settings.agent_reads_own_env),
         "routes": prompt_routes(settings),
+        # Models in use that the provider will not serve without keeping the prompt (Fable 5.2: 30 days).
+        "retention_required": retention_required(settings),
         # The exporter turns on from either switch AND only with the `[otel]` extra installed
         # (`chimera/obs.py: configure_otel` logs "tracing stays off" without it). `telemetry` is what
         # is actually exported; `telemetry_requested` lets the card say "asked for, nothing sent".

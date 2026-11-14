@@ -17,6 +17,7 @@ Honesty rules:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
@@ -123,7 +124,110 @@ class CatalogEntry:
     input rate. Filled only where the provider published it — never a multiplier assumed per row."""
     cache_write_per_m: float | None = None
     """USD per 1M prompt-cache WRITES; None = not recorded (priced at the input rate, a floor)."""
+    long_prompt: tuple[int, float, float, float | None, float | None] | None = None
+    """A second price tier for a long prompt: ``(over_tokens, input, output, cache_read, cache_write)``,
+    USD per 1M. A request whose prompt (cache reads and writes included) is OVER ``over_tokens`` pays
+    these instead. None = one price for every length. Claude Haiku 5.5 is the case: 0.10 / 0.50 up
+    to 100,000 prompt tokens and 0.50 / 2.50 above."""
 
+
+
+@dataclass(frozen=True)
+class ModelCaps:
+    """What a model REFUSES in a request, so the gateway can leave it out instead of getting a 400.
+
+    Every field defaults to "accepted", which is what an unlisted model gets: capabilities are
+    recorded only where a provider PUBLISHED a restriction (Anthropic's model pages and migration
+    guides, read 2026-11-14), never inferred from a family name. A model with no row is sent exactly
+    what it was sent before this existed.
+    """
+
+    sampling: bool = True
+    """False = ``temperature``, ``top_p`` and ``top_k`` return a 400 and must be omitted."""
+    forced_tool_choice: bool = True
+    """False = ``tool_choice`` of ``any`` / ``tool`` (a forced call) is rejected; auto and none pass."""
+    thinking_off: bool = True
+    """False = reasoning cannot be switched off (``thinking: disabled``), so a caller that asks for
+    it gets the model's own thinking rather than an error."""
+    retention_days: int | None = None
+    """A MANDATORY data-retention period, in days; None = the provider asks for none. A model that
+    requires retention is not served under zero data retention, which is a privacy fact the owner
+    has to be told before routing a prompt there."""
+
+
+# Keyed by the model's id as the provider spells it, with the version dashed (`claude-fable-5-2`);
+# `caps_for` folds `5.2` into `5-2` first, so the OpenRouter spelling reaches the same row.
+_NO_SAMPLING = ModelCaps(sampling=False)
+_CAPS: dict[str, ModelCaps] = {
+    # Fable 5.2: "Omit temperature, top_p, and top_k"; forced tool use "returns a 400 error";
+    # "Adaptive thinking is always on and can't be turned off"; "requires 30-day data retention and
+    # isn't available under zero data retention unless expressly authorized by Anthropic".
+    "claude-fable-5-2": ModelCaps(
+        sampling=False, forced_tool_choice=False, thinking_off=False, retention_days=30
+    ),
+    # Opus 5.5 migration guide, "What every request must satisfy": no sampling parameters, no forced
+    # tool call, `thinking: disabled` rejected.
+    "claude-opus-5-5": ModelCaps(sampling=False, forced_tool_choice=False, thinking_off=False),
+    # Sonnet 5.5 ("What's new in Claude Sonnet 5.5", read 2026-11-14): setting temperature/top_p/top_k
+    # "returns a 400 error"; "Claude Sonnet 5.5 doesn't support forced tool use" (`tool_choice` any/tool
+    # returns a 400 invalid_request_error); `thinking: disabled` returns a 400 that points to
+    # `between_tools`, so it cannot be switched off the way the gateway asks.
+    "claude-sonnet-5-5": ModelCaps(sampling=False, forced_tool_choice=False, thinking_off=False),
+    # Haiku 5.5: "Omit temperature, top_p, and top_k". Nothing published about the other two.
+    "claude-haiku-5-5": _NO_SAMPLING,
+}
+
+_VERSION_DOT = re.compile(r"(?<=\d)\.(?=\d)")
+_VENDOR_PREFIX = re.compile(r"^(?:[a-z0-9_]+\.)+(?=claude-)")
+
+#: OpenRouter's moving aliases (`~anthropic/claude-fable-latest`) and the model each pointed at on
+#: 2026-11-14: the index lists the alias at exactly the current model's input, output and cache prices
+#: (Fable 8/40, Opus 4/20, Sonnet 2/10, Haiku 0.10/0.50 with the same >100k override), and nothing
+#: else in it says where an alias points. An alias is mapped to the model it IS today, because the
+#: alternative is to send it everything that model refuses. When the alias moves to a model with other
+#: rules, this table is the stale part; what it applies in the meantime is only ever the stricter side.
+_LATEST: dict[str, str] = {
+    "claude-fable-latest": "claude-fable-5-2",
+    "claude-opus-latest": "claude-opus-5-5",
+    "claude-sonnet-latest": "claude-sonnet-5-5",
+    "claude-haiku-latest": "claude-haiku-5-5",
+}
+
+
+def model_identity(slug: str) -> str:
+    """The model a slug NAMES, with every routing segment taken off, lower-cased and version-dashed.
+
+    A slug is ``route / name``, and only the name says what the model is. ``endpoint/<name>/<model>``
+    is a user-chosen endpoint name followed by the model it serves: ``endpoint/claude-fable-5-2/qwen3``
+    is a Qwen behind an endpoint that happens to be called after Fable, and must not get Fable's
+    rules. The last path segment is the model id; a Bedrock/Vertex vendor-and-region prefix
+    (``global.anthropic.``), a ``:batch``-style variant and an ``@snapshot`` are not part of it.
+    """
+    s = base_slug(slug).strip().lower()
+    if s.startswith("endpoint/"):
+        parts = s.split("/", 2)
+        s = parts[2] if len(parts) == 3 else ""
+    s = s.rsplit("/", 1)[-1].lstrip("~")
+    s = s.split("@", 1)[0].split(":", 1)[0]
+    s = _VERSION_DOT.sub("-", s)
+    s = _VENDOR_PREFIX.sub("", s)
+    return _LATEST.get(s, s)
+
+
+def caps_for(slug: str) -> ModelCaps:
+    """The recorded capabilities of ``slug``, or the all-accepted default for a model with no row.
+
+    Matched on the model's own identity (:func:`model_identity`) at a whole-version boundary:
+    ``claude-opus-5-5`` must not match a row for ``claude-opus-5`` and the reverse, and a Bedrock
+    (``anthropic.claude-haiku-5-5``), OpenRouter (``openrouter/anthropic/claude-haiku-5.5``) or alias
+    (``~anthropic/claude-haiku-latest``) spelling of the same model reaches the same row.
+    """
+    identity = model_identity(slug)
+    for key, caps in _CAPS.items():
+        # The id itself, or the id plus a dated snapshot: a longer name is another model.
+        if re.fullmatch(rf"{re.escape(key)}(?:-\d{{8}})?", identity):
+            return caps
+    return ModelCaps()
 
 
 def price_is_known(entry: CatalogEntry, live_input_per_m: float, *, tolerance: float = 0.5) -> bool:
@@ -316,6 +420,27 @@ CATALOG: tuple[CatalogEntry, ...] = (
         5.00, 25.00, tools=True, context_k=1000,
         cache_read_per_m=0.50, cache_write_per_m=6.25,
         notes="frontier; replaces claude-opus-4-8, withdrawn on 2026-08-18. Cache read 0.50 and write 6.25 as the OpenRouter index publishes them for this slug (input_cache_read / input_cache_write, read 2026-10-05) — Anthropic's 0.1x / 1.25x of input, confirmed at the source rather than applied here",
+    ),
+    CatalogEntry(
+        "openrouter/anthropic/claude-fable-5.2", "top", "Anthropic",
+        8.0, 40.0, tools=True, context_k=1000, cache_read_per_m=0.2, cache_write_per_m=10.0,
+        notes="Added 2026-11-14, NOT a default of any preset. Anthropic's pricing page (platform.claude.com/docs/en/about-claude/pricing) and OpenRouter's /api/v1/models index agreed to the cent on 2026-11-14. Cache write is the five-minute kind (1.25x input); cache read is 0.025x input, not the 0.1x of older models. Takes no temperature/top_p/top_k, cannot be forced to call a tool, cannot have thinking switched off, and requires 30-day data retention, so it is not served under zero data retention (`ModelCaps`: the gateway leaves those parameters out)",
+    ),
+    CatalogEntry(
+        "openrouter/anthropic/claude-opus-5.5", "top", "Anthropic",
+        4.0, 20.0, tools=True, context_k=1000, cache_read_per_m=0.2, cache_write_per_m=5.0,
+        notes="Added 2026-11-14, NOT a default of any preset. Anthropic's pricing page (platform.claude.com/docs/en/about-claude/pricing) and OpenRouter's /api/v1/models index agreed to the cent on 2026-11-14. Cache write is the five-minute kind (1.25x input); cache read is 0.05x input. Takes no sampling parameters, no forced tool call and no `thinking: disabled` (`ModelCaps`)",
+    ),
+    CatalogEntry(
+        "openrouter/anthropic/claude-sonnet-5.5", "mid", "Anthropic",
+        2.0, 10.0, tools=True, context_k=1000, cache_read_per_m=0.1, cache_write_per_m=2.5,
+        notes="Added 2026-11-14, NOT a default of any preset. Anthropic's pricing page (platform.claude.com/docs/en/about-claude/pricing) and OpenRouter's /api/v1/models index agreed to the cent on 2026-11-14. Cache write is the five-minute kind (1.25x input); cache read is 0.05x input. Takes no sampling parameters and no `thinking: disabled` (`ModelCaps`)",
+    ),
+    CatalogEntry(
+        "openrouter/anthropic/claude-haiku-5.5", "weak", "Anthropic",
+        0.1, 0.5, tools=True, context_k=1000, cache_read_per_m=0.01, cache_write_per_m=0.125,
+        long_prompt=(100_000, 0.50, 2.50, 0.05, 0.625),
+        notes="Added 2026-11-14, NOT a default of any preset. Anthropic's pricing page (platform.claude.com/docs/en/about-claude/pricing) and OpenRouter's /api/v1/models index agreed to the cent on 2026-11-14. Cache write is the five-minute kind (1.25x input). Priced by prompt length: a request whose prompt is over 100,000 tokens (cache reads and writes included) pays 0.50 in / 2.50 out / 0.05 cache read / 0.625 cache write, which `chimera.fusion.receipts.ModelPrice.long_prompt` carries; this row holds the up-to-100k tier. Takes no sampling parameters (`ModelCaps`)",
     ),
     CatalogEntry(
         "openrouter/qwen/qwen3.7-max", "top", "Qwen (Alibaba)",
@@ -634,5 +759,17 @@ def register_catalog_prices() -> None:
                     entry.output_per_m,
                     cache_read_per_m=entry.cache_read_per_m,
                     cache_write_per_m=entry.cache_write_per_m,
+                    long_prompt_over=entry.long_prompt[0] if entry.long_prompt else None,
+                    long_prompt=(
+                        ModelPrice(
+                            entry.long_prompt[1], entry.long_prompt[2],
+                            cache_read_per_m=entry.long_prompt[3],
+                            cache_write_per_m=entry.long_prompt[4],
+                        )
+                        if entry.long_prompt else None
+                    ),
+                    # A catalogue Claude row names a MODEL and is matched on its identity; the flag is
+                    # on the row's price, so a later `set_price` with the same text is not.
+                    by_identity="claude-" in pattern,
                 ),
             )

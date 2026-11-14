@@ -637,7 +637,7 @@ def worst_case_usd(
 def _never_billed(exc: BaseException) -> bool:
     """True when ``exc`` provably left before a provider could bill anything.
 
-    Only these give their reservation back. A missing key is raised before any request is built; a
+    Only these give their reservation back. A missing key or a parameter the model refuses is raised before any request is built; a
     nested ceiling refuses before its call; a context overflow or a content-policy refusal is the
     provider declining the prompt (``RecoveryAction.ABORT``), which generates nothing. Everything
     else (a timeout, a cut stream, an unknown error, an interrupt that may have landed mid-call)
@@ -647,9 +647,11 @@ def _never_billed(exc: BaseException) -> bool:
     ``max_usd`` having spent nothing: each refusal charged the whole completion ceiling.
     """
     from chimera.providers.failover import FailoverReason, classify
-    from chimera.providers.gateway import MissingCredentialsError
+    from chimera.providers.gateway import MissingCredentialsError, UnsupportedParameterError
 
-    if isinstance(exc, (MissingCredentialsError, BudgetExceeded)):
+    # `UnsupportedParameterError` is the gateway refusing a request the model cannot take, raised
+    # before any request is built: nothing left the process, so nothing was billed.
+    if isinstance(exc, (MissingCredentialsError, BudgetExceeded, UnsupportedParameterError)):
         return True
     if not isinstance(exc, Exception):
         return False

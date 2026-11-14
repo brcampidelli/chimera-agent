@@ -543,15 +543,21 @@ def test_a_summariser_call_is_charged_to_the_turns_ceiling() -> None:
     session = CodeSession(_agent_with_summariser(backend), session_id="priced")
     session.messages = _tool_conversation(10)
     session.last_turn = _record()
-    spend = SpendBudget(max_usd=0.05, strict=False)
+    # Haiku 5.5 is $0.10 in / $0.50 out per million (100k is AT the long-prompt threshold, not over
+    # it): 100k in + 1k out = 0.01 + 0.0005 = 0.0105. This test used to expect 0.084 and a 0.05
+    # ceiling, which is the figure the generic `claude-haiku` row (Haiku 3.5, $0.80/$4.00) gave this
+    # model before P0-13 priced the 5.x generation under its own rows. The expectation was computed
+    # on the wrong price; what it proves (a summary call is charged and can trip the ceiling) is
+    # unchanged, so the ceiling now sits just under the correct cost.
+    spend = SpendBudget(max_usd=0.01, strict=False)
 
     record = session.compact_if_idle(now=LONG_PAUSE, enabled=True, model=ANTHROPIC, spend=spend)
 
     assert record is not None
     assert len(backend.prompts) == 1
-    assert record["summary_usd"] == 0.084
-    assert spend.spent == 0.084
-    # 0.084 is over the 0.05 ceiling, so the run that follows is refused rather than let past it.
+    assert record["summary_usd"] == 0.0105
+    assert spend.spent == 0.0105
+    # 0.0105 is over the 0.01 ceiling, so the run that follows is refused rather than let past it.
     assert spend.blocked() is not None
     assert "Always answer in Portuguese." in str(session.history_for_model()[0]["content"])
 

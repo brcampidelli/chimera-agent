@@ -118,15 +118,22 @@ class MeteredBackend:
                 completion,
                 cache_read_tokens=_as_count(getattr(result, "cache_read_tokens", None)),
                 cache_write_tokens=_as_count(getattr(result, "cache_write_tokens", None)),
+                calls=_as_count(getattr(result, "calls", None)),
+                aggregate=getattr(result, "aggregate", False) is True,
             )
             if model
             else None
         )
-        if _stages_of(result):
+        if (
+            _stages_of(result)
+            or isinstance(getattr(result, "usd", None), int | float)
+            or getattr(result, "aggregate", False) is True
+        ):
             # A fused answer is labelled "fusion", which no price resolves, so every call a meter
             # saw through the Fuse button read as unknown. Its stages carry their own models and
             # tokens, and `SpendBudget.record_result` and the loop's tally already price by them;
-            # this is the meter catching up, all-or-nothing as ever.
+            # this is the meter catching up, all-or-nothing as ever. A result that carries its own
+            # exact cost (an agent run's tally) is read as that cost, never re-priced from its sums.
             cost = price_completion(result)
             usd = None if cost.unpriced is not None else cost.usd
         with self._lock:

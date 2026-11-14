@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Claude 5 models in the catalogue, priced and asked only what they accept.** Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5 carry verified prices (Haiku 5.5's long-context tier included); the gateway stops sending parameters a model refuses; an exact provider cost is never rebuilt below what was spent, and an unknown one stays unpriced so the spend cap still holds. Fable 5.2's data-retention requirement is shown in the privacy card and the security docs. (#1279)
+
 - **The Storage card now sees the conversations' worktrees, says why each is kept, and offers to archive idle ones.** It used to list only the worktrees in the system temp folder, missing the project's durable folder (89 checkouts, 72.9 GiB measured on one machine); it now lists them with size, age and the reason each still exists, warns above a limit (`CHIMERA_WORKTREE_LIMIT_GB`, default 50) and offers to archive conversations idle for `CHIMERA_WORKTREE_IDLE_DAYS` (default 14) through the existing archive route, never deleting anything. A new worktree card also says "fetching the remote base" while it waits and highlights the warning when it did not start from the remote tip. (P1-18) (#1253)
 
 - **Token and cost baseline, read-only.** `scripts/token_baseline.py` reads the usage, run and trace logs under the desktop home and prints only aggregates (per surface, with coverage of price and cache and a 30-turn floor below which only the n is shown); its totals match the Cost screen over the same rows, and `bench/token_baseline/` holds the pre-registration and the first reading. (P0-18) (#1252)
@@ -32,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - **The Design check measures HTML artboards.** Colours, fonts, spacing and text contrast are checked against the tokens, and anything the check could not measure is listed as "not checked" instead of reading as "no findings". (#1277)
+
+- **The app's agent now knows who you are.** The profile you fill in (stored profile and remembered facts about you) is added to the agent's instructions in the same place in the desktop Code turn, the terminal and the bots, and stays identical between turns so prompt caching keeps working. (#1275)
 
 - **Pasted credentials no longer sit in chat session files, and a web page can no longer POST to a token-less local server.** Chat transcripts are masked on disk, writes from another origin are refused when no server token is set, the attachment and dictation uploads get the same origin check as skill uploads, and a non-ASCII bearer header now gets a 401 instead of a 500. (#1274)
 

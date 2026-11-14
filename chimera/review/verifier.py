@@ -57,6 +57,11 @@ class Verifier(Protocol):
         """(calls, failed calls, prompt tokens, completion tokens) spent so far."""
         ...
 
+    def cost(self) -> float | None:
+        """USD spent so far, priced call by call at the model that answered; None if any call could
+        not be priced. A verifier that does not implement it is priced from its token totals."""
+        ...
+
 
 class KeepAll:
     """No second stage: every located finding is shown. For ``--no-verify`` and for the bench."""
@@ -68,6 +73,9 @@ class KeepAll:
 
     def usage(self) -> tuple[int, int, int, int]:
         return (0, 0, 0, 0)
+
+    def cost(self) -> float | None:
+        return 0.0
 
 
 def verifier_request(finding: Finding, file: FileDiff) -> str:
@@ -97,6 +105,12 @@ class CautiousVerifier:
         self.model = model
         self._lock = threading.Lock()  # findings are checked in parallel
         self._calls = self._failed = self._prompt = self._completion = 0
+        self._usd = 0.0
+        self._unpriced = False
+
+    def cost(self) -> float | None:
+        with self._lock:
+            return None if self._unpriced else round(self._usd, 6)
 
     def usage(self) -> tuple[int, int, int, int]:
         with self._lock:
@@ -121,6 +135,18 @@ class CautiousVerifier:
             self._calls += 1
             self._prompt += int(result.prompt_tokens or 0)
             self._completion += int(result.completion_tokens or 0)
+            # Priced HERE, one call at a time: a long-prompt tier belongs to a request, and the sum of
+            # every check is not one.
+            from chimera.review.pipeline import price_call
+
+            usd = price_call(
+                str(getattr(result, "model", "") or self.model),
+                int(result.prompt_tokens or 0), int(result.completion_tokens or 0),
+            )
+            if usd is None:
+                self._unpriced = True
+            else:
+                self._usd += usd
         return read_verdict(result.content or "")
 
 

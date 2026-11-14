@@ -239,3 +239,36 @@ def test_no_catalogue_window_promises_more_than_the_provider_serves(live_slugs: 
         if entry.slug in served and entry.context_k * 1000 > served[entry.slug]
     ]
     assert not over, f"a catalogue window promises more than the provider serves: {over}"
+
+
+def test_the_latest_aliases_still_point_where_the_catalogue_says() -> None:
+    """`catalog._LATEST` maps OpenRouter's moving `~anthropic/claude-*-latest` aliases to the model each
+    is today, which decides their price, capabilities and retention warning. The index publishes the
+    target in `alias_target.slug`, so this reads it instead of inferring it from the price: when an
+    alias moves, this reddens and `_LATEST` (and the two price rows) are the lines to update."""
+    import json
+    import urllib.request
+
+    from chimera.providers.catalog import _LATEST
+
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/models", headers={"User-Agent": "chimera-tests"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as response:
+        data = json.loads(response.read())["data"]
+    targets = {
+        entry["id"]: (entry.get("alias_target") or {}).get("slug")
+        for entry in data
+        if str(entry.get("id", "")).startswith("~anthropic/")
+    }
+    if not any(targets.values()):
+        pytest.skip("the index publishes no alias_target: nothing to compare against")
+    moved = {}
+    for alias, current in _LATEST.items():
+        live = targets.get(f"~anthropic/{alias}")
+        if live is None:
+            continue
+        # `claude-fable-5.2` in the index, `claude-fable-5-2` in the table: the same model.
+        if live.split("/")[-1].replace(".", "-") != current:
+            moved[alias] = (current, live)
+    assert not moved, f"an alias moved: {moved}"

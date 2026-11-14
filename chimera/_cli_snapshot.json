@@ -5504,7 +5504,7 @@
         },
         {
           "deprecated": false,
-          "help": "Show the stored profile and the exact preamble sessions will receive.",
+          "help": "Show the exact profile block the agent receives: the stored profile and the persona facts.",
           "hidden": false,
           "name": "show",
           "params": [],

@@ -1,5 +1,5 @@
 ---
-source_sha256: 7f5fca41b1aee08855e7e093378dcbb321639030f29b4fc89c219aaf65167e16
+source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
 ---
 
 # 安全与防护措施
@@ -233,6 +233,12 @@ export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorizatio
   `chimera/governance/surfaces.py` 按家族判断一个名字属于哪种界面（`platform:discord` 是机器人）；如果某个模块再次自己写一份列表，测试就会失败。
 
 **闭环会自行推送。** 当代码轮次的验证通过且 diff 检查干净时，Chimera 会把该轮次的改动提交到工作区分支，并将该分支推送到 `origin` 以开启拉取请求。它从不推送到默认分支，也从不强制推送。只有所有者开启了 `CHIMERA_CLOSE_LOOP_MERGE` 才会合并，并且涉及计费、破坏性迁移、行级安全、授权或机密的拉取请求永远不会被合并。只有所有者的界面能启动它；桥接、渠道和后台任务不能。
+
+### 要求保留数据的模型
+
+有些模型只有在提供方保留提示词时才会提供服务。**Claude Fable 5.2 要求保留数据 30 天，在零数据保留（ZDR）下不可用**，除非 Anthropic 明确授权（Anthropic 模型页面，2026-11-14 查阅）。把它选作默认模型、层级、融合角色或任何其他模型设置，都会把提示词（包括召回的记忆）发送到一条会保存 30 天的路由，无论所有者对该路由提出过什么要求。
+
+这还会与 OpenRouter 的两个开关冲突，具体情况取决于路由。经由 OpenRouter（`openrouter/anthropic/claude-fable-5.2`）时，网关每次调用都会发送 `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` 或 `CHIMERA_OPENROUTER_ZDR=true`，因此没有任何路由能提供 Fable 5.2：偏好得到遵守，该模型在此路由上不可用。只有当配置的备用模型也耗尽时，该轮才会失败；配置了备用模型时，可以在备用模型上完成。直接访问（`anthropic/claude-fable-5-2`）时，偏好从不发送，因此模型照常运行，无论开关如何，Anthropic 都会保留提示词 30 天：没有任何东西被阻止，也没有任何东西被遵守。安全界面的隐私卡片会列出每个要求保留数据的已配置模型及使用它的角色，并标出与当前生效偏好相矛盾的模型，同时说明该偏好是否在模型的路由上被强制执行（模型在那里不可用）或没有（模型运行且提示词被保留）。目录按模型记录这一要求（`chimera/providers/catalog.py` 中的 `ModelCaps.retention_days`），没有任何预设或默认值使用这样的模型。
 
 ## 诚实的边界
 

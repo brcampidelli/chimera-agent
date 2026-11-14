@@ -16113,6 +16113,13 @@
             "title": "Openrouter Zdr",
             "type": "boolean"
           },
+          "retention_required": {
+            "items": {
+              "$ref": "#/components/schemas/RetentionRequiredOut"
+            },
+            "title": "Retention Required",
+            "type": "array"
+          },
           "routes": {
             "items": {
               "$ref": "#/components/schemas/PromptRouteOut"
@@ -17371,6 +17378,47 @@
           "notes"
         ],
         "title": "ResourcesOut",
+        "type": "object"
+      },
+      "RetentionRequiredOut": {
+        "description": "A configured model whose provider keeps the prompt (``retention_required``).",
+        "properties": {
+          "conflicts": {
+            "default": false,
+            "title": "Conflicts",
+            "type": "boolean"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "enforced": {
+            "default": false,
+            "title": "Enforced",
+            "type": "boolean"
+          },
+          "fallback": {
+            "default": false,
+            "title": "Fallback",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "model",
+          "days"
+        ],
+        "title": "RetentionRequiredOut",
         "type": "object"
       },
       "RetiredOut": {

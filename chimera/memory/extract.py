@@ -384,13 +384,24 @@ def _write(memory: MemoryManager, op: Operation, near: dict[str, MemoryItem],
     """Store one checked fact. An update rewrites the record, keeping the old text on the trail."""
     if op.op == "update":
         old = near[op.target]
+        if old.kind == "persona":
+            # A persona fact is the owner's own statement and rides in the standing profile block,
+            # which outranks the project's instructions. A rewrite proposed by the automatic
+            # extractor must not inherit that authority (it would keep kind, `clean` and the old
+            # source): it is filed as a SEPARATE semantic fact, linked to the one it would have
+            # replaced, and recalled like any other fact until the owner decides.
+            item = memory.add(
+                redact(op.fact), "semantic", source=SOURCE, provenance=provenance,
+                metadata={"proposes_update_of": old.id},
+            )
+            result.saved.append(item.content)
+            return
         # The old delete+add made the rewrite indistinguishable from the fact never having said
         # anything else — and it dropped the old record's id, key trail and created_at (study 31,
         # G31-06). `update` keeps the id and files the superseded text in the record's metadata.
-        item = memory.update(old.id, op.fact)
-        if provenance == "tainted":
-            item.provenance = "tainted"
-            memory.store.add(item)
+        item = memory.update(
+            old.id, op.fact, provenance="tainted" if provenance == "tainted" else None
+        )
         result.saved.append(item.content)
         return
     status, item = memory.remember(op.fact, "semantic", source=SOURCE, provenance=provenance)

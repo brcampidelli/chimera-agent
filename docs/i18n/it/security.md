@@ -1,5 +1,5 @@
 ---
-source_sha256: 7f5fca41b1aee08855e7e093378dcbb321639030f29b4fc89c219aaf65167e16
+source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
 ---
 
 # Sicurezza & salvaguardie
@@ -352,6 +352,12 @@ proprietario del 2026-10-18, **Controllo completo tramite il ponte**, in Imposta
   (`platform:discord` è un bot); un test fallisce se un modulo torna a scrivere la propria lista.
 
 **Il ciclo di chiusura fa push da solo.** Quando la verifica di un turno di codice passa e il suo controllo del diff è pulito, Chimera fa commit delle modifiche del turno sul branch dello spazio di lavoro e invia quel branch a `origin` per aprire una pull request. Non invia mai al branch predefinito e non forza mai un push. Esegue il merge solo se il proprietario ha attivato `CHIMERA_CLOSE_LOOP_MERGE`, e in quel caso mai una pull request che tocchi fatturazione, una migrazione distruttiva, RLS, un grant o un segreto. La avvia solo la schermata del proprietario; il bridge, i canali e il lavoro in background no.
+
+### Modelli che richiedono la conservazione dei dati
+
+Alcuni modelli sono serviti solo finché il provider conserva il prompt. **Claude Fable 5.2 richiede 30 giorni di conservazione dei dati e non è disponibile con zero data retention (ZDR)**, salvo autorizzazione esplicita di Anthropic (pagina del modello di Anthropic, letta il 2026-11-14). Sceglierlo come predefinito, come tier, come ruolo di fusione o in qualsiasi altra impostazione di modello invia i prompt, memoria richiamata compresa, a una route che li conserva per 30 giorni, qualunque cosa il proprietario abbia chiesto per la route.
+
+Questo è anche in conflitto con i due interruttori di OpenRouter, e ciò che accade dipende dalla route. Tramite OpenRouter (`openrouter/anthropic/claude-fable-5.2`) il gateway invia `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` o `CHIMERA_OPENROUTER_ZDR=true` a ogni chiamata, quindi nessuna route può servire Fable 5.2: la preferenza è rispettata e il modello non è disponibile sulla route. Il turno fallisce solo se si esauriscono anche i modelli di fallback configurati; con un fallback configurato può concludersi su quello. Raggiunto direttamente (`anthropic/claude-fable-5-2`), la preferenza non viene mai inviata, quindi il modello gira e Anthropic conserva il prompt per 30 giorni a prescindere dall'interruttore: nulla è bloccato e nulla è rispettato. La scheda privacy nella schermata Sicurezza elenca ogni modello configurato che richiede conservazione, con i ruoli che lo usano, e segna quelli che contraddicono la preferenza in vigore, dicendo se tale preferenza è applicata sulla route del modello (il modello lì non è disponibile) oppure no (il modello gira e il prompt viene conservato). Il catalogo registra il requisito per modello (`ModelCaps.retention_days` in `chimera/providers/catalog.py`), e nessun preset né valore predefinito usa un modello così.
 
 ## Limiti onesti
 
