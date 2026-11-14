@@ -1,0 +1,705 @@
+{
+  "nonlatin": {
+    "cells": {
+      "ru:20261114": {
+        "legacy": {
+          "n": 30,
+          "recovered": 6,
+          "wilson": [
+            0.095,
+            0.373
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 6,
+        "dropped_by_gate": {
+          "legacy": 24,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 24,
+          "mcnemar_p": 1.1920928955078125e-07,
+          "bonett_price": [
+            0.577,
+            0.923
+          ]
+        }
+      },
+      "zh:20261114": {
+        "legacy": {
+          "n": 30,
+          "recovered": 11,
+          "wilson": [
+            0.219,
+            0.545
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 11,
+        "dropped_by_gate": {
+          "legacy": 19,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 19,
+          "mcnemar_p": 3.814697265625e-06,
+          "bonett_price": [
+            0.403,
+            0.785
+          ]
+        }
+      },
+      "ja:20261114": {
+        "legacy": {
+          "n": 30,
+          "recovered": 13,
+          "wilson": [
+            0.274,
+            0.608
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 13,
+        "dropped_by_gate": {
+          "legacy": 17,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 17,
+          "mcnemar_p": 1.52587890625e-05,
+          "bonett_price": [
+            0.338,
+            0.725
+          ]
+        }
+      },
+      "pt:20261114": {
+        "legacy": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 30,
+        "dropped_by_gate": {
+          "legacy": 0,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 0,
+          "mcnemar_p": 1.0,
+          "bonett_price": [
+            -0.087,
+            0.087
+          ]
+        }
+      },
+      "ru:20261115": {
+        "legacy": {
+          "n": 30,
+          "recovered": 4,
+          "wilson": [
+            0.053,
+            0.297
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 4,
+        "dropped_by_gate": {
+          "legacy": 26,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 26,
+          "mcnemar_p": 2.9802322387695312e-08,
+          "bonett_price": [
+            0.652,
+            0.973
+          ]
+        }
+      },
+      "zh:20261115": {
+        "legacy": {
+          "n": 30,
+          "recovered": 12,
+          "wilson": [
+            0.246,
+            0.577
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 12,
+        "dropped_by_gate": {
+          "legacy": 18,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 18,
+          "mcnemar_p": 7.62939453125e-06,
+          "bonett_price": [
+            0.37,
+            0.755
+          ]
+        }
+      },
+      "ja:20261115": {
+        "legacy": {
+          "n": 30,
+          "recovered": 17,
+          "wilson": [
+            0.392,
+            0.726
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 17,
+        "dropped_by_gate": {
+          "legacy": 13,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 13,
+          "mcnemar_p": 0.000244140625,
+          "bonett_price": [
+            0.215,
+            0.597
+          ]
+        }
+      },
+      "pt:20261115": {
+        "legacy": {
+          "n": 30,
+          "recovered": 29,
+          "wilson": [
+            0.833,
+            0.994
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 29,
+        "dropped_by_gate": {
+          "legacy": 1,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 1,
+          "mcnemar_p": 1.0,
+          "bonett_price": [
+            -0.074,
+            0.137
+          ]
+        }
+      },
+      "ru:20261116": {
+        "legacy": {
+          "n": 30,
+          "recovered": 7,
+          "wilson": [
+            0.118,
+            0.409
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 7,
+        "dropped_by_gate": {
+          "legacy": 23,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 23,
+          "mcnemar_p": 2.384185791015625e-07,
+          "bonett_price": [
+            0.541,
+            0.897
+          ]
+        }
+      },
+      "zh:20261116": {
+        "legacy": {
+          "n": 30,
+          "recovered": 9,
+          "wilson": [
+            0.167,
+            0.479
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 9,
+        "dropped_by_gate": {
+          "legacy": 21,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 21,
+          "mcnemar_p": 9.5367431640625e-07,
+          "bonett_price": [
+            0.47,
+            0.842
+          ]
+        }
+      },
+      "ja:20261116": {
+        "legacy": {
+          "n": 30,
+          "recovered": 19,
+          "wilson": [
+            0.455,
+            0.781
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 19,
+        "dropped_by_gate": {
+          "legacy": 11,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 11,
+          "mcnemar_p": 0.0009765625,
+          "bonett_price": [
+            0.158,
+            0.53
+          ]
+        }
+      },
+      "pt:20261116": {
+        "legacy": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recovered": 30,
+          "wilson": [
+            0.886,
+            1.0
+          ]
+        },
+        "ascii_visible": 30,
+        "dropped_by_gate": {
+          "legacy": 0,
+          "corrected": 0
+        },
+        "paired": {
+          "legacy_only": 0,
+          "corrected_only": 0,
+          "mcnemar_p": 1.0,
+          "bonett_price": [
+            -0.087,
+            0.087
+          ]
+        }
+      }
+    },
+    "identity_breaks": []
+  },
+  "english": {
+    "honest": {
+      "doc_random": {
+        "legacy": {
+          "n": 90,
+          "lost": 0
+        },
+        "corrected": {
+          "n": 90,
+          "lost": 0
+        },
+        "ungated": {
+          "n": 90,
+          "lost": 0
+        }
+      },
+      "doc_security": {
+        "legacy": {
+          "n": 30,
+          "lost": 0
+        },
+        "corrected": {
+          "n": 30,
+          "lost": 0
+        },
+        "ungated": {
+          "n": 30,
+          "lost": 0
+        }
+      }
+    },
+    "poison": {
+      "all": {
+        "legacy": {
+          "n": 30,
+          "recalled": 25,
+          "unmarked": 0,
+          "blocked_ids": [
+            "p_override_1",
+            "p_override_2",
+            "p_persona_1",
+            "p_persona_5",
+            "p_selfmod_1"
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recalled": 25,
+          "unmarked": 0,
+          "blocked_ids": [
+            "p_override_1",
+            "p_override_2",
+            "p_persona_1",
+            "p_persona_5",
+            "p_selfmod_1"
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recalled": 30,
+          "unmarked": 0,
+          "blocked_ids": []
+        }
+      },
+      "no_taint": {
+        "legacy": {
+          "n": 30,
+          "recalled": 25,
+          "unmarked": 25,
+          "blocked_ids": [
+            "p_override_1",
+            "p_override_2",
+            "p_persona_1",
+            "p_persona_5",
+            "p_selfmod_1"
+          ]
+        },
+        "corrected": {
+          "n": 30,
+          "recalled": 25,
+          "unmarked": 25,
+          "blocked_ids": [
+            "p_override_1",
+            "p_override_2",
+            "p_persona_1",
+            "p_persona_5",
+            "p_selfmod_1"
+          ]
+        },
+        "ungated": {
+          "n": 30,
+          "recalled": 30,
+          "unmarked": 30,
+          "blocked_ids": []
+        }
+      }
+    },
+    "irrelevant_doc_random": {
+      "shift_1": {
+        "pairs": 90,
+        "legacy_admitted": 67,
+        "corrected_admitted": 5,
+        "baseline_only": 0,
+        "treatment_only": 62
+      },
+      "shift_2": {
+        "pairs": 90,
+        "legacy_admitted": 68,
+        "corrected_admitted": 9,
+        "baseline_only": 0,
+        "treatment_only": 59
+      },
+      "shift_3": {
+        "pairs": 90,
+        "legacy_admitted": 66,
+        "corrected_admitted": 3,
+        "baseline_only": 0,
+        "treatment_only": 63
+      }
+    },
+    "irrelevant_nonlatin": {
+      "ru:20261114": {
+        "pairs": 30,
+        "legacy_admitted": 0,
+        "corrected_admitted": 0,
+        "baseline_only": 0,
+        "treatment_only": 0
+      },
+      "ru:20261115": {
+        "pairs": 30,
+        "legacy_admitted": 0,
+        "corrected_admitted": 0,
+        "baseline_only": 0,
+        "treatment_only": 0
+      },
+      "ru:20261116": {
+        "pairs": 30,
+        "legacy_admitted": 0,
+        "corrected_admitted": 1,
+        "baseline_only": 1,
+        "treatment_only": 0
+      },
+      "zh:20261114": {
+        "pairs": 30,
+        "legacy_admitted": 1,
+        "corrected_admitted": 10,
+        "baseline_only": 9,
+        "treatment_only": 0
+      },
+      "zh:20261115": {
+        "pairs": 30,
+        "legacy_admitted": 0,
+        "corrected_admitted": 6,
+        "baseline_only": 6,
+        "treatment_only": 0
+      },
+      "zh:20261116": {
+        "pairs": 30,
+        "legacy_admitted": 1,
+        "corrected_admitted": 13,
+        "baseline_only": 12,
+        "treatment_only": 0
+      },
+      "ja:20261114": {
+        "pairs": 30,
+        "legacy_admitted": 0,
+        "corrected_admitted": 0,
+        "baseline_only": 0,
+        "treatment_only": 0
+      },
+      "ja:20261115": {
+        "pairs": 30,
+        "legacy_admitted": 0,
+        "corrected_admitted": 1,
+        "baseline_only": 1,
+        "treatment_only": 0
+      },
+      "ja:20261116": {
+        "pairs": 30,
+        "legacy_admitted": 1,
+        "corrected_admitted": 0,
+        "baseline_only": 0,
+        "treatment_only": 1
+      },
+      "pt:20261114": {
+        "pairs": 30,
+        "legacy_admitted": 0,
+        "corrected_admitted": 0,
+        "baseline_only": 0,
+        "treatment_only": 0
+      },
+      "pt:20261115": {
+        "pairs": 30,
+        "legacy_admitted": 3,
+        "corrected_admitted": 3,
+        "baseline_only": 0,
+        "treatment_only": 0
+      },
+      "pt:20261116": {
+        "pairs": 30,
+        "legacy_admitted": 1,
+        "corrected_admitted": 1,
+        "baseline_only": 0,
+        "treatment_only": 0
+      }
+    }
+  },
+  "verdict": {
+    "instrument_exhibits_defect": false,
+    "P1_recovery": false,
+    "P2_poison": true,
+    "P3_cost_non_inferior": true,
+    "P3_blocked_diff_interval": [
+      0.59,
+      0.758
+    ],
+    "confirmed": false
+  }
+}

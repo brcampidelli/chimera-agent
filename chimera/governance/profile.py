@@ -301,11 +301,6 @@ def govern_step(
 
     approvals = ApprovalLedger()
 
-    def _bypass_safe(tool: str, shown: str) -> bool:
-        from chimera.governance.bypass import bypass_safe
-
-        return bypass_safe(tool, {"command": shown}, workspace=workspace)
-
     def with_hooks(governed: Any, kernel_approve: Any, kernel_approver_name: str) -> Any:
         # The owner's lifecycle hooks (`chimera/governance/hooks.py`), whatever the mode: the owner
         # switched them on separately. Outside the kernel, so a hook can stop what the kernel would
@@ -377,7 +372,7 @@ def govern_step(
         TrustKernel(audit=audit, audit_allows=audit_allows, band=band),
         approve=approve,
         bypass_permissions=bypass_permissions,
-        bypass_safe=_bypass_safe,
+        bypass_workspace=workspace,
         audit=audit,
         ledger=approvals,
         no_approver=no_approver,

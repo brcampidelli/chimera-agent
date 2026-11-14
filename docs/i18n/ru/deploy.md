@@ -1,5 +1,5 @@
 ---
-source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
+source_sha256: ded4f1799194e9f44cf268e7e309fba1b6befe25a2dd3b52fbca4cda40ced559
 ---
 
 # Развёртывание Chimera на сервере (VPS)
@@ -58,6 +58,18 @@ docker compose ps          # status + health
 ```bash
 git pull && docker compose up -d --build
 ```
+
+**Обновление с образа, работавшего от root:**
+
+Теперь образ работает от непривилегированного пользователя (uid 10001). Том `chimera-data`, созданный старым образом, принадлежит root, поэтому контейнер отказывается запускаться (код 78, с этим сообщением), а не падает при первой записи. Один раз смените владельца до обновления:
+
+```bash
+docker compose run --rm --no-deps --user 0 --entrypoint chown chimera -R 10001:10001 /data
+```
+
+Docker Compose называет том `<проект>_chimera-data` (проект — имя папки), поэтому `-v chimera-data:/data` сменил бы владельца пустого тома с другим именем; команда выше идёт через Compose и попадает в настоящий. Увидеть тома можно через `docker compose config --volumes` и `docker volume ls`. Если `/data` — bind mount, а не том, выполните `sudo chown -R 10001:10001 <путь на хосте>`.
+
+Чтобы оставаться на root, используйте предыдущий тег образа; текущий так не сможет.
 
 ---
 
