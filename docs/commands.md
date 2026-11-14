@@ -141,7 +141,7 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`profile`](#profile) | Persistent user profile — the assistant's stable, cacheable preamble. |
 | [`profile forget`](#profile-forget) | Remove a stored fact. |
 | [`profile set`](#profile-set) | Add a profile fact (name replaces; the list kinds append with dedup). |
-| [`profile show`](#profile-show) | Show the stored profile and the exact preamble sessions will receive. |
+| [`profile show`](#profile-show) | Show the exact profile block the agent receives: the stored profile and the persona facts. |
 | [`project`](#project) | Run a project start-to-finish against a Spec (drift = acceptance authority). |
 | [`project approve`](#project-approve) | Approve the initial plan (default) or a paused high-risk card, then continue. |
 | [`project deny`](#project-deny) | Reject a paused high-risk card (parks it for review, escalates to a human). |
@@ -2267,7 +2267,7 @@ chimera profile set KIND VALUE
 
 ## profile show
 
-Show the stored profile and the exact preamble sessions will receive.
+Show the exact profile block the agent receives: the stored profile and the persona facts.
 
 ```bash
 chimera profile show

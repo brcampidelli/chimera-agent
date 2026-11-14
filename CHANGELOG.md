@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The app's agent now knows who you are.** The profile you fill in (stored profile and remembered facts about you) is added to the agent's instructions in the same place in the desktop Code turn, the terminal and the bots, and stays identical between turns so prompt caching keeps working. (#1275)
+
 - **Pasted credentials no longer sit in chat session files, and a web page can no longer POST to a token-less local server.** Chat transcripts are masked on disk, writes from another origin are refused when no server token is set, the attachment and dictation uploads get the same origin check as skill uploads, and a non-ASCII bearer header now gets a 401 instead of a 500. (#1274)
 
 - **A retry after a failed verification now really escalates.** It raises the reasoning effort, then moves to the next single model, instead of rerunning the same model while the receipt claimed fusion; fusion no longer joins any turn that carries tools, including "fuse this turn", and each attempt in the receipt records the model and effort actually sent. (#1272)

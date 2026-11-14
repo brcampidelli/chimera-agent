@@ -57,9 +57,12 @@ function ProjectRowItem({
  * feature whose entire premise is "it remembers you", not being able to see what it remembers is
  * the part that matters most.
  *
- * ONE list. The route sends the persona facts twice: `profile` is the ranked block the agent gets in
- * its prompt (each fact learned from untrusted content carries an English label addressed to the
- * MODEL), and `persona` is the same rows as records. The screen used to draw both, under two
+ * ONE list. The route sends the persona facts twice: `profile` is the ranked text for readers that
+ * are models (each fact learned from untrusted content carries an English label addressed to the
+ * MODEL), and `persona` is the same rows as records. What the agent actually receives is a block in
+ * its system prompt, after its instructions: the clean persona facts plus the stored profile.json
+ * (compatibility). A fact learned from untrusted content is NOT in that block; it reaches the agent
+ * only when a turn recalls it, fenced. The screen used to draw both, under two
  * headings, so every fact appeared twice and the model's label leaked onto a translated screen. The
  * records are what a person needs — the text, where it came from, whether it is verified — so they
  * are all this renders; `profile` stays on the wire for the readers it was written for.

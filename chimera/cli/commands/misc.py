@@ -50,15 +50,21 @@ def _right_hand_builder(
     from chimera.core import Agent, AgentConfig
     from chimera.evolution.wiring import build_memory_manager
     from chimera.interface import ChatSession
-    from chimera.interface.profile import load_profile, profile_path, render_profile
+    from chimera.interface.profile import profile_block
     from chimera.providers import LLMGateway
 
     gateway = LLMGateway()
 
     def build(request: SessionRequest) -> ChatSession:
         settings = get_settings().model_copy(update={"home": request.home})
+        mem = build_memory_manager(settings)
         config = AgentConfig(
-            model=model, max_steps=max_steps, project_root=request.workspace
+            model=model,
+            max_steps=max_steps,
+            project_root=request.workspace,
+            # The profile block where the real surfaces put it, so the ruler measures the prompt
+            # the product sends and not an older arrangement of it.
+            instructions=profile_block(settings.home, mem),
         )
         if system_prompt is not None:
             config.system_prompt = system_prompt
@@ -69,12 +75,10 @@ def _right_hand_builder(
             ).registry,
             config,
         )
-        mem = build_memory_manager(settings)
         return ChatSession(
             agent,
             memory=mem,
             graph=_recall_graph(mem),
-            profile=render_profile(load_profile(profile_path(settings.home)), mem.profile()),
             remember_from_chat=request.remember_from_chat,
         )
 
