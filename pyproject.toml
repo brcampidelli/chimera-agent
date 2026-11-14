@@ -378,6 +378,8 @@ pytest_add_cli_args_test_selection = [
   "tests/test_code_environments.py",
   "tests/test_the_registry_bounds_every_tool_output.py",  # names governance/ledger.py and ledger_tool.py
   "tests/test_solve_judges_like_the_api.py",  # names core/verify.py and api/runs.py (the solve receipt)
+  "tests/test_escalation_ladder.py",  # names core/verify.py and api/runs.py (attempt receipts)
+  "tests/test_a_fused_turn_with_tools_runs_on_one_model.py",  # names api/runs.py
   "tests/test_ssh_environment.py",
   "tests/test_ssh_remote_files_hardening.py",  # names governance/ledger.py (WORKSPACE_WRITERS)
   "tests/test_the_ledger_judges_git_hooks_and_the_new_text_of_an_edit.py",

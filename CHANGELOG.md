@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A retry after a failed verification now really escalates.** It raises the reasoning effort, then moves to the next single model, instead of rerunning the same model while the receipt claimed fusion; fusion no longer joins any turn that carries tools, including "fuse this turn", and each attempt in the receipt records the model and effort actually sent. (#1272)
+
 - **Memory recall no longer drops facts written in Russian, Chinese or Japanese.** The admission gate used an ASCII-only word splitter, so a fact that recall had just found was discarded as "irrelevant" without any message; it now reads text the same way recall does, and the code search index follows suit. (#1271)
 
 - **Safer release pipeline.** Every CI action is pinned to a commit, PyPI publishing now refuses a manual run off `main` or a tag that differs from the package version, and the Docker image runs as a non-root user. (#1262)
