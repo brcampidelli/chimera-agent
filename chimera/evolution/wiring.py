@@ -56,11 +56,20 @@ def build_memory_manager(settings: Settings) -> MemoryManager:
     from chimera.governance.audit import AuditLog
     from chimera.memory import MemoryManager
     from chimera.memory.backend import open_memory_store
+    from chimera.memory.consolidate import ConsolidationLedger
 
+    home = Path(settings.home)
     return MemoryManager(
         open_memory_store(settings),
         embed=semantic_embed(settings),
-        audit=AuditLog(Path(settings.home) / "audit.jsonl"),
+        audit=AuditLog(home / "audit.jsonl"),
+        # Beside the store, so what was settled by one process is known to the next: the manager is
+        # rebuilt per request and per session end, and an in-memory ledger would never be seen twice.
+        ledger=ConsolidationLedger(home / "memory_consolidation.json"),
+        # Vectors keyed by text hash and embedding model: a search after the first embeds only the
+        # query, and a changed `embed_model` cannot be answered with the old model's vectors.
+        vector_cache=home / "memory_vectors.db",
+        vector_namespace=str(settings.embed_model),
     )
 
 
