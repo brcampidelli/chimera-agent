@@ -386,6 +386,12 @@ class Attempt:
     #: checked), or "none". A receipt that says "success" without saying on whose authority invites
     #: the reader to assume the strongest one.
     evidence: str = "none"
+    #: WHO judged, as opposed to ``evidence`` (what the judgment rested on): ``verifier`` (a command
+    #: decided), ``other`` (a reviewer on a different model than the worker), ``self`` (the reviewer
+    #: ran on the very model that wrote the patch — its verdict is advisory and decides nothing),
+    #: ``unspecified`` (a reviewer whose model cannot be compared with the worker's) or ``none``.
+    #: Always set, so a receipt never leaves the reader to assume the strongest judge.
+    evaluator: str = "none"
     #: Did the attempt change the workspace? ``None`` means *could not be measured* (no snapshot,
     #: no guard) — deliberately NOT the same as ``False`` ("measured, and nothing changed"). The
     #: third state is the whole point: collapsing "we could not tell" into either boolean is how a
@@ -1403,6 +1409,16 @@ class AutonomousAgent:
                 # `ok` ride on it would decide the attempt on a non-answer; the contract, coverage
                 # and diff gates below still run and can still fail it.
                 ok = True if review_abstained else approved
+                if not review_abstained and self._judge_independence(worker) == "self":
+                    # The reviewer is the model that wrote the patch: it grades its own work and
+                    # agrees with itself, so its REVISE is an opinion and not a veto. Reverting
+                    # work because the author disliked its own prose is the failure the independent
+                    # reviewer rule exists to prevent, and with no verifier there is nothing else
+                    # to arbitrate. The note survives on the attempt; the diff, contract and
+                    # coverage gates below still decide.
+                    if not approved and fb:
+                        fb = f"Advisory (reviewed by the same model that wrote it): {fb}"
+                    ok = True
             # Record the paired observation for PROBE: arm = which worker ran, proxy = the cheap
             # manager verdict, reward = the verified outcome (only with a real verifier + manager).
             # An abstaining proxy is not a cheap verdict, it is no verdict; logging it as 0/1 would
@@ -1493,20 +1509,28 @@ class AutonomousAgent:
             # as no manager: it did not approve anything. Naming it would be the fabrication-by-
             # omission that `_manager_ran` was written to stop, one step further along.
             manager_judged = self._manager_ran() and not review_abstained
+            independence = self._judge_independence(worker) if manager_judged else "none"
+            # A self-review is a note, not an authority: naming it as the evidence would put the
+            # author's approval of its own work on the receipt beside the word "manager".
+            manager_decided = manager_judged and independence != "self"
             if verifier_active:
                 evidence = "verifier"
+                evaluator = "verifier"
             elif diff_productive:
                 # "diff+manager" claims two authorities. With no manager configured the only real
                 # one is the diff, and saying so is the difference between a receipt and a label.
-                evidence = "diff+manager" if manager_judged else "diff"
-            elif ok and manager_judged:
+                evidence = "diff+manager" if manager_decided else "diff"
+                evaluator = independence
+            elif ok and manager_decided:
                 evidence = "manager"
+                evaluator = independence
             else:
                 # Includes the case that used to read "manager": approved by nobody, because nobody
                 # was asked. `none` is what that is.
                 evidence = "none"
+                evaluator = independence
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout,
-                              verify_abstained=abstained, evidence=evidence)
+                              verify_abstained=abstained, evidence=evidence, evaluator=evaluator)
             attempt.run_id = str(getattr(agent_result, "run_id", "") or "")
             attempt.diff_summary = diff_summary or ""
             attempt.diffs = diffs
@@ -2228,7 +2252,10 @@ class AutonomousAgent:
             receipt = build_receipt(
                 result, task, verify_command, datetime.now(UTC).isoformat(),
                 profile=self.run_profile,
-                verify_source=self.verify_source,
+                # A run with no verify command has no origin to name: "user" here would read as
+                # "someone chose this command" beside an empty one. The default exists for rows that
+                # predate the field, not for a run that never had a verifier.
+                verify_source=self.verify_source if verify_command else "none",
                 profile_source=self.profile_source,
                 # The directory this run was actually confined to, not the one a caller meant. A run
                 # built without a workspace records none rather than the process cwd, which would be
@@ -2278,16 +2305,24 @@ class AutonomousAgent:
                 "task": str(task)[:2000],
                 "success": bool(getattr(result, "success", False)),
                 "workspace": str(self.workspace) if self.workspace else "",
+                "verify_source": (
+                    str(getattr(self, "verify_source", "") or "none")
+                    if getattr(self.verifier, "command", None) else "none"
+                ),
                 "partial": True,
                 "partial_reason": f"{type(cause).__name__}: {cause}"[:500],
                 "attempts": [
                     {
                         "index": int(getattr(a, "index", 0) or 0),
+                        # The id the scheduler's usage row is keyed by: without it the Cost ledger
+                        # cannot tell this receipt is that row's own money and counts it twice.
+                        "run_id": str(getattr(a, "run_id", "") or ""),
                         "success": bool(getattr(a, "success", False)),
                         "prompt_tokens": int(getattr(a, "prompt_tokens", 0) or 0),
                         "completion_tokens": int(getattr(a, "completion_tokens", 0) or 0),
                         "usd": getattr(a, "usd", None),
                         "model": str(getattr(a, "model", "") or ""),
+                        "evaluator": str(getattr(a, "evaluator", "") or "none"),
                     }
                     for a in getattr(result, "attempts", None) or []
                 ],
@@ -2494,6 +2529,27 @@ class AutonomousAgent:
             _log.info("review skipped: the run reached its dollar ceiling")
             return True, "", True
         return review.approved, review.feedback, review.abstained
+
+    def _judge_independence(self, worker: Worker) -> str:
+        """Whether the reviewer is a different judge than the model that wrote this attempt.
+
+        ``self`` only when both models are known and equal. A reviewer with no model of its own, or
+        a worker that does not expose one, is ``unspecified`` rather than guessed either way: calling
+        it ``other`` would claim an independence nobody checked, and calling it ``self`` would
+        demote a reviewer that may well be separate. A fusion engine is a panel, so it is ``other``.
+        """
+        manager = self.manager
+        if manager is None or not self.config.use_manager:
+            return "none"
+        from chimera.fusion.engine import FusionEngine
+
+        if isinstance(getattr(manager, "backend", None), FusionEngine):
+            return "other"
+        reviewer = str(getattr(manager, "model", None) or "").strip().lower()
+        writer = str(getattr(getattr(worker, "config", None), "model", None) or "").strip().lower()
+        if not reviewer or not writer:
+            return "unspecified"
+        return "self" if reviewer == writer else "other"
 
     def _manager_ran(self) -> bool:
         """Whether a manager actually looked at this attempt.

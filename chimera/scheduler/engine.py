@@ -732,7 +732,9 @@ class Scheduler:
 
         In-process only: it is a dict on this ``Scheduler``, so it guards two ticks that share ONE
         scheduler object (a re-entrant call, two threads of the same process). It does not stop a
-        second process on the same ``jobs.json`` from starting the same job.
+        second process on the same ``jobs.json`` from starting the same job; that is
+        :class:`~chimera.scheduler.daemon.CronDaemon`'s per-home lock, which keeps a second daemon
+        from ticking at all.
         """
         # `setdefault` is one atomic dict operation, which is what stands in for a lock here: this
         # module takes no threads of its own (a test holds it to that), and a check-then-add on a

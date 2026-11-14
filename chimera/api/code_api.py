@@ -2982,6 +2982,28 @@ def _live_memory(settings: Settings, boot: Any, boot_graph: Any, boot_key: Any) 
         return manager, graph
 
 
+def _recalled_rows(items: list[Any]) -> list[dict[str, Any]]:
+    """The facts a turn recalled, as the ``done`` frame carries them.
+
+    Id, text, where it came from and whether it is unverified: enough for the receipt to list them
+    and to offer "forget" through the same route the Memory screen uses. ``unverified`` is the
+    store's own trust label, so a fact learned from untrusted content is marked on the receipt
+    exactly as it was marked to the model.
+    """
+    return [
+        {
+            # getattr: a minimal recall fake (and any third-party store) may hand back records that
+            # carry only a text and a label; the receipt must not be what breaks on it.
+            "id": getattr(item, "id", ""),
+            "content": item.content,
+            "source": getattr(item, "source", ""),
+            "kind": getattr(item, "kind", ""),
+            "unverified": getattr(item, "provenance", "clean") == "tainted",
+        }
+        for item in items
+    ]
+
+
 def memory_key(settings: Settings) -> tuple[str, str, bool]:
     """What decides WHICH store a memory manager is. Used to tell a boot one from a stale one.
 
@@ -4673,12 +4695,16 @@ def register_code_api(
         # The tainted facts that reach the prompt, kept to tell the turn's ledger once it exists
         # (below): the ledger is built with the agent, and the facts go into the agent's prompt.
         recalled_tainted: list[Any] = []
+        # The records themselves, for the `done` frame: the receipt used to say how many facts a turn
+        # used and nothing about which, so a wrong fact steering an answer could not be found.
+        recalled_items: list[Any] = []
         facts, memory_layer = recall_facts(
             req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws),
             # Quoted with source and date under the same switch that writes extracted facts
             # (study 25 S13): a fact the model did not see being written is shown with its age.
             cite=bool(getattr(live(), "memory_extract", False)),
             on_tainted=recalled_tainted.append,
+            on_items=recalled_items.extend,
         )
         # Created before the agent so approval and question cards can be routed after `emit`
         # exists. Questions are registered only for this attended desktop turn; their text answer
@@ -6055,6 +6081,7 @@ def register_code_api(
                             "tainted": False,
                             "memory_facts_used": len(facts),
                             "memory_layer": memory_layer,
+                            "memory_facts": _recalled_rows(recalled_items),
                             "fused": fused,
                         })
                         return
@@ -6372,6 +6399,8 @@ def register_code_api(
                         # to accumulate nothing and recall nothing; it now READS what the chat reads.
                         "memory_facts_used": len(facts),
                         "memory_layer": memory_layer,
+                        # Which records, with their origin and trust label (see `_recalled_rows`).
+                        "memory_facts": _recalled_rows(recalled_items),
                         # This turn could not use tools, and a reader cannot tell that from a zero
                         # tool count alone — the same count a turn that needed none reports.
                         "fused": fused,

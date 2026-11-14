@@ -17,7 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Tools:** every tool result is now capped at 20 000 characters at the registry (tools that already capped themselves are unchanged), `http_get`, `scrape` and `read_document` take an `offset` to read on past a cut, and a subagent run reports how many subagents it spawned; the lower MCP ceiling and a spawn limit are options that stay off. (#1243)
 
+### Changed
+
+- **`solve` now judges its work like the app does.** It reads the project's own test command (gated by where the command came from), a reviewer running on the same model that wrote the patch is advisory instead of a veto, and every run receipt records who judged and where the check came from. (#1256)
+
+- **The API no longer leaks internal errors, and uploads no longer freeze it.** An uncaught server error now returns a generic 500 with an error id you can find in `backend.log`, large attachments are processed off the main loop so the app keeps answering meanwhile, and log lines written during a turn name that turn. (#1254)
+
+- **Settings:** the search now finds every row (it covered about half), each setting says when a saved change applies (now, next conversation or next launch; the ones not yet traced say nothing), empty Memory, Runs, Decisions and Skills screens offer a first step, the presentation view uses the shared dialog, and reads of `CHIMERA_*` outside `Settings` are pinned by a ratchet. (#1251)
+
 ### Fixed
+
+- **Cost numbers now agree.** The Cost screen shows the real cache hit rate (it was capped at 50%), the daily spend cap counts autonomous `solve` runs and the blog writer like the screen does, and only one cron daemon runs per home so a scheduled job no longer fires twice when the app and `chimera serve --cron` are both open. (#1260)
+
+- **Keyboard focus is now easy to see.** The focus ring is a solid outline that reaches 3:1 against every surface in every theme and accent, gets thicker in High contrast and stays visible in Windows High Contrast, and tabs now correctly name the panels they control for screen readers. (#1258)
+
+- **Links in a reply can no longer carry the app's credentials away.** The desktop window now stays on its own pages (other sites open in your browser), and the access tokens it holds are given only to the app itself, never to a site it is sent to or to the dev-server and Design previews inside it. (#1259)
+
+- **Memory you can see and trust.** The turn receipt now lists the facts a reply used, with where each came from and an unverified mark, and lets you forget one on the spot; the Memory screen flags near-duplicate facts written on different days so you can keep the right one, and tidying memory no longer risks losing facts or paying for the same merge twice. (#1257)
 
 - **Every HTML page the server hands out now carries a Content-Security-Policy.** FastAPI's `/redoc` and `/docs/oauth2-redirect`, served outside the token guard with no policy and loading a CDN script onto the app's origin, are off; `/api/docs` sends a policy naming exactly what Swagger loads; a stray `.htm` or `.xhtml` at the bundle root is policed like `.html`; and a new test requests every page and enumerates every route outside the API so the next one cannot ship without a policy. (#1248)
 
@@ -28,12 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Desktop: streaming no longer re-renders the whole conversation per token.** Finished exchanges are memoised, streamed text is written once per frame, the heavy screens (Settings, Knowledge, Automation, Work, Onboarding, Activity) and the syntax highlighter load on demand, the running-turns poll is a single hook, and on-screen clocks pause while the window is hidden. Auto-detected highlighting now chooses among the 14 languages the file viewer maps. Not yet measured in the packaged app (see `apps/desktop/PROFILING.md`). (#1247)
 
 - **TUI: unknown slash commands and `/undo N`.** The full-screen terminal app no longer sends an unrecognised `/command` to the model as a paid turn, `/undo N` now previews and asks before restoring, and `chat`, `assist` and the TUI build their command lists from one shared registry. (#1242)
-
-### Changed
-
-- **The API no longer leaks internal errors, and uploads no longer freeze it.** An uncaught server error now returns a generic 500 with an error id you can find in `backend.log`, large attachments are processed off the main loop so the app keeps answering meanwhile, and log lines written during a turn name that turn. (#1254)
-
-- **Settings:** the search now finds every row (it covered about half), each setting says when a saved change applies (now, next conversation or next launch; the ones not yet traced say nothing), empty Memory, Runs, Decisions and Skills screens offer a first step, the presentation view uses the shared dialog, and reads of `CHIMERA_*` outside `Settings` are pinned by a ratchet. (#1251)
 
 ## [0.89.0] - 2026-11-12
 ### Fixed

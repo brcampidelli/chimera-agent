@@ -162,16 +162,20 @@ from chimera.api.screen_credential import ScreenCredential
 from chimera.api.sessions import SessionManager, SessionStore
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.usage import (
-    _already_counted,
-    load_usage,
+    ledger_rows,
     record_turn,
     summarize_usage,
-    usage_from_runs,
 )
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
 from chimera.core.agent_batch_note import AGENT_ANSWER_LIMIT
 from chimera.core.events import AgentEvent, EventSink
+
+# Lives in core so `chimera solve` reads the same rule without importing the server stack; the names
+# stay importable from here because call sites (and tests that monkeypatch them) look them up on
+# this module (hence the explicit `as` re-export, which strict mypy requires).
+from chimera.core.verify_infer import resolve_verify as resolve_verify
+from chimera.core.verify_infer import verifier_source as verifier_source
 from chimera.interface import ChatSession
 from chimera.providers.gateway import SupportsComplete
 from chimera.sandbox.confirm import declare_no_human_here
@@ -1568,16 +1572,9 @@ def build_api_app(
 
     @app.get("/api/usage", dependencies=[guard], response_model=UsageSummaryOut)
     def usage_endpoint() -> dict[str, Any]:
-        # BOTH logs. `usage.jsonl` holds chat turns and orchestration; runs write their receipts to
-        # `runs.jsonl` and were simply missing from this screen — see `usage_from_runs`.
-        # BOTH logs, joined on the run id. `usage.jsonl` holds chat turns and orchestration;
-        # runs write their receipts to `runs.jsonl` and were missing from this screen entirely.
-        # A SCHEDULED run writes to both, so the merge has to subtract what is already counted —
-        # see `_already_counted`, and the measured $0.049 it was billing twice.
-        turnos = load_usage(settings.home / "usage.jsonl")
-        return summarize_usage(
-            turnos + usage_from_runs(settings.home / "runs.jsonl", already=_already_counted(turnos))
-        )
+        # One ledger for the screen, the weekly review and the daily cap — see `ledger_rows`: both
+        # logs, joined on the run id so a scheduled run (which writes to both) is billed once.
+        return summarize_usage(ledger_rows(settings.home))
 
     @app.get("/api/runs", dependencies=[guard], response_model=list[RunReceiptOut])
     def runs_endpoint(workspace: str | None = None) -> list[Any]:
@@ -3950,43 +3947,6 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
     return CascadeBackend(
         gateway, cast("SupportsComplete", fusion_for_role(gateway, settings)), config
     )
-
-
-def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, str]:
-    """``(command, source)`` — source is ``user`` | ``project`` | ``inferred:<file>`` | ``none``.
-
-    The source travels into the receipt so a stored run can never be read as "the user chose this".
-    A receipt that cannot tell a typed command from an inferred one is a receipt that will eventually
-    be cited as evidence of a decision nobody made.
-
-    An empty STRING is an explicit "no verifier": someone who cleared the field asked for exactly
-    that, and inferring over the top of it would be overriding a choice with a guess. Only ``None``
-    — the field absent from the request — means "look at the project".
-    """
-    if requested is not None:
-        return (requested or None), ("user" if requested else "none")
-    from chimera.core.verify_infer import infer_verify, project_verify
-
-    configured = project_verify(workspace)
-    if configured is not None:
-        return configured.command, "project"
-    found = infer_verify(workspace)
-    if found is None:
-        return None, "none"
-    return found.command, f"inferred:{found.source_file}"
-
-
-def verifier_source(verify_source: str) -> str:
-    """Collapse receipt provenance to the source class the verifier gate reads.
-
-    The receipt keeps the inferred filename; the gate distinguishes an explicit project config from
-    discovery in ordinary build files — see :data:`chimera.core.verify.VERIFY_SOURCES`.
-    """
-    if verify_source == "user":
-        return "user"
-    if verify_source == "project":
-        return "project"
-    return "inferred"
 
 
 def _build_solve_agent(
