@@ -45,6 +45,7 @@ export function Automation({
         <h1 className="text-lg font-semibold text-foreground">{t("nav.automation")}</h1>
       </div>
       <Tabs
+        id={id}
         items={items}
         value={tab}
         onChange={setTab}
