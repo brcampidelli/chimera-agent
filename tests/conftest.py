@@ -479,3 +479,28 @@ def _memory_extraction_is_off_the_network_and_ends_with_its_test(
     for thread in threading.enumerate():
         if thread.name == "memory-extract" and thread is not threading.current_thread():
             thread.join(timeout=15)
+
+
+@pytest.fixture(autouse=True)
+def _booting_the_app_does_not_fetch_prices_from_the_provider() -> Iterator[None]:
+    """`chimera app` / `serve` start a price warm-up thread; no test should let it reach OpenRouter.
+
+    With ``OPENROUTER_API_KEY`` set (many tests do, to get past the keyless setup screen) the boot
+    starts a daemon thread that downloads the provider's model index. The thread outlives the command,
+    so the request landed on the network guard's clock of whichever test was running by then:
+    ``test_no_cron_flag_keeps_the_app_reactive`` failed on CI with a connection to 104.18.2.115:443
+    while the file passes alone and a boot that never asked for the index was the only thing it did.
+    The warm-up is replaced by a no-op; a test of the warm-up itself calls ``warm_price_cache`` directly
+    (as ``test_model_listing`` does) or patches this seam back.
+    """
+    from chimera.cli.commands import serve
+
+    original = serve._start_price_warmup
+    serve._start_price_warmup = lambda settings: None
+    try:
+        yield
+    finally:
+        serve._start_price_warmup = original
+        for thread in threading.enumerate():
+            if thread.name == "price-warmup" and thread is not threading.current_thread():
+                thread.join(timeout=15)

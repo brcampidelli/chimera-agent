@@ -504,11 +504,7 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
     # number for every model it serves; the only thing missing was fetching it before somebody needed
     # it. A daemon thread so a slow index never delays the window opening, and it fails silently: a
     # missing price is exactly the state this improves on, never a reason not to start.
-    import threading
-
-    from chimera.providers.listing import warm_price_cache
-
-    threading.Thread(target=warm_price_cache, args=(settings,), daemon=True).start()
+    _start_price_warmup(settings)
 
     llm = LLMGateway()
     from chimera.fusion import RoutedBackend
@@ -880,6 +876,15 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
             home=Path(settings.home).expanduser(),
         ),
     )
+
+
+def _start_price_warmup(settings: Any) -> None:
+    """Start the one-per-boot price fetch on a named daemon thread (a seam the test suite replaces)."""
+    import threading
+
+    from chimera.providers.listing import warm_price_cache
+
+    threading.Thread(target=warm_price_cache, args=(settings,), name="price-warmup", daemon=True).start()
 
 
 def _start_cron_daemon(
