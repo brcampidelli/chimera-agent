@@ -754,6 +754,17 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+def start_price_warmup(settings: Any) -> None:
+    """Run `warm_price_cache` once per boot on a named daemon thread.
+
+    A seam the test suite replaces (tests/conftest.py): left live, the thread outlives the command
+    that started it and its request lands on whichever test runs next.
+    """
+    import threading
+
+    threading.Thread(target=warm_price_cache, args=(settings,), name="price-warmup", daemon=True).start()
+
+
 def warm_price_cache(settings: Any) -> None:
     """Fetch the index once and persist its prices. Never raises; safe to call from a thread.
 

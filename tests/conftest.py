@@ -493,14 +493,14 @@ def _booting_the_app_does_not_fetch_prices_from_the_provider() -> Iterator[None]
     The warm-up is replaced by a no-op; a test of the warm-up itself calls ``warm_price_cache`` directly
     (as ``test_model_listing`` does) or patches this seam back.
     """
-    from chimera.cli.commands import serve
+    from chimera.providers import listing
 
-    original = serve._start_price_warmup
-    serve._start_price_warmup = lambda settings: None
+    original = listing.start_price_warmup
+    listing.start_price_warmup = lambda settings: None
     try:
         yield
     finally:
-        serve._start_price_warmup = original
+        listing.start_price_warmup = original
         for thread in threading.enumerate():
             if thread.name == "price-warmup" and thread is not threading.current_thread():
                 thread.join(timeout=15)
