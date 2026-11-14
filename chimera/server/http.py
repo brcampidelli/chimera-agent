@@ -7,13 +7,13 @@ logic lives in the pure :func:`handle` function (easy to unit-test); the
 
 from __future__ import annotations
 
-import hmac
 import json
 from collections.abc import Callable, Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from chimera.core.bearer import bearer_matches
 from chimera.server.gateway import InboundMessage, MessageGateway
 from chimera.telemetry import get_logger
 
@@ -24,6 +24,12 @@ WebhookHandler = Callable[[str, dict[str, Any]], list[str]]
 GitHubEventHandler = Callable[[bytes, Mapping[str, str]], tuple[int, dict[str, Any]]]
 
 
+#: The largest body this gateway reads: a chat message or a webhook payload, never an upload.
+MAX_BODY_BYTES = 1024 * 1024
+#: GitHub documents 25 MB as the ceiling of an event payload (a large push), so that one route gets it.
+MAX_GITHUB_EVENT_BYTES = 26 * 1024 * 1024
+
+
 def _bearer_ok(headers: Mapping[str, str] | None, token: str) -> bool:
     """Constant-time check of an ``Authorization: Bearer <token>`` header against ``token``."""
     auth = ""
@@ -31,8 +37,7 @@ def _bearer_ok(headers: Mapping[str, str] | None, token: str) -> bool:
         if key.lower() == "authorization":
             auth = value
             break
-    prefix = "Bearer "
-    return auth.startswith(prefix) and hmac.compare_digest(auth[len(prefix) :], token)
+    return bearer_matches(auth, token)
 
 
 def _needs_bearer(method: str, route: str) -> bool:
@@ -60,6 +65,33 @@ def authorized(
     if not _needs_bearer(method, urlparse(path).path):
         return True
     return _bearer_ok(headers, token)
+
+
+def browser_refusal(
+    method: str, path: str, headers: Mapping[str, str] | None, token: str | None
+) -> tuple[int, str] | None:
+    """Why a write to a token-less gateway is turned away, or None.
+
+    Without a token nothing authenticates ``/chat``, ``/a2a`` or a webhook, and a page open in the
+    owner's browser can POST to 127.0.0.1 with ``fetch(..., {mode: "no-cors"})``: a JSON body sent with
+    no ``Content-Type`` is a CORS simple request, so there is no preflight and only the answer is
+    hidden. Two things stop it without breaking a script: the body has to DECLARE ``application/json``
+    (a cross-site page cannot set that without a preflight, which this server never answers), and a
+    request a browser says came from another page (``Origin`` that is not this host, or a cross-site
+    ``Sec-Fetch-Site``) is refused. With a token the bearer is the defence, and nothing changes.
+    """
+    if token or not _needs_bearer(method, urlparse(path).path):
+        return None
+    lowered = {key.lower(): value for key, value in (headers or {}).items()}
+    origin = lowered.get("origin")
+    host = lowered.get("host", "")
+    if origin is not None and urlparse(origin).netloc != host:
+        return 403, "refusing a write sent from another site"
+    if lowered.get("sec-fetch-site", "") in ("cross-site", "same-site"):
+        return 403, "refusing a write sent from another site"
+    if lowered.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        return 415, "send Content-Type: application/json"
+    return None
 
 
 def handle(
@@ -198,13 +230,25 @@ def make_server(
             except ValueError:  # malformed Content-Length -> 400, not a dropped connection
                 self._send(400, {"error": "invalid Content-Length"})
                 return
-            body = self.rfile.read(length) if length else b""
-            # Authorise BEFORE choosing a transport. The SSE branch below cannot go through
-            # `handle`, so if the check lived only there, picking the streaming method name would
-            # skip it entirely — which is exactly the hole this ordering closes.
-            if not authorized(method, self.path, dict(self.headers.items()), token):
+            # Authorise BEFORE choosing a transport, and before reading a byte of the body: the check
+            # reads only the headers, and reading first let a caller with no bearer make this process
+            # buffer whatever it declared. The SSE branch below cannot go through `handle`, so if the
+            # check lived only there, picking the streaming method name would skip it entirely.
+            headers_in = dict(self.headers.items())
+            if not authorized(method, self.path, headers_in, token):
                 self._send(401, {"error": "unauthorized"})
                 return
+            refused = browser_refusal(method, self.path, headers_in, token)
+            if refused is not None:
+                self._send(refused[0], {"error": refused[1]})
+                return
+            if length > (MAX_GITHUB_EVENT_BYTES if urlparse(self.path).path == "/github/events" else MAX_BODY_BYTES):
+                # Refused unread, and the connection closed: the unread body would otherwise be parsed
+                # as the next request on a kept-alive socket.
+                self.close_connection = True
+                self._send(413, {"error": "request body too large"})
+                return
+            body = self.rfile.read(length) if length else b""
             # A2A message/stream is Server-Sent Events — it can't go through the pure `handle`
             # (which returns one body), so stream it directly off the A2AServer's iterator.
             if method == "POST" and a2a is not None and self._is_a2a_stream(body):
