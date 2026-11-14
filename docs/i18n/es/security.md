@@ -1,5 +1,5 @@
 ---
-source_sha256: 7f5fca41b1aee08855e7e093378dcbb321639030f29b4fc89c219aaf65167e16
+source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
 ---
 
 # Seguridad y salvaguardas
@@ -345,6 +345,12 @@ anterior: **Permitir que Claude opere esta app**, **Control total** y, desde la 
   (`platform:discord` es un bot); un test falla si un módulo vuelve a escribir su propia lista.
 
 **El ciclo de cierre hace push por sí mismo.** Cuando la verificación de un turno de código pasa y su comprobación del diff está limpia, Chimera hace commit de los cambios del turno en la rama del espacio de trabajo y envía esa rama a `origin` para abrir un pull request. Nunca envía a la rama predeterminada y nunca fuerza un push. Solo fusiona si el dueño activó `CHIMERA_CLOSE_LOOP_MERGE`, y entonces nunca un pull request que toque facturación, una migración destructiva, seguridad a nivel de fila, un grant o un secreto. Lo inicia la pantalla del dueño; el puente, los canales y el trabajo en segundo plano no.
+
+### Modelos que exigen retención de datos
+
+Algunos modelos solo se sirven mientras el proveedor conserva el prompt. **Claude Fable 5.2 exige retención de datos de 30 días y no está disponible con retención cero (ZDR)**, salvo que Anthropic lo autorice expresamente (página del modelo en Anthropic, leída el 2026-11-14). Elegirlo como predeterminado, como tier, como rol de fusión o en cualquier otro ajuste de modelo envía los prompts, memoria recuperada incluida, a una ruta que los conserva 30 días, pida lo que pida el dueño sobre la ruta.
+
+Esto además choca con los dos interruptores de OpenRouter, y lo que ocurre depende de la ruta. Por OpenRouter (`openrouter/anthropic/claude-fable-5.2`), el gateway envía `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` o `CHIMERA_OPENROUTER_ZDR=true` en cada llamada, así que ninguna ruta puede servir Fable 5.2: la preferencia se respeta y el modelo queda no disponible en la ruta. El turno solo falla si también se agotan los modelos de respaldo configurados; con un respaldo configurado puede terminar en él. Alcanzado directamente (`anthropic/claude-fable-5-2`), la preferencia nunca se envía, así que el modelo corre y Anthropic conserva el prompt 30 días sin importar el interruptor: nada se bloquea y nada se respeta. La tarjeta de privacidad de la pantalla de Seguridad lista cada modelo configurado que exige retención, con los roles que lo usan, y marca los que contradicen la preferencia vigente, indicando si esa preferencia se aplica en la ruta del modelo (el modelo no está disponible allí) o no (el modelo corre y el prompt se conserva). El catálogo registra la exigencia por modelo (`ModelCaps.retention_days` en `chimera/providers/catalog.py`), y ningún preset ni valor predeterminado usa un modelo así.
 
 ## Límites honestos
 

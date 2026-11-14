@@ -17,8 +17,9 @@ Honesty rules, on purpose:
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from chimera.build_info import CHIMERA_VERSION, chimera_git_sha
@@ -26,6 +27,8 @@ from chimera.fusion.engine import FusionTrace, StageUsage
 from chimera.telemetry import get_logger
 
 _log = get_logger("fusion.receipts")
+
+_VERSION_DOT = re.compile(r"(?<=\d)\.(?=\d)")
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,33 @@ class ModelPrice:
     cache_write_per_m: float | None = None
     """What a prompt-cache WRITE costs (Anthropic: 1.25x input for the five-minute kind). None =
     unknown, priced at ``input_per_m``, which is a floor: no provider bills a write below input."""
+    long_prompt_over: int | None = None
+    """Prompt length, in tokens, ABOVE which ``long_prompt`` applies. None = one price at any length."""
+    long_prompt: ModelPrice | None = None
+    """The price of a request whose prompt is over ``long_prompt_over`` tokens. Claude Haiku 5.5 bills
+    a long prompt at five times the short one, cache reads and writes included in the length, and a
+    single flat row under-states every such call by 80%."""
+    by_identity: bool = field(default=False, compare=False, repr=False)
+    """Whether the ROW this price sits in names a Claude MODEL (the catalogue's own rows) and is matched
+    on the model's identity, or names a ROUTE and is matched against the whole slug. It is a property of
+    the row's price and not of the pattern text, so a `set_price` that happens to reuse a catalogue
+    pattern is still a route-level override. Left out of equality: it says how a row is MATCHED, not
+    what it costs."""
+
+
+def tier_is_estimate(price: ModelPrice, prompt_tokens: int | None, *, aggregate: bool) -> bool:
+    """Whether a figure priced from an AGGREGATE rests on the long tier's upper bound.
+
+    True only for ``aggregate`` counts whose total is over the long-prompt threshold: there the true
+    cost lies between the two tiers and the long one was charged. Under the threshold, or for one
+    call, the figure is exact and this is False.
+    """
+    return (
+        aggregate
+        and price.long_prompt is not None
+        and price.long_prompt_over is not None
+        and (prompt_tokens or 0) > price.long_prompt_over
+    )
 
 
 def cost_usd(
@@ -49,20 +79,34 @@ def cost_usd(
     *,
     cache_read_tokens: int | None = None,
     cache_write_tokens: int | None = None,
+    calls: int | None = None,
+    aggregate: bool = False,
 ) -> float:
     """Dollars for one call, with the prompt's cache share at its own rates.
 
-    Cache tokens are a PART of ``prompt_tokens``, not an addition to it: LiteLLM's Anthropic adapter
-    adds ``cache_read_input_tokens`` and ``cache_creation_input_tokens`` into ``prompt_tokens``, and
-    the OpenAI shape reports ``cached_tokens`` as a subset of it. Every pricer used to bill the
-    whole prompt at the input rate, which over-stated a read (~0.1x) and under-stated a write
-    (1.25x) — wrong in both directions at once.
+    ``calls`` is how many API calls the token counts add up, when they are a SUM (a cascade's k
+    samples of one prompt): a long-prompt tier is decided per request, so it is read off the prompt
+    of ONE call (the sum divided by ``calls``) and not off the total, which would bill k short
+    prompts at the long rate. None or 1 = the counts are one call's, as always.
 
-    Clamped to the prompt, on purpose: the gateway's own response cache answers with
-    ``prompt_tokens=0`` and the original count under ``cache_read_tokens``, a call nobody billed.
-    More cache tokens than the prompt holds were not charged by any provider, so they cost nothing.
+    ``aggregate=True`` says the counts are the SUM of several calls of unknown, unequal sizes (a
+    delegation's whole budget): no single prompt length exists. The tier is then read off the TOTAL,
+    which is exact when the total is under the threshold (every call was shorter still) and an UPPER
+    BOUND when it is over (the real figure is somewhere between the short and the long price). For a
+    spend ceiling that is the safe side to err on: reading the short tier instead under-states the
+    spend, and a ceiling that thinks it has money left is the failure it exists to prevent. Callers
+    that can, mark such a figure as an estimate (:func:`tier_is_estimate`); callers that hold the
+    exact per-call cost (an agent run's tally, ``AgentResult.usd``) must use that and never price
+    the aggregate again.
     """
     prompt = max(0, prompt_tokens or 0)
+    per_call = prompt / calls if calls and calls > 1 else prompt
+    if (
+        price.long_prompt is not None
+        and price.long_prompt_over is not None
+        and per_call > price.long_prompt_over
+    ):
+        price = price.long_prompt
     read = min(max(0, cache_read_tokens or 0), prompt)
     write = min(max(0, cache_write_tokens or 0), prompt - read)
     fresh = prompt - read - write
@@ -95,6 +139,53 @@ _PRICES: list[tuple[str, ModelPrice]] = [
     ("deepseek-reasoner", ModelPrice(0.55, 2.19)),
     # Anthropic publishes cache reads at 0.1x input and five-minute writes at 1.25x; the breakpoints
     # `providers.prompt_cache` sets are the default five-minute kind.
+    # The 5.x generation, ABOVE the family rows below, because those are substrings of these ids:
+    # `claude-haiku` priced `claude-haiku-5-5` at the Haiku 3.5 rate (8x its input, 8x its output) and
+    # `claude-fable-5-2` had no row at all, which a spend cap reads as "price unknown, refuse".
+    # Both spellings of each: Anthropic's dashed id and OpenRouter's dotted one. Read 2026-11-14 from
+    # Anthropic's pricing page and OpenRouter's /api/v1/models; cache write is the five-minute kind.
+    *[
+        (f"claude-fable-5{sep}2", ModelPrice(8.0, 40.0, cache_read_per_m=0.20, cache_write_per_m=10.0))
+        for sep in ("-", ".")
+    ],
+    *[
+        (f"claude-opus-5{sep}5", ModelPrice(4.0, 20.0, cache_read_per_m=0.20, cache_write_per_m=5.0))
+        for sep in ("-", ".")
+    ],
+    *[
+        (f"claude-sonnet-5{sep}5", ModelPrice(2.0, 10.0, cache_read_per_m=0.10, cache_write_per_m=2.5))
+        for sep in ("-", ".")
+    ],
+    *[
+        (
+            f"claude-haiku-5{sep}5",
+            ModelPrice(
+                0.10, 0.50, cache_read_per_m=0.01, cache_write_per_m=0.125,
+                long_prompt_over=100_000,
+                long_prompt=ModelPrice(0.50, 2.50, cache_read_per_m=0.05, cache_write_per_m=0.625),
+            ),
+        )
+        for sep in ("-", ".")
+    ],
+    # OpenRouter's moving aliases, priced as the model each is today (same figures in the index,
+    # 2026-11-14), so an alias neither falls through to a family row nor loses the Haiku long tier.
+    ("claude-fable-latest", ModelPrice(8.0, 40.0, cache_read_per_m=0.20, cache_write_per_m=10.0)),
+    ("claude-opus-latest", ModelPrice(4.0, 20.0, cache_read_per_m=0.20, cache_write_per_m=5.0)),
+    ("claude-sonnet-latest", ModelPrice(2.0, 10.0, cache_read_per_m=0.10, cache_write_per_m=2.5)),
+    (
+        "claude-haiku-latest",
+        ModelPrice(
+            0.10, 0.50, cache_read_per_m=0.01, cache_write_per_m=0.125,
+            long_prompt_over=100_000,
+            long_prompt=ModelPrice(0.50, 2.50, cache_read_per_m=0.05, cache_write_per_m=0.625),
+        ),
+    ),
+    # Haiku 4.5: $1 / $5, cache read 0.10, 5m write 1.25 (Anthropic's pricing page and OpenRouter's
+    # index agree, 2026-11-14). The `claude-haiku` row below is the 3.5 price and used to price it.
+    *[
+        (f"claude-haiku-4{sep}5", ModelPrice(1.0, 5.0, cache_read_per_m=0.10, cache_write_per_m=1.25))
+        for sep in ("-", ".")
+    ],
     ("claude-sonnet", ModelPrice(3.0, 15.0, cache_read_per_m=0.30, cache_write_per_m=3.75)),
     ("claude-haiku", ModelPrice(0.80, 4.0, cache_read_per_m=0.08, cache_write_per_m=1.0)),
     ("gpt-4o-mini", ModelPrice(0.15, 0.60)),
@@ -113,8 +204,71 @@ _PRICES: list[tuple[str, ModelPrice]] = [
 ]
 
 
+def _long_tier_without_publication(
+    family: ModelPrice | None, live: tuple[float, float], read: float | None, write: float | None
+) -> tuple[int | None, ModelPrice | None]:
+    """The long-prompt tier of a live-priced slug whose index row publishes none.
+
+    An index file written before ``pricing.overrides`` were parsed has no tier for ANY slug, and a
+    variant (`claude-haiku-5.5:batch`, priced at half) must not fall to its short price above the
+    threshold: that is a fifth of the real cost, and it lets a spend ceiling through. When the table
+    knows a long tier for this family it is used, scaled by how far the variant's short price is
+    from the family's (0.05 against 0.10 is half, so 0.25/1.25 against the table's 0.50/2.50), and
+    never below the variant's own short price. A family with no tier has none to borrow.
+    """
+    if family is None or family.long_prompt is None or family.long_prompt_over is None:
+        return None, None
+    base = family.long_prompt
+    ratio = live[0] / family.input_per_m if family.input_per_m > 0 else 1.0
+    if ratio <= 0:
+        ratio = 1.0
+    long_in = max(base.input_per_m * ratio, live[0])
+    long_out = max(base.output_per_m * ratio, live[1])
+    scaled_read = None if base.cache_read_per_m is None else base.cache_read_per_m * ratio
+    scaled_write = None if base.cache_write_per_m is None else base.cache_write_per_m * ratio
+    return family.long_prompt_over, ModelPrice(
+        long_in, long_out,
+        cache_read_per_m=scaled_read if scaled_read is not None else read,
+        cache_write_per_m=scaled_write if scaled_write is not None else write,
+    )
+
+
+def _pattern_in(pattern: str, norm: str, identity: str, price: ModelPrice) -> bool:
+    """Whether a table ``pattern`` names this model.
+
+    Most rows are a plain substring of the whole slug, as they always were (a person's `set_price`
+    names a route and has to keep meaning that route).
+
+    A catalogue Claude row (``price.by_identity``) is matched against the model's IDENTITY (:func:`chimera.providers.catalog.model_identity`:
+    last path segment, vendor prefix, ``@snapshot`` and ``:variant`` removed, versions dashed), the
+    same reading the capability table uses, so the two cannot disagree about which model a slug is. A
+    row that ends in a version digit (``claude-opus-5``) must equal the identity, or the identity plus
+    a dated snapshot: it is not a prefix of the NEXT release (``claude-opus-5-5``) nor of a longer
+    name (``claude-fable-5-2-distill-x``). A family row (``claude-haiku``) is a prefix of the identity.
+    """
+    if not price.by_identity:
+        return pattern in norm
+    key = _VERSION_DOT.sub("-", pattern.rsplit("/", 1)[-1])
+    if key[-1].isdigit():
+        return re.fullmatch(rf"{re.escape(key)}(?:-\d{{8}})?", identity) is not None
+    return identity.startswith(key)
+
+
+# The rows this module ships for Claude models are matched on identity (`_pattern_in`). Marked on the
+# row's price, once, here: everything registered later through `set_price` is a route-level override
+# unless it says otherwise, whatever its pattern text.
+_PRICES[:] = [
+    (pattern, replace(price, by_identity=True) if "claude-" in pattern else price)
+    for pattern, price in _PRICES
+]
+
+
 def set_price(pattern: str, price: ModelPrice) -> None:
-    """Register/override a price for models whose id contains ``pattern`` (checked first)."""
+    """Register/override a price for models whose id contains ``pattern`` (checked first).
+
+    Matched against the whole slug, unless ``price.by_identity`` is set (only the catalogue's Claude
+    rows do): a hand-typed override names a route, even when its text equals a catalogue pattern.
+    """
     _PRICES.insert(0, (pattern.lower(), price))
 
 
@@ -190,7 +344,7 @@ def resolve_price(model: str) -> ModelPrice | None:
     family, and worse evidence than a price a human typed for that one model.
     """
     from chimera.providers.gateway import _is_local_model
-    from chimera.providers.listing import known_cache_price, known_price
+    from chimera.providers.listing import known_cache_price, known_long_prompt, known_price
 
     _ensure_catalog_registered()
     # Reasoning effort is a request option, not part of the provider's model identity. Receipts
@@ -209,7 +363,12 @@ def resolve_price(model: str) -> ModelPrice | None:
     if ":free" in norm:
         return _FREE_TIER
 
-    family = next((price for pattern, price in _PRICES if pattern in norm), None)
+    from chimera.providers.catalog import model_identity
+
+    identity = model_identity(price_model)
+    family = next(
+        (price for pattern, price in _PRICES if _pattern_in(pattern, norm, identity, price)), None
+    )
     live = known_price(price_model)
     if live is not None:
         read, write = known_cache_price(price_model)
@@ -221,7 +380,24 @@ def resolve_price(model: str) -> ModelPrice | None:
         if family is not None and (family.input_per_m, family.output_per_m) == live:
             read = family.cache_read_per_m if read is None else read
             write = family.cache_write_per_m if write is None else write
-        return ModelPrice(live[0], live[1], cache_read_per_m=read, cache_write_per_m=write)
+        published = known_long_prompt(price_model)
+        if published is not None:
+            # The index publishes this variant's OWN long-prompt tier (`pricing.overrides`), which is
+            # what a `:batch` slug needs: its short price differs from the table's, so the table's
+            # tier would not be its tier.
+            over, long_in, long_out, long_read, long_write = published
+            return ModelPrice(
+                live[0], live[1], cache_read_per_m=read, cache_write_per_m=write,
+                long_prompt_over=over,
+                long_prompt=ModelPrice(
+                    long_in, long_out, cache_read_per_m=long_read, cache_write_per_m=long_write
+                ),
+            )
+        borrowed_over, borrowed = _long_tier_without_publication(family, live, read, write)
+        return ModelPrice(
+            live[0], live[1], cache_read_per_m=read, cache_write_per_m=write,
+            long_prompt_over=borrowed_over, long_prompt=borrowed,
+        )
 
     if family is not None:
         return family

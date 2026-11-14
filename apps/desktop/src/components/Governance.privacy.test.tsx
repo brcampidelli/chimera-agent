@@ -138,6 +138,80 @@ describe("Governance — the privacy card", () => {
     expect(panel.getByText(/Decisions API backend .* without this preference/i)).toBeInTheDocument();
   });
 
+  it("names a model the provider serves only with retention, and flags it against deny", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({
+        ...PRIVACY,
+        openrouter_data_collection: "deny",
+        retention_required: [
+          {
+            model: "openrouter/anthropic/claude-fable-5.2",
+            days: 30,
+            roles: ["top"],
+            conflicts: true,
+            enforced: true,
+            fallback: true,
+          },
+        ],
+      }),
+    );
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(
+      panel.getByText(/claude-fable-5\.2 is served only with 30-day data retention \(top\)/i),
+    ).toBeInTheDocument();
+    // A fallback exists: the MODEL is unavailable, and the turn fails only if those run out too.
+    expect(panel.getByText(/this model is unavailable on this route/i)).toBeInTheDocument();
+    expect(panel.getByText(/fails only if every fallback model is exhausted too/i)).toBeInTheDocument();
+    expect(panel.queryByText(/the turn fails instead of running/i)).toBeNull();
+  });
+
+  it("says the turn fails when the preference is enforced and no fallback can take over", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({
+        ...PRIVACY,
+        openrouter_zdr: true,
+        retention_required: [
+          {
+            model: "openrouter/anthropic/claude-fable-5.2",
+            days: 30,
+            roles: ["default"],
+            conflicts: true,
+            enforced: true,
+            fallback: false,
+          },
+        ],
+      }),
+    );
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(panel.getByText(/the turn fails instead of running/i)).toBeInTheDocument();
+    expect(panel.queryByText(/this model is unavailable on this route/i)).toBeNull();
+  });
+
+  it("does not promise a failure on a direct route that never carries the preference", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({
+        ...PRIVACY,
+        openrouter_data_collection: "deny",
+        retention_required: [
+          { model: "anthropic/claude-fable-5-2", days: 30, roles: ["default"], conflicts: true, enforced: false },
+        ],
+      }),
+    );
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(panel.getByText(/not sent on this route, so the model still runs/i)).toBeInTheDocument();
+    expect(panel.queryByText(/the turn fails instead of running/i)).toBeNull();
+  });
+
+  it("says nothing about retention when no configured model requires it", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config(PRIVACY));
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(panel.queryByText(/served only with/i)).toBeNull();
+  });
+
   it("says the verifier's fallback reaches OpenRouter without deny on the default install", async () => {
     // Verified answers on, `local_logprob`, an OpenRouter key: the Decisions API stands behind the
     // local verifier, so `deny` must not read as covering a grounded turn's sources.

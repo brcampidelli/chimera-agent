@@ -102,6 +102,9 @@ class ModelOption:
     #: Whether the route accepts a reasoning-effort variant (``#low|#medium|#high``), as the provider
     #: publishes it in ``supported_parameters``. None = not said; the picker then offers none.
     reasoning: bool | None = None
+    #: A second price tier for a long prompt, as the index publishes it in ``pricing.overrides``:
+    #: ``(over_tokens, input, output, cache_read, cache_write)``, USD per 1M. None = one price.
+    long_prompt: tuple[int, float, float, float | None, float | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -133,6 +136,34 @@ def _price_per_million(raw: Any) -> float | None:
     if value < 0:
         return None
     return round(value * 1_000_000, 6)
+
+
+def _long_prompt_tier(
+    pricing: dict[str, Any],
+) -> tuple[int, float, float, float | None, float | None] | None:
+    """The long-prompt tier of an index row's ``pricing.overrides``, or None.
+
+    ``{"min_prompt_tokens": 100000, "prompt": "0.0000005", ...}`` is how the index spells Haiku 5.5's
+    "over 100,000 prompt tokens" rate. Only an override that names both an input and an output price
+    and a positive threshold is kept; anything else is a shape this does not understand, and a tier
+    guessed from it would be worse than none.
+    """
+    overrides = pricing.get("overrides")
+    if not isinstance(overrides, list):
+        return None
+    for item in overrides:
+        if not isinstance(item, dict):
+            continue
+        over = item.get("min_prompt_tokens")
+        long_in = _price_per_million(item.get("prompt"))
+        long_out = _price_per_million(item.get("completion"))
+        if isinstance(over, int) and over > 0 and long_in is not None and long_out is not None:
+            return (
+                over, long_in, long_out,
+                _price_per_million(item.get("input_cache_read")),
+                _price_per_million(item.get("input_cache_write")),
+            )
+    return None
 
 
 def _openrouter_option(entry: dict[str, Any]) -> ModelOption | None:
@@ -185,6 +216,7 @@ def _openrouter_option(entry: dict[str, Any]) -> ModelOption | None:
         # receipt needed them: without them a cache read was billed as a fresh token.
         cache_read_per_m=_price_per_million(pricing.get("input_cache_read")),
         cache_write_per_m=_price_per_million(pricing.get("input_cache_write")),
+        long_prompt=_long_prompt_tier(pricing),
     )
 
 
@@ -537,6 +569,8 @@ class Remembered:
     #: USD per 1M prompt-cache reads / writes. None = the provider did not publish one.
     cache_read_per_m: float | None = None
     cache_write_per_m: float | None = None
+    #: ``(over_tokens, input, output, cache_read, cache_write)`` of a long-prompt tier. None = none.
+    long_prompt: tuple[int, float, float, float | None, float | None] | None = None
 
 
 # (path, mtime, table). Keyed by path and mtime so a test that repoints CHIMERA_HOME, or a fetch that
@@ -577,6 +611,7 @@ def remember_models(models: Sequence[ModelOption], *, home: Path | None = None) 
             "context_k": m.context_k,
             "cache_read": m.cache_read_per_m,
             "cache_write": m.cache_write_per_m,
+            "long_prompt": list(m.long_prompt) if m.long_prompt else None,
         }
         for m in models
     }
@@ -624,6 +659,7 @@ def _remembered(slug: str) -> Remembered | None:
                         value.get("context_k") if isinstance(value.get("context_k"), int) else None,
                         _as_price(value.get("cache_read")),
                         _as_price(value.get("cache_write")),
+                        _as_long_prompt(value.get("long_prompt")),
                     )
             for key, value in (raw.get("prices") or {}).items():  # the 0.48.0rc2 shape
                 if isinstance(value, list) and len(value) == 2 and str(key) not in table:
@@ -642,12 +678,28 @@ def _as_price(value: Any) -> float | None:
     return float(value) if isinstance(value, int | float) else None
 
 
+def _as_long_prompt(value: Any) -> tuple[int, float, float, float | None, float | None] | None:
+    if not (isinstance(value, list) and len(value) == 5):
+        return None
+    over, long_in, long_out = value[0], _as_price(value[1]), _as_price(value[2])
+    if not isinstance(over, int) or over <= 0 or long_in is None or long_out is None:
+        return None
+    return (over, long_in, long_out, _as_price(value[3]), _as_price(value[4]))
+
+
 def known_price(slug: str) -> tuple[float, float] | None:
     """USD per 1M (input, output) for this EXACT slug, or None when we have never seen it priced."""
     found = _remembered(slug)
     if found is None or found.input_per_m is None or found.output_per_m is None:
         return None
     return (found.input_per_m, found.output_per_m)
+
+
+def known_long_prompt(slug: str) -> tuple[int, float, float, float | None, float | None] | None:
+    """``(over_tokens, input, output, cache_read, cache_write)`` of this EXACT slug's long-prompt tier
+    as the index published it, or None (no tier published, or the slug was never seen)."""
+    found = _remembered(slug)
+    return None if found is None else found.long_prompt
 
 
 def known_cache_price(slug: str) -> tuple[float | None, float | None]:

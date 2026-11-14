@@ -356,6 +356,12 @@ owner's decision of 2026-10-18, **Full control through the bridge** on Settings 
 
 **The close loop pushes on its own.** When a Code turn's verification passes and its diff check is clean, Chimera commits the turn's changes to the workspace's branch and pushes that branch to `origin` to open a pull request. It never pushes to the default branch and never force-pushes. It merges only if the owner has switched `CHIMERA_CLOSE_LOOP_MERGE` on, and then never a pull request that touches billing, a destructive migration, row-level security, a grant or a secret. The owner's screen starts it; the bridge, channels and background work do not.
 
+### Models that require data retention
+
+Some models are served only while the provider keeps the prompt. **Claude Fable 5.2 requires 30-day data retention and is not available under zero data retention** unless Anthropic expressly authorizes it (Anthropic's model page, read 2026-11-14). Choosing it as the default, a tier, a fusion role or any other model setting sends prompts, recalled memory included, to a route that keeps them for 30 days, whatever the owner asked of the route.
+
+That also conflicts with the two OpenRouter switches, and what happens depends on the route. Through OpenRouter (`openrouter/anthropic/claude-fable-5.2`) the gateway sends `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` or `CHIMERA_OPENROUTER_ZDR=true` with every call, so no route can serve Fable 5.2: the preference is honoured, and that model is unavailable on the route. The turn itself fails only if the configured fallback models are exhausted too; with a fallback configured it can finish on the fallback. Reached directly (`anthropic/claude-fable-5-2`), the preference is never sent, so the model runs and Anthropic keeps the prompt for 30 days regardless of the switch: nothing is blocked and nothing is honoured. The privacy card on the Security screen lists every configured model that requires retention, with the roles that use it, and marks the ones that contradict the preference in force, saying whether that preference is enforced on the model's route (the model is unavailable there) or not (the model runs and the prompt is kept). The catalogue records the requirement per model (`ModelCaps.retention_days` in `chimera/providers/catalog.py`), and no preset or default uses such a model.
+
 ## Honest limits
 
 This measures whether an *already-injected* agent's harmful action is stopped — not whether

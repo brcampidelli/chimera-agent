@@ -27,7 +27,7 @@ from chimera.governance import wire_context
 from chimera.governance.reconcile import append_wire_record
 from chimera.governance.reconcile import digest as wire_digest
 from chimera.providers.cache import CompletionCache
-from chimera.providers.catalog import max_output_for
+from chimera.providers.catalog import caps_for, max_output_for
 from chimera.providers.discovery import LOCAL_MODEL_PREFIXES, is_local_model
 from chimera.providers.failover import (
     CredentialPool,
@@ -151,6 +151,18 @@ class CompletionResult(BaseModel):
     """Prompt-cache HITS the provider reported (billed at the read rate). None = unknown."""
     cache_write_tokens: int | None = None
     """Prompt-cache WRITES the provider reported (billed at the write rate). None = unknown."""
+    usd: float | None = None
+    """The EXACT cost of this result, when it stands for several calls whose cost was known one by one
+    (a cascade's k samples: a sample the local response cache served cost nothing, a long one paid the
+    long tier). None for a plain single call, which is priced from its own tokens."""
+    aggregate: bool = False
+    """True when the token counts are a SUM over several calls (a cascade's samples). With no exact
+    ``usd`` such a result is of UNKNOWN cost: its totals cannot price it (no prompt length to read a
+    tier from, and a sample with no usage hides inside them)."""
+    calls: int | None = None
+    """How many API calls the token counts above add up; None = one. Set where a result stands for
+    several calls of one prompt (a cascade's k samples), so a per-request price tier is read off ONE
+    call's prompt and not off the sum."""
     finish_reason: str = ""
     """Why the provider stopped generating, verbatim: ``stop`` | ``length`` | ``tool_calls`` | …
 
@@ -307,6 +319,102 @@ def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, 
             body["provider"] = {**kept, **route_theirs}
         merged["extra_body"] = body
     return merged
+
+
+#: Request keys a model that takes no sampling parameters answers with a 400.
+_SAMPLING_KEYS = ("temperature", "top_p", "top_k")
+
+
+def _is_forced_tool_choice(choice: object) -> bool:
+    """A ``tool_choice`` that FORCES a call: Anthropic's ``any`` / ``tool``, OpenAI's ``required`` or a
+    named function. ``auto`` and ``none`` are not forced, and stay."""
+    if isinstance(choice, str):
+        return choice == "required"
+    if isinstance(choice, dict):
+        return choice.get("type") in ("any", "tool", "function")
+    return False
+
+
+def _sampling(resolved: str, temperature: float) -> dict[str, float]:
+    """The ``temperature`` argument for ``resolved``, or nothing when the model refuses it.
+
+    Every call site used to pass ``temperature=`` unconditionally, so a model that rejects sampling
+    parameters (Fable 5.2, Opus 5.5, Sonnet 5.5, Haiku 5.5) answered every call with a 400 before it
+    could think. Left out, the model runs at its own default; the caller's ``temperature`` was a
+    request for a behaviour the model does not offer, not one it can be given.
+    """
+    return {"temperature": temperature} if caps_for(resolved).sampling else {}
+
+
+class UnsupportedParameterError(ValueError):
+    """The request asks for something the model cannot do, and leaving it out would change the answer.
+
+    Raised for a FORCED ``tool_choice`` (a specific function, ``any``, ``required``) sent to a model
+    that returns a 400 on it. Dropping it, or swapping in ``auto``, would hand a caller that demanded
+    a structured call a plain-text reply as a success, so the call stops here, with the reason.
+    """
+
+
+def _scrub(resolved: str, caps_sampling: bool, caps_thinking_off: bool, target: dict[str, Any]) -> None:
+    """Take the refused sampling and thinking-off parameters out of ONE kwargs dict, in place."""
+    if not caps_sampling:
+        for key in _SAMPLING_KEYS:
+            target.pop(key, None)
+    if not caps_thinking_off:
+        reasoning = target.get("reasoning")
+        if isinstance(reasoning, dict) and reasoning.get("enabled") is False:
+            kept = {k: v for k, v in reasoning.items() if k != "enabled"}
+            if kept:
+                target["reasoning"] = kept
+            else:
+                target.pop("reasoning")
+        thinking = target.get("thinking")
+        if isinstance(thinking, dict) and thinking.get("type") == "disabled":
+            target.pop("thinking")
+
+
+def reject_forced_tool_choice(resolved: str, kwargs: dict[str, Any]) -> None:
+    """Raise :class:`UnsupportedParameterError` if ``kwargs`` force a tool call at a model that cannot.
+
+    Looked for at the top level AND in ``extra_body``, the two places a caller can put it.
+    """
+    if caps_for(resolved).forced_tool_choice:
+        return
+    body = kwargs.get("extra_body")
+    for place in (kwargs, body if isinstance(body, dict) else {}):
+        if _is_forced_tool_choice(place.get("tool_choice")):
+            raise UnsupportedParameterError(
+                f"model {resolved} does not support a forced tool_choice "
+                f"({place.get('tool_choice')!r}): the provider answers it with a 400. Use "
+                "tool_choice='auto' and say in the prompt when the tool applies, or choose a model "
+                "that accepts it."
+            )
+
+
+def _without_refused(resolved: str, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """``kwargs`` with what ``resolved`` is known to refuse taken out (a copy; the input is untouched).
+
+    The caller's own kwargs win over the gateway's in :func:`_call_kwargs`, so this runs AFTER that
+    merge: a bench that passes ``top_p`` reaches a model that would 400 on it, and a refusal at the
+    provider is a failed turn where leaving the parameter out is a turn that runs. It looks inside
+    ``extra_body`` as well, which litellm splices into the request body verbatim: the gateway's own
+    thinking-off switch travels there, and so can anything a caller adds. Only what a provider
+    PUBLISHED as refused is dropped (:class:`ModelCaps`). A forced ``tool_choice`` is not dropped: it
+    raises (:func:`reject_forced_tool_choice`), because the call would succeed with a different meaning.
+    """
+    caps = caps_for(resolved)
+    reject_forced_tool_choice(resolved, kwargs)
+    out = dict(kwargs)
+    _scrub(resolved, caps.sampling, caps.thinking_off, out)
+    body = out.get("extra_body")
+    if isinstance(body, dict):
+        body = dict(body)
+        _scrub(resolved, caps.sampling, caps.thinking_off, body)
+        if body:
+            out["extra_body"] = body
+        else:
+            out.pop("extra_body")
+    return out
 
 
 #: Message keys Chimera uses for itself and never sends: the attached-image paths (folded into
@@ -855,7 +963,9 @@ class LLMGateway:
             kwargs.setdefault("extra_body", {})["reasoning"] = {"effort": effort}
         elif effort:
             kwargs["reasoning_effort"] = effort
-        if thinking is False and resolved.startswith("openrouter/"):
+        # Not for a model whose thinking cannot be switched off (Fable 5.2, Opus 5.5): "disabled" is
+        # rejected there, and asking for it must mean "as little thinking as it allows", not a 400.
+        if thinking is False and resolved.startswith("openrouter/") and caps_for(resolved).thinking_off:
             kwargs.setdefault("extra_body", {})["reasoning"] = {"enabled": False}
         # The context window an Ollama chat or generate call asks for. Without it Ollama serves the
         # machine's default (4,096 here) and cuts a longer prompt to about half of it, silently: the
@@ -1075,8 +1185,21 @@ class LLMGateway:
             candidate_kwargs = kwargs
             if "response_format" in kwargs and provider != self._route_key(resolved):
                 candidate_kwargs = {k: v for k, v in kwargs.items() if k != "response_format"}
+            # The merge that WILL be sent, validated as such: the gateway's own `extra_body` (a route
+            # pin, the privacy preference) replaces a caller's in a plain dict merge and would hide a
+            # forced `tool_choice` the caller put there, which `_call_kwargs` then restores.
+            merged_kwargs = _call_kwargs(candidate_extra, candidate_kwargs)
+            try:
+                reject_forced_tool_choice(candidate, merged_kwargs)
+            except UnsupportedParameterError:
+                if candidate == resolved:
+                    raise
+                # A fallback that would turn the caller's forced call into a plain reply is not a
+                # fallback for it: skipped, and the next one (or the failure) is what the caller gets.
+                _log.warning("fallback %s skipped: it does not support a forced tool_choice", candidate)
+                continue
             for api_key in api_keys:
-                call_kwargs: dict[str, Any] = _call_kwargs(candidate_extra, candidate_kwargs)
+                call_kwargs: dict[str, Any] = _without_refused(candidate, merged_kwargs)
                 if api_key:
                     call_kwargs["api_key"] = api_key
                 elif (placeholder := self._endpoint_api_key(candidate, [])) is not None:
@@ -1089,7 +1212,7 @@ class LLMGateway:
                     response = litellm.completion(
                         model=self._litellm_model(candidate),
                         messages=call_messages,
-                        temperature=temperature,
+                        **_sampling(candidate, temperature),
                         max_tokens=candidate_max,
                         tools=tools,
                         **call_kwargs,
@@ -1218,12 +1341,12 @@ class LLMGateway:
                 return result
         max_tokens = self._bounded(max_tokens, resolved)
 
-        call_kwargs: dict[str, Any] = _call_kwargs(
+        call_kwargs: dict[str, Any] = _without_refused(resolved, _call_kwargs(
             self._provider_kwargs(
                 resolved, thinking=thinking, reasoning_effort=self._requested_effort(model)
             ),
             kwargs,
-        )
+        ))
         keys = self._key_order(self._route_key(resolved))
         if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
             call_kwargs["api_key"] = placeholder
@@ -1236,7 +1359,7 @@ class LLMGateway:
             response = await litellm.acompletion(
                 model=self._litellm_model(resolved),
                 messages=sent,
-                temperature=temperature,
+                **_sampling(resolved, temperature),
                 max_tokens=max_tokens,
                 tools=tools,
                 **call_kwargs,
@@ -1403,9 +1526,9 @@ class LLMGateway:
         # `resolved` handed on: without it a route-scoped field (the OpenRouter privacy preference)
         # could never reach the streaming primitive, and the live terminal and A2A streams would go
         # out without the `deny` the owner set.
-        call_kwargs = _call_kwargs(
+        call_kwargs = _without_refused(resolved, _call_kwargs(
             self._provider_kwargs(resolved, reasoning_effort=self._requested_effort(model)), kwargs
-        )
+        ))
         keys = self._key_order(self._route_key(resolved))
         if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
             call_kwargs["api_key"] = placeholder
@@ -1415,7 +1538,7 @@ class LLMGateway:
         response = litellm.completion(
             model=self._litellm_model(resolved),
             messages=sent,
-            temperature=temperature,
+            **_sampling(resolved, temperature),
             max_tokens=max_tokens,
             stream=True,
             **call_kwargs,
@@ -1465,12 +1588,12 @@ class LLMGateway:
         max_tokens = self._bounded(budget, resolved)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        call_kwargs = _call_kwargs(
+        call_kwargs = _without_refused(resolved, _call_kwargs(
             self._provider_kwargs(
                 resolved, thinking=thinking, reasoning_effort=self._requested_effort(model)
             ),
             kwargs,
-        )
+        ))
         keys = self._key_order(self._route_key(resolved))
         if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
             call_kwargs["api_key"] = placeholder
@@ -1489,7 +1612,7 @@ class LLMGateway:
             response = self._stream_once(
                 model=self._litellm_model(resolved),
                 messages=sent,
-                temperature=temperature,
+                **_sampling(resolved, temperature),
                 max_tokens=max_tokens,
                 tools=tools,
                 stream=True,

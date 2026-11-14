@@ -134,12 +134,19 @@ def review(
         return report
 
     usage = Usage()
+    spent = 0.0  # each reviewer call priced as it arrives; a tier is a property of one request
+    unpriced = False
     located: list[tuple[Finding, FileDiff]] = []
     for batch in batches:
         reply = find(backend, reviewer.model, "\n\n".join("\n".join(f.render()) for f in batch))
         usage.calls += 1
         usage.prompt_tokens += reply.prompt_tokens
         usage.completion_tokens += reply.completion_tokens
+        call_usd = price_call(reviewer.model, reply.prompt_tokens, reply.completion_tokens)
+        if call_usd is None:
+            unpriced = True
+        else:
+            spent += call_usd
         if not reply.ok:
             usage.failed_calls += 1
             reason = f"the reviewer's reply could not be used: {reply.error}"
@@ -186,7 +193,23 @@ def review(
     usage.failed_calls += failed
     usage.prompt_tokens += prompt
     usage.completion_tokens += completion
-    usage.usd = _price(reviewer.model, usage.prompt_tokens, usage.completion_tokens)
+    cost_fn = getattr(verifier, "cost", None)
+    if callable(cost_fn):
+        checks = cost_fn()
+    elif prompt or completion:
+        # A verifier that keeps only totals: priced at the reviewer's model as one aggregate, whose
+        # long tier (if the total passes it) is an upper bound, never an under-statement.
+        from chimera.fusion.receipts import cost_usd, resolve_price
+
+        price = resolve_price(reviewer.model)
+        checks = None if price is None else cost_usd(price, prompt, completion, aggregate=True)
+    else:
+        checks = 0.0
+    if checks is None:
+        unpriced = True
+    else:
+        spent += checks
+    usage.usd = None if unpriced else round(spent, 6)
 
     report.findings = number(order(kept), "F")
     report.dropped = number(order(report.dropped), "D")
@@ -247,10 +270,16 @@ def _reviewer_notes(reviewer: ReviewerChoice) -> list[str]:
     ]
 
 
-def _price(model: str, prompt: int, completion: int) -> float | None:
-    from chimera.fusion.receipts import resolve_price
+def price_call(model: str, prompt: int, completion: int) -> float | None:
+    """USD for ONE request (None when the model has no price), with its own long-prompt tier.
+
+    A review is many requests (one per batch, one per verified finding). Summing their tokens and
+    pricing the total read the tier off the sum: two Haiku 5.5 calls of 60,000 tokens cost 0.013, and
+    as one call of 120,000 they cost 0.065. So every caller prices a call here and adds the dollars.
+    """
+    from chimera.fusion.receipts import cost_usd, resolve_price
 
     price = resolve_price(model)
     if price is None:
         return None
-    return round(prompt / 1e6 * price.input_per_m + completion / 1e6 * price.output_per_m, 6)
+    return cost_usd(price, prompt, completion)
