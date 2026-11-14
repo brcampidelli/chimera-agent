@@ -41,12 +41,25 @@ import re
 import unicodedata
 from collections.abc import Iterable, Sequence
 
-__all__ = ["fold_for_match", "idf_weights", "informative", "tokens"]
+__all__ = [
+    "fold_for_match",
+    "idf_weights",
+    "identifier_tokens",
+    "fold_for_index",
+    "informative",
+    "space_han",
+    "tokens",
+]
 
 #: Any letter or digit in any script, after folding. `[^\W_]` rather than a named list of ranges:
 #: a range list is a promise to remember every alphabet, and this file exists because one was
 #: forgotten. Underscore is excluded so `snake_case` splits into words.
 _WORD = re.compile(r"[^\W_]+", re.UNICODE)
+
+#: The same alphabet with the underscore KEPT. For a search over source code, where `snake_case` is
+#: one identifier and splitting it would turn a precise query into a loose one. Named rather than a
+#: flag so a call site says which of the two it wants and a reader can grep for it.
+_IDENTIFIER = re.compile(r"\w+", re.UNICODE)
 
 #: Function words for the languages this app ships in, written without diacritics because that is
 #: what `tokens` produces. Closed-class only — articles, prepositions, pronouns, conjunctions and
@@ -161,16 +174,30 @@ def _han(ch: str) -> bool:
     return 0x3400 <= code <= 0x4DBF or 0x4E00 <= code <= 0x9FFF or 0xF900 <= code <= 0xFAFF
 
 
-def tokens(text: str) -> list[str]:
-    """Comparable pieces of ``text``: any script, Latin diacritics folded, Han split per character.
+def space_han(text: str) -> str:
+    """``text`` with a space around every Han character, for an index whose tokenizer cannot split it.
 
-    Folding rather than widening the character class does two jobs: it stops ``ç`` and ``ã`` from
-    splitting a word into fragments plus a stray vowel, and it makes ``voce`` match ``você`` —
-    which matters because people type both, and a store that distinguishes them remembers half of
-    what it was told.
+    SQLite FTS5's default tokenizer treats a run of ideographs as ONE word, so a query token cut per
+    character by :func:`tokens` can never equal it. Indexing the spaced form makes the index and the
+    query cut the same way; everything that is not Han is returned untouched.
     """
+    return "".join(f" {ch} " if _han(ch) else ch for ch in text)
+
+
+def fold_for_index(text: str) -> str:
+    """``text`` as an FTS index should store it: the SAME fold :func:`tokens` applies, Han spaced.
+
+    FTS5's own diacritic removal covers fewer letters than ours (``ộ`` survives it), so a query
+    folded by :func:`identifier_tokens` and an index folded by SQLite disagreed and the symbol
+    ``ộ_cache`` was unfindable by its own name. Folding here, before SQLite sees the text, makes the
+    index and the query one normalization.
+    """
+    return space_han(_fold(text))
+
+
+def _split(text: str, pattern: re.Pattern[str]) -> list[str]:
     out: list[str] = []
-    for match in _WORD.finditer(_fold(text)):
+    for match in pattern.finditer(_fold(text)):
         buffer = ""
         for ch in match.group():
             if _han(ch):
@@ -186,6 +213,26 @@ def tokens(text: str) -> list[str]:
         if buffer:
             out.append(buffer)
     return out
+
+
+def tokens(text: str) -> list[str]:
+    """Comparable pieces of ``text``: any script, Latin diacritics folded, Han split per character.
+
+    Folding rather than widening the character class does two jobs: it stops ``ç`` and ``ã`` from
+    splitting a word into fragments plus a stray vowel, and it makes ``voce`` match ``você`` —
+    which matters because people type both, and a store that distinguishes them remembers half of
+    what it was told.
+    """
+    return _split(text, _WORD)
+
+
+def identifier_tokens(text: str) -> list[str]:
+    """:func:`tokens`, except that ``snake_case`` stays one piece.
+
+    The code index (:mod:`chimera.rag.store`) needs it: a query for ``replace_all`` is a precise
+    request, and the retrieval layer's own tokenizer reads it as two common words.
+    """
+    return _split(text, _IDENTIFIER)
 
 
 def informative(terms: Iterable[str]) -> set[str]:
