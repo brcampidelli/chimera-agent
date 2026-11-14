@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from chimera.core.instructions import for_home as owner_identity
+from chimera.interface.profile import owner_instructions
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
@@ -205,7 +205,6 @@ class MessagingManager:
         from chimera.governance.profile import governed_profile
         from chimera.integrations import SenderRegistry, SendMessageTool
         from chimera.interface import ChatSession
-        from chimera.interface.profile import session_preamble
         from chimera.server import MessageGateway
         from chimera.tools import default_registry
 
@@ -260,8 +259,9 @@ class MessagingManager:
                     model=self._model,
                     max_steps=self._max_steps,
                     project_root=self._workspace,
-                    # The owner's identity, as on every surface that answers a person.
-                    instructions=owner_identity(self._settings.home),
+                    # The owner's identity and profile block, as on every surface that answers a
+                    # person: same order, same place, after the identity.
+                    instructions=owner_instructions(self._settings.home, self._memory),
                     turn_context=True,
                 )),
             )
@@ -269,9 +269,9 @@ class MessagingManager:
                 runner,
                 memory=self._memory,
                 graph=self._graph,
-                # As in `_serve_platform`, which had the same gap: the owner's profile, and recalled
-                # facts quoted the way the terminal quotes them. Still no extractor (see there).
-                profile=session_preamble(self._settings.home, self._memory),
+                # As in `_serve_platform`, which had the same gap: recalled facts quoted the way the
+                # terminal quotes them (the owner's profile is in the instructions above). Still no
+                # extractor (see there).
                 cite_facts=self._settings.memory_extract,
                 remember_from_chat=self._settings.remember_from_chat,
                 real_history=self._settings.chat_real_history,

@@ -255,7 +255,9 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="after a chat or Code turn, on by default (CHIMERA_MEMORY_EXTRACT), never on the "
             "messaging bots; the harness re-checks every proposal against the user's own words"),
     _i("memory.persona_preamble", "chimera.memory.manager:MemoryManager.profile", "volatile",
-       ("S3", "S10")),
+       ("S3", "S10"),
+       note="the HTTP gateway's sessions still send it; the Code turn, the terminal and the bots "
+            "send the profile block instead"),
     # ---- the tool router (off by default; #537 measured it worse) ------------------------------
     _i("router.prompt", "chimera.core.tool_router:ToolRouter._prompt", "call", ("S1",), "measured",
        "bench/tool_router (#537): the router made every executor worse"),
@@ -297,7 +299,10 @@ SECTIONS: tuple[PromptSection, ...] = (
                            "carried into its assistant message; bench/chat_history"),
     _c("chat.restored_labels", "chimera.interface.session:_RESTORED", "volatile", ("S3", "S10"),
        "unmeasured", render=_restored_labels),
-    _i("chat.profile", "chimera.interface.profile:render_profile", "volatile", ("S3", "S10")),
+    _c("profile.header", "chimera.interface.profile:PROFILE_HEADER", "owner",
+       ("S1", "S2", "S3", "S5", "S10"), "unmeasured",
+       note="the profile block, in the system prompt right after the owner's identity, on the Code "
+            "turn, the terminal and the bots; byte-stable between edits"),
     _c("cron.scheduled_run_note", "chimera.scheduler.surface:SCHEDULED_RUN_NOTE", "surface",
        ("S1", "S10"), "unmeasured",
        note="the turn context of every scheduled run (study 28 P3): unattended, the answer is the "

@@ -19,7 +19,6 @@ from rich.console import Console
 from rich.markup import escape
 
 from chimera import __version__
-from chimera.config import get_settings
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -277,17 +276,6 @@ def _maybe_defer(
         allowed=frozenset(allow_names) if allow_names else None,
     )
     return deferido
-
-
-def _session_profile(mem: Any) -> str:
-    """The chat/assist preamble: stable user profile first, volatile memory facts after.
-
-    Byte-stable for the same profile (the cacheable prefix); memory-derived facts go
-    in a separated volatile section so they never break the stable prefix.
-    """
-    from chimera.interface.profile import session_preamble
-
-    return session_preamble(get_settings().home, mem)
 
 
 def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComplete:

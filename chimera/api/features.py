@@ -583,10 +583,12 @@ def register_features(
         mgr = _memory_manager(_settings())
         return {
             # Both fields carry the same persona facts, and both are kept: the bridge exposes this
-            # route, so an agent reading it may use either. `profile` is the ranked text the agent
-            # gets (no "What you know about the user:" preamble, but each untrusted fact keeps its
+            # route, so an agent reading it may use either. `profile` is the ranked text for a model
+            # reader (no "What you know about the user:" preamble, but each untrusted fact keeps its
             # English "[unverified: ...]" label; dropping it here would hand an agent unlabelled
-            # tainted facts). `persona` is the records, with provenance as a field, and is the only
+            # tainted facts). It is NOT the block the agent's own prompt carries: that one is
+            # `chimera.interface.profile.profile_block`, clean facts only, in the system prompt.
+            # `persona` is the records, with provenance as a field, and is the only
             # one a screen renders: the Profile screen drew both under two headings, so every fact
             # appeared twice and the model's label leaked onto a translated page.
             "profile": '\n'.join(mgr.profile_facts()),

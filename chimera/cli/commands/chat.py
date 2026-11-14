@@ -16,7 +16,6 @@ from rich.panel import Panel
 from chimera.cli.commands._shared import (
     _cascade_backend,
     _require_valid_policy,
-    _session_profile,
     app,
     console,
 )
@@ -733,6 +732,9 @@ def chat(
     # attacks executed here that the governed registry blocked, and 0 of 12 external reads arrived
     # inside the `<<external-data>>` fence the system prompt below promises on every single turn
     # (`bench/right_hand_governance/RESULTS.md`, 2026-09-08).
+    # Built before the agent: the profile block after the owner's identity reads persona facts
+    # from it, and it used to be built after the agent had already been given its instructions.
+    mem = None if no_memory else _memory_manager()
     hand = build_right_hand(
         Path(workspace), settings=settings, surface="chat", write_region=write_region
     )
@@ -748,13 +750,12 @@ def chat(
             max_steps=max_steps,
             project_root=Path(workspace),
             # The owner's identity and declared read-only references follow this attended surface.
-            instructions=foreground_instructions(settings.home),
+            instructions=foreground_instructions(settings.home, mem, profile=True),
             turn_context=True,
             context_budget=DEFAULT_BUDGET_FRACTION if compact_context else None,
             cap_unmeasured=bool(compact_context),
         )),
     )
-    mem = None if no_memory else _memory_manager()
 
     # The conversation outlives the terminal.
     #
@@ -778,7 +779,6 @@ def chat(
             turns,
             memory=mem,
             graph=_recall_graph(mem),
-            profile=_session_profile(mem),
             # The setting existed and no terminal surface passed it, so "remember that…" was
             # answered "Got it, I'll remember" and wrote nothing, with the flag on or off.
             remember_from_chat=settings.remember_from_chat,
@@ -998,7 +998,10 @@ def assist(
     gateway = LLMGateway()
     from chimera.tools.references import foreground_instructions
 
-    instructions = foreground_instructions(settings.home)
+    # Built here, before the agent: the profile block that follows the owner's identity in the
+    # system prompt reads the persona facts from it.
+    mem = None if no_memory else _memory_manager()
+    instructions = foreground_instructions(settings.home, mem, profile=True)
     routed: SupportsComplete | None = None if no_cascade else _cascade_backend(gateway, settings)
     backend: SupportsComplete = gateway if routed is None else routed
     # `--model` under the ladder was a value accepted and dropped — see `_switch_model`. Naming one
@@ -1028,8 +1031,7 @@ def assist(
             cap_unmeasured=bool(compact_context),
         )),
     )
-    # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
-    mem = None if no_memory else _memory_manager()
+    # Second-brain defaults: memory + graph + profile block always on (unless opted out).
     # One meter for the run, exactly as `chat` builds one — see `chimera.cli.spend` for why it is
     # not `AgentConfig.max_usd`.
     budget = session_budget(max_usd)
@@ -1040,7 +1042,6 @@ def assist(
         turns,
         memory=mem,
         graph=_recall_graph(mem),
-        profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
         # A tainted fact recalled into this conversation arms its ledger like a fetched page
         # (study 30 S30-25): the [unverified] label alone narrows nothing.
@@ -1123,7 +1124,9 @@ def assist(
                 changed = stored.add(kind.strip(), value.strip())
             if changed:
                 save_profile(path, stored)
-                session.profile = _session_profile(mem)  # takes effect next turn
+                # The block is in the system prompt, so the next turn needs the instructions
+                # re-rendered, not a session field.
+                agent.config.instructions = foreground_instructions(settings.home, mem, profile=True)
                 console.print(
                     f"[green]stored[/green] {escape(kind.strip())}: {escape(value.strip())}"
                 )
@@ -1353,6 +1356,9 @@ def tui(
     # Built before the app that will draw its questions, because the tools that consult it are built
     # before the session that the app is constructed around. `ChimeraTUI.on_mount` binds it.
     gate = ModalGate()
+    # Built before the agent: the profile block after the owner's identity reads persona facts
+    # from it, and it used to be built after the agent had already been given its instructions.
+    mem = None if no_memory else _memory_manager()
     hand = build_right_hand(
         Path(workspace),
         settings=settings,
@@ -1376,11 +1382,10 @@ def tui(
             # answered in different languages and different voices depending on which window you
             # opened. Nothing failed and nothing said so — the only symptom is a reply that reads
             # like a stranger's.
-            instructions=foreground_instructions(settings.home),
+            instructions=foreground_instructions(settings.home, mem, profile=True),
             turn_context=True,
         )),
     )
-    mem = None if no_memory else _memory_manager()
     budget = session_budget(max_usd)
     turns: Any = agent if budget is None else BudgetedTurns(agent, budget)
     # The conversation outlives the window.
@@ -1394,7 +1399,6 @@ def tui(
             turns,
             memory=mem,
             graph=_recall_graph(mem),
-            profile=_session_profile(mem),
             remember_from_chat=settings.remember_from_chat,
             # A tainted fact recalled into this conversation arms its ledger like a fetched page
             # (study 30 S30-25): the [unverified] label alone narrows nothing.

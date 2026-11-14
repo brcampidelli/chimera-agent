@@ -117,8 +117,12 @@ def test_the_discord_bot_carries_the_owner_profile(tmp_path: Path, monkeypatch: 
     _owner_profile(tmp_path)
     session, _kw, _f = _serve(tmp_path, monkeypatch, ["--discord"])
 
-    assert "Name: Bruno" in session.profile
-    assert "answer in PT-BR" in session.profile
+    # The profile is in the agent's instructions now, after the owner's identity, as on the Code
+    # turn and the terminal; it used to be a chat preamble and the test read that field.
+    instructions = session.agent.config.instructions
+    assert 'Name: "Bruno"' in instructions
+    assert '"answer in PT-BR"' in instructions
+    assert session.profile == ""
 
 
 def test_the_discord_bot_quotes_recalled_facts_like_the_terminal(
@@ -208,7 +212,8 @@ def test_the_app_bot_carries_the_profile_and_quotes_facts(tmp_path: Path) -> Non
     _owner_profile(tmp_path)
     session, _route = _app_bot(tmp_path, chat_memory=True)
 
-    assert "Name: Bruno" in session.profile
+    assert 'Name: "Bruno"' in session.agent.config.instructions
+    assert session.profile == ""
     assert session.cite_facts is True
     assert session.remember_from_chat is True
 
