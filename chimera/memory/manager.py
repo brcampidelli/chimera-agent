@@ -13,9 +13,11 @@ import time
 import uuid
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from chimera.core.redact import redact
+from chimera.memory.consolidate import ConsolidationLedger, cluster_signature
 from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 from chimera.memory.semantic import EmbedFn, SemanticIndex
 from chimera.memory.store import MemoryBackend
@@ -39,6 +41,9 @@ class ConsolidationOutcome:
     blank: int
     """Clusters the summarizer was asked about and answered with nothing: left as they were, but the
     call was made (and, with a model, paid for)."""
+    unchanged: int = 0
+    """Clusters skipped because they were settled on an earlier pass and nothing about them changed:
+    no call was made for them."""
 
 
 class MemoryManager:
@@ -53,8 +58,13 @@ class MemoryManager:
         audit: Any = None,
         supersession: bool = False,
         supersession_threshold: float = 0.92,
+        ledger: ConsolidationLedger | None = None,
+        vector_cache: Path | None = None,
+        vector_namespace: str = "",
     ) -> None:
         self.store = store
+        #: Clusters already put to the summarizer (see :class:`ConsolidationLedger`).
+        self._ledger = ledger if ledger is not None else ConsolidationLedger()
         #: Injected so a test can write a fact at a chosen time. `failover.py` takes its clock the
         #: same way, and for the same reason: a timestamp nothing can control is a timestamp nothing
         #: can assert.
@@ -62,7 +72,11 @@ class MemoryManager:
         # Opt-in semantic recall: when an embedder is supplied, ``search`` ranks by cosine
         # similarity (bridges paraphrases keyword search can't). Absent/failing embedder ->
         # the keyword/FTS path always remains as a fallback.
-        self._semantic = SemanticIndex(embed) if embed is not None else None
+        self._semantic = (
+            SemanticIndex(embed, cache_path=vector_cache, namespace=vector_namespace)
+            if embed is not None
+            else None
+        )
         # Supersession is an explicit opt-in: similarity can identify candidates but cannot
         # safely infer that two claims refer to the same subject without the caller choosing it.
         self._supersession = supersession
@@ -333,6 +347,44 @@ class MemoryManager:
                 groups += [g for g in cluster(items, threshold=threshold) if len(g) >= 2]
         return groups
 
+    def similar_pairs(
+        self, *, threshold: float = 0.6, limit: int = 50
+    ) -> list[tuple[MemoryItem, MemoryItem, float]]:
+        """Pairs of facts that say nearly the same thing but were written on different days.
+
+        Those are the pairs worth a look: two near-identical facts from the same day are usually one
+        statement stored twice, while two from different days are often an old claim and its
+        correction, both still recallable, and recall cannot tell which one is current. Same kind and
+        same project only (a fact about one folder is not a duplicate of another folder's), token
+        Jaccard like the consolidation clustering, and never a pair with an unknown date: a fact with
+        no age is not given one here. Free to compute, no model call; the owner decides which to keep.
+        """
+        from datetime import UTC, datetime
+
+        from chimera.memory.consolidate import _tokens
+
+        def day(item: MemoryItem) -> str | None:
+            if item.created_at is None:
+                return None
+            return datetime.fromtimestamp(item.created_at, UTC).date().isoformat()
+
+        pairs: list[tuple[MemoryItem, MemoryItem, float]] = []
+        buckets: dict[tuple[str, str | None], list[tuple[MemoryItem, set[str], str | None]]] = {}
+        for item in self.store.all():
+            buckets.setdefault((item.kind, item.project), []).append((item, _tokens(item.content), day(item)))
+        for rows in buckets.values():
+            for i, (a, ta, da) in enumerate(rows):
+                if not ta or da is None:
+                    continue
+                for b, tb, db in rows[i + 1 :]:
+                    if not tb or db is None or da == db:
+                        continue
+                    score = len(ta & tb) / len(ta | tb)
+                    if score >= threshold:
+                        pairs.append((a, b, score))
+        pairs.sort(key=lambda pair: -pair[2])
+        return pairs[:limit]
+
     def consolidation_groups(
         self,
         *,
@@ -385,13 +437,19 @@ class MemoryManager:
         spans two of either), their key and their source when every member agrees on one, and the
         strongest trust label. Only the text is new.
         """
-        removed = merged = blank = 0
+        removed = merged = blank = unchanged = 0
         for group in self._consolidation_clusters(threshold=threshold, kinds=kinds):
             if only is not None and frozenset(i.id for i in group) not in only:
                 continue
+            signature = cluster_signature(group)
+            if self._ledger.settled(signature):
+                # Asked before, and nothing in the cluster has changed since: another call would buy
+                # the same blank answer (or the same merge the owner already has).
+                unchanged += 1
+                continue
             # Masked on the way OUT, to the summarizer: a stored fact can predate write-time masking
             # (written before `redact` existed, edited in the store by hand, imported by an older
-            # version) — the reason the export re-masks too — and the summarizer is usually a remote
+            # version) - the reason the export re-masks too - and the summarizer is usually a remote
             # model. A key in an old fact would otherwise be sent to a third party in the prompt.
             summary = summarizer([redact(item.content) for item in group])  # type: ignore[operator]
             # And on the way back IN: `add` does not mask, and a model can echo or reconstruct a
@@ -399,14 +457,19 @@ class MemoryManager:
             text = redact(summary).strip()
             if not text:
                 blank += 1
+                # Remembered: the call was paid for, and asking again changes nothing.
+                self._ledger.settle(signature)
                 continue
             # Propagate the strongest provenance of the cluster: merging a tainted member into a
             # summary must NOT launder it to clean (same guarantee remember/merge uphold).
             prov = "tainted" if any(i.provenance == "tainted" for i in group) else "clean"
             keys = {i.key for i in group}
             sources = {i.source for i in group}
-            for item in group:
-                self.store.remove(item.id)
+            # The summary is written BEFORE the originals go. The other order had a window in which
+            # the members were deleted and the summary did not exist yet: a crash, a full disk or a
+            # locked database there lost every fact in the cluster, and nothing recorded that they
+            # had been there. Now the worst case is a summary beside its originals, which the next
+            # pass sees as one more cluster to settle: a duplicate, never a loss.
             self.add(
                 text,
                 group[0].kind,
@@ -415,6 +478,8 @@ class MemoryManager:
                 provenance=prov,
                 project=group[0].project,
             )
+            for item in group:
+                self.store.remove(item.id)
             removed += len(group) - 1
             merged += 1
             self._chain(
@@ -428,7 +493,7 @@ class MemoryManager:
                 },
             )
         _log.debug("consolidated: removed %d memories", removed)
-        return ConsolidationOutcome(removed=removed, merged=merged, blank=blank)
+        return ConsolidationOutcome(removed=removed, merged=merged, blank=blank, unchanged=unchanged)
 
     def nudges(self, user_texts: list[str], *, max_suggestions: int = 3) -> list[str]:
         """Suggest persona facts to save from preferences stated in recent user messages.

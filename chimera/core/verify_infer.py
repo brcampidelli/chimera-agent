@@ -31,6 +31,10 @@ import logging
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from chimera.core.verify import CommandVerifier
 
 _log = logging.getLogger(__name__)
 
@@ -208,3 +212,59 @@ def infer_verify(workspace: Path) -> InferredVerify | None:
         if found is not None:
             return found
     return None
+
+
+def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, str]:
+    """``(command, source)`` — source is ``user`` | ``project`` | ``inferred:<file>`` | ``none``.
+
+    The source travels into the receipt so a stored run can never be read as "the user chose this".
+    A receipt that cannot tell a typed command from an inferred one is a receipt that will eventually
+    be cited as evidence of a decision nobody made.
+
+    An empty STRING is an explicit "no verifier": someone who cleared the field asked for exactly
+    that, and inferring over the top of it would be overriding a choice with a guess. Only ``None``
+    — the field absent from the request — means "look at the project".
+    """
+    if requested is not None:
+        return (requested or None), ("user" if requested else "none")
+    configured = project_verify(workspace)
+    if configured is not None:
+        return configured.command, "project"
+    found = infer_verify(workspace)
+    if found is None:
+        return None, "none"
+    return found.command, f"inferred:{found.source_file}"
+
+
+def verifier_source(verify_source: str) -> str:
+    """Collapse receipt provenance to the source class the verifier gate reads.
+
+    The receipt keeps the inferred filename; the gate distinguishes an explicit project config from
+    discovery in ordinary build files — see :data:`chimera.core.verify.VERIFY_SOURCES`.
+    """
+    if verify_source == "user":
+        return "user"
+    if verify_source == "project":
+        return "project"
+    return "inferred"
+
+
+def cli_verifier(
+    requested: str | None, workspace: Path, *, gen_tests: bool = False
+) -> tuple[CommandVerifier | None, str]:
+    """The verifier `chimera solve` runs under, and the origin its receipt names.
+
+    A typed ``--verify`` is authorised by construction; a command read off the project is gated
+    exactly as the API gates it (:func:`verifier_source`), so a ``Makefile`` in a repository someone
+    just cloned never runs on the host because ``solve`` was pointed at it. ``--gen-tests`` is the
+    exception: it fills the empty verifier slot with generated tests, and an inferred command taking
+    that slot first would silently turn the flag off.
+    """
+    from chimera.core.verify import CommandVerifier
+
+    if gen_tests and requested is None:
+        return None, "none"
+    command, origin = resolve_verify(requested, workspace)
+    if not command:
+        return None, origin
+    return CommandVerifier(command, workspace, source=verifier_source(origin)), origin

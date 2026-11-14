@@ -20,6 +20,7 @@ from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 # NOTE: provenance is a first-class column, not folded into metadata: it is a SECURITY signal
 # (a tainted memory must never launder itself to "clean"), and it must round-trip identically to the
 # JSON store or the guarantee breaks purely by backend choice.
+_BUSY_TIMEOUT_S = 30.0
 _COLUMNS = "id, kind, content, key, source, metadata, provenance, project, created_at"
 
 
@@ -55,8 +56,21 @@ class _Connection:
     """
 
     def __init__(self, path: str) -> None:
-        self._raw = sqlite3.connect(path, check_same_thread=False)
+        # `timeout` is the busy handler: a writer that finds the file locked by another process waits
+        # up to this long instead of failing at once with "database is locked". The default (5 s)
+        # is shorter than a busy import, and the PRAGMA restates it for the connection.
+        self._raw = sqlite3.connect(path, check_same_thread=False, timeout=_BUSY_TIMEOUT_S)
         self._lock = threading.RLock()
+        self._raw.execute(f"PRAGMA busy_timeout={int(_BUSY_TIMEOUT_S * 1000)}")
+        try:
+            # WAL: a reader no longer blocks the writer and vice versa, and a commit is one append
+            # rather than a rollback-journal rewrite. The app, the CLI and the bot are different
+            # processes on one file; in the default journal mode two of them writing at once is
+            # where "database is locked" comes from.
+            self._raw.execute("PRAGMA journal_mode=WAL")
+            self._raw.execute("PRAGMA synchronous=NORMAL")  # still crash-safe in WAL mode
+        except sqlite3.Error:
+            pass  # a filesystem without shared memory (some network drives) keeps the old journal
 
     def execute(self, sql: str, params: Any = ()) -> _Rows:
         with self._lock:

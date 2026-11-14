@@ -83,7 +83,11 @@ def test_a_cap_saved_from_the_screen_brakes_the_running_daemons_next_job(
     assert backend.calls > 0
 
     # Today's spend, now far past any cap the screen could save — and priced, because the fake
-    # model's own row is unpriced and that refuses for a different reason.
+    # model's own row is unpriced and that refuses for a different reason. That run also filed a
+    # receipt in `runs.jsonl`; the cap now reads the receipts too (`ledger_rows`), and the receipt
+    # is only joined to its usage row by run id. Rewriting the usage row below without clearing the
+    # receipt would leave an orphaned unpriced run today, which the cap rightly refuses as "unknown".
+    (home / "runs.jsonl").unlink(missing_ok=True)
     (home / "usage.jsonl").write_text(
         json.dumps({"ts": datetime.now(UTC).isoformat(), "session_id": "x", "usd": 999.0}) + "\n",
         encoding="utf-8",

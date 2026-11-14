@@ -102,7 +102,7 @@ export function Work() {
         <ListChecks className="h-5 w-5" />
         <h1 className="text-lg font-semibold text-foreground">{t("nav.work")}</h1>
       </div>
-      <Tabs items={items} value={tab} onChange={choose} aria-label={t("nav.work")} className="px-6" />
+      <Tabs id={id} items={items} value={tab} onChange={choose} aria-label={t("nav.work")} className="px-6" />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <TabPanel tabsId={id} value={tab}>
           {tab === "task" ? (

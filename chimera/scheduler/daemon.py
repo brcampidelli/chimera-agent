@@ -25,6 +25,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from chimera.core.filelock import HeldLock, try_hold
 from chimera.orchestration.budget import BudgetExceeded
 from chimera.scheduler.engine import Scheduler
 from chimera.scheduler.models import CronJob, DispatchStatus, JobOutcome
@@ -36,6 +37,10 @@ _log = get_logger("scheduler.daemon")
 #: (same directory), so one folder is the whole scheduler's state and a backup of one is a
 #: backup of both.
 HEARTBEAT_RELPATH = Path("scheduler") / "heartbeat.json"
+
+class DaemonAlreadyRunning(RuntimeError):
+    """Another process already runs the cron daemon for this home."""
+
 
 Dispatch = Callable[[CronJob], "DispatchStatus | None"]
 """A dispatch may report how the job ended. ``None`` means "nothing to report", which the
@@ -252,6 +257,37 @@ class CronDaemon:
         # never hears of. Returns whether it changed the job, which is persisted here: the engine
         # stays without I/O and the notifier without a store. None = no notices, as before.
         self.on_outcome = on_outcome
+        # One daemon per home. `Scheduler._claim` only guards ONE process, and the desktop app turns
+        # the cron on by default while `chimera serve --cron` starts another: two loops on one
+        # `jobs.json`, each seeing every due job and each dispatching it. An OS lock beside the
+        # store (released by the kernel if the process dies) is what lets exactly one loop run.
+        self.lock_path = scheduler.store.path.parent / "daemon"
+        self._lock: HeldLock | None = None
+        self.refusal = ""
+
+    def claim(self) -> bool:
+        """Take this home's daemon lock; False when it cannot be had. Idempotent.
+
+        Fails CLOSED. A lock that could not even be opened (a directory where the file should be, a
+        read-only home) is not "nobody else is running": starting anyway is how two daemons come
+        up, which is what the lock exists to prevent. ``refusal`` says which case it was.
+        """
+        if self._lock is not None:
+            return True
+        held = try_hold(self.lock_path)
+        if held is None:
+            self.refusal = "another process already runs the cron daemon for this home"
+            return False
+        if not held.real:
+            self.refusal = f"the daemon lock is unavailable ({held.reason})"
+            return False
+        self._lock = held
+        return True
+
+    def release(self) -> None:
+        lock, self._lock = self._lock, None
+        if lock is not None:
+            lock.release()
 
     def tick(self, now: float | None = None) -> list[CronJob]:
         """One scheduler tick: dispatch every job due at ``now`` (defaults to the real clock).
@@ -294,20 +330,54 @@ class CronDaemon:
         return ran
 
     def run_forever(self, *, stop: threading.Event | None = None) -> None:
-        """Tick, sleep, repeat until ``stop`` is set. A bad tick is logged, never fatal."""
+        """Tick, sleep, repeat until ``stop`` is set. A bad tick is logged, never fatal.
+
+        Returns at once, without ticking, when another process holds the home's daemon lock.
+        """
+        if not self.claim():
+            _log.warning("cron daemon not started: %s", self.refusal)
+            return
         _log.info("cron daemon started (tick=%ss)", self.tick_seconds)
-        while stop is None or not stop.is_set():
-            try:
-                self.tick()
-            except Exception as exc:  # the daemon must survive any tick failure
-                _log.warning("cron tick failed: %s", exc)
-            self._sleep(self.tick_seconds)
+        try:
+            while stop is None or not stop.is_set():
+                try:
+                    self.tick()
+                except Exception as exc:  # the daemon must survive any tick failure
+                    _log.warning("cron tick failed: %s", exc)
+                self._sleep(self.tick_seconds)
+        finally:
+            self.release()
 
     def start(self) -> tuple[threading.Thread, threading.Event]:
-        """Run the loop in a background daemon thread. Returns ``(thread, stop_event)``."""
+        """Run the loop in a background daemon thread. Returns ``(thread, stop_event)``.
+
+        Raises :class:`DaemonAlreadyRunning` when another process holds this home's daemon lock —
+        here and not inside the thread, so the caller can say so instead of believing it has a clock.
+        """
+        if not self.claim():
+            raise DaemonAlreadyRunning(self.refusal)
         stop = threading.Event()
         thread = threading.Thread(
             target=self.run_forever, kwargs={"stop": stop}, daemon=True, name="chimera-cron"
         )
         thread.start()
         return thread, stop
+
+
+def start_unless_running(
+    daemon: CronDaemon, say: Callable[[str], None]
+) -> tuple[threading.Thread, threading.Event] | None:
+    """Start ``daemon``, or say why not and return None when the home already has one.
+
+    The desktop app starts the cron by default, so ``chimera serve --cron`` over SSH on the same
+    home is the usual way to get here. Two loops on one ``jobs.json`` would dispatch every due job
+    twice; the caller keeps serving without a clock and says so, rather than looking scheduled.
+    """
+    try:
+        return daemon.start()
+    except DaemonAlreadyRunning as exc:
+        say(
+            f"cron daemon NOT started: {exc}. If another Chimera process runs the schedule, its "
+            "jobs keep firing there and this one will not fire them twice."
+        )
+        return None

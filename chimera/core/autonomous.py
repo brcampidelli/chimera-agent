@@ -35,6 +35,7 @@ from chimera.core.agent import AgentResult
 from chimera.core.checklist import RequirementChecklist
 from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
 from chimera.core.contract import CompletionContract
+from chimera.core.escalation import Escalation
 from chimera.core.events import AgentEvent, EventSink
 from chimera.core.events import attempt as _ev_attempt
 from chimera.core.events import edit as _ev_edit
@@ -69,6 +70,7 @@ from chimera.evolution.playbook import Playbook
 from chimera.evolution.stagnation import StagnationDetector
 from chimera.evolution.trace_probe import anti_pattern_hint
 from chimera.orchestration.budget import SpendBudget, SpendCappedBackend, SpendExceeded
+from chimera.providers.catalog import base_slug, split_effort
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
@@ -386,6 +388,12 @@ class Attempt:
     #: checked), or "none". A receipt that says "success" without saying on whose authority invites
     #: the reader to assume the strongest one.
     evidence: str = "none"
+    #: WHO judged, as opposed to ``evidence`` (what the judgment rested on): ``verifier`` (a command
+    #: decided), ``other`` (a reviewer on a different model than the worker), ``self`` (the reviewer
+    #: ran on the very model that wrote the patch — its verdict is advisory and decides nothing),
+    #: ``unspecified`` (a reviewer whose model cannot be compared with the worker's) or ``none``.
+    #: Always set, so a receipt never leaves the reader to assume the strongest judge.
+    evaluator: str = "none"
     #: Did the attempt change the workspace? ``None`` means *could not be measured* (no snapshot,
     #: no guard) — deliberately NOT the same as ``False`` ("measured, and nothing changed"). The
     #: third state is the whole point: collapsing "we could not tell" into either boolean is how a
@@ -416,6 +424,12 @@ class Attempt:
     tool_names: list[str] = field(default_factory=list)
     #: The model slug that actually answered this attempt (the EDITOR's model under role routing).
     model: str = ""
+    #: The slug this attempt SENT (``#effort`` kept only when the effort reached the wire; none with
+    #: thinking off) and the effort alone. Beside ``model`` (what answered) because the two answer
+    #: different questions: a retry "escalated" to a stronger model that the router quietly sent to the
+    #: same one left ``model`` identical across attempts.
+    requested_model: str = ""
+    effort: str = ""
     #: Prompt tokens the provider served from its cache, summed over the attempt; ``None`` when the
     #: route never reported cache usage, which is not a miss. See `_cache_read_tokens`.
     cache_read_tokens: int | None = None
@@ -638,6 +652,7 @@ class AutonomousAgent:
         *,
         should_stop: Callable[[], bool] | None = None,
         escalate_worker: Worker | None = None,
+        escalation: Escalation | None = None,
         stagnation: StagnationDetector | None = None,
         progress_ledger: ProgressLedger | None = None,
         replan_on_stall: bool = False,
@@ -698,6 +713,11 @@ class AutonomousAgent:
         # call. None (the default) makes the loop byte-identical to before.
         self.should_stop = should_stop
         self.escalate_worker = escalate_worker
+        # The retry ladder (effort, then model), which wins over `escalate_worker` when both are given.
+        self.escalation = escalation
+        if escalation is not None:
+            # Quem gera nao avalia: the ladder must not land the editor on the reviewer's model.
+            escalation.reviewer_of = self._reviewer_model
         self.stagnation = stagnation
         self.progress_ledger = progress_ledger
         self.replan_on_stall = replan_on_stall
@@ -919,6 +939,48 @@ class AutonomousAgent:
         capped.backend = SpendCappedBackend(inner, spend)
         return capped
 
+    def _worker_for(self, index: int) -> Worker:
+        """The worker attempt ``index`` runs on: the first one, or its escalated successor."""
+        if index > 1 and self.escalation is not None:
+            if not self.escalation.stepped(index):
+                # At the ceiling nothing was raised: the retry stays on the worker that just ran,
+                # rather than a fresh agent with the same slug announced as an escalation.
+                return self._worker_for(index - 1)
+            worker: Worker = self.escalation.worker_for(index)
+            return worker
+        if index > 1 and self.escalate_worker is not None:
+            return self.escalate_worker
+        return self.worker
+
+    def _asked_model(self, worker: Worker, index: int) -> str:
+        """The slug (``#effort`` included) attempt ``index`` asks for, or "" when the worker has none.
+
+        From the ladder when there is one, because a cascade worker ignores its own ``config.model``
+        on tool turns and the ladder is what the run means to climb; otherwise from the worker's
+        config, which a duck-typed test worker may not have.
+        """
+        if self.escalation is not None:
+            return self.escalation.sent(self.escalation.model_for(index))
+        config = getattr(worker, "config", None)
+        slug = str(getattr(config, "model", "") or "")
+        # Where the gateway overwrites the effort with "thinking off", the receipt must not claim one;
+        # where it does not (an OpenAI route), the effort was sent. Same function as the gateway's.
+        from chimera.providers.gateway import thinking_overrides_effort
+
+        overridden = thinking_overrides_effort(base_slug(slug), getattr(config, "thinking", None))
+        return split_effort(slug)[0] if overridden else slug
+
+    def _reviewer_model(self) -> str:
+        """The independent reviewer's model, or "" when there is none to keep the editor away from."""
+        manager = self.manager
+        if manager is None or not self.config.use_manager:
+            return ""
+        from chimera.fusion.engine import FusionEngine
+
+        if isinstance(getattr(manager, "backend", None), FusionEngine):
+            return ""
+        return str(getattr(manager, "model", None) or "").strip()
+
     def _seed_run_state(self, worker: Worker, task: str, plan: Plan | None) -> None:
         """Tell the worker what it was asked and which plan it is on, in the fields that mean those.
 
@@ -1091,6 +1153,9 @@ class AutonomousAgent:
                 task = str(saved.get("task", task))
                 attempts = [Attempt(**a) for a in saved.get("attempts", [])]
                 self._resumed_attempts = list(attempts)
+                if self.escalation is not None:
+                    # The ladder's floor and what each attempt asked for were in memory only.
+                    self.escalation.restore(attempts)
                 # HITL 'ignore' (deny): the tainted result was NOT sanctioned — end the run denied,
                 # never finalizing the flagged answer, and clear the thread.
                 if saved.get("denied"):
@@ -1157,16 +1222,19 @@ class AutonomousAgent:
             self._emit(_ev_attempt(index, self.config.max_attempts))
             snapshot = self.guard.snapshot() if self.guard else None
             prompt = self._compose(plan_task, plan, context, feedback)
-            # Observed difficulty (issue #3): the first attempt uses the cost-aware worker;
-            # once an attempt has failed (index > 1) the task has proven hard, so retries run
-            # on the escalated fusion worker when one is given. Falls back to the same worker.
-            worker = (
-                self.escalate_worker
-                if index > 1 and self.escalate_worker is not None
-                else self.worker
-            )
-            if worker is self.escalate_worker:
-                _log.debug("attempt %d: task proved hard, escalating retry to fusion worker", index)
+            # Observed difficulty (issue #3): the first attempt uses the cost-aware worker; once an
+            # attempt has failed (index > 1) the task has proven hard. With an `Escalation` the retry
+            # asks for more effort, then for the next single model up (never fusion: see
+            # `chimera.core.escalation`); a bare `escalate_worker` is still honoured. Falls back to
+            # the same worker. The step happens here, on a NEW attempt, never inside a conversation.
+            worker = self._worker_for(index)
+            asked_model = self._asked_model(worker, index)
+            if index > 1 and self.escalation is not None and not self.escalation.stepped(index):
+                _log.debug(
+                    "attempt %d: no escalation left (already at %s); retrying as is", index, asked_model
+                )
+            elif worker is not self.worker:
+                _log.debug("attempt %d: task proved hard, escalating retry to %s", index, asked_model)
             # After the choice, so this lands on the worker that actually runs the attempt: the
             # escalate worker is a separate Agent with its own RunState. `task`, not `plan_task` —
             # the field documents itself as the request verbatim, and a resume rebinds `task` from
@@ -1179,6 +1247,9 @@ class AutonomousAgent:
             if self.should_stop is not None and self.should_stop():
                 return self._finalize_cancelled(task, attempts, plan, thread_id)
             agent_result = self._run_worker(worker, prompt, spend=spend)
+            if self.escalation is not None:
+                # A model that ran inside the attempt (`escalate_on_tool_loop`) is a floor for the retries.
+                self.escalation.observe(str(getattr(agent_result, "model", "") or ""))
             # Collected per attempt, from the worker that ran it: `Agent.run` clears its list at
             # the start of every attempt, and an escalated retry runs on a different Agent.
             self._report_defects.extend(
@@ -1403,6 +1474,16 @@ class AutonomousAgent:
                 # `ok` ride on it would decide the attempt on a non-answer; the contract, coverage
                 # and diff gates below still run and can still fail it.
                 ok = True if review_abstained else approved
+                if not review_abstained and self._judge_independence(worker) == "self":
+                    # The reviewer is the model that wrote the patch: it grades its own work and
+                    # agrees with itself, so its REVISE is an opinion and not a veto. Reverting
+                    # work because the author disliked its own prose is the failure the independent
+                    # reviewer rule exists to prevent, and with no verifier there is nothing else
+                    # to arbitrate. The note survives on the attempt; the diff, contract and
+                    # coverage gates below still decide.
+                    if not approved and fb:
+                        fb = f"Advisory (reviewed by the same model that wrote it): {fb}"
+                    ok = True
             # Record the paired observation for PROBE: arm = which worker ran, proxy = the cheap
             # manager verdict, reward = the verified outcome (only with a real verifier + manager).
             # An abstaining proxy is not a cheap verdict, it is no verdict; logging it as 0/1 would
@@ -1413,7 +1494,7 @@ class AutonomousAgent:
                 and probe_proxy is not None
                 and not proxy_abstained
             ):
-                arm = "escalate" if worker is self.escalate_worker else "worker"
+                arm = "escalate" if worker is not self.worker else "worker"
                 self.probe_log.record(
                     arm=arm, proxy=1.0 if probe_proxy else 0.0, reward=1.0 if verified else 0.0
                 )
@@ -1493,20 +1574,28 @@ class AutonomousAgent:
             # as no manager: it did not approve anything. Naming it would be the fabrication-by-
             # omission that `_manager_ran` was written to stop, one step further along.
             manager_judged = self._manager_ran() and not review_abstained
+            independence = self._judge_independence(worker) if manager_judged else "none"
+            # A self-review is a note, not an authority: naming it as the evidence would put the
+            # author's approval of its own work on the receipt beside the word "manager".
+            manager_decided = manager_judged and independence != "self"
             if verifier_active:
                 evidence = "verifier"
+                evaluator = "verifier"
             elif diff_productive:
                 # "diff+manager" claims two authorities. With no manager configured the only real
                 # one is the diff, and saying so is the difference between a receipt and a label.
-                evidence = "diff+manager" if manager_judged else "diff"
-            elif ok and manager_judged:
+                evidence = "diff+manager" if manager_decided else "diff"
+                evaluator = independence
+            elif ok and manager_decided:
                 evidence = "manager"
+                evaluator = independence
             else:
                 # Includes the case that used to read "manager": approved by nobody, because nobody
                 # was asked. `none` is what that is.
                 evidence = "none"
+                evaluator = independence
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout,
-                              verify_abstained=abstained, evidence=evidence)
+                              verify_abstained=abstained, evidence=evidence, evaluator=evaluator)
             attempt.run_id = str(getattr(agent_result, "run_id", "") or "")
             attempt.diff_summary = diff_summary or ""
             attempt.diffs = diffs
@@ -1567,6 +1656,8 @@ class AutonomousAgent:
                 int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
             )
             attempt.model = str(getattr(agent_result, "model", "") or "")
+            attempt.requested_model = asked_model
+            attempt.effort = split_effort(asked_model)[1] or ""
             self._emit(_ev_result(index, ok, detail=(fb or vout)[:200]))
             if not ok and snapshot is not None and self.guard is not None:
                 # Antes de apagar, guardar. `restore` e' a decisao certa — o verificador reprovou —
@@ -1941,6 +2032,8 @@ class AutonomousAgent:
             int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
         )
         parcial.model = str(getattr(agent_result, "model", "") or "")
+        parcial.requested_model = self._asked_model(self._worker_for(index), index)
+        parcial.effort = split_effort(parcial.requested_model)[1] or ""
 
         # A cut-short attempt still sent its instructions, and was paid for under them.
         parcial.system_sha = _system_sha(agent_result)
@@ -2228,7 +2321,10 @@ class AutonomousAgent:
             receipt = build_receipt(
                 result, task, verify_command, datetime.now(UTC).isoformat(),
                 profile=self.run_profile,
-                verify_source=self.verify_source,
+                # A run with no verify command has no origin to name: "user" here would read as
+                # "someone chose this command" beside an empty one. The default exists for rows that
+                # predate the field, not for a run that never had a verifier.
+                verify_source=self.verify_source if verify_command else "none",
                 profile_source=self.profile_source,
                 # The directory this run was actually confined to, not the one a caller meant. A run
                 # built without a workspace records none rather than the process cwd, which would be
@@ -2278,16 +2374,24 @@ class AutonomousAgent:
                 "task": str(task)[:2000],
                 "success": bool(getattr(result, "success", False)),
                 "workspace": str(self.workspace) if self.workspace else "",
+                "verify_source": (
+                    str(getattr(self, "verify_source", "") or "none")
+                    if getattr(self.verifier, "command", None) else "none"
+                ),
                 "partial": True,
                 "partial_reason": f"{type(cause).__name__}: {cause}"[:500],
                 "attempts": [
                     {
                         "index": int(getattr(a, "index", 0) or 0),
+                        # The id the scheduler's usage row is keyed by: without it the Cost ledger
+                        # cannot tell this receipt is that row's own money and counts it twice.
+                        "run_id": str(getattr(a, "run_id", "") or ""),
                         "success": bool(getattr(a, "success", False)),
                         "prompt_tokens": int(getattr(a, "prompt_tokens", 0) or 0),
                         "completion_tokens": int(getattr(a, "completion_tokens", 0) or 0),
                         "usd": getattr(a, "usd", None),
                         "model": str(getattr(a, "model", "") or ""),
+                        "evaluator": str(getattr(a, "evaluator", "") or "none"),
                     }
                     for a in getattr(result, "attempts", None) or []
                 ],
@@ -2494,6 +2598,28 @@ class AutonomousAgent:
             _log.info("review skipped: the run reached its dollar ceiling")
             return True, "", True
         return review.approved, review.feedback, review.abstained
+
+    def _judge_independence(self, worker: Worker) -> str:
+        """Whether the reviewer is a different judge than the model that wrote this attempt.
+
+        ``self`` only when both models are known and equal. A reviewer with no model of its own, or
+        a worker that does not expose one, is ``unspecified`` rather than guessed either way: calling
+        it ``other`` would claim an independence nobody checked, and calling it ``self`` would
+        demote a reviewer that may well be separate. A fusion engine is a panel, so it is ``other``.
+        """
+        manager = self.manager
+        if manager is None or not self.config.use_manager:
+            return "none"
+        from chimera.fusion.engine import FusionEngine
+
+        if isinstance(getattr(manager, "backend", None), FusionEngine):
+            return "other"
+        # The provider's id, not the request: the same model at another effort has the same blind spots.
+        reviewer = base_slug(str(getattr(manager, "model", None) or "").strip().lower())
+        writer = base_slug(str(getattr(getattr(worker, "config", None), "model", None) or "").strip().lower())
+        if not reviewer or not writer:
+            return "unspecified"
+        return "self" if reviewer == writer else "other"
 
     def _manager_ran(self) -> bool:
         """Whether a manager actually looked at this attempt.

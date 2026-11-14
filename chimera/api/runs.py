@@ -74,6 +74,10 @@ class AttemptReceipt(BaseModel):
     #: command-verified pass from an LLM approving prose. Nobody chose that — it just never crossed
     #: the serialization boundary, which is the quiet way a three-way verdict decays into a two-way one.
     evidence: str = "none"
+    #: Who judged: "verifier" | "other" | "self" | "unspecified" | "none". "self" is a reviewer on the
+    #: very model that wrote the attempt — advisory, it decided nothing. Rows written before this
+    #: field read "none", which is "not recorded", never "no judge".
+    evaluator: str = "none"
     #: Whether the workspace changed — ``null`` for "could not be measured", which is NOT "nothing
     #: changed". Serialized explicitly (never omitted) so the unknown survives the round trip; a
     #: field that disappears when it is None is indistinguishable from a field nobody set.
@@ -90,6 +94,11 @@ class AttemptReceipt(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""  # the model that actually answered (the EDITOR's, under role routing)
+    #: What the attempt SENT, ``#effort`` included only when the effort reached the wire (none with thinking
+    #: off), and the effort alone. ``model`` says only what answered: two equal ``model`` values cannot tell
+    #: "escalated and served by the same route" from "never escalated".
+    requested_model: str = ""
+    effort: str = ""
     #: Prompt tokens the provider served from its cache across the attempt. ``None`` is "the route
     #: reported nothing", which is not a miss. Recorded because a year of receipts went to disk
     #: without it and the question "did this pair run under cache hits?" became unanswerable —
@@ -350,6 +359,7 @@ def build_receipt(
             # accepts by design — an older Attempt without these fields reads as "unknown" rather
             # than raising, which is the honest answer for a record that predates them.
             evidence=getattr(a, "evidence", "none") or "none",
+            evaluator=getattr(a, "evaluator", "none") or "none",
             run_id=getattr(a, "run_id", "") or "",
             diff_productive=getattr(a, "diff_productive", None),
             side_effects=list(getattr(a, "side_effects", None) or []),
@@ -361,6 +371,8 @@ def build_receipt(
             prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),
+            requested_model=str(getattr(a, "requested_model", "") or ""),
+            effort=str(getattr(a, "effort", "") or ""),
             provider=str(getattr(a, "provider", "") or ""),
             host=str(getattr(a, "route_host", "") or ""),
             discarded_at=str(getattr(a, "discarded_at", "") or ""),

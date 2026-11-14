@@ -133,6 +133,9 @@ if sys.platform == "win32":  # pragma: no cover - platform split, both halves sh
         # direction: a writer that cannot get in should say so rather than hang a 24/7 process.
         msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
 
+    def _acquire_nowait(handle: IO[Any]) -> None:
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)  # OSError when someone holds it
+
     def _release(handle: IO[Any]) -> None:
         try:
             msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
@@ -144,6 +147,9 @@ else:  # pragma: no cover - platform split, both halves ship
 
     def _acquire(handle: IO[Any]) -> None:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+    def _acquire_nowait(handle: IO[Any]) -> None:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # BlockingIOError when held
 
     def _release(handle: IO[Any]) -> None:
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
@@ -236,3 +242,71 @@ def exclusively(path: Path, *, attempts: int = LOCK_ATTEMPTS) -> Iterator[None]:
         f"could not take the exclusive lock for {path.name} after {attempts} attempts; "
         "another process is holding it. Nothing was written."
     )
+
+
+class HeldLock:
+    """A process-lifetime exclusive lock taken by :func:`try_hold`; ``release()`` gives it back.
+
+    ``real`` is False when the lock file could not be created or locked for a reason other than
+    contention (read-only home, exhausted descriptors): the caller is told, and decides. Dropped
+    without ``release()`` the OS still frees it when the process ends, which is the point of using
+    an OS lock and not a sentinel file that outlives a crash.
+    """
+
+    def __init__(self, handle: IO[Any] | None, reason: str = "") -> None:
+        self._handle = handle
+        #: Why there is no real lock (empty when there is one). For a caller that must refuse.
+        self.reason = reason
+
+    @property
+    def real(self) -> bool:
+        return self._handle is not None
+
+    def release(self) -> None:
+        handle, self._handle = self._handle, None
+        if handle is None:
+            return
+        try:
+            _release(handle)
+        finally:
+            handle.close()
+
+
+def try_hold(path: Path) -> HeldLock | None:
+    """Take the exclusive lock for ``path`` WITHOUT waiting, or return None when someone holds it.
+
+    The lock lives in the sibling ``.lock`` file like :func:`locked`, but it is held for as long as
+    the caller keeps the result (a daemon holds it for its whole life) and it never blocks: a second
+    daemon must be told "no" at once, not wait ten seconds to find out. Both OS flavours drop the
+    lock when the process dies, so a crashed daemon does not wedge the next one — an
+    exclusive-create sentinel file would.
+
+    A failure that is not contention (cannot create the file, cannot lock it) returns a result with
+    ``real=False`` and a ``reason``, and a warning is logged. Whether to go on without the lock is the
+    CALLER's decision: a store write may (:func:`locked` degrades), a daemon whose whole point is to
+    be the only one may not.
+    """
+    import errno
+
+    lock_path = Path(str(path) + ".lock")
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle: IO[Any] = open(lock_path, "a+b")  # noqa: SIM115 - held until release()
+    except OSError as exc:
+        _log.warning("could not open lock for %s (%s); not exclusive", path.name, exc)
+        return HeldLock(None, f"cannot open {lock_path}: {exc}")
+    try:
+        if os.fstat(handle.fileno()).st_size == 0:
+            handle.write(b"\0")  # msvcrt needs a byte at offset 0 to lock
+            handle.flush()
+        os.lseek(handle.fileno(), 0, os.SEEK_SET)
+        _acquire_nowait(handle)
+    except OSError as exc:
+        handle.close()
+        # EACCES / EAGAIN / EDEADLK are how the platforms say "held". Anything else is the
+        # environment, not a rival.
+        if exc.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLK, errno.EWOULDBLOCK):
+            return None
+        _log.warning("could not lock %s (%s); not exclusive", path.name, exc)
+        return HeldLock(None, f"cannot lock {lock_path}: {exc}")
+    return HeldLock(handle)

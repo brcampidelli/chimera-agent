@@ -37,6 +37,7 @@ export type WorkInfo = Schemas["WorkOut"];
 export type VersionInfo = Schemas["VersionOut"];
 export type ChatTurn = Schemas["TurnOut"];
 export type MemoryItem = Schemas["MemoryItemOut"];
+export type SimilarMemory = Schemas["SimilarPairsOut"];
 export type MemoryLayers = Schemas["MemoryLayersOut"];
 export type MemoryProfile = Schemas["MemoryProfileOut"];
 export type MemoryExport = Schemas["MemoryExportOut"];

@@ -46,7 +46,13 @@ export function Tabs<T extends string>({
    *  switch that sits beside other controls (a catalog's Mine | Discover), where an underline would
    *  read as the page's own navigation. Same roving tabindex, same keys. */
   variant?: "underline" | "segmented";
-  /** Pass the id a `TabPanel` names in `tabsId`, so `aria-controls` points at a real element. */
+  /**
+   * Pass the same id the screen's `TabPanel` gets as `tabsId`. That pairing is what links a tab to
+   * its panel, and the two used to be set apart: `Tabs` minted its own id when none came in, the
+   * screen passed a different one to `TabPanel`, and every `aria-controls` / `aria-labelledby` in the
+   * app pointed at nothing (a17-02). Without an id this is a strip with no panel beside it, so no
+   * `aria-controls` is written at all rather than one that dangles.
+   */
   id?: string;
   "aria-label": string;
 }) {
@@ -126,7 +132,9 @@ export function Tabs<T extends string>({
             role="tab"
             id={`${id}-tab-${tab.value}`}
             aria-selected={selected}
-            aria-controls={`${id}-panel-${tab.value}`}
+            // Only the selected tab: `TabPanel` renders one panel, so the others have nothing to
+            // control and a reference to an element that is not in the page is itself the defect.
+            aria-controls={selected && idProp !== undefined ? `${id}-panel-${tab.value}` : undefined}
             // The roving tabindex: exactly one tab is reachable by Tab.
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(tab.value)}
@@ -164,7 +172,7 @@ export function Tabs<T extends string>({
   );
 }
 
-/** The panel a tab controls. Pair the `id` with the `Tabs` above it via the same `tabsId`. */
+/** The panel a tab controls. `tabsId` must be the `id` given to the `Tabs` above it. */
 export function TabPanel({
   tabsId,
   value,

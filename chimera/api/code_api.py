@@ -2162,9 +2162,16 @@ def bypass_owner_for(
 
     Read per question, not when the turn was built: a conversation's switch can be turned on while
     its turn runs, and the very next tool call must be released by it. Off, every question goes to
-    the owner's approver unchanged. On, a question is released only when it is not a block, a warn,
-    a bridge's, nor one a rule or the policy holds, and the release is recorded in the audit and
-    announced on the turn's stream.
+    the owner's approver unchanged. On, a question is released only when the switch's one rule
+    (`bypass.release_by_bypass`) says so, and the release is recorded in the audit and announced on
+    the turn's stream.
+
+    This approver is where the tool boundary goes when the floor said no (`governed_tool`,
+    `ledger_tool`: floor no -> ``approve``), so it must apply the same floor: the copy it had of its
+    own (audit 2026-11, a07-01) never did, and answered yes to the force push, the ``+main``, the
+    ``.env`` upload and the ``-EncodedCommand`` the floor had just kept for the owner. The call is
+    judged on its real arguments when the boundary named it (`pending.asking_for_call`), and on the
+    card's text otherwise.
     """
 
     @functools.wraps(original_owner)
@@ -2173,19 +2180,25 @@ def bypass_owner_for(
             return bool(original_owner(*args))
         first = args[0] if args else None
         action = str(args[1] if len(args) > 1 else getattr(first, "action", "") or "")
-        decision = str(getattr(getattr(first, "decision", None), "value", "review")).lower()
-        if decision in {"block", "warn"}:
-            return bool(original_owner(*args))
-        from chimera.governance.approval_rules import matching_rule, tool_and_action
+        from chimera.governance.bypass import card_call, release_by_bypass
+        from chimera.governance.pending import asked_call
 
-        tool, shown = tool_and_action(action)
-        if matching_rule(home, ws, tool, shown) is not None:
+        call = asked_call()
+        if call is not None and not _question_is_for(call, action):
+            # A call left in the thread's context by another question must not lend this card its
+            # arguments: this question is not the one the boundary named, so the owner answers it.
             return bool(original_owner(*args))
-        if tool in {"open_pull_request", "browser", "ask_user"}:
-            return bool(original_owner(*args))
-        from chimera.governance.policy import Decision, RuleSet
-        verdict = RuleSet().evaluate(shown)
-        if verdict is not None and verdict.decision in {Decision.BLOCK, Decision.WARN}:
+        if call is not None:
+            # `shown` only when the kernel named it (annotated, so its facts block can be cut); the
+            # ledger's question text is read whole, like any other card's.
+            tool, call_args, evaluation, shown = call.tool, call.args, call.evaluation, call.shown
+        else:
+            (tool, call_args), evaluation, shown = card_call(action), None, ""
+        question = SimpleNamespace(action=action, decision=getattr(first, "decision", None))
+        if not release_by_bypass(
+            tool, call_args, evaluation, shown=shown, workspace=ws, home=None, question=question,
+            rules_home=home,
+        ):
             return bool(original_owner(*args))
         audit.record("bypass_permissions", {"action": action, "reason": "bypass_permissions", "tool": tool, "run_id": run_id or ""})
         if approval_sink is not None and getattr(approval_sink, "emit", None):
@@ -2194,6 +2207,20 @@ def bypass_owner_for(
 
     bypass_owner.__dict__.update(getattr(original_owner, "__dict__", {}))
     return bypass_owner
+
+
+def _question_is_for(call: Any, action: str) -> bool:
+    """Whether a card's text is the question the boundary asked for ``call``.
+
+    The kernel hands its approver the exact text it named the call with (``shown``); the taint
+    ledger names no text, and its card's first line starts with the tool. A mismatch is a question
+    asked on this thread for something else, and it must not be judged on another call's arguments.
+    """
+    from chimera.governance.approval_rules import tool_and_action
+
+    if call.shown:
+        return bool(action == call.shown)
+    return bool(tool_and_action(action)[0] == call.tool)
 
 
 def _owner_allows(
@@ -2963,6 +2990,28 @@ def _live_memory(settings: Settings, boot: Any, boot_graph: Any, boot_key: Any) 
             _log.debug("entity graph skipped for the switched store: %s", exc)
         _switched_memory = (key, manager, graph)
         return manager, graph
+
+
+def _recalled_rows(items: list[Any]) -> list[dict[str, Any]]:
+    """The facts a turn recalled, as the ``done`` frame carries them.
+
+    Id, text, where it came from and whether it is unverified: enough for the receipt to list them
+    and to offer "forget" through the same route the Memory screen uses. ``unverified`` is the
+    store's own trust label, so a fact learned from untrusted content is marked on the receipt
+    exactly as it was marked to the model.
+    """
+    return [
+        {
+            # getattr: a minimal recall fake (and any third-party store) may hand back records that
+            # carry only a text and a label; the receipt must not be what breaks on it.
+            "id": getattr(item, "id", ""),
+            "content": item.content,
+            "source": getattr(item, "source", ""),
+            "kind": getattr(item, "kind", ""),
+            "unverified": getattr(item, "provenance", "clean") == "tainted",
+        }
+        for item in items
+    ]
 
 
 def memory_key(settings: Settings) -> tuple[str, str, bool]:
@@ -4656,12 +4705,16 @@ def register_code_api(
         # The tainted facts that reach the prompt, kept to tell the turn's ledger once it exists
         # (below): the ledger is built with the agent, and the facts go into the agent's prompt.
         recalled_tainted: list[Any] = []
+        # The records themselves, for the `done` frame: the receipt used to say how many facts a turn
+        # used and nothing about which, so a wrong fact steering an answer could not be found.
+        recalled_items: list[Any] = []
         facts, memory_layer = recall_facts(
             req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws),
             # Quoted with source and date under the same switch that writes extracted facts
             # (study 25 S13): a fact the model did not see being written is shown with its age.
             cite=bool(getattr(live(), "memory_extract", False)),
             on_tainted=recalled_tainted.append,
+            on_items=recalled_items.extend,
         )
         # Created before the agent so approval and question cards can be routed after `emit`
         # exists. Questions are registered only for this attended desktop turn; their text answer
@@ -5979,7 +6032,13 @@ def register_code_api(
                 # fusion engine for this call and restore it in `finally`. Fusion ignores tools, so
                 # this turn will not touch a file — reported as `fused` rather than left to look like
                 # a turn that simply did not need to.
-                fused = bool(req.fuse) and fuse_backend is not None
+                from chimera.providers.fusion_guard import agent_carries_tools
+
+                # Fusion does not tool-call, and a coding agent always carries tools: the turn is
+                # answered by one model and says so (`fuse_downgraded`), never as a fusion that
+                # did not run.
+                fuse_downgraded = bool(req.fuse) and fuse_backend is not None and agent_carries_tools(agent)
+                fused = bool(req.fuse) and fuse_backend is not None and not fuse_downgraded
                 original_backend = getattr(agent, "backend", None) if fused else None
                 if fused:
                     agent.backend = _cast_for_turn(fuse_backend, req)
@@ -6038,7 +6097,8 @@ def register_code_api(
                             "tainted": False,
                             "memory_facts_used": len(facts),
                             "memory_layer": memory_layer,
-                            "fused": fused,
+                            "memory_facts": _recalled_rows(recalled_items),
+                            "fused": fused, "fuse_downgraded": fuse_downgraded,
                         })
                         return
                     if verdict.plan is not None:
@@ -6355,9 +6415,11 @@ def register_code_api(
                         # to accumulate nothing and recall nothing; it now READS what the chat reads.
                         "memory_facts_used": len(facts),
                         "memory_layer": memory_layer,
+                        # Which records, with their origin and trust label (see `_recalled_rows`).
+                        "memory_facts": _recalled_rows(recalled_items),
                         # This turn could not use tools, and a reader cannot tell that from a zero
                         # tool count alone — the same count a turn that needed none reports.
-                        "fused": fused,
+                        "fused": fused, "fuse_downgraded": fuse_downgraded,
                         # The cache's side of the bill, and why it did not answer. `cache_miss_cause`
                         # is one of the fixed causes in `chimera/core/cache_miss.py`, or None when the
                         # provider was silent; `none` means the cache answered this turn.

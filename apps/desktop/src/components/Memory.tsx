@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { MemoryFactRow } from "@/components/MemoryFactRow";
 import { MemoryTools } from "@/components/MemoryTools";
+import { MemorySimilar } from "@/components/MemorySimilar";
 import { ErrorState } from "@/components/ui/async";
 import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -259,6 +260,8 @@ export function Memory({ embedded = false }: { embedded?: boolean } = {}) {
           shown.map((f) => <MemoryFactRow key={f.id} fact={f} onDelete={(id) => remove.mutate(id)} />)
         )}
       </Panel>
+
+      <MemorySimilar />
 
       <Panel title={t("memory.addFact")}>
         <div className="flex items-center gap-2 px-4 py-3">

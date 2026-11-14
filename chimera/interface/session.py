@@ -1174,6 +1174,7 @@ def recall_facts(
     project: str | None = EVERY_PROJECT,
     cite: bool = False,
     on_tainted: Callable[[Any], None] | None = None,
+    on_items: Callable[[list[Any]], None] | None = None,
 ) -> tuple[list[str], str | None]:
     """Long-term facts relevant to ``message``: gated keyword/semantic hits + graph-linked facts.
 
@@ -1196,6 +1197,10 @@ def recall_facts(
     label is a sentence to the model; this is how the caller's taint ledger learns the same thing
     (study 30 S30-25). Without it a clean run read a poisoned fact, stayed clean, and stored what it
     wrote next as clean: the label was laundered away by one rewrite.
+
+    ``on_items`` is called once with the stored records that reached the prompt (after the gate), so
+    a screen can list WHICH facts a turn used, with their origin and trust label, rather than only
+    how many. Entity-linked facts have no record behind them here and are not in it.
     """
     if gate is _GATE_UNSET:
         gate = MemoryGate()
@@ -1225,7 +1230,15 @@ def recall_facts(
                 except TypeError:  # a minimal SupportsRecall fake that accepts neither
                     items = memory.search(message, k=k)
         if gate is not None:
-            items = gate.filter(items, message)  # admission gate (trust boundary)
+            # Admission gate (trust boundary). The layer that found the items decides whether a
+            # lexical relevance floor applies: see MemoryGate.filter.
+            # Only our own gate takes `layer`. A caller's gate written to the two-argument
+            # contract keeps working: catching TypeError instead would also swallow a real error
+            # raised inside a gate that does take it.
+            if isinstance(gate, MemoryGate):
+                items = gate.filter(items, message, layer=captured.get("layer"))
+            else:
+                items = gate.filter(items, message)
         if items:
             # Surface trust provenance on recall, exactly as the autonomous readback and the persona
             # preamble do: a fact learned from untrusted content must not read to the model as
@@ -1240,6 +1253,8 @@ def recall_facts(
                 )
                 for item in items
             ]
+            if on_items is not None:
+                on_items(list(items))
             if on_tainted is not None:
                 for item in items:
                     if getattr(item, "provenance", "clean") == "tainted":

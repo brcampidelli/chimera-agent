@@ -269,17 +269,18 @@ def migrate(
         # registered here, rather than recalled in every folder (see ClaudeImporter).
         importer.projects = tuple(registered_project_keys(Path(target)))
     if apply:
-        from chimera.evolution.wiring import semantic_embed
-        from chimera.memory import MemoryManager
-        from chimera.memory.backend import open_memory_store
+        from chimera.evolution.wiring import build_memory_manager
 
         # Honor the configured backend + embedder, or the merge writes to a store the agent never
-        # reads (json while it recalls from sqlite) — a silent no-op that reports success. Through
-        # the same opener every surface uses, pointed at `--home` when one was given.
+        # reads (json while it recalls from sqlite) - a silent no-op that reports success. Through
+        # `build_memory_manager`, the one constructor every surface uses, pointed at `--home` when
+        # one was given: it also chains each write into that home's audit log, which this command
+        # skipped by building a bare MemoryManager. An import is the largest batch of facts any path
+        # writes, and it left no `memory_add` record at all.
         _s = get_settings()
         if Path(target) != Path(_s.home):
             _s = _s.model_copy(update={"home": Path(target)})
-        manager = MemoryManager(open_memory_store(_s), embed=semantic_embed(_s))
+        manager = build_memory_manager(_s)
         result = importer.apply(target, memory_manager=manager)
     else:
         result = importer.scan()

@@ -61,6 +61,10 @@ SITE = "https://chimeraagent.space"
 # ressuscita quarenta matérias de três dias atrás na primeira rodada.
 SEEN_PATH = "/opt/data/state/blog_digest_seen.json"
 LOG_PATH = "/opt/data/logs/blog-writer.log"
+# O mesmo livro-caixa que a tela de Custo, o resumo semanal e o teto diário leem
+# (`chimera.api.usage.ledger_rows`). O redator gastava no OpenRouter por fora dele: a tela dizia
+# "gastei X" e o teto liberava o dia com o dinheiro do redator já fora da conta.
+USAGE_PATH = os.path.join(os.environ.get("CHIMERA_HOME") or "/opt/data", "usage.jsonl")
 
 UA = {"User-Agent": f"Mozilla/5.0 (compatible; ChimeraWriter/1.0; +{SITE})"}
 
@@ -557,6 +561,36 @@ def _clean(text: str) -> str:
     return text.strip('"').strip("'").strip()
 
 
+def record_spend(model: str, usage: object) -> None:
+    """Uma linha em `usage.jsonl` para uma chamada paga. Nunca levanta: registrar não pode derrubar a rodada.
+
+    O formato é o de `chimera.api.usage.UsageRecord` (este script é só stdlib e não importa o
+    pacote). `usd` é `None` quando a resposta não trouxe preço — o total da tela conta isso como
+    "sem preço", em vez de somar um zero inventado.
+    """
+    try:
+        u = usage if isinstance(usage, dict) else {}
+        cost = u.get("cost")
+        details = u.get("prompt_tokens_details")
+        cached = details.get("cached_tokens") if isinstance(details, dict) else None
+        row = {
+            "ts": datetime.now(UTC).isoformat(),
+            "session_id": "blog-writer",
+            "model": model,
+            "provider": "openrouter",
+            "host": "openrouter.ai",
+            "prompt_tokens": int(u.get("prompt_tokens") or 0),
+            "completion_tokens": int(u.get("completion_tokens") or 0),
+            "cache_read_tokens": cached if isinstance(cached, int) else None,
+            "usd": float(cost) if isinstance(cost, int | float) and not isinstance(cost, bool) else None,
+            "route_kind": "blog_writer",
+        }
+        with open(USAGE_PATH, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row) + chr(10))
+    except Exception as exc:
+        log(f"gasto não registrado: {type(exc).__name__}")
+
+
 def _ask(prompt: str, max_tokens: int) -> dict | None:
     """Uma chamada ao modelo que devolve JSON, ou None. Nunca levanta."""
     key = env("OPENROUTER_API_KEY")
@@ -568,6 +602,8 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
         "max_tokens": max_tokens,
         "temperature": 0.3,
         "response_format": {"type": "json_object"},
+        # Pede o preço na própria resposta; sem ele a linha fica sem preço (None), nunca zero.
+        "usage": {"include": True},
     }
     req = urllib.request.Request(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -594,6 +630,9 @@ def _ask(prompt: str, max_tokens: int) -> dict | None:
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.load(resp)
+            # The money first: the provider charged for this response whatever its content turns
+            # out to be (`content: null` is a real answer from a tool-calling or refusing model).
+            record_spend(body["model"], data.get("usage"))
             raw = data["choices"][0]["message"]["content"].strip()
             break
         except urllib.error.HTTPError as exc:

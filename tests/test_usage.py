@@ -82,7 +82,10 @@ def test_silent_cache_routes_do_not_dilute_the_aggregate() -> None:
                     cache_read_tokens=None, cache_write_tokens=None),
     ]
     summary = summarize_usage(records)
-    assert summary["cache_hit_pct"] == 90 / 190
+    # cache_read / prompt over the rows that reported: 90 / 100. The silent 900-token row is out of
+    # both sides. (Was 90/190: the read was added to the denominator although it is part of the
+    # prompt — a double count that capped the screen at 50%.)
+    assert summary["cache_hit_pct"] == 0.9
     assert summary["totals"]["cache_read_tokens"] == 90
     assert summary["totals"]["cache_write_tokens"] == 0
 
@@ -108,7 +111,28 @@ def test_summarize_cache_hit_and_route_mix() -> None:
         UsageRecord(ts="2026-07-13T10:00:00+00:00", session_id="s1", route_kind="mystery"),
     ]
     s = summarize_usage(records)
-    # cache_read / (prompt + cache_read) = 10 / (40 + 10) = 0.2
-    assert s["cache_hit_pct"] == 0.2
+    # cache_read / prompt = 10 / 40 = 0.25 (cache is part of the prompt, not added to it)
+    assert s["cache_hit_pct"] == 0.25
     # None -> single; "mystery" (unknown kind) also buckets to single
     assert s["route_mix"] == {"single": 2, "fusion": 1, "cascade": 1}
+
+
+def test_cache_rate_openrouter_shape_is_read_over_prompt() -> None:
+    # 840 cached of a 1,000-token prompt: OpenRouter's `cached_tokens` is a subset of
+    # `prompt_tokens`. The screen read this as 840/1840 = 46%.
+    s = summarize_usage([
+        UsageRecord(ts="2026-07-13T10:00:00+00:00", session_id="s", prompt_tokens=1000,
+                    cache_read_tokens=840)
+    ])
+    assert s["cache_hit_pct"] == 0.84
+
+
+def test_gateway_response_cache_row_cannot_push_the_rate_past_100() -> None:
+    # The gateway's own cache answers with prompt_tokens=0 and the original count as a read.
+    s = summarize_usage([
+        UsageRecord(ts="2026-07-13T10:00:00+00:00", session_id="s", prompt_tokens=0,
+                    cache_read_tokens=500),
+        UsageRecord(ts="2026-07-13T10:00:00+00:00", session_id="t", prompt_tokens=100,
+                    cache_read_tokens=50),
+    ])
+    assert s["cache_hit_pct"] == 0.5

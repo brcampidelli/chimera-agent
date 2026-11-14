@@ -134,6 +134,14 @@
     box-shadow: var(--glow), var(--inset);
     border-color: hsl(var(--accent) / 0.5);
   }
+  /* The glow above is a translucent halo and does not reach 3:1 (focus-ring-is-visible.test.ts), so
+     a field gets the same solid outline as every other control — and it is the one that survives
+     Windows forced colors, where shadows are dropped. */
+  &:focus-visible,
+  &:has(:focus-visible) {
+    outline: var(--ring-width) solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
@@ -188,7 +196,9 @@
     --accent-foreground: 0 0% 100%;
     --accent-ink: 217 91% 70%;
     --accent2: 189 94% 55%;
-    --ring: 217 91% 62%;
+    --ring: 217 91% 67%;
+    /* How thick the keyboard ring draws. High contrast thickens it (see below). */
+    --ring-width: 2px;
     --ok: 152 58% 50%;
     --ok-foreground: 152 58% 58%;
     --bad: 0 72% 62%;
@@ -277,7 +287,7 @@
      one token later, because the obvious name was taken and meant something else. */
     --accent-ink: 217 91% 42%;
     --accent2: 189 90% 42%;
-    --ring: 217 91% 52%;
+    --ring: 217 91% 47%;
     /* Fill and text are the same colour in the dark theme and cannot be here.
      Measured against this theme's own card, `--ok` reads 3.06:1 as 11px text and `--bad` 3.82:1 —
      both under the 4.5 that small text needs, while both are fine as fills and as icons, where the
@@ -403,7 +413,7 @@
     --accent: 340 75% 62%;
     --accent-ink: 340 75% 74%;
     --accent2: 355 80% 66%;
-    --ring: 340 75% 62%;
+    --ring: 340 75% 68%;
     --accent-foreground: 222 47% 11%;
   }
   :root:not([data-theme='light'])[data-accent='graphite'] {
@@ -417,35 +427,35 @@
     --accent: 189 85% 52%;
     --accent-ink: 189 85% 26%;
     --accent2: 170 80% 38%;
-    --ring: 189 85% 52%;
+    --ring: 189 85% 28%;
     --accent-foreground: 222 47% 11%;
   }
   :root[data-theme='light'][data-accent='green'] {
     --accent: 152 60% 52%;
     --accent-ink: 152 60% 26%;
     --accent2: 172 66% 36%;
-    --ring: 152 60% 52%;
+    --ring: 152 60% 28%;
     --accent-foreground: 222 47% 11%;
   }
   :root[data-theme='light'][data-accent='amber'] {
     --accent: 38 92% 46%;
     --accent-ink: 38 92% 26%;
     --accent2: 22 90% 48%;
-    --ring: 38 92% 46%;
+    --ring: 38 92% 29%;
     --accent-foreground: 222 47% 11%;
   }
   :root[data-theme='light'][data-accent='rose'] {
     --accent: 340 75% 52%;
     --accent-ink: 340 75% 38%;
     --accent2: 355 75% 50%;
-    --ring: 340 75% 52%;
+    --ring: 340 75% 44%;
     --accent-foreground: 0 0% 100%;
   }
   :root[data-theme='light'][data-accent='graphite'] {
     --accent: 220 12% 46%;
     --accent-ink: 220 12% 36%;
     --accent2: 210 16% 42%;
-    --ring: 220 12% 46%;
+    --ring: 220 12% 42%;
     --accent-foreground: 0 0% 100%;
   }
 
@@ -499,6 +509,7 @@
     --muted-foreground: 214 16% 76%;
     --hairline: 210 20% 100% / 0.16;
     --border: 220 8% 38%;
+    --ring-width: 3px;
   }
   :root[data-theme='light'][data-contrast='high'] {
     --foreground: 222 50% 8%;
@@ -506,6 +517,7 @@
     --muted-foreground: 222 16% 28%;
     --hairline: 222 30% 12% / 0.24;
     --border: 220 10% 66%;
+    --ring-width: 3px;
   }
 
   /* The swatches the accent row draws. Colours live here, in CSS, with every other colour: the
@@ -681,4 +693,15 @@
 }
 ::highlight(chimera-find-current) {
   background-color: hsl(var(--accent) / 0.55);
+}
+
+/* Windows High Contrast ("forced colors") removes box-shadow and repaints colours from the system
+   palette, so a ring made of either vanishes. An outline in a system colour is kept and reads against
+   whatever the user's palette is. The width stays at the app's own token, so the high-contrast
+   setting still thickens it. */
+@media (forced-colors: active) {
+  :is(button, a[href], input, select, textarea, summary, [role='tab'], [role='switch'], [role='checkbox'], [role='menuitem'], [role='option']):focus-visible {
+    outline: var(--ring-width) solid Highlight;
+    outline-offset: 2px;
+  }
 }

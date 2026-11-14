@@ -59,6 +59,7 @@ import { takeOfferedTurn } from "@/lib/offered-turn";
 import { SideChat, useSideChatKey } from "@/components/code/SideChat";
 import { useAddAttachmentRequest } from "@/lib/attach-request";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
+import { RecalledFacts } from "@/components/code/RecalledFacts";
 import { RewindTimeline } from "@/components/code/RewindTimeline";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
 import { Button } from "@/components/ui/button";
@@ -652,14 +653,23 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {/* Only when a layer actually contributed. "0 facts" and "we did not look" render the same and
           mean different things, so the absent case says nothing rather than saying zero. */}
       {done.memory_facts_used ? (
-        <Badge title={t("code.chat.recalled", {
-          n: done.memory_facts_used,
-          layer: done.memory_layer ?? "",
-        })}>
-          {done.memory_facts_used === 1
-            ? t("activity.memoryRecall.one")
-            : t("activity.memoryRecall.many", { n: done.memory_facts_used })}
-        </Badge>
+        (() => {
+          const label =
+            done.memory_facts_used === 1
+              ? t("activity.memoryRecall.one")
+              : t("activity.memoryRecall.many", { n: done.memory_facts_used });
+          const title = t("code.chat.recalled", {
+            n: done.memory_facts_used,
+            layer: done.memory_layer ?? "",
+          });
+          // The list when the turn named the facts; the plain chip for a frame that only counted
+          // them (an older server, or entity-linked facts that have no stored record to list).
+          return done.memory_facts?.length ? (
+            <RecalledFacts facts={done.memory_facts} label={label} title={title} t={t} />
+          ) : (
+            <Badge title={title}>{label}</Badge>
+          );
+        })()
       ) : null}
       {/* A durable fact was written. Shown because it outlives this conversation: it will be
           recalled into every future one, and a change with that reach should not happen in

@@ -5,8 +5,9 @@ same ruler. This module is that first reading. It only ever OPENS files for read
 moves, rotates and writes nothing under the home, and it never opens ``.env``.
 
 The ruler is the Cost screen's. The rows are ``usage.jsonl`` plus the run receipts rebuilt by
-:func:`chimera.api.usage.usage_from_runs` with the same ``already=_already_counted(...)`` join the
-dashboard uses, so a run written to both files is counted once. The pre-registration lives in
+:func:`chimera.api.usage.ledger_rows` (usage joined with the run receipts on the run id), the one
+function the dashboard, the weekly review and the daily cap all read, so a run written to both files
+is counted once. The pre-registration lives in
 ``bench/token_baseline/PREREGISTRATION.md`` and this file implements it; where the two disagree the
 pre-registration wins and this file is the bug.
 
@@ -37,10 +38,8 @@ from chimera.api.usage import (
     SIDE_KIND,
     TIDY_KIND,
     UsageRecord,
-    _already_counted,
-    load_usage,
+    ledger_rows,
     summarize_usage,
-    usage_from_runs,
 )
 
 #: Below this many units a group prints only its ``n`` (pre-registered; same for every surface).
@@ -463,8 +462,7 @@ def aggregate_runs(
 
 def _records(home: Path) -> list[UsageRecord]:
     """The Cost screen's rows: usage plus the receipts the usage log does not already hold."""
-    usage = load_usage(home / "usage.jsonl")
-    return usage + usage_from_runs(home / "runs.jsonl", already=_already_counted(usage))
+    return ledger_rows(home)
 
 
 def build_report(
@@ -548,7 +546,7 @@ def _cross_check(total: UsageAcc, panel: Mapping[str, Any]) -> dict[str, Any]:
         "bate": mine == theirs and usd_matches,
         "usd_bate": usd_matches,
         "linhas_sem_preco_painel": totals["unpriced_turns"],
-        "cache_painel_read_sobre_prompt_mais_read": None if cache_pct is None else round(cache_pct, 4),
+        "cache_painel_read_sobre_prompt": None if cache_pct is None else round(cache_pct, 4),
     }
 
 

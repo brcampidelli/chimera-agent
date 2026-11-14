@@ -33,7 +33,7 @@ export function Connections() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-6">
-      <Tabs items={items} value={tab} onChange={setTab} aria-label={t("settings.tab.connections")} />
+      <Tabs id={id} items={items} value={tab} onChange={setTab} aria-label={t("settings.tab.connections")} />
       <div className="pt-4">
         <TabPanel tabsId={id} value={tab}>
           {tab === "chimera" && (

@@ -3950,6 +3950,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/memory/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Similar Memory
+         * @description Near-duplicate facts from different days. Read-only; resolving one is the ordinary
+         *     ``DELETE /api/memory/{id}`` on whichever the owner picks.
+         */
+        get: operations["similar_memory_api_memory_similar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/memory/{item_id}": {
         parameters: {
             query?: never;
@@ -7191,6 +7212,12 @@ export interface components {
             diffs: components["schemas"]["FileDiffOut"][];
             /** Dropped Tool Calls */
             dropped_tool_calls?: number | null;
+            /**
+             * Effort
+             * @description The reasoning effort actually sent (low|medium|high), empty when none.
+             * @default
+             */
+            effort: string;
             /** Evidence */
             evidence: string;
             /** Feedback */
@@ -7207,6 +7234,12 @@ export interface components {
              * @default
              */
             provider: string;
+            /**
+             * Requested Model
+             * @description The model slug this attempt SENT, reasoning-effort suffix included only when the effort reached the wire (none with thinking off or on a route that drops it). Beside the model that answered: two equal answers cannot tell an escalation served by the same route from no escalation. Empty before the field.
+             * @default
+             */
+            requested_model: string;
             /** Reverted */
             reverted: boolean;
             /** Side Effects */
@@ -12949,6 +12982,8 @@ export interface components {
         MemoryItemOut: {
             /** Content */
             content: string;
+            /** Created At */
+            created_at?: number | null;
             /** Id */
             id: string;
             /** Kind */
@@ -15455,6 +15490,21 @@ export interface components {
             message: string;
             /** Model */
             model?: string | null;
+        };
+        /**
+         * SimilarPairOut
+         * @description Two facts that read alike and were written on different days.
+         */
+        SimilarPairOut: {
+            a: components["schemas"]["MemoryItemOut"];
+            b: components["schemas"]["MemoryItemOut"];
+            /** Similarity */
+            similarity: number;
+        };
+        /** SimilarPairsOut */
+        SimilarPairsOut: {
+            /** Pairs */
+            pairs: components["schemas"]["SimilarPairOut"][];
         };
         /**
          * SkillCostOut
@@ -23282,6 +23332,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemoryProfileOut"];
+                };
+            };
+        };
+    };
+    similar_memory_api_memory_similar_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarPairsOut"];
                 };
             };
         };

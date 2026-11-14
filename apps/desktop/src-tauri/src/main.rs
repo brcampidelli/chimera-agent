@@ -321,6 +321,20 @@ fn is_external_url(target: &tauri::Url, origin: &str) -> bool {
         && target.port_or_known_default() == origin.port_or_known_default())
 }
 
+/// The navigation handler of every window that holds the credentials: the app's own addresses go
+/// ahead; a web page goes to the system browser, as an external link opened in a new window already
+/// does (`on_new_window`); anything else stays where it is.
+fn keep_navigation_in_app(target: &tauri::Url, origin: &Mutex<String>) -> bool {
+    let origin = origin.lock().map(|origin| origin.clone()).unwrap_or_default();
+    if is_app_navigation(target, &origin) {
+        return true;
+    }
+    if is_external_url(target, &origin) {
+        let _ = open::that_detached(target.as_str());
+    }
+    false
+}
+
 /// Close every panel window. Called when the main window goes, so the app ends as it did before
 /// there were other windows (and the sidecar goes with it), and when the backend moved to another
 /// port, which leaves those windows talking to nothing. Their panels return to their docks: which
@@ -4293,14 +4307,78 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
     }
 }
 
+/// The guarded body of the initialization script (`credential_init.js`): a function expression that
+/// takes the app's scheme, host and both credentials. Shared with the Vitest test that evaluates it.
+const CREDENTIAL_INIT: &str = include_str!("credential_init.js");
+
 /// What the webview runs before the page: both credentials, as JSON string literals. The page reads
 /// them from `window` (`apps/desktop/src/lib/server.ts`), so neither ever appears in a URL.
-fn init_script(server_token: &str, screen_token: &str) -> Result<String, serde_json::Error> {
+///
+/// The script runs before EVERY document the webview creates — any page the window navigates to,
+/// and on Windows every subframe too (P0-19). So the credentials are passed as arguments to a guard
+/// that hands them only to the top-level document of the app's scheme and host (`app_url`); they are
+/// arguments, not text spliced into the template, so no token value can rewrite the guard.
+fn init_script(app_url: &str, server_token: &str, screen_token: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let app = tauri::Url::parse(app_url)?;
+    let host = app.host_str().filter(|host| !host.is_empty()).ok_or("the app's address has no host")?;
     Ok(format!(
-        "window.__CHIMERA_SERVER_TOKEN__ = {}; window.__CHIMERA_SCREEN_TOKEN__ = {};",
+        "({})({}, {}, {}, {});",
+        CREDENTIAL_INIT.trim_end(),
+        serde_json::to_string(&format!("{}:", app.scheme()))?,
+        serde_json::to_string(host)?,
         serde_json::to_string(server_token)?,
         serde_json::to_string(screen_token)?
     ))
+}
+
+/// Whether the window may navigate its top level to `target`: only to the backend it is showing —
+/// its own pages, and the `blob:` addresses those pages mint for downloads (the URL parser gives a
+/// `blob:` address the origin of the page that made it). Everything else is refused, and the window
+/// hands a web page to the system browser instead (`on_navigation` in `main`).
+///
+/// This is half of P0-19. Before it the window had no navigation handler: a link without `target`
+/// in a reply, or a `location` set by anything on the page, took the window — and the credentials
+/// its initialization script hands out — to whatever site it named.
+fn is_app_navigation(target: &tauri::Url, origin: &str) -> bool {
+    let Ok(origin) = tauri::Url::parse(origin) else {
+        return false;
+    };
+    if !target.username().is_empty() || target.password().is_some() {
+        return false;
+    }
+    let ours = origin.origin();
+    if !ours.is_tuple() || target.origin() != ours {
+        return false;
+    }
+    // A `blob:` the app minted is a download, and the script hands a `blob:` document nothing.
+    target.scheme() == "blob" || is_app_entry_path(target.path())
+}
+
+/// Whether `path` is the app's own entry page: `/`, `/index.html`, or a route the backend answers
+/// with the app — segments of letters, digits, `-` and `_` only, and never under `/guest`, `/api`
+/// or `/v1` (the OpenAI-compatible API, `chimera/api/openai_compat.py`).
+///
+/// The same rule as the guard in `credential_init.js`, which hands the credentials out on it. Not
+/// every document of the origin is the app: `/guest.html`, the share-link page, is served beside it
+/// with no token, and a relative link in a reply (`[x](/guest.html?t=…)`) reached it as a top-level
+/// document of the app's scheme and host. No `.` keeps every file out (`/GUEST.HTML`, `/guest.html/`,
+/// `/assets/x.html`, `/sw.js`); no `%` keeps an encoded dot out (`/guest%2ehtml`, which the backend
+/// decodes back to the file). `Url::path` is already normalised (`/./guest.html` is `/guest.html`).
+fn is_app_entry_path(path: &str) -> bool {
+    if path == "/" || path == "/index.html" {
+        return true;
+    }
+    let Some(rest) = path.strip_prefix('/') else {
+        return false;
+    };
+    let mut segments = rest.split('/');
+    let first = segments.next().unwrap_or_default().to_ascii_lowercase();
+    if ["guest", "api", "v1"].iter().any(|prefix| first.starts_with(prefix)) {
+        return false;
+    }
+    std::iter::once(first.as_str())
+        .chain(segments)
+        .all(|segment| segment.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'))
 }
 
 fn new_server_token() -> Result<String, String> {
@@ -4443,9 +4521,14 @@ fn main() {
 
             // The page receives the secret through Tauri's initialization script, not its URL.
             // This keeps it out of browser history, logs and referrers and adds no page-callable IPC.
-            let init_token = init_script(&server_token, &screen_token)?;
+            let init_token = init_script(&url, &server_token, &screen_token)?;
+            let navigating = Arc::clone(&float_origin);
             let main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
                 .initialization_script(init_token.clone())
+                // The top level stays on the backend's origin (P0-19). Read from the shared origin on
+                // every navigation: the supervisor moves it BEFORE it navigates the window to a new
+                // port, so that navigation is the app's own.
+                .on_navigation(move |target| keep_navigation_in_app(target, &navigating))
                 .title("Chimera")
                 .inner_size(1200.0, 800.0)
                 .min_inner_size(760.0, 520.0)
@@ -4462,10 +4545,13 @@ fn main() {
                         return NewWindowResponse::Deny;
                     }
                     let n = FLOAT_WINDOWS.fetch_add(1, Ordering::Relaxed);
+                    let float_navigating = Arc::clone(&allowed);
                     // `window_features` puts the new webview in the opener's environment, which
                     // WebView2 requires to hand it over; it also carries the size the page asked for.
                     match WebviewWindowBuilder::new(&opener, format!("{FLOAT_LABEL}{n}"), WebviewUrl::External(target))
                         .initialization_script(init_token.clone())
+                        // A panel window holds the same credentials, so it is held the same way.
+                        .on_navigation(move |target| keep_navigation_in_app(target, &float_navigating))
                         .window_features(features)
                         .title("Chimera")
                         // The page names its panel ("Tools · Chimera"); the taskbar should too,
@@ -4824,6 +4910,22 @@ mod float_window_tests {
             "javascript:alert(1)",
             "ms-settings:privacy",
             "mailto:someone@example.com",
+            // Pages of the origin that are not the app: the share-link page, in every spelling the
+            // backend still serves it under (the Windows filesystem ignores case; `%2e` decodes to
+            // a dot), and any other file.
+            "http://127.0.0.1:8765/guest.html?t=x",
+            "http://127.0.0.1:8765/guest.html/",
+            "http://127.0.0.1:8765/GUEST.HTML",
+            "http://127.0.0.1:8765/./guest.html",
+            "http://127.0.0.1:8765/%67uest.html",
+            "http://127.0.0.1:8765/guest%2ehtml",
+            "http://127.0.0.1:8765/guest",
+            "http://127.0.0.1:8765/Guest/x",
+            "http://127.0.0.1:8765/api/info",
+            "http://127.0.0.1:8765/v1/models",
+            "http://127.0.0.1:8765/V1/chat",
+            "http://127.0.0.1:8765/assets/x.html",
+            "http://127.0.0.1:8765/sw.js",
             "ftp://example.com/file",
             // Credentials in the address.
             "https://user:secret@example.com/",
@@ -4921,7 +5023,7 @@ mod tray_tests {
             "main no longer draws a fresh screen credential"
         );
         assert!(!main.contains(concat!("screen_token = server_", "token")), "the screen credential is the server token");
-        assert!(main.contains(concat!("init_script(&server_token, &screen_", "token)")));
+        assert!(main.contains(concat!("init_script(&url, &server_token, &screen_", "token)")));
         assert_eq!(
             main.matches(concat!(".initialization_script(init_", "token.clone())")).count(),
             2,
@@ -5085,12 +5187,108 @@ mod tray_tests {
     /// approval card's one-click yes needs the screen one (`chimera/api/screen_credential.py`), and a
     /// script that dropped it, or that put the server token in its place, would bring back exactly
     /// the bypass it closes — a token on disk standing in for the screen.
+    ///
+    /// Until P0-19 this asserted the bare assignments, and that WAS the defect: an unguarded script
+    /// handed both credentials to every document the webview created. They now travel as the last
+    /// two arguments to the guard in `credential_init.js` (its behaviour is tested in Vitest, which
+    /// evaluates the same file), after the app's scheme and host.
     #[test]
     fn the_webview_is_given_the_screen_credential_beside_the_server_token() {
-        let script = init_script("srv\"tok", "scr-tok").expect("serializes");
+        let script = init_script("http://127.0.0.1:8765", "srv\"tok", "scr-tok").expect("serializes");
+        assert!(script.starts_with("(// What the webview runs"), "the guard is not the script: {script}");
+        assert!(
+            script.ends_with(r#"}))("http:", "127.0.0.1", "srv\"tok", "scr-tok");"#),
+            "the arguments are not the scheme, host and both credentials: {script}"
+        );
+        assert!(script.contains("window.__CHIMERA_SERVER_TOKEN__ = serverToken;"));
+        assert!(script.contains("window.__CHIMERA_SCREEN_TOKEN__ = screenToken;"));
+        assert!(script.contains("if (window !== window.top) return;"), "a subframe would be handed the credentials");
+    }
+
+    /// The composed script, exactly as the window receives it, is checked in as a fixture
+    /// (`credential_init.fixture.js`) that the Vitest test evaluates (`src/lib/credentialInit.test.ts`).
+    /// So the test on the web side runs what Rust builds — wrapper, arguments and all — not the raw
+    /// template. A change to either side fails here until the fixture is regenerated:
+    /// `CHIMERA_WRITE_FIXTURE=1 cargo test --bins the_composed_script`.
+    #[test]
+    fn the_composed_script_is_the_fixture_the_web_test_evaluates() {
+        let script = init_script("http://127.0.0.1:8765", "server-secret", "screen-secret").expect("serializes");
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/credential_init.fixture.js");
+        if std::env::var_os("CHIMERA_WRITE_FIXTURE").is_some() {
+            std::fs::write(path, format!("{script}
+")).expect("writes the fixture");
+        }
+        // Line endings are the checkout's business (autocrlf), not the script's.
+        let normal = |text: &str| text.replace("
+", "
+").trim_end().to_string();
+        let fixture = std::fs::read_to_string(path).expect("the fixture exists");
+        assert_eq!(normal(&fixture), normal(&script), "credential_init.fixture.js is stale: regenerate it");
+    }
+
+    /// A token is an argument, never text in the guard: one that looks like JavaScript stays a string.
+    #[test]
+    fn a_credential_cannot_rewrite_the_guard() {
+        let script = init_script("http://127.0.0.1:8765", "x\"); window.top = window; (\"", "s").expect("serializes");
+        assert!(script.ends_with(r#""x\"); window.top = window; (\"", "s");"#), "{script}");
+        assert!(init_script("not a url", "a", "b").is_err(), "an address without a host must not build a script");
+    }
+
+    /// P0-19's other half: the window's top level may go only to the backend it shows.
+    #[test]
+    fn the_window_navigates_only_within_the_app() {
+        let ours =
+            |target: &str| is_app_navigation(&tauri::Url::parse(target).expect("a url"), "http://127.0.0.1:8765");
+        for target in [
+            "http://127.0.0.1:8765/",
+            "http://127.0.0.1:8765/settings?tab=models#top",
+            "http://127.0.0.1:8765/?float=activity.jobs",
+            // A download the page minted.
+            "blob:http://127.0.0.1:8765/0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+            // The parser lowercases the scheme: the same origin, written in capitals.
+            "HTTP://127.0.0.1:8765/",
+            "http://127.0.0.1:8765/index.html",
+            // A route the backend answers with the app itself.
+            "http://127.0.0.1:8765/code/abc",
+        ] {
+            assert!(ours(target), "{target} is the app's own");
+        }
+        for target in [
+            // A link without `target` in a reply.
+            "https://example.com/",
+            // The dev-server preview, or any other local port: not this backend.
+            "http://127.0.0.1:5173/",
+            "http://127.0.0.1:8766/",
+            "http://localhost:8765/",
+            // Another name for the loopback is still another origin.
+            "http://LOCALHOST:8765/",
+            "http://[::1]:8765/",
+            // The "host" before `@` is a user name; the host is evil.com.
+            "http://127.0.0.1@evil.com/",
+            "mailto:someone@example.com",
+            "https://127.0.0.1:8765/",
+            "http://user:pw@127.0.0.1:8765/",
+            "blob:https://example.com/0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+            "about:blank",
+            "data:text/html,<p>hi</p>",
+            "file:///C:/Windows/System32/calc.exe",
+            "javascript:alert(1)",
+        ] {
+            assert!(!ours(target), "{target} must not be loaded in the window");
+        }
+        assert!(!is_app_navigation(&tauri::Url::parse("http://127.0.0.1:8765/").unwrap(), "not a url"));
+    }
+
+    /// Both windows that hold the credentials carry the navigation handler: a panel window is the
+    /// same page with the same script, so leaving it out would reopen the hole there.
+    #[test]
+    fn every_window_with_the_credentials_is_held_in_the_app() {
+        let source = production_only();
+        let main = body_of(&source, concat!("fn ", "main() {"));
         assert_eq!(
-            script,
-            r#"window.__CHIMERA_SERVER_TOKEN__ = "srv\"tok"; window.__CHIMERA_SCREEN_TOKEN__ = "scr-tok";"#
+            main.matches(concat!(".on_navigation(move |target| keep_navigation_in_", "app(")).count(),
+            2,
+            "the main window and the panel windows must both keep their top level in the app"
         );
     }
 

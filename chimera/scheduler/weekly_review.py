@@ -185,12 +185,11 @@ class _Window:
 
 def _spend(home: Path, window: _Window) -> SpendTotals:
     """The Cost screen's total, over the week: the same two logs, the same join, the same sum."""
-    from chimera.api.usage import _already_counted, load_usage, summarize_usage, usage_from_runs
+    from chimera.api.usage import ledger_rows, summarize_usage
 
-    turnos = load_usage(home / "usage.jsonl")
     # The join is computed over EVERY row, not the week's: a scheduled run writes its usage row a
     # moment after its receipt, and a pair split by the window's edge must still be one charge.
-    linhas = turnos + usage_from_runs(home / "runs.jsonl", already=_already_counted(turnos))
+    linhas = ledger_rows(home)
     semana = [r for r in linhas if window.keep("usage", r.ts)]
     totals = summarize_usage(semana)["totals"]
     return SpendTotals(

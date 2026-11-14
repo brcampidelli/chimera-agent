@@ -2289,6 +2289,8 @@ class MemoryItemOut(BaseModel):
     #: the default is now to save into the project you are in: unshown, a fact meant for every
     #: project gets quietly filed under one, stops arriving elsewhere, and nothing says why.
     project: str | None = None
+    #: When the fact was written (epoch seconds), or None for one that predates the field.
+    created_at: float | None = None
 
 
 class MemoryProfileOut(BaseModel):
@@ -2363,6 +2365,18 @@ class ConsolidateGroupOut(BaseModel):
     unverified: bool = False
     """A member is unverified, so the merged fact will be too — including the members that were not."""
     items: list[MemoryItemOut]
+
+
+class SimilarPairOut(BaseModel):
+    """Two facts that read alike and were written on different days."""
+
+    a: MemoryItemOut
+    b: MemoryItemOut
+    similarity: float
+
+
+class SimilarPairsOut(BaseModel):
+    pairs: list[SimilarPairOut]
 
 
 class ConsolidatePreviewOut(BaseModel):
@@ -2980,7 +2994,7 @@ class UsageSummaryOut(BaseModel):
     by_day: list[UsageDayOut]
     by_model: list[UsageModelOut]
     by_session: list[UsageSessionOut]
-    cache_hit_pct: float | None  # cache_read / (prompt + cache_read), or None when the denominator is 0
+    cache_hit_pct: float | None  # cache_read / prompt (cache is part of the prompt), or None when no row reported cache
     cache_write_tokens: int | None = None
     route_mix: dict[str, int]  # {"single", "fusion", "cascade"} turn counts
 
@@ -3052,6 +3066,19 @@ class AttemptReceiptOut(BaseModel):
     )
     provider: str = ""
     host: str = ""
+    requested_model: str = Field(
+        default="",
+        description=(
+            "The model slug this attempt SENT, reasoning-effort suffix included only when the effort "
+            "reached the wire (none with thinking off or on a route that drops it). Beside the model "
+            "that answered: two equal answers cannot tell an escalation served by the same route "
+            "from no escalation. Empty before the field."
+        ),
+    )
+    effort: str = Field(
+        default="",
+        description="The reasoning effort actually sent (low|medium|high), empty when none.",
+    )
     system_sha: str = Field(
         default="",
         description=(

@@ -334,3 +334,69 @@ class TestNotasDeRelease:
     def test_recusa_release_sem_notas(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._gh(monkeypatch, {"tag_name": "v0.42.0", "body": "ver CHANGELOG"})
         assert writer.release_notes("0.42.0") is None
+
+
+class TestGastoNoLivroCaixa:
+    """O redator paga o OpenRouter; o gasto tem de cair no arquivo que a tela e o teto leem."""
+
+    def test_a_chamada_vira_linha_que_a_tela_le(self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+        from chimera.api.usage import ledger_rows
+
+        monkeypatch.setattr(writer, "USAGE_PATH", str(tmp_path / "usage.jsonl"))
+        writer.record_spend(
+            "deepseek/deepseek-chat",
+            {"prompt_tokens": 1000, "completion_tokens": 50, "cost": 0.0012,
+             "prompt_tokens_details": {"cached_tokens": 840}},
+        )
+
+        (linha,) = ledger_rows(tmp_path)
+        assert (linha.prompt_tokens, linha.completion_tokens, linha.usd) == (1000, 50, 0.0012)
+        assert linha.cache_read_tokens == 840 and linha.route_kind == "blog_writer"
+
+    def test_resposta_sem_preco_fica_sem_preco_nao_zero(self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+        from chimera.api.usage import ledger_rows
+
+        monkeypatch.setattr(writer, "USAGE_PATH", str(tmp_path / "usage.jsonl"))
+        writer.record_spend("m", {"prompt_tokens": 10, "completion_tokens": 1})
+
+        assert ledger_rows(tmp_path)[0].usd is None
+
+    def test_falha_ao_gravar_nao_derruba_a_rodada(self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(writer, "USAGE_PATH", str(tmp_path / "nao" / "existe" / "usage.jsonl"))
+        monkeypatch.setattr(writer, "LOG_PATH", str(tmp_path / "log.txt"))
+        writer.record_spend("m", {})  # não levanta
+
+
+class TestGastoComContentNulo:
+    """O provedor cobra a resposta mesmo quando `content` vem null; o gasto entra antes de ler o texto."""
+
+    def test_content_null_ainda_registra_o_gasto_pelo_ask(
+        self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from chimera.api.usage import ledger_rows
+
+        monkeypatch.setattr(writer, "USAGE_PATH", str(tmp_path / "usage.jsonl"))
+        monkeypatch.setattr(writer, "LOG_PATH", str(tmp_path / "log.txt"))
+        monkeypatch.setattr(writer, "env", lambda k: "chave" if "KEY" in k else None)
+        corpo = (
+            b'{"choices":[{"message":{"content":null}}],'
+            b'"usage":{"prompt_tokens":900,"completion_tokens":40,"cost":0.002}}'
+        )
+
+        class Resp:
+            def __enter__(self) -> Any:
+                return self
+
+            def __exit__(self, *_e: Any) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return corpo
+
+        monkeypatch.setattr(writer.json, "load", lambda r: writer.json.loads(r.read()))
+        monkeypatch.setattr(writer.urllib.request, "urlopen", lambda *_a, **_k: Resp())
+
+        assert writer._ask("p", 100) is None  # sem texto, sem artigo
+
+        (linha,) = ledger_rows(tmp_path)
+        assert (linha.prompt_tokens, linha.completion_tokens, linha.usd) == (900, 40, 0.002)

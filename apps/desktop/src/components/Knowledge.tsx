@@ -39,7 +39,7 @@ export function Knowledge() {
         <Brain className="h-5 w-5" />
         <h1 className="text-lg font-semibold text-foreground">{t("nav.knowledge")}</h1>
       </div>
-      <Tabs items={items} value={tab} onChange={setTab} aria-label={t("nav.knowledge")} className="px-6" />
+      <Tabs id={id} items={items} value={tab} onChange={setTab} aria-label={t("nav.knowledge")} className="px-6" />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 py-6">
           <TabPanel tabsId={id} value={tab}>
