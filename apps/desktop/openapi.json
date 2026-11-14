@@ -8928,6 +8928,13 @@
             "title": "Revision",
             "type": "integer"
           },
+          "unchecked": {
+            "items": {
+              "$ref": "#/components/schemas/DesignUncheckedOut"
+            },
+            "title": "Unchecked",
+            "type": "array"
+          },
           "unverifiable": {
             "default": 0,
             "title": "Unverifiable",
@@ -8964,6 +8971,13 @@
           "revision": {
             "title": "Revision",
             "type": "integer"
+          },
+          "unchecked": {
+            "items": {
+              "$ref": "#/components/schemas/DesignUncheckedOut"
+            },
+            "title": "Unchecked",
+            "type": "array"
           }
         },
         "required": [
@@ -9382,6 +9396,36 @@
           "revision"
         ],
         "title": "DesignSummaryOut",
+        "type": "object"
+      },
+      "DesignUncheckedOut": {
+        "description": "A part of the design the checks did not cover. \"Not checked\" is not \"no findings\".",
+        "properties": {
+          "artboard_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artboard Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "DesignUncheckedOut",
         "type": "object"
       },
       "DesignVersionOut": {

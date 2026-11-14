@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 
-import { FindingList } from "@/components/design/FindingList";
+import { FindingList, UncheckedList } from "@/components/design/FindingList";
 import { NumberField } from "@/components/design/InspectorFields";
 import type { DesignSession } from "@/components/design/useDesignSession";
 import { Button } from "@/components/ui/button";
@@ -152,8 +152,10 @@ export function DesignTokensPanel({
           {t("design.check.run")}
         </Button>
         {checkError ? <p role="alert" className="text-sm text-bad-foreground">{t("design.check.error")}</p> : null}
-        {check && check.findings.length === 0 ? <p className="text-sm text-ok-foreground">{t("design.check.clean")}</p> : null}
+        {check && check.findings.length === 0 && check.unchecked.length === 0 ? <p className="text-sm text-ok-foreground">{t("design.check.clean")}</p> : null}
+        {check && check.findings.length === 0 && check.unchecked.length > 0 ? <p className="text-sm text-muted-foreground">{t("design.check.cleanPartial")}</p> : null}
         {check ? <FindingList findings={check.findings} onJump={onJump} /> : null}
+        {check ? <UncheckedList unchecked={check.unchecked} /> : null}
       </section>
     </div>
   );

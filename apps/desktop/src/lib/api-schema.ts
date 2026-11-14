@@ -10821,6 +10821,8 @@ export interface components {
             passed_checks?: string[];
             /** Revision */
             revision: number;
+            /** Unchecked */
+            unchecked?: components["schemas"]["DesignUncheckedOut"][];
             /**
              * Unverifiable
              * @default 0
@@ -10835,6 +10837,8 @@ export interface components {
             findings: components["schemas"]["DesignFindingOut"][];
             /** Revision */
             revision: number;
+            /** Unchecked */
+            unchecked?: components["schemas"]["DesignUncheckedOut"][];
         };
         /**
          * DesignConfirmIn
@@ -11030,6 +11034,18 @@ export interface components {
             title: string;
             /** Updated At */
             updated_at: string;
+        };
+        /**
+         * DesignUncheckedOut
+         * @description A part of the design the checks did not cover. "Not checked" is not "no findings".
+         */
+        DesignUncheckedOut: {
+            /** Artboard Id */
+            artboard_id?: string | null;
+            /** Message */
+            message: string;
+            /** Reason */
+            reason: string;
         };
         /** DesignVersionOut */
         DesignVersionOut: {

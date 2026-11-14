@@ -507,6 +507,7 @@ describe("the design panel", () => {
     vi.mocked(checkDesign).mockResolvedValue({
       revision: 1,
       findings: [{ kind: "low_contrast", node_id: "title", artboard_id: "board_1", message: "contrast 2.1:1" }],
+      unchecked: [],
     });
     const { user } = render();
     await screen.findByRole("application");
@@ -517,6 +518,22 @@ describe("the design panel", () => {
     await waitFor(() =>
       expect(screen.getAllByRole("status").some((s) => s.textContent?.includes("Selected: Title"))).toBe(true),
     );
+  });
+
+  it("says not checked, never clean, when the checks left something out", async () => {
+    serve(doc(1));
+    vi.mocked(checkDesign).mockResolvedValue({
+      revision: 1,
+      findings: [],
+      unchecked: [{ artboard_id: "board_1", reason: "selector", message: "selectors with combinators are not evaluated" }],
+    });
+    const { user } = render();
+    await screen.findByRole("application");
+    await user.click(screen.getByRole("tab", { name: "Tokens" }));
+    await user.click(screen.getByRole("button", { name: "Check against tokens" }));
+    expect(await screen.findByText("Not checked")).toBeInTheDocument();
+    expect(screen.getByText("selectors with combinators are not evaluated")).toBeInTheDocument();
+    expect(screen.queryByText("Every element follows the tokens.")).not.toBeInTheDocument();
   });
 
   it("refines only what is selected", async () => {

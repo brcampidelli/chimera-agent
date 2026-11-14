@@ -33,7 +33,8 @@ from typing import Annotated, Any, Literal, TypeVar
 from pydantic import BaseModel, Field, StringConstraints, ValidationError
 
 from chimera.design import prompts
-from chimera.design.export_html import TokenIssue, check_against_tokens
+from chimera.design.export_html import TokenIssue, Unchecked, check_report
+from chimera.design.html_check import summarize_html
 from chimera.design.ids import new_id, remap_new_ids
 from chimera.design.model import (
     DesignDocument,
@@ -124,6 +125,8 @@ class ProposalOutcome:
 class AuditOutcome:
     audit: Audit | None = None
     findings: list[TokenIssue] = field(default_factory=list)
+    #: What the deterministic checks did not cover: "not checked", never "no findings".
+    unchecked: list[Unchecked] = field(default_factory=list)
     #: Issues the model attributed to an element id the document does not have — dropped, counted.
     unverifiable: int = 0
     error: str | None = None
@@ -301,20 +304,28 @@ def audit(
     backend: SupportsComplete, doc: DesignDocument, brief: str, *, model: str | None = None
 ) -> AuditOutcome:
     """The model's review of ``doc`` against ``brief``, beside the deterministic token checks."""
-    findings = check_against_tokens(doc)
+    report = check_report(doc)
+    findings, unchecked = report.findings, report.unchecked
+    html_facts = [
+        facts for board in (b for page in doc.pages for b in page.artboards)
+        if (facts := summarize_html(board, doc.tokens))
+    ]
     user = prompts.AUDIT.format(
         brief=_untrusted(brief[:MAX_BRIEF]),
         tokens=_untrusted(_dumps(wire(doc.tokens))),
         document=_untrusted(_dumps(summarize(doc))),
         findings=_untrusted(_dumps([f.__dict__ for f in findings[:100]])),
+        html=_untrusted(_dumps(html_facts)),
+        unchecked=_untrusted(_dumps([u.__dict__ for u in unchecked[:50]])),
     )
     parsed, error, attempts = _ask(backend, user, Audit, model=model)
     if parsed is None:
-        return AuditOutcome(findings=findings, error=error, attempts=attempts)
+        return AuditOutcome(findings=findings, unchecked=unchecked, error=error, attempts=attempts)
     kept = [i for i in parsed.issues if i.node_id is None or i.node_id in doc.nodes]
     dropped = len(parsed.issues) - len(kept)
     result = parsed.model_copy(update={"issues": kept})
-    return AuditOutcome(audit=result, findings=findings, unverifiable=dropped, attempts=attempts)
+    return AuditOutcome(audit=result, findings=findings, unchecked=unchecked, unverifiable=dropped,
+                        attempts=attempts)
 
 
 # ---- shared machinery ---------------------------------------------------------------------------
