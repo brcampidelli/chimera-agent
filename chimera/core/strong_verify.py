@@ -68,6 +68,6 @@ class StrongVerifier:
                 _log.warning("strong verifier reply carried no grade — abstaining (not blocking)")
                 return (True, None)
             return (score >= self.threshold, score)
-        except Exception as exc:  # noqa: BLE001 — a flaky judge must not fail the run
+        except Exception as exc:  # a flaky judge must not fail the run
             _log.warning("strong verifier failed, abstaining (not blocking): %s", exc)
             return (True, None)

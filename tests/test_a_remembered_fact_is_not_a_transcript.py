@@ -129,7 +129,7 @@ def test_the_skills_endpoint_says_whether_anything_reads_the_cards(
     off here on purpose: the default is on since the owner's decision of 2026-11-10, and this test is
     about what the endpoint says when reading is off, not about the default.
     """
-    from tests.test_api import _client  # noqa: PLC0415
+    from tests.test_api import _client
 
     monkeypatch.setenv("CHIMERA_SKILL_CARDS", "0")
     body = _client(tmp_path).get("/api/skills").json()
@@ -140,9 +140,9 @@ def test_the_skills_endpoint_says_whether_anything_reads_the_cards(
 
 def test_the_flag_follows_the_setting_rather_than_being_hardcoded(tmp_path: Any) -> None:
     """The half a constant would pass: a field pinned to one value is not a report of anything."""
-    import os  # noqa: PLC0415
+    import os
 
-    from tests.test_api import _client  # noqa: PLC0415
+    from tests.test_api import _client
 
     os.environ["CHIMERA_SKILL_CARDS"] = "1"
     try:

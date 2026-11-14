@@ -39,10 +39,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "learning_lift"))
 
-from run_learning import _MODEL, _fresh_workspace, _grade  # noqa: E402
-from tasks_hard_fix import HARD_FIX_TASKS as TASKS  # noqa: E402
+from run_learning import _MODEL, _fresh_workspace, _grade
+from tasks_hard_fix import HARD_FIX_TASKS as TASKS
 
-from chimera.eval.paired import compare_paired  # noqa: E402
+from chimera.eval.paired import compare_paired
 
 _TIMEOUT = int(os.environ.get("BENCH_TIMEOUT", "480"))
 _SEEDS = int(os.environ.get("BENCH_SEEDS", "3"))

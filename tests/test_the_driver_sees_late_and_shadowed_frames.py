@@ -58,7 +58,7 @@ class _Site(BaseHTTPRequestHandler):
     def log_message(self, *args: object) -> None:
         pass
 
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         path = self.path.split("?")[0]
         if path == "/slow.js":
             time.sleep(_LATE_DELAY_S)
@@ -89,7 +89,7 @@ def driver() -> Iterator[PlaywrightDriver]:
         d = PlaywrightDriver(
             headless=True, allowed=lambda url: urlparse(url).hostname == "127.0.0.1"
         )
-    except Exception as exc:  # noqa: BLE001 — no Chromium here (CI): they need a real browser
+    except Exception as exc:  # no Chromium here (CI): they need a real browser
         pytest.skip(f"chromium unavailable: {exc}")
     yield d
     d.close()

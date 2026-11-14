@@ -54,7 +54,7 @@ class _Call:
 def _normalizar(finish_reason: str, calls: list[_Call]) -> CompletionResult:
     message = SimpleNamespace(content="", tool_calls=calls)
     choice = SimpleNamespace(message=message, finish_reason=finish_reason)
-    return LLMGateway._normalize(SimpleNamespace(choices=[choice], usage=None), "m")  # noqa: SLF001
+    return LLMGateway._normalize(SimpleNamespace(choices=[choice], usage=None), "m")
 
 
 def test_the_batch_path_counts_the_call_it_dropped() -> None:

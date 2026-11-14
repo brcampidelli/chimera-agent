@@ -137,7 +137,7 @@ def whisper_snapshot(models_dir: Path, size: str) -> str:
         return str(snapshot_download(
             repo_id=repo, revision=revision, cache_dir=str(models_dir), local_files_only=True,
         ))
-    except Exception:  # noqa: BLE001 - not cached yet: the download below is the first use
+    except Exception:  # not cached yet: the download below is the first use
         pass
     _log.warning(
         "downloading the speech model %s (about 150 MB) once, on first use; voice notes wait until it is here",
@@ -238,7 +238,7 @@ def encode_ogg(wav: Path, out: Path) -> None:
     exe = shutil.which("ffmpeg")
     if exe is None:
         raise VoiceUnavailable("ffmpeg is not on PATH, and a voice note needs it to encode OGG")
-    subprocess.run(  # noqa: S603 — fixed argv, both paths are ours
+    subprocess.run(  # fixed argv, both paths are ours
         [exe, "-y", "-loglevel", "error", "-i", str(wav), "-c:a", "libopus", "-b:a", "32k", str(out)],
         check=True, timeout=120, capture_output=True, **no_window(),
     )
@@ -325,7 +325,7 @@ class VoiceReplier:
         out_dir = Path(tempfile.mkdtemp(prefix=_CHAT_PREFIX))
         try:
             return self.speech.speak(text, language, out_dir)
-        except Exception as exc:  # noqa: BLE001 — the text is the reply; a voice failure only loses audio
+        except Exception as exc:  # the text is the reply; a voice failure only loses audio
             _log.warning("voice reply failed, sent as text only: %s", type(exc).__name__)
             discard_reply_audio(out_dir / "reply.ogg")
             return None

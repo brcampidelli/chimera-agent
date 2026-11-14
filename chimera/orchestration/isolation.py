@@ -310,7 +310,7 @@ def run_in_processes(
                 name = futures[future]
                 try:
                     out[name] = IsolatedResult(name, ok=True, value=future.result())
-                except Exception as exc:  # noqa: BLE001 — worker crash stays contained
+                except Exception as exc:  # worker crash stays contained
                     out[name] = IsolatedResult(name, ok=False, error=f"{type(exc).__name__}: {exc}")
         except TimeoutError:
             for future, name in futures.items():
@@ -351,11 +351,11 @@ def _kill_stragglers(pool: ProcessPoolExecutor, workers: list[Any]) -> None:
         try:
             killer()
             return
-        except Exception as exc:  # noqa: BLE001 — fall through to the manual path
+        except Exception as exc:  # fall through to the manual path
             _log.debug("kill_workers failed, terminating individually: %s", exc)
     for proc in workers:
         try:
             if proc.is_alive():
                 proc.terminate()
-        except Exception as exc:  # noqa: BLE001 — cleanup must not raise over the real result
+        except Exception as exc:  # cleanup must not raise over the real result
             _log.debug("could not terminate a straggling worker: %s", exc)

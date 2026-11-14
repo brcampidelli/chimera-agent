@@ -131,7 +131,7 @@ def diagnostics_for_buffer(workspace: Path, path: str, text: str) -> dict[str, A
 
     try:
         client = _server_for(Path(workspace))
-    except Exception as exc:  # noqa: BLE001 — a dead server is a degraded editor, not a 500
+    except Exception as exc:  # a dead server is a degraded editor, not a 500
         _log.warning("could not start ruff server: %s", exc)
         return {"diagnostics": [], "available": False, "note": "the language server did not start"}
 
@@ -144,7 +144,7 @@ def diagnostics_for_buffer(workspace: Path, path: str, text: str) -> dict[str, A
             if client.sync_document(target, text)
             else client.diagnostics_for(target)  # identical buffer: nothing to recompute
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.warning("diagnostics failed: %s", exc)
         return {"diagnostics": [], "available": False, "note": "the language server stopped"}
 

@@ -120,7 +120,7 @@ class _BenchDriver(PlaywrightDriver):
         # v1 looked right after the action returned; this is that moment, before the wait.
         try:
             self.v1_html = self.page_html()
-        except Exception:  # noqa: BLE001 — a diagnostic; the product's own look is what counts
+        except Exception:  # a diagnostic; the product's own look is what counts
             self.v1_html = None
         started = time.monotonic()
         super().settle(seconds)
@@ -220,7 +220,7 @@ def measure(url: str, page_set: str, table_kind: str | None) -> dict[str, Any]:
             "navigate_s": round(driver.navigate_s, 3),
             "overhead_s": round(total_s - driver.navigate_s, 3),
         })
-    except Exception as exc:  # noqa: BLE001 — a page that fails is reported, not replaced
+    except Exception as exc:  # a page that fails is reported, not replaced
         row["error"] = f"{type(exc).__name__}: {str(exc)[:160]}"
     finally:
         if driver is not None:

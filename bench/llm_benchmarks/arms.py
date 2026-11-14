@@ -152,7 +152,7 @@ def run_chimera_solve(
     env = dict(os.environ)
     env.setdefault("CHIMERA_HOST_EXEC", "allow")  # headless bench: the loop must be able to run code
     try:
-        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+        proc = subprocess.run(  # fixed argv, no shell
             cmd, cwd=str(workspace), capture_output=True, text=True, timeout=timeout, env=env
         )
         ok = proc.returncode == 0

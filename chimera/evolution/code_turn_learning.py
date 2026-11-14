@@ -115,10 +115,10 @@ class CodeTurnRecall:
         if self.cards is not None:
             try:
                 parts.append(str(self.cards.card_context(task) or ""))
-            except Exception as exc:  # noqa: BLE001 -- advice, never a turn failure
+            except Exception as exc:  # advice, never a turn failure
                 _log.debug("skill-card retrieval skipped: %s", type(exc).__name__)
         try:
             parts.append(lesson_block(self.home, task))
-        except Exception as exc:  # noqa: BLE001 -- recall is advisory; the turn goes on without it
+        except Exception as exc:  # recall is advisory; the turn goes on without it
             _log.debug("lessons unavailable for this turn: %s", type(exc).__name__)
         return "\n\n".join(part for part in parts if part)

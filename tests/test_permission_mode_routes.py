@@ -15,7 +15,7 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from tests.test_code_permission_screen_security import (  # noqa: E402
+from tests.test_code_permission_screen_security import (
     _bridged,
     _bridged_turn,
     _saved_conversation,

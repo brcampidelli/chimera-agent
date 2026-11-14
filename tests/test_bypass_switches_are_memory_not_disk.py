@@ -16,17 +16,17 @@ from typing import Any
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.core import code_session  # noqa: E402
-from chimera.core.bypass_switches import (  # noqa: E402
+from chimera.core import code_session
+from chimera.core.bypass_switches import (
     SWITCH_FILE_NAME,
     BypassSaveError,
     forget_all_switches,
     open_switches,
 )
-from chimera.core.code_projects import CodeProjectRegistry  # noqa: E402
-from chimera.core.code_session import CodeSessionStore  # noqa: E402
+from chimera.core.code_projects import CodeProjectRegistry
+from chimera.core.code_session import CodeSessionStore
 
 
 @pytest.fixture(autouse=True)

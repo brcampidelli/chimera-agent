@@ -80,7 +80,7 @@ def _grade(task: str, workspace: Path) -> float | None:
     spec.loader.exec_module(module)
     try:
         result = module.score_workspace(workspace)
-    except Exception as exc:  # noqa: BLE001 — a grader that dies is a row, not a crash
+    except Exception as exc:  # a grader that dies is a row, not a crash
         print(f"    grader raised: {type(exc).__name__}: {exc}")
         return None
     value = result.get("outcome_score")

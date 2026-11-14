@@ -112,7 +112,7 @@ def test_two_parallel_fetches_in_one_run_each_keep_their_own_final_url(
     def call(context: contextvars.Context, tool: LedgeredTool, url: str) -> None:
         try:
             context.run(tool.run, url=url)
-        except BaseException as exc:  # noqa: BLE001 — surfaced by the assertion below
+        except BaseException as exc:  # surfaced by the assertion below
             errors.append(exc)
 
     threads = [

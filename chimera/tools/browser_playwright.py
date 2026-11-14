@@ -281,7 +281,7 @@ class RequestGuard:
                 allow = self.permits(url)
             if allow and self._off_the_list(url, params, main_frame):
                 allow, offsite = False, True
-        except Exception:  # noqa: BLE001 — cannot decide: fail closed
+        except Exception:  # cannot decide: fail closed
             allow = False
         finally:
             if self._end_request is not None:
@@ -321,7 +321,7 @@ class RequestGuard:
         if self._turn_local is not None:
             try:
                 allowed = bool(self._turn_local(url))
-            except Exception:  # noqa: BLE001 — a failed decision is external
+            except Exception:  # a failed decision is external
                 allowed = False
         self._request_log.append((url, allowed))
         self._trim_request_log()
@@ -351,7 +351,7 @@ class RequestGuard:
                 and trusted_source_matches(urlparse(url).hostname or "", raw)
                 for url, allowed in requests
             )
-        except Exception:  # noqa: BLE001 — uncertain provenance remains tainted
+        except Exception:  # uncertain provenance remains tainted
             return False
 
     def local_only_since(self, start: int, top_url: str) -> bool:
@@ -817,7 +817,7 @@ class PlaywrightDriver:
                 crop = self._page.screenshot(
                     type="png", clip={"x": left, "y": top, "width": right - left, "height": bottom - top}
                 )
-        except Exception:  # noqa: BLE001 — the crop is a courtesy; the element is still named
+        except Exception:  # the crop is a courtesy; the element is still named
             crop = None
         info["crop"] = crop
         return info

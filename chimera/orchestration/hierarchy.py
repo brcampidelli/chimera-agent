@@ -400,7 +400,7 @@ class HierarchicalOrchestrator:
             return
         try:
             self.on_event(OrchEvent(kind, text, task_id, dict(data)))  # type: ignore[arg-type]
-        except Exception as exc:  # noqa: BLE001 -- see the docstring
+        except Exception as exc:  # see the docstring
             _log.debug("event sink raised (ignored): %s", exc)
 
     def _stopped(self) -> bool:
@@ -780,7 +780,7 @@ class HierarchicalOrchestrator:
             # without this line the one branch that cannot lie about its cause would have been
             # the one reported as "the provider failed".
             cut_off, raw = ("spend" if isinstance(exc, SpendExceeded) else "budget"), ""
-        except Exception as exc:  # noqa: BLE001 -- a provider error must not nuke the batch
+        except Exception as exc:  # a provider error must not nuke the batch
             _log.warning("worker %s failed: %s", spec.task_id, exc)
             raw = ""
         if cut_off:
@@ -832,7 +832,7 @@ class HierarchicalOrchestrator:
                         envelope = candidate
                         verified = True
                         reasked = True
-                except Exception as exc:  # noqa: BLE001 -- re-ask is best-effort
+                except Exception as exc:  # re-ask is best-effort
                     _log.debug("re-ask for %s failed: %s", spec.task_id, exc)
         # The budget already sums prompt+completion per call; the receipt keeps the
         # total under prompt_tokens (split is meaningless post-aggregation) and the
@@ -935,7 +935,7 @@ class HierarchicalOrchestrator:
             return envelope
         try:
             tainted = bool(ledger.run_tainted())
-        except Exception as exc:  # noqa: BLE001 — a ledger that cannot answer must not fail the worker
+        except Exception as exc:  # a ledger that cannot answer must not fail the worker
             _log.debug("could not read the worker's taint: %s", exc)
             return envelope
         return envelope.model_copy(update={"tainted": True}) if tainted else envelope
@@ -1122,7 +1122,7 @@ class HierarchicalOrchestrator:
         if callable(search):
             try:
                 hits = search(task, k=5)
-            except Exception as exc:  # noqa: BLE001 — recall is advisory, never fail the run
+            except Exception as exc:  # recall is advisory, never fail the run
                 _log.debug("hierarchy memory readback failed: %s", exc)
                 hits = []
             from chimera.core.autonomous import RECALLED_FACT_LABEL

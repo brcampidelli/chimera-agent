@@ -252,7 +252,7 @@ def safety_overview(settings: Settings, switches: Any = None) -> SafetyOverview:
         sandbox = get_sandbox(settings)
         sandbox_name = _sandbox_name(sandbox)
         isolated = bool(sandbox_is_isolated(sandbox))
-    except Exception:  # noqa: BLE001 - an unbuildable sandbox runs nothing isolated: the safe read
+    except Exception:  # an unbuildable sandbox runs nothing isolated: the safe read
         sandbox_name, isolated = "unknown", False
     governance = []
     for surface in CARD_SURFACES:
@@ -360,7 +360,7 @@ def describe(
         isolated = False
         try:
             isolated = sandbox_is_isolated(get_sandbox())
-        except Exception:  # noqa: BLE001 — an unbuildable sandbox is a host sandbox, the safe read
+        except Exception:  # an unbuildable sandbox is a host sandbox, the safe read
             isolated = False
         if isolated:
             shell = "isolated"

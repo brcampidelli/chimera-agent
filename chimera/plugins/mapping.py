@@ -111,7 +111,7 @@ def _file(record: InstalledPlugin, home: Path, rel: str) -> Path | None:
 def _plugins(home: Path, scope: Collection[str] | None) -> list[InstalledPlugin]:
     try:
         return active(home, scope)
-    except Exception as exc:  # noqa: BLE001 -- a broken plugins folder must not cost a surface
+    except Exception as exc:  # a broken plugins folder must not cost a surface
         _log.warning("plugins not read: %s", type(exc).__name__)
         return []
 

@@ -380,7 +380,7 @@ def doctor(
 
         try:
             LLMGateway().quick("ok", model=settings.default_model)
-        except Exception as exc:  # noqa: BLE001 — every provider failure is an answer here
+        except Exception as exc:  # every provider failure is an answer here
             from chimera.core.redact import redact
 
             console.print(

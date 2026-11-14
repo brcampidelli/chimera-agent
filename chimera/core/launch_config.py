@@ -84,14 +84,14 @@ class ServerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     name: str
-    runtimeExecutable: str | None = Field(default=None, max_length=300)  # noqa: N815 — the file's own spelling
-    runtimeArgs: list[str] = Field(default_factory=list, max_length=64)  # noqa: N815
+    runtimeExecutable: str | None = Field(default=None, max_length=300)  # the file's own spelling
+    runtimeArgs: list[str] = Field(default_factory=list, max_length=64)
     program: str | None = Field(default=None, max_length=300)
     args: list[str] = Field(default_factory=list, max_length=64)
     port: int = Field(default=DEFAULT_PORT, ge=1, le=65535)
     cwd: str | None = Field(default=None, max_length=400)
     env: dict[str, str] = Field(default_factory=dict, max_length=64)
-    autoPort: bool | None = None  # noqa: N815
+    autoPort: bool | None = None
     url: str | None = Field(default=None, max_length=300)
 
     @field_validator("name")
@@ -191,7 +191,7 @@ class LaunchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: str = Field(default="0.0.1", max_length=20)
-    autoVerify: bool = True  # noqa: N815
+    autoVerify: bool = True
     configurations: list[ServerConfig] = Field(default_factory=list, max_length=MAX_CONFIGURATIONS)
 
     @model_validator(mode="after")

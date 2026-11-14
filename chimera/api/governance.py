@@ -67,7 +67,7 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
     try:
         # The same set the status bar counts: yes-or-no questions and typed ones (see `visible_to_owner`).
         waiting = len(visible_to_owner(settings.home))
-    except Exception:  # noqa: BLE001 — a scoreboard must render on a home with no approvals dir
+    except Exception:  # a scoreboard must render on a home with no approvals dir
         waiting = 0
     dsum = defended.summary()
     usum = undefended.summary()

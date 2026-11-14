@@ -16,7 +16,7 @@ from typer.testing import CliRunner
 
 pytest.importorskip("fastapi")  # the `app` command needs the desktop extra
 
-from chimera.cli.main import app  # noqa: E402
+from chimera.cli.main import app
 
 runner = CliRunner()
 

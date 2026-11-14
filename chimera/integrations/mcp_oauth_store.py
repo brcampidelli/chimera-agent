@@ -82,7 +82,7 @@ def _vault_read(kr: Any, name: str) -> str | None:
     account = _account(name)
     try:
         head = kr.get_password(SERVICE, account)
-    except Exception:  # noqa: BLE001 — an unreadable entry is an absent one
+    except Exception:  # an unreadable entry is an absent one
         return None
     if not head or not str(head).startswith(_HEAD):
         return None
@@ -96,7 +96,7 @@ def _vault_read(kr: Any, name: str) -> str | None:
     for index in range(count):
         try:
             part = kr.get_password(SERVICE, f"{account}.{index}")
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
         if part is None:
             return None
@@ -111,7 +111,7 @@ def _vault_delete(kr: Any, name: str) -> bool:
     removed = False
     try:
         head = kr.get_password(SERVICE, account)
-    except Exception:  # noqa: BLE001
+    except Exception:
         head = None
     count = _MAX_CHUNKS
     if head and str(head).startswith(_HEAD):
@@ -123,7 +123,7 @@ def _vault_delete(kr: Any, name: str) -> bool:
         try:
             kr.delete_password(SERVICE, key)
             removed = True
-        except Exception:  # noqa: BLE001 — "not found" is the common case
+        except Exception:  # "not found" is the common case
             continue
     return removed
 
@@ -142,7 +142,7 @@ def _vault_write(kr: Any, name: str, text: str) -> bool:
         # The head last: a write that dies halfway leaves no head, which reads as no record rather
         # than as a record cut short.
         kr.set_password(SERVICE, account, f"{_HEAD}{len(chunks)}")
-    except Exception:  # noqa: BLE001 — never the value in a message; a locked vault is a refusal
+    except Exception:  # never the value in a message; a locked vault is a refusal
         _log.warning("could not write an MCP OAuth record to the OS vault")
         _vault_delete(kr, name)
         return False

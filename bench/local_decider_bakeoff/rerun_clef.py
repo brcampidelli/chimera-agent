@@ -66,7 +66,7 @@ def check_jevbench_reuse(new: Path, old: Path) -> dict[str, Any]:
 def check_governance_reuse(url: str, model: str, registered: Path) -> dict[str, Any]:
     """Reuse check B: the 55 unwrapped two-sided items under the new configuration against rep 0."""
     rep0 = {r["id"]: r for r in _rows(registered) if r.get("arm") == "J" and r.get("wrapper") is None and r.get("rep") == 0}
-    call = instruments._local_jev(url, model)  # noqa: SLF001 — the same transport the run used
+    call = instruments._local_jev(url, model)  # the same transport the run used
     same = n = 0
     max_dp = 0.0
     for item in arm_j.two_sided_items():
@@ -82,7 +82,7 @@ def check_governance_reuse(url: str, model: str, registered: Path) -> dict[str, 
 
 
 def _start(stack: ExitStack, args: argparse.Namespace, logs: Path, meta: dict[str, Any]) -> str:
-    from bench.local_decider_bakeoff.run_model import CLEF_UBATCH_LADDER, servers  # noqa: PLC0415
+    from bench.local_decider_bakeoff.run_model import CLEF_UBATCH_LADDER, servers
 
     for ubatch in CLEF_UBATCH_LADDER:
         procs, url = servers(ARM, args, logs, ubatch=ubatch)
@@ -105,7 +105,7 @@ def _start(stack: ExitStack, args: argparse.Namespace, logs: Path, meta: dict[st
 
 
 def rerun(args: argparse.Namespace, spec: dict[str, Any]) -> None:
-    from bench.local_decider_bakeoff.run_model import easy_guard, halt_guard  # noqa: PLC0415
+    from bench.local_decider_bakeoff.run_model import easy_guard, halt_guard
 
     out = RESULTS / ARM
     jb, jb_old = out / "jevbench.jsonl", out / "jevbench.ub512.jsonl"

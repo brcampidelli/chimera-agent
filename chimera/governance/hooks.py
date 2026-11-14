@@ -401,7 +401,7 @@ class HookRunner:
                     decision, reason, note, requested, refused, error = _read_answer(
                         ran.stdout or "", event
                     )
-            except Exception as exc:  # noqa: BLE001 — a hook that cannot start is a failed hook
+            except Exception as exc:  # a hook that cannot start is a failed hook
                 error = f"could not run: {type(exc).__name__}: {exc}"
         duration_ms = (time.perf_counter() - started) * 1000
         if error:
@@ -429,7 +429,7 @@ class HookRunner:
         if self.audit is not None:
             try:
                 self.audit.record("hook", receipt)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _log.warning("could not write the updatedInput receipt for %s", hook_id, exc_info=True)
 
     def answered(self, hook_id: str, tool: str, *, approved: bool, approver: str) -> None:
@@ -452,7 +452,7 @@ class HookRunner:
         if self.audit is not None:
             try:
                 self.audit.record("hook", receipt)
-            except Exception:  # noqa: BLE001 — the in-memory receipt stands; log and go on
+            except Exception:  # the in-memory receipt stands; log and go on
                 _log.warning("could not write the answer receipt for %s", hook_id, exc_info=True)
 
     def _receipt(
@@ -484,7 +484,7 @@ class HookRunner:
         if self.audit is not None:
             try:
                 self.audit.record("hook", receipt)
-            except Exception:  # noqa: BLE001 — the in-memory receipt stands; log and go on
+            except Exception:  # the in-memory receipt stands; log and go on
                 _log.warning("could not write the hook receipt for %s", hook.id, exc_info=True)
 
 
@@ -581,7 +581,7 @@ class HookedTool(Tool):
             if self.approve is not None:
                 try:
                     approved = bool(self.approve(verdict, action))
-                except Exception:  # noqa: BLE001 — an approver that fails has not approved
+                except Exception:  # an approver that fails has not approved
                     approved = False
             self.runner.answered(
                 pre.deciding_hook, judged, approved=approved,

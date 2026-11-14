@@ -16,11 +16,11 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings  # noqa: E402
-from chimera.core.agent import AgentResult  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.config import Settings
+from chimera.core.agent import AgentResult
+from chimera.interface import ChatSession
 
 
 class _FakeAgent:

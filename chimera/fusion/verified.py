@@ -421,7 +421,7 @@ def escalation_model(settings: Any) -> str:
         return explicit
     try:
         providers = list(settings.configured_providers())
-    except Exception:  # noqa: BLE001 — a settings object without keys reads as "no OpenRouter"
+    except Exception:  # a settings object without keys reads as "no OpenRouter"
         providers = []
     if "openrouter" in providers:
         return MEASURED_ESCALATION_MODEL
@@ -466,7 +466,7 @@ def build_verifier(settings: Any, *, gateway: Any | None = None) -> GroundedVeri
     chain: list[Slot] = []
     try:
         decider = build_decider(settings, gateway=gateway)
-    except Exception as exc:  # noqa: BLE001 — a misconfigured backend is a fallback, and said so
+    except Exception as exc:  # a misconfigured backend is a fallback, and said so
         _log.warning("verified answers: decision backend %s could not be built: %s", backend, exc)
         decider = None
     if backend != "local_logprob":
@@ -674,7 +674,7 @@ def check_answer(
         answer, block = checker.check(
             turn, draft, tool_names=tool_names, stopped_reason=stopped_reason, drafter_model=drafter_model,
         )
-    except Exception as exc:  # noqa: BLE001 — the answer is already paid for and must not be lost
+    except Exception as exc:  # the answer is already paid for and must not be lost
         _log.warning("verified answers: the check failed: %s", exc)
         block = {
             "outcome": "unverified", "verifier": {}, "halt": f"{type(exc).__name__}: {str(exc)[:200]}",
@@ -693,7 +693,7 @@ def redraft_with(gateway: Any, messages: Sequence[Any], model: str, **kwargs: An
 
     try:
         result = gateway.complete(list(messages), model=model, **kwargs)
-    except Exception as exc:  # noqa: BLE001 — escalation failing is a receipt line, not a crash
+    except Exception as exc:  # escalation failing is a receipt line, not a crash
         return Redraft(text="", model=model, error=f"{type(exc).__name__}: {str(exc)[:200]}")
     cost = price_completion(result)
     return Redraft(text=str(result.content or ""), model=str(result.model or model), usd=float(cost.usd or 0.0))

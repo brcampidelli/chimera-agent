@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Scale } from "lucide-react";
 import { getDecisions, labelDecision } from "@/lib/api";
+import { formatHash } from "@/lib/router";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
@@ -88,7 +89,18 @@ export function Decisions({ embedded = false }: { embedded?: boolean } = {}) {
       <AlertsPanel alerts={data.alerts ?? []} t={t} />
       {data.groups.length === 0 ? (
         <Panel>
-          <EmptyState text={t("decisions.empty")} />
+          <EmptyState
+            text={t("decisions.empty")}
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { window.location.hash = formatHash("settings", { tab: "security" }); }}
+              >
+                {t("decisions.empty.action")}
+              </Button>
+            }
+          />
         </Panel>
       ) : (
         <details className="surface">

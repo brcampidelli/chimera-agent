@@ -42,7 +42,7 @@ def _fetch_text(url: str, timeout: float = 15.0) -> str:
             check_url(target)  # re-check the redirect hop
             resp = httpx.get(target, timeout=timeout, follow_redirects=False, headers={"User-Agent": _UA})
         return resp.text if resp.status_code < 400 else ""
-    except Exception:  # noqa: BLE001 — a missing sitemap/robots (or a blocked internal URL) is not a crash
+    except Exception:  # a missing sitemap/robots (or a blocked internal URL) is not a crash
         return ""
 
 
@@ -121,7 +121,7 @@ def _load_state(state_path: Path) -> tuple[set[str], list[tuple[str, int]], int]
         pages_path = state_path.with_suffix(".jsonl")
         prior = sum(1 for _ in pages_path.open(encoding="utf-8")) if pages_path.exists() else 0
         return visited, frontier, prior
-    except Exception:  # noqa: BLE001 — a corrupt/absent state file just means "start fresh"
+    except Exception:  # a corrupt/absent state file just means "start fresh"
         return set(), [], 0
 
 

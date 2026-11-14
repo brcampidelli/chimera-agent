@@ -77,7 +77,7 @@ class _Harness(App[None]):
     def _run(self) -> None:
         try:
             self.result = self._work()
-        except BaseException as exc:  # noqa: BLE001 - the test wants the class name, not a traceback
+        except BaseException as exc:  # the test wants the class name, not a traceback
             self.error = f"{type(exc).__name__}: {exc}"
 
 

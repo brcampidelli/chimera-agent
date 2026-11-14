@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from chimera.eval.hierarchy_ab import (  # noqa: E402
+from chimera.eval.hierarchy_ab import (
     HierarchyTask,
     baseline_prompt,
     make_specs,

@@ -259,7 +259,7 @@ def run_items(items: list[tuple[int, dict[str, Any], list[str]]], out: Path, wor
         if any((inst["instance_id"], arm) not in done for arm in arms) and not state["stopped"]:
             try:
                 build_template(inst)
-            except Exception as exc:  # noqa: BLE001 — solve_one retries it and records the halt
+            except Exception as exc:  # solve_one retries it and records the halt
                 print(f"  template for {inst['instance_id']} failed here: {exc}", flush=True)
         for arm in arms:
             if (inst["instance_id"], arm) in done:

@@ -32,7 +32,7 @@ def chimera_home() -> Path | None:
         from chimera.config import get_settings
 
         return Path(get_settings().home).expanduser()
-    except Exception:  # noqa: BLE001 — a guard must not crash a tool; None protects the .env only
+    except Exception:  # a guard must not crash a tool; None protects the .env only
         return None
 
 
@@ -47,7 +47,7 @@ def own_env_readable() -> bool:
         from chimera.config import get_settings
 
         return bool(get_settings().agent_reads_own_env)
-    except Exception:  # noqa: BLE001 — a guard must not crash a tool; the default is the answer
+    except Exception:  # a guard must not crash a tool; the default is the answer
         return True
 
 

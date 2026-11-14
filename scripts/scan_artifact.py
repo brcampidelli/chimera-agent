@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from chimera.core.redact import _PATTERNS  # noqa: E402
+from chimera.core.redact import _PATTERNS
 
 #: Files whose bytes are worth reading. A wheel is mostly Python and JavaScript; a font or a PNG
 #: cannot be reviewed by eye either way, and scanning them is how a scanner earns a reputation for

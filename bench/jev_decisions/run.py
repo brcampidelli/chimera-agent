@@ -578,7 +578,7 @@ def _one(task: dict[str, Any], client: httpx.Client, gateway: Any) -> dict[str, 
             res = local(client, task["state"], think=True)
         else:
             res = verbalized(gateway, task["state"])
-    except Exception as exc:  # noqa: BLE001 — recorded as a halt, never a verdict
+    except Exception as exc:  # recorded as a halt, never a verdict
         res = {"halt": str(exc)[:300]}
     row.update(res)
     return row

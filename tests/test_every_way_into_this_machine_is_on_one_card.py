@@ -430,7 +430,7 @@ def test_the_settings_screen_may_write_both_and_a_value_that_would_mislead_is_re
 ) -> None:
     for key in ("CHIMERA_SHARING", "CHIMERA_SHARE_EXPIRY_HOURS"):
         assert is_editable(key)
-        assert key not in APPLIES_WHEN  # read per request: it applies at once
+        assert APPLIES_WHEN[key] == "now"  # read per request: it applies at once
         monkeypatch.setenv(key, "")
     env = tmp_path / ".env"
     for bad in ("0", "-2", "soon", "nan", "inf"):

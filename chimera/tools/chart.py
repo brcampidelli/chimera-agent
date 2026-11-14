@@ -410,7 +410,7 @@ class RenderChartTool(Tool):
                 _render_static(spec, out, fmt)
         except ImportError:
             return _INSTALL_HINT
-        except Exception as exc:  # noqa: BLE001 — a render failure is a tool error, not a crash
+        except Exception as exc:  # a render failure is a tool error, not a crash
             return f"error: chart render failed: {exc}"
         if self.on_chart is not None:
             try:
@@ -419,6 +419,6 @@ class RenderChartTool(Tool):
                 shown = str(out)
             try:
                 self.on_chart(chart_frame(spec, shown, fmt))
-            except Exception:  # noqa: BLE001 — the file is written; a screen that failed to hear changes nothing
+            except Exception:  # the file is written; a screen that failed to hear changes nothing
                 _log.debug("render_chart: announcing the chart failed", exc_info=True)
         return f"saved {fmt} chart to {out}"

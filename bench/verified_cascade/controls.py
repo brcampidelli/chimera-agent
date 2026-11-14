@@ -21,10 +21,10 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from bench.verified_cascade.common import RESULTS  # noqa: E402
-from bench.verified_cascade.harness import THRESHOLD  # noqa: E402
-from bench.verified_cascade.replay import RunData, outcomes, shipped_label  # noqa: E402
-from bench.verified_cascade.stats import mcnemar_exact, newcombe_paired, percentile  # noqa: E402
+from bench.verified_cascade.common import RESULTS
+from bench.verified_cascade.harness import THRESHOLD
+from bench.verified_cascade.replay import RunData, outcomes, shipped_label
+from bench.verified_cascade.stats import mcnemar_exact, newcombe_paired, percentile
 
 DRAWS = 1000
 SEED_R1 = 3033

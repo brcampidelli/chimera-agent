@@ -130,6 +130,6 @@ class ProgressLedger:
         except (json.JSONDecodeError, ValueError, ValidationError) as exc:
             _log.debug("progress ledger: unusable response (%s) — neutral assessment", exc)
             return _NEUTRAL
-        except Exception as exc:  # noqa: BLE001 — a monitor must never break the solve loop
+        except Exception as exc:  # a monitor must never break the solve loop
             _log.warning("progress ledger failed, continuing without it: %s", exc)
             return _NEUTRAL

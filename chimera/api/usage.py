@@ -113,7 +113,7 @@ def record_turn(home: Path, session_id: str, report: Any) -> None:
                 declined=len(getattr(report, "declined", None) or []),
             ),
         )
-    except Exception as exc:  # noqa: BLE001 — see the docstring
+    except Exception as exc:  # see the docstring
         _log.debug("usage logging skipped: %s", exc)
 
 
@@ -163,7 +163,7 @@ def record_spend(
                 route_kind=route_kind,
             ),
         )
-    except Exception as exc:  # noqa: BLE001 -- see the docstring
+    except Exception as exc:  # see the docstring
         _log.debug("usage logging skipped: %s", exc)
 
 

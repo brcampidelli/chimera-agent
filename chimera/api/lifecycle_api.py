@@ -172,7 +172,7 @@ def register_lifecycle_api(
                         "cancelled": result.cancelled,
                     },
                 )
-            except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error frame
+            except Exception as exc:  # surfaced to the client as an error frame
                 _log.warning("lifecycle run failed: %s", exc)
                 emit("error", {"message": "the run failed"})
             finally:

@@ -16,25 +16,25 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
 from chimera.api import (
-    build_api_app,  # noqa: E402
-    code_api,  # noqa: E402
+    build_api_app,
+    code_api,
 )
-from chimera.api import screen_credential as sc  # noqa: E402
-from chimera.api.code_api import (  # noqa: E402
+from chimera.api import screen_credential as sc
+from chimera.api.code_api import (
     COMMANDS_OFF_OPTIONS,
     COMMANDS_UNVERIFIED_LINE,
     CodeTurnRequest,
     gate_commands_before_work,
 )
-from chimera.api.posture import Posture  # noqa: E402
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.core.agent import AgentResult  # noqa: E402
-from chimera.core.code_projects import CodeProjectRegistry  # noqa: E402
-from chimera.core.context_budget import RunState  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.api.posture import Posture
+from chimera.config import Settings, get_settings
+from chimera.core.agent import AgentResult
+from chimera.core.code_projects import CodeProjectRegistry
+from chimera.core.context_budget import RunState
+from chimera.interface import ChatSession
 
 TOKEN = "owner-bearer-for-the-commands-gate-tests"
 NEEDS = "rode os testes e corrija o que falhar"

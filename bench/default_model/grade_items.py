@@ -82,7 +82,7 @@ def main() -> None:
             try:
                 run_instance(spec, pred, False, False, client, run_id, TIMEOUT_S)
                 graded += 1
-            except Exception as exc:  # noqa: BLE001 — collect_grades counts a missing report as an error
+            except Exception as exc:  # collect_grades counts a missing report as an error
                 errors += 1
                 print(f"  {iid} {arm}: {type(exc).__name__}: {exc}"[:300], flush=True)
         if used and image not in held:
@@ -91,14 +91,14 @@ def main() -> None:
             old = held.pop(0)
             try:
                 client.images.remove(old, force=False)
-            except Exception as exc:  # noqa: BLE001 — an image in use by a leftover container stays
+            except Exception as exc:  # an image in use by a leftover container stays
                 print(f"  could not remove {old}: {exc}"[:200], flush=True)
         print(f"[{n}/{len(order)}] {iid} graded {graded} skipped {skipped} errors {errors} "
               f"{time.strftime('%H:%M:%S')}", flush=True)
     for old in held:
         try:
             client.images.remove(old, force=False)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"  could not remove {old}: {exc}"[:200], flush=True)
     print(f"done: graded {graded}, skipped {skipped}, errors {errors}", flush=True)
 

@@ -203,6 +203,7 @@ export function Skills(_props: { embedded?: boolean } = {}) {
             skills={skills}
             learnedEmpty={learnedEmpty && mine.some((s) => s.items.length > 0)}
             onReview={() => setParams(withPatch({ view: null, section: "waiting" }))}
+            onDiscover={() => setParams(withPatch({ view: "discover", section: "chimera", item: null }))}
           />
         }
         discoverHeader={

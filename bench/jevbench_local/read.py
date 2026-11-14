@@ -82,7 +82,7 @@ def main() -> None:
     clone = args.jevbench.resolve()
     pinned(clone)
     sys.path.insert(0, str(clone))
-    from jevbench.metrics import brier_score, ece_top_label  # noqa: PLC0415
+    from jevbench.metrics import brier_score, ece_top_label
 
     ctx, ship = rows_of("ctx"), rows_of("ship")
     print("references (public accuracy, JevBench v1.4):", ", ".join(f"{k} {v:.3f}" for k, v in REFERENCES.items()))

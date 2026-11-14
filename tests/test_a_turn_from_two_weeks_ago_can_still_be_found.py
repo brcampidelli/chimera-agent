@@ -175,7 +175,7 @@ def test_the_like_fallback_answers_the_same_questions(tmp_path: Path) -> None:
     """The build without FTS5: the same table, searched by substring, same scoping."""
     index = _index(tmp_path)
     _seed(index)
-    index._fts = False  # noqa: SLF001 — the degradation, forced on a build that has FTS5
+    index._fts = False  # the degradation, forced on a build that has FTS5
     assert [h.turn_id for h in index.search("any password", project="/proj/one")] == ["t-login"]
     assert index.search("test_login", project="/proj/one")[0].turn_id == "t-tests"
     assert {h.turn_id for h in index.search("login", project=EVERY_PROJECT)} == {

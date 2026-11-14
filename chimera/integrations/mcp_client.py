@@ -159,7 +159,7 @@ class MCPTool(Tool):
         try:
             with bound_sink(sink):
                 result = self._caller(self._remote_name, kwargs)
-        except Exception as exc:  # noqa: BLE001 — a server's failure is an answer, fenced like one
+        except Exception as exc:  # a server's failure is an answer, fenced like one
             _log.warning("MCP tool %s failed (%s)", self.name, type(exc).__name__)
             return fence_observation(
                 tool_raised(self.name, exc), error_text_mode=error_text_mode
@@ -501,7 +501,7 @@ class StreamableHTTPMCPSession:
                 _log.debug("MCP streamable HTTP session connected")
                 self._ready.set()
                 await self._stop_event.wait()
-        except Exception as exc:  # noqa: BLE001 — never log remote exception text or headers
+        except Exception as exc:  # never log remote exception text or headers
             self._connect_error = exc
             self._ready.set()
 
@@ -512,7 +512,7 @@ class StreamableHTTPMCPSession:
             result = asyncio.run_coroutine_threadsafe(self._session.list_tools(), self._loop).result(
                 timeout=self.catalog_timeout
             )
-        except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
+        except Exception as exc:  # SDK errors can contain request headers
             raise RuntimeError(f"MCP HTTP list_tools failed ({type(exc).__name__})") from None
         return [MCPToolSpec(tool.name, tool.description or "", tool.inputSchema or
                             {"type": "object", "properties": {}}) for tool in result.tools]
@@ -524,7 +524,7 @@ class StreamableHTTPMCPSession:
             result = asyncio.run_coroutine_threadsafe(
                 self._session.call_tool(name, arguments), self._loop
             ).result(timeout=self.call_timeout)
-        except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
+        except Exception as exc:  # SDK errors can contain request headers
             raise RuntimeError(f"MCP HTTP tool call failed ({type(exc).__name__})") from None
         # The sink of the run that made this call, when a tool bound one; else the session's own.
         sink = call_sink() or self.payload_sink
@@ -732,7 +732,7 @@ class StdioMCPSession:
             self._connect_error = RuntimeError("MCP session was closed before it became ready")
             self._ready.set()
             raise
-        except Exception as exc:  # noqa: BLE001 — surface connect failures to start()
+        except Exception as exc:  # surface connect failures to start()
             self._connect_error = exc
             self._ready.set()
 

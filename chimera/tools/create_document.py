@@ -148,7 +148,7 @@ class CreateDocumentTool(Tool):
             return INSTALL_HINT.format(fmt=fmt)
         except ValueError as exc:
             return f"error: invalid document spec: {exc}"
-        except Exception as exc:  # noqa: BLE001 — a render failure is a tool error, not a crash
+        except Exception as exc:  # a render failure is a tool error, not a crash
             return f"error: could not render the {fmt}: {exc}"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(data)

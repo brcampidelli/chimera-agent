@@ -202,7 +202,7 @@ def test_a_result_names_the_endpoint_and_host_never_openai(monkeypatch: pytest.M
 
 def test_a_reasoning_variant_is_not_sent_to_an_arbitrary_endpoint() -> None:
     gateway = LLMGateway(_settings(_entry()))
-    assert gateway._effort_for_route("endpoint/lab/m", "high") is None  # noqa: SLF001
+    assert gateway._effort_for_route("endpoint/lab/m", "high") is None
 
 
 # --- privacy ---------------------------------------------------------------------------------------
@@ -487,7 +487,7 @@ def test_the_test_route_refuses_the_bearer_token_alone(live_app: Any) -> None:
 @contextmanager
 def _loopback_server(answer: Callable[[BaseHTTPRequestHandler], None]) -> Iterator[str]:
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+        def do_GET(self) -> None:  # the stdlib's name
             answer(self)
 
         def log_message(self, *_args: Any) -> None:

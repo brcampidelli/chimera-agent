@@ -102,7 +102,7 @@ def grade(text: str, reference: str) -> bool:
 
 
 def load_simpleqa() -> list[dict[str, str]]:
-    with urllib.request.urlopen(DATASET_URL, timeout=120) as resp:  # noqa: S310
+    with urllib.request.urlopen(DATASET_URL, timeout=120) as resp:
         raw = resp.read().decode("utf-8")
     rows = list(csv.DictReader(io.StringIO(raw)))
     return [r for r in rows if len(normalise_text(r["answer"])) <= MAX_REFERENCE_TOKENS]
@@ -169,7 +169,7 @@ def collect(out: Path, *, target: int, cap: int, workers: int, sample_index: int
             for fut in futures:
                 try:
                     row = fut.result()
-                except Exception as exc:  # noqa: BLE001 — a provider hiccup must not lose the file
+                except Exception as exc:  # a provider hiccup must not lose the file
                     print(f"  ERROR {type(exc).__name__}: {str(exc)[:100]}", flush=True)
                     continue
                 spent += row["usd"]
@@ -251,7 +251,7 @@ def main() -> int:
             iid, arm, rot, order = futures[fut]
             try:
                 r = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a provider hiccup must not lose the file
+            except Exception as exc:  # a provider hiccup must not lose the file
                 print(f"  {iid:<9} {arm:<6} r{rot} {order:<7} ERROR {type(exc).__name__}: {str(exc)[:100]}", flush=True)
                 continue
             spent += r.usd or 0.0

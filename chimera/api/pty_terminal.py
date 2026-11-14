@@ -174,7 +174,7 @@ class _WinProc:
     def poll(self) -> int | None:
         try:
             return None if self._pty.isalive() else int(self._pty.exitstatus or 0)
-        except Exception:  # noqa: BLE001 — a dead handle is a dead process
+        except Exception:  # a dead handle is a dead process
             return 0
 
     def kill(self) -> None:
@@ -218,13 +218,13 @@ class PtySession:
         import pty
         import termios
 
-        master, slave = pty.openpty()  # type: ignore[attr-defined]  # POSIX-only; never runs on Windows
+        master, slave = pty.openpty()  # POSIX-only; never runs on Windows
         try:
             self._set_winsize_posix(master, cols, rows)
 
             def _controlling_tty() -> None:  # runs in the child, after setsid
                 with suppress(OSError):
-                    fcntl.ioctl(0, termios.TIOCSCTTY, 0)  # type: ignore[attr-defined]  # POSIX-only
+                    fcntl.ioctl(0, termios.TIOCSCTTY, 0)  # POSIX-only
 
             self._proc = subprocess.Popen(
                 argv,
@@ -235,7 +235,7 @@ class PtySession:
                 stderr=slave,
                 close_fds=True,
                 start_new_session=True,  # its own group: the kill reaches the grandchildren
-                preexec_fn=_controlling_tty,  # noqa: PLW1509 — the controlling tty cannot be set otherwise
+                preexec_fn=_controlling_tty,  # the controlling tty cannot be set otherwise
                 **no_window(),
             )
         except BaseException:
@@ -308,7 +308,7 @@ class PtySession:
                 text = self._pty.read(_READ_BYTES)
             except EOFError:
                 return
-            except Exception:  # noqa: BLE001 — a closed handle ends the stream, it is not a crash
+            except Exception:  # a closed handle ends the stream, it is not a crash
                 return
             if text and not self._put(text):
                 return
@@ -388,7 +388,7 @@ class PtySession:
         import struct
         import termios
 
-        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))  # type: ignore[attr-defined]  # POSIX-only
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))  # POSIX-only
 
     def resize(self, cols: int, rows: int) -> None:
         cols = _clamp(cols, COLS_RANGE)

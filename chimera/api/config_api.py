@@ -399,8 +399,9 @@ def is_editable(key: str) -> bool:
 #: to stop: a control that confirms and does nothing spends the user's trust in every other control
 #: on the screen.
 #:
-#: Anything absent from this map applies to the next call. That is the common case now that the
-#: gateway and the request handlers read through instead of holding a boot-time snapshot.
+#: Every variable the Settings screen shows has an entry (`tests/test_settings_screen_applies_coverage.py`
+#: fails when one does not): `now`, a later moment, or `unverified`. Absence used to mean "the next
+#: call", which could not be told apart from "nobody checked".
 NEXT_CONVERSATION = "next_conversation"
 NEXT_LAUNCH = "next_launch"
 #: Two moments at once: what builds its sandbox per use (a `!` command, a workflow or cron shell
@@ -408,6 +409,15 @@ NEXT_LAUNCH = "next_launch"
 #: it was built with. Saying only "next conversation" would describe the side that WIDENS access as
 #: later than it is.
 COMMANDS_NOW = "commands_now"
+#: Read at the moment of use — a request, a turn, a model call, a scheduler tick — through the live
+#: settings (`get_settings()`, the gateway's `settings` property, the app's `live()`), never from a
+#: value captured when something was built. Stated out loud since the screen used to read an absent
+#: entry as "applies now": an absence cannot be told apart from a variable nobody looked at, and the
+#: screen is exactly where a wrong "applies now" is a control that confirms and does nothing.
+NOW = "now"
+#: Shown on the screen, read somewhere this pass did not trace to the end. The screen says nothing
+#: about when it applies, which is the honest answer; it is a to-do, not a default.
+UNVERIFIED = "unverified"
 APPLIES_WHEN: dict[str, str] = {
     # Decided when a conversation is built (`factory()` in `chimera app`), so an open conversation
     # keeps the behaviour it started with — deliberately: changing a running chat's guard or backend
@@ -483,6 +493,80 @@ APPLIES_WHEN: dict[str, str] = {
     "CHIMERA_CHAT_INBOUND_MEDIA": NEXT_LAUNCH,
     "CHIMERA_CHAT_VOICE_REPLY": NEXT_LAUNCH,
     "CHIMERA_CHAT_VOICE_MODEL": NEXT_LAUNCH,
+    # ---- Everything else the Settings screen shows, stated one by one (study 'a11', P1-14). ----
+    # Each NOW below was decided by reading where the value is consumed, not by analogy:
+    #
+    # The app's `live()` / `live_settings()` are re-read at each use (`chimera/api/app.py`,
+    # `register_code_api(live_settings=...)`): the close-loop and merge switches are lambdas over it
+    # (`code_api.close_loop_wiring`), the archive / worktree sweeps read it on every list, idle
+    # compaction on every turn, sharing on every share request.
+    "CHIMERA_CODE_CLOSE_LOOP": NOW,
+    "CHIMERA_CLOSE_LOOP_MERGE": NOW,
+    "CHIMERA_ARCHIVE_ON_PR_MERGE": NOW,
+    "CHIMERA_WORKTREE_CLEANUP": NOW,
+    "CHIMERA_IDLE_COMPACTION": NOW,
+    "CHIMERA_SHARING": NOW,
+    "CHIMERA_SHARE_EXPIRY_HOURS": NOW,
+    # The model a Code turn uses is `live().default_model` / `_model_for(req, live())`, per turn.
+    "CHIMERA_DEFAULT_MODEL": NOW,
+    "CHIMERA_VOICE_MODEL": NOW,
+    "CHIMERA_VOICE_WORK_MODEL": NOW,
+    # `LLMGateway.settings` reads through (see its docstring): base URL, fallbacks, prompt cache,
+    # the completion cache (`if not self.settings.cache` on every call), the embedding model and
+    # the OpenRouter retention fields all take a save on the next model call.
+    "CHIMERA_API_BASE": NOW,
+    "CHIMERA_FALLBACK_MODELS": NOW,
+    "CHIMERA_PROMPT_CACHE": NOW,
+    "CHIMERA_ARM_ON_RECALLED_LESSONS": NOW,  # per autonomous run: `arms_on_recalled_lessons()` reads get_settings()
+    "CHIMERA_WIRE_LOG": NOW,  # `if not self.settings.wire_log` on each call
+    "CHIMERA_CACHE": NOW,
+    "CHIMERA_EMBED_MODEL": NOW,
+    "CHIMERA_OPENROUTER_DATA_COLLECTION": NOW,
+    "CHIMERA_OPENROUTER_ZDR": NOW,
+    # The app's completion route and the model lists read `live_settings()` per request.
+    "CHIMERA_COMPLETE_MODEL": NOW,
+    "CHIMERA_OLLAMA_BASE_URL": NOW,
+    # `get_settings()` at the moment of the check, in each case.
+    "CHIMERA_STRICT_SPEND_CAP": NOW,  # orchestration/budget.py
+    "CHIMERA_CLAUDE_COMPAT": NOW,  # core/agent.py, when the loop has no explicit value
+    "CHIMERA_AGENT_READS_OWN_ENV": NOW,  # tools/workspace.py
+    "CHIMERA_EXPLORER_CONTRACT": NOW,  # core/explorer.py
+    # The scheduler asks `get_settings()` each time a job finishes (`enabled=lambda: ...`).
+    "CHIMERA_CRON_NOTIFY_FAILURES": NOW,
+    # Only the Code turn builds the research sub-agent (`code_api`), and it builds it afresh per turn.
+    "CHIMERA_RESEARCH_AGENT": NOW,
+    # `get_sandbox()` is the one factory for all three: the sandbox kind and its image are read in
+    # the same call as the network, so they take the same two moments (see `COMMANDS_NOW`).
+    "CHIMERA_SANDBOX": COMMANDS_NOW,
+    "CHIMERA_SANDBOX_IMAGE": COMMANDS_NOW,
+    # ---- Not traced to the end. The screen shows them and says nothing about when. ----
+    "CHIMERA_REACH": UNVERIFIED,
+    "CHIMERA_APPROVAL": UNVERIFIED,
+    "CHIMERA_HOST_EXEC": UNVERIFIED,
+    "CHIMERA_GOVERNANCE": UNVERIFIED,
+    "CHIMERA_APPROVAL_WEBHOOK": UNVERIFIED,
+    "CHIMERA_EGRESS_ALLOW": UNVERIFIED,
+    "CHIMERA_TOOL_DENYLIST": UNVERIFIED,
+    "CHIMERA_APP_MESSAGING": UNVERIFIED,
+    "CHIMERA_COST_MODE": UNVERIFIED,
+    "CHIMERA_WEAK_MODEL": UNVERIFIED,
+    "CHIMERA_MID_MODEL": UNVERIFIED,
+    "CHIMERA_ORCHESTRATOR_MODEL": UNVERIFIED,
+    "CHIMERA_KEY_VAULT": UNVERIFIED,
+    "CHIMERA_MEMORY_BACKEND": UNVERIFIED,
+    "CHIMERA_SEMANTIC_MEMORY": UNVERIFIED,
+    "CHIMERA_AUTO_CONSOLIDATE": UNVERIFIED,
+    "CHIMERA_SKILL_CARDS": UNVERIFIED,
+    "CHIMERA_PROJECT_PACK": UNVERIFIED,
+    "CHIMERA_CLAUDE_AGENTS": UNVERIFIED,
+    "CHIMERA_CLAUDE_AGENT_OPUS": UNVERIFIED,
+    "CHIMERA_CLAUDE_AGENT_SONNET": UNVERIFIED,
+    "CHIMERA_CLAUDE_AGENT_HAIKU": UNVERIFIED,
+    "CHIMERA_CLAUDE_AGENT_FABLE": UNVERIFIED,
+    "CHIMERA_PREVIEW_AUTO_VERIFY": UNVERIFIED,
+    "CHIMERA_DESKTOP_BRIDGE": UNVERIFIED,
+    "CHIMERA_DESKTOP_BRIDGE_FULL": UNVERIFIED,
+    "CHIMERA_SERVER_TOKEN": UNVERIFIED,
 }
 
 def _trusted_source_list(value: str) -> list[str]:

@@ -167,11 +167,11 @@ def test_off_never_calls_set_thread_execution_state() -> None:
         def __init__(self) -> None:
             self.calls: list[str] = []
 
-        def SetThreadExecutionState(self, flags: int) -> int:  # noqa: N802 — the Win32 name
+        def SetThreadExecutionState(self, flags: int) -> int:  # the Win32 name
             self.calls.append(f"set {flags:#x}")
             return 1
 
-        def GetSystemPowerStatus(self, _status: Any) -> int:  # noqa: N802
+        def GetSystemPowerStatus(self, _status: Any) -> int:
             self.calls.append("power")
             return 0
 
@@ -190,7 +190,7 @@ def test_working_asks_windows_for_the_system_and_releases_with_continuous_alone(
         def __init__(self) -> None:
             self.flags: list[int] = []
 
-        def SetThreadExecutionState(self, flags: int) -> int:  # noqa: N802 — the Win32 name
+        def SetThreadExecutionState(self, flags: int) -> int:  # the Win32 name
             self.flags.append(flags)
             return 1
 

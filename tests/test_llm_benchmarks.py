@@ -84,7 +84,7 @@ def test_doctest_gate_actually_discriminates(tmp_path: Path) -> None:
         (tmp_path / "solution.py").write_text(
             f'def add(a, b):\n    """Add.\n\n    >>> add(1,2)\n    3\n    """\n{body}\n', encoding="utf-8"
         )
-        return subprocess.run(  # noqa: S603
+        return subprocess.run(
             [sys.executable, "-B", "-c", humaneval._DOCTEST_GATE],
             cwd=str(tmp_path),
             capture_output=True,
@@ -104,7 +104,7 @@ def test_doctest_gate_does_not_fail_a_docstring_without_examples(tmp_path: Path)
     (tmp_path / "solution.py").write_text(
         'def add(a, b):\n    """Add two numbers."""\n    return a + b\n', encoding="utf-8"
     )
-    proc = subprocess.run(  # noqa: S603
+    proc = subprocess.run(
         [sys.executable, "-B", "-c", humaneval._DOCTEST_GATE],
         cwd=str(tmp_path),
         capture_output=True,

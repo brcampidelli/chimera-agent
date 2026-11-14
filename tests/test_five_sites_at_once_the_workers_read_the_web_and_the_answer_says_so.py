@@ -37,7 +37,7 @@ PAGE = b"<html><body><h1>Acme pricing</h1><p>Plan A costs 10 a month.</p></body>
 
 
 class _Site(http.server.BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's spelling
+    def do_GET(self) -> None:  # the stdlib's spelling
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.end_headers()

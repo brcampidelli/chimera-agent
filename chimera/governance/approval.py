@@ -298,7 +298,7 @@ def ask_via(question: Callable[[str, str], bool], ledger: ApprovalLedger | None 
         action, reason = _describe(*args)
         try:
             approved = bool(question(action, reason))
-        except Exception:  # noqa: BLE001 — a surface that cannot ask has not been answered
+        except Exception:  # a surface that cannot ask has not been answered
             _log.warning("the surface could not ask; refusing: %s", (reason or action)[:200])
             approved = False
         if ledger is not None:

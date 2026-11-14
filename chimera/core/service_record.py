@@ -134,7 +134,7 @@ def new_record(*, url: str, token: str, home: Path | str, mode: str = "service")
         process = psutil.Process(os.getpid())
         process_created_at = process.create_time()
         process_exe = process.exe()
-    except Exception:  # noqa: BLE001 - record remains useful when process inspection is restricted
+    except Exception:  # record remains useful when process inspection is restricted
         process_created_at = 0.0
         process_exe = ""
     return ServiceRecord(

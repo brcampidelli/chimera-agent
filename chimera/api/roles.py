@@ -106,7 +106,7 @@ def resolve(profile: Profile | None, settings: Settings, override: RoleModels | 
         # as well", which is not what anyone typing one field meant.
         return RolePlan(_merge(RoleModels(), override), None)
 
-    ladder = resolve_tiers(settings)  # type: ignore[arg-type]
+    ladder = resolve_tiers(settings)
 
     # One model on every rung: routing has nothing to route. This is the ordinary state for a user
     # with a single provider key, and pretending otherwise would produce a `max` profile that costs

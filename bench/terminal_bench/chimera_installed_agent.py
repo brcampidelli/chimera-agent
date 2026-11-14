@@ -183,7 +183,7 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
             session.copy_to_container(  # type: ignore[attr-defined]
                 Path(_TAR), container_dir="/installed-agent", container_filename="wheelhouse.tar"
             )
-        except Exception as exc:  # noqa: BLE001 — any copy failure means "no offline fallback"
+        except Exception as exc:  # any copy failure means "no offline fallback"
             _log_note = f"wheelhouse not staged ({exc}); network install must carry this run"
             if logging_dir is not None:
                 try:

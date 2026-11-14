@@ -212,7 +212,7 @@ def _announce_applied(
             frames.append(frame)
         for frame in frames:
             announcer(frame)
-    except Exception:  # noqa: BLE001 — the document is saved; a screen that failed to hear changes nothing
+    except Exception:  # the document is saved; a screen that failed to hear changes nothing
         _log.debug("design: announcing the saved change failed", exc_info=True)
 
 
@@ -374,7 +374,7 @@ class DesignTool(Tool):
             return
         try:
             self.on_design(frame)
-        except Exception:  # noqa: BLE001 — the document is saved; a screen that failed to hear changes nothing
+        except Exception:  # the document is saved; a screen that failed to hear changes nothing
             _log.debug("design: announcing the change failed", exc_info=True)
 
     def _read_only(self, what: str) -> str:

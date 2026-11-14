@@ -735,12 +735,12 @@ class DesktopMCP:
 
         server: Any = Server("chimera-desktop")
 
-        @server.list_tools()  # type: ignore[misc, no-untyped-call, untyped-decorator]
+        @server.list_tools()  # type: ignore[untyped-decorator]
         async def _list_tools() -> list[Any]:
             specs = await anyio.to_thread.run_sync(self.tool_specs)
             return [types.Tool(**spec) for spec in specs]
 
-        @server.call_tool()  # type: ignore[misc, no-untyped-call, untyped-decorator]
+        @server.call_tool()  # type: ignore[untyped-decorator]
         async def _call_tool(name: str, arguments: dict[str, Any] | None) -> list[Any]:
             # The HTTP call blocks for as long as the turn is allowed to take; off the event loop.
             text = await anyio.to_thread.run_sync(self.dispatch, name, arguments or {})

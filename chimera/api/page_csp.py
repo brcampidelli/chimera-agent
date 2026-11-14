@@ -161,6 +161,29 @@ ASSET_HTML_CSP = "default-src 'none'; sandbox"
 _HTML_SUFFIXES = (".html", ".htm", ".xhtml")
 
 
+def serves_as_page(name: str) -> bool:
+    """Whether a file with this name is served as an HTML document, and so needs a page policy."""
+    return name.lower().endswith(_HTML_SUFFIXES)
+
+
+# `/api/docs`, FastAPI's Swagger page: what `get_swagger_ui_html` writes, and only that — the bundle
+# and stylesheet from jsDelivr, its favicon, the inline script that starts it, and the schema from
+# this origin. It used to be served with no policy. `frame-ancestors 'none'`: nothing frames it.
+DOCS_PAGE_CSP = "; ".join(
+    (
+        "default-src 'none'",
+        "script-src https://cdn.jsdelivr.net 'unsafe-inline'",
+        "style-src https://cdn.jsdelivr.net 'unsafe-inline'",
+        "img-src 'self' data: https://fastapi.tiangolo.com",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'none'",
+        "form-action 'none'",
+        "frame-ancestors 'none'",
+    )
+)
+
+
 def static_files_with_policy(directory: Path) -> StaticFiles:
     """`StaticFiles` for `/assets`, with a policy on anything in it a browser would render as a page.
 
@@ -179,7 +202,7 @@ def static_files_with_policy(directory: Path) -> StaticFiles:
             status_code: int = 200,
         ) -> Response:
             response = super().file_response(full_path, stat_result, scope, status_code)
-            if str(full_path).lower().endswith(_HTML_SUFFIXES):
+            if serves_as_page(str(full_path)):
                 response.headers["Content-Security-Policy"] = ASSET_HTML_CSP
             return response
 

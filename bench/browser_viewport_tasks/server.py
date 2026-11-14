@@ -49,7 +49,7 @@ def go_page(site: str, slug: str) -> str:
 class _Handler(BaseHTTPRequestHandler):
     requested: list[str]
 
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         path = unquote(urlparse(self.path).path)
         self.server.requested.append(path)  # type: ignore[attr-defined]
         parts = path.strip("/").split("/")

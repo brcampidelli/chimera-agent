@@ -164,7 +164,7 @@ def make_agent_dispatch(
                     on_result(job, answer)
                 _log.info("cron '%s' result delivered (attempt %d)", job.name, attempt)
                 return
-            except Exception as exc:  # noqa: BLE001 — retry, then give up loudly
+            except Exception as exc:  # retry, then give up loudly
                 last_exc = exc
                 _log.warning("cron '%s' delivery attempt %d failed: %s", job.name, attempt, exc)
         _log.error(
@@ -265,7 +265,7 @@ class CronDaemon:
         """
         try:
             self.scheduler.store.reload_if_changed()
-        except Exception as exc:  # noqa: BLE001 — a bad reload must not skip the tick
+        except Exception as exc:  # a bad reload must not skip the tick
             _log.warning("cron store reload failed: %s", exc)
         at = self._clock() if now is None else now
         ran = self.scheduler.run_due(at, self.dispatch, job_timeout=self.job_timeout)
@@ -278,7 +278,7 @@ class CronDaemon:
                 try:
                     if self.on_outcome(job, at):
                         self.scheduler.store.add(job)
-                except Exception as exc:  # noqa: BLE001 — a notice must never cost a tick
+                except Exception as exc:  # a notice must never cost a tick
                     _log.warning("cron '%s': failure notice skipped: %s", job.name, exc)
         if self.heartbeat_path is not None:
             try:
@@ -289,7 +289,7 @@ class CronDaemon:
                     pid=os.getpid(),
                     ended_at=ended,
                 )
-            except OSError as exc:  # noqa: BLE001 — a failed beat must not kill the tick
+            except OSError as exc:  # a failed beat must not kill the tick
                 _log.warning("cron heartbeat write failed: %s", exc)
         return ran
 
@@ -299,7 +299,7 @@ class CronDaemon:
         while stop is None or not stop.is_set():
             try:
                 self.tick()
-            except Exception as exc:  # noqa: BLE001 — the daemon must survive any tick failure
+            except Exception as exc:  # the daemon must survive any tick failure
                 _log.warning("cron tick failed: %s", exc)
             self._sleep(self.tick_seconds)
 

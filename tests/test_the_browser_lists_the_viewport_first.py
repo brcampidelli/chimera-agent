@@ -305,7 +305,7 @@ _TALL = (
 
 
 class _Tall(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
@@ -332,7 +332,7 @@ def test_real_layout_check_detects_overflow_and_missing_css() -> None:
     }
 
     class _Pages(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+        def do_GET(self) -> None:  # the stdlib's name
             body = pages[self.path]
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -348,7 +348,7 @@ def test_real_layout_check_detects_overflow_and_missing_css() -> None:
     base = f"http://127.0.0.1:{server.server_address[1]}"
     try:
         driver = PlaywrightDriver(headless=True, allowed=lambda url: urlparse(url).hostname == "127.0.0.1")
-    except Exception as exc:  # noqa: BLE001 — no Chromium here (CI)
+    except Exception as exc:  # no Chromium here (CI)
         server.shutdown()
         pytest.skip(f"chromium unavailable: {exc}")
     try:
@@ -370,7 +370,7 @@ def test_the_real_driver_places_elements_and_scrolls(tall_page: str) -> None:
 
     try:
         driver = PlaywrightDriver(headless=True, allowed=lambda url: urlparse(url).hostname == "127.0.0.1")
-    except Exception as exc:  # noqa: BLE001 — no Chromium here (CI)
+    except Exception as exc:  # no Chromium here (CI)
         pytest.skip(f"chromium unavailable: {exc}")
     try:
         first = {el.name: el.where for el in driver.navigate(tall_page)}

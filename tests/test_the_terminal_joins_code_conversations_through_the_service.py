@@ -112,7 +112,7 @@ def home(tmp_path: Path) -> Path:
 class _InfoHandler(BaseHTTPRequestHandler):
     info: dict[str, Any] = {}
 
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         if self.headers.get("Authorization") != f"Bearer {TOKEN}":
             self.send_response(401)
             self.end_headers()

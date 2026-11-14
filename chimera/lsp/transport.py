@@ -65,7 +65,7 @@ class LspTransport:
 
     def start(self) -> LspTransport:
         program = resolve_program(self.argv[0])
-        self._proc = subprocess.Popen(  # noqa: S603 — argv list, never a shell string
+        self._proc = subprocess.Popen(  # argv list, never a shell string
             [program, *self.argv[1:]],
             cwd=str(self.cwd) if self.cwd else None,
             env=self.env,
@@ -142,7 +142,7 @@ class LspTransport:
                     continue
                 try:
                     self._on_message(message)
-                except Exception as exc:  # noqa: BLE001 — a handler must not kill the reader
+                except Exception as exc:  # a handler must not kill the reader
                     _log.warning("%s: message handler failed: %s", self.name, exc)
         except (ValueError, OSError):
             pass  # the pipe closed under us; `close()` and the exit callback say what happened

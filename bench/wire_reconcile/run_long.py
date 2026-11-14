@@ -266,7 +266,7 @@ def generate_one(run_dir: Path, task_index: int, arm: str, total: dict[str, int]
         stopped = result.stopped_reason
     except _Budget:
         raise
-    except Exception as exc:  # noqa: BLE001 — a protocol failure is recorded, never replaced (Amendment 3 §8)
+    except Exception as exc:  # a protocol failure is recorded, never replaced (Amendment 3 §8)
         stopped, error = "error", f"{type(exc).__name__}: {exc}"
     meta = _meta(home, task_index, arm, backend.calls, outage, stopped, error, threshold, fraction)
     meta["max_steps"] = max_steps

@@ -15,6 +15,25 @@ import { memorySourceLabel } from "@/lib/memorySource";
 import type { MemoryLayers } from "@/lib/types";
 
 const inputCls = "field h-9 w-full px-3 text-sm";
+const ADD_FACT_INPUT_ID = "memory-add-fact";
+
+/** The facts list with nothing to show. Only the truly empty memory gets a first step: a filter or a
+ *  search that matches nothing is not an empty memory, and offering to add a fact there would be wrong. */
+function MemoryEmpty({ t, filtered, searching }: { t: TFunc; filtered: boolean; searching: boolean }) {
+  if (filtered) return <EmptyState text={t("memory.filter.noneUnverified")} />;
+  if (searching) return <EmptyState text={t("memory.emptySearch")} />;
+  return (
+    <EmptyState
+      text={t("memory.empty")}
+      hint={t("memory.empty.hint")}
+      action={
+        <Button size="sm" variant="outline" onClick={() => document.getElementById(ADD_FACT_INPUT_ID)?.focus()}>
+          {t("memory.empty.action")}
+        </Button>
+      }
+    />
+  );
+}
 const infoBtn = `rounded-chip p-0.5 text-muted-foreground hover:text-foreground ${focusRing}`;
 const linkBtn = `rounded-chip text-accent-ink hover:underline ${focusRing}`;
 
@@ -231,14 +250,10 @@ export function Memory({ embedded = false }: { embedded?: boolean } = {}) {
         ) : facts.isLoading ? (
           <Spinner />
         ) : !shown || shown.length === 0 ? (
-          <EmptyState
-            text={
-              onlyUnverified && facts.data && facts.data.length > 0
-                ? t("memory.filter.noneUnverified")
-                : term
-                  ? t("memory.emptySearch")
-                  : t("memory.empty")
-            }
+          <MemoryEmpty
+            t={t}
+            filtered={Boolean(onlyUnverified && facts.data && facts.data.length > 0)}
+            searching={Boolean(term)}
           />
         ) : (
           shown.map((f) => <MemoryFactRow key={f.id} fact={f} onDelete={(id) => remove.mutate(id)} />)
@@ -248,6 +263,7 @@ export function Memory({ embedded = false }: { embedded?: boolean } = {}) {
       <Panel title={t("memory.addFact")}>
         <div className="flex items-center gap-2 px-4 py-3">
           <input
+            id={ADD_FACT_INPUT_ID}
             className={inputCls}
             placeholder={t("memory.placeholder")}
             value={draft}

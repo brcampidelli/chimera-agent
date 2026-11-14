@@ -147,7 +147,7 @@ def provider_of(slug: str) -> str:
         _model, provider, _key, _base = litellm.get_llm_provider(text)
         if provider:
             return provider_name(str(provider))
-    except Exception:  # noqa: BLE001 -- an unknown bare slug is spoken of by its own name
+    except Exception:  # an unknown bare slug is spoken of by its own name
         pass
     return provider_name(text)
 

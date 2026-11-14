@@ -432,7 +432,7 @@ def _handshake_within(connection: _LinkConnection, key: bytes, timeout: float) -
             secured = cast(Any, connection)
             multiprocessing.connection.deliver_challenge(secured, key)
             multiprocessing.connection.answer_challenge(secured, key)
-        except BaseException as exc:  # noqa: BLE001 — re-raised on the accept thread below
+        except BaseException as exc:  # re-raised on the accept thread below
             failure.append(exc)
 
     worker = threading.Thread(target=run, name="chimera-browser-handshake", daemon=True)

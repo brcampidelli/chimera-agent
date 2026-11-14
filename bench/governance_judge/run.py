@@ -51,7 +51,7 @@ def _retrying(call: Any, *, tries: int = 6, wait: float = 20.0) -> Any:
     for attempt in range(tries):
         try:
             return call()
-        except Exception as exc:  # noqa: BLE001 — only the rate-limit shape is retried
+        except Exception as exc:  # only the rate-limit shape is retried
             text = str(exc)
             if attempt == tries - 1 or ("429" not in text and "rate-limit" not in text.lower()):
                 raise

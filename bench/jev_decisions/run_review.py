@@ -229,7 +229,7 @@ def main() -> None:
         row = _row(arm, item)
         try:
             res = jev(client, user_text(item)) if arm == "J" else verbalized(gateway, user_text(item))
-        except Exception as exc:  # noqa: BLE001 — a halt, never a verdict
+        except Exception as exc:  # a halt, never a verdict
             res = {"halt": str(exc)[:300]}
         row.update(res)
         return row

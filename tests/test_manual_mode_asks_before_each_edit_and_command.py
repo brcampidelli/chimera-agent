@@ -21,15 +21,15 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.api.manual_gate import (  # noqa: E402
+from chimera.api.manual_gate import (
     NEEDS_SCREEN,
     ManualAllowances,
     proposed_diff,
 )
-from chimera.api.screen_credential import HEADER_NAME  # noqa: E402
-from tests.test_code_permission_screen_security import _bridged, _saved_conversation  # noqa: E402
+from chimera.api.screen_credential import HEADER_NAME
+from tests.test_code_permission_screen_security import _bridged, _saved_conversation
 
 MANUAL = {"reach": "workspace", "approval": "always", "commands": "asks", "edits": "asks"}
 AUTO = {"reach": "workspace", "approval": "suspicious", "commands": "granted", "edits": "granted"}

@@ -89,6 +89,29 @@ export function Spinner() {
   );
 }
 
-export function EmptyState({ text }: { text: string }) {
-  return <div className="px-4 py-6 text-sm text-muted-foreground">{text}</div>;
+/**
+ * An empty list. `text` alone is the old shape and renders exactly as before; `title`, `hint` and
+ * `action` are for the screens where "nothing here yet" should also say what to do first. The action
+ * is a ready node (a Button) rather than a label plus callback, so the screen decides what it is.
+ */
+export function EmptyState({
+  text,
+  title,
+  hint,
+  action,
+}: {
+  text: string;
+  title?: string;
+  /** A second, quieter line: why it is empty, or what fills it. */
+  hint?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="px-4 py-6 text-sm text-muted-foreground">
+      {title && <p className="text-sm font-medium text-foreground">{title}</p>}
+      <p>{text}</p>
+      {hint && <p className="mt-1 text-xs">{hint}</p>}
+      {action && <div className="mt-3">{action}</div>}
+    </div>
+  );
 }

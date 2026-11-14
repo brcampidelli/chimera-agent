@@ -213,10 +213,10 @@ def test_two_screens_asking_at_once_share_one_walk_of_the_disk(
     calls: list[Path] = []
     real = storage.measure
 
-    def counted(home: Path, workspace: Path | None = None) -> dict[str, object]:
+    def counted(home: Path, workspace: Path | None = None, **extra: object) -> dict[str, object]:
         calls.append(home)
         time.sleep(0.3)
-        return real(home, workspace)
+        return real(home, workspace, **extra)  # type: ignore[arg-type]  # the keywords measure takes
 
     monkeypatch.setattr(storage, "measure", counted)
     storage.forget_shared_reports()

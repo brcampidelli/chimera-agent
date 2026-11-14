@@ -528,7 +528,7 @@ class BridgeJobs:
         async def wrapper() -> None:
             try:
                 await run(job)
-            except Exception as exc:  # noqa: BLE001 — a job's failure is its result, not a crash
+            except Exception as exc:  # a job's failure is its result, not a crash
                 job.error = job.error or f"{type(exc).__name__}: {exc}"
             finally:
                 job.done = True

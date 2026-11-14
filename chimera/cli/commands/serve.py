@@ -1306,7 +1306,7 @@ def _serve_platform(
             # anything to any chat id.
             voice=[send_tool],
         )
-        if os.environ.get("CHIMERA_CHAT_SCHEDULE_ONCE", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if get_settings().chat_schedule_once.strip().lower() in {"1", "true", "yes", "on"}:
             from chimera.governance.approval import always_ask
             from chimera.tools.schedule_once import ScheduleOnceTool
 

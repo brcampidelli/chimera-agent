@@ -244,7 +244,7 @@ def policy_file_refusal(path: Path) -> str | None:
         from chimera.deployment_policy import is_policy_file
 
         protected = is_policy_file(Path(path), get_settings())
-    except Exception:  # noqa: BLE001 — cannot tell, so treat it as the policy file
+    except Exception:  # cannot tell, so treat it as the policy file
         _log.warning("could not check %s against the deployment policy file; refusing", path)
         return "the deployment policy file could not be ruled out"
     return "it is the owner's deployment policy" if protected else None

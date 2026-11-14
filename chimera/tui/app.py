@@ -394,7 +394,7 @@ class ChimeraTUI(App[None]):
                 on_tool=self._emit_tool,
                 **notices,
             )
-        except Exception as exc:  # noqa: BLE001 — keep the TUI alive on transient errors
+        except Exception as exc:  # keep the TUI alive on transient errors
             self.post_message(TurnFinished(None, note=f"error: {scrub_provider_ids(str(exc))}"))
             return
         self._record_usage(report)
@@ -639,7 +639,7 @@ class ChimeraTUI(App[None]):
             return
         try:
             self.sessions.persist(self.session_id)
-        except Exception as exc:  # noqa: BLE001 — a thread that cannot be saved is not a dead app
+        except Exception as exc:  # a thread that cannot be saved is not a dead app
             self._append(f"[yellow]not saved:[/yellow] [dim]{escape(str(exc))}[/dim]")
 
     def _say_which_thread(self) -> None:

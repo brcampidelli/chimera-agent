@@ -20,14 +20,14 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings  # noqa: E402
-from chimera.integrations.mcp_client import MCPToolSpec  # noqa: E402
-from chimera.integrations.mcp_cues import selection_cues  # noqa: E402
-from chimera.integrations.mcp_pins import check_manifest  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
-from chimera.interface.session import SupportsRun  # noqa: E402
+from chimera.config import Settings
+from chimera.integrations.mcp_client import MCPToolSpec
+from chimera.integrations.mcp_cues import selection_cues
+from chimera.integrations.mcp_pins import check_manifest
+from chimera.interface import ChatSession
+from chimera.interface.session import SupportsRun
 
 
 def _client(home: Path) -> TestClient:
