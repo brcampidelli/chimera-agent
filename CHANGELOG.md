@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **`solve` now judges its work like the app does.** It reads the project's own test command (gated by where the command came from), a reviewer running on the same model that wrote the patch is advisory instead of a veto, and every run receipt records who judged and where the check came from. (#1256)
+
 - **The API no longer leaks internal errors, and uploads no longer freeze it.** An uncaught server error now returns a generic 500 with an error id you can find in `backend.log`, large attachments are processed off the main loop so the app keeps answering meanwhile, and log lines written during a turn name that turn. (#1254)
 
 - **Settings:** the search now finds every row (it covered about half), each setting says when a saved change applies (now, next conversation or next launch; the ones not yet traced say nothing), empty Memory, Runs, Decisions and Skills screens offer a first step, the presentation view uses the shared dialog, and reads of `CHIMERA_*` outside `Settings` are pinned by a ratchet. (#1251)
