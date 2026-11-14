@@ -87,6 +87,16 @@ repo can tell you, since the desktop is only ever built in CI.
 
 ## Cutting it
 
+The steps below are what `scripts/cut_release.py` does, in order, and it opens the release as a pull
+request: `main` is protected, so the bump passes CI before it lands. Run it from the repository root:
+
+```bash
+python scripts/cut_release.py X.Y.Z            # opens the PR and stops
+python scripts/cut_release.py X.Y.Z --merge    # waits for CI, then merges
+```
+
+The manual list it replaces is kept for reference, for when the script itself is what is broken.
+
 ```bash
 # 1. bump all three version strings — they must agree on the VERSION, not on the literal text.
 #    Python and Rust disagree on how a prerelease is spelled, and neither will accept the other's:

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
@@ -212,6 +213,25 @@ def _nobody_has_declared_the_terminal_dead() -> Iterator[None]:
     confirm_mod._no_human_surface = None
     yield
     confirm_mod._no_human_surface = None
+
+
+@pytest.fixture(autouse=True)
+def _no_test_inherits_the_ports_an_earlier_one_listened_on() -> Iterator[None]:
+    """Forget the ports a listener claimed (`chimera.core.listeners`), before and after every test.
+
+    The set is process-wide and "nothing is ever released" is the right rule for a process, not for a
+    session of three thousand tests that each bind port 0: a port the OS handed to an earlier test's
+    guest listener goes back to the pool when that test ends, and a later test that asks the OS for a
+    free port for its dev server can be handed the same number. `ElementPicker.target` then refuses it
+    ("one Chimera itself serves on", 403) where the test expects a 409. It showed up on one shard of
+    CI, on three Pythons, and never when the file ran alone: the answer depended on which tests ran
+    before it and on what the kernel did with the numbers.
+    """
+    from chimera.core import listeners
+
+    listeners._held.clear()
+    yield
+    listeners._held.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -414,3 +434,48 @@ def _no_test_reaches_a_real_server(request: pytest.FixtureRequest) -> Iterator[N
         yield
     if violations:
         pytest.fail("test connected outside this machine: " + ", ".join(violations), pytrace=False)
+
+
+class _NoProviderInTests:
+    """What an extraction with no backend of its own gets here instead of the real gateway."""
+
+    def complete(self, messages: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("no test reaches a real model provider")
+
+
+@pytest.fixture(autouse=True)
+def _memory_extraction_is_off_the_network_and_ends_with_its_test(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[None]:
+    """A turn's background memory extraction neither reaches a provider nor outlives its test.
+
+    `MemoryExtractor.after_turn` starts a daemon thread that builds a real `LLMGateway` when no backend
+    was given, and memory extraction is on by default. Any test that finished a turn through the Code
+    screen, ``chat`` or the TUI therefore left a thread that, a moment later, called OpenRouter (the
+    environment held ``OPENROUTER_API_KEY=sk-test``) — while the NEXT test was running, so the network
+    guard charged the call to a test that sent no message at all: the CI shard failed
+    ``test_the_default_workspace_is_filed_under_the_name_the_writer_used`` and two `chimera code`
+    tests with "test connected outside this machine", and none of them fails alone.
+
+    Two halves. An extraction with no backend of its own gets one that refuses (a test that wants a
+    model gives the extractor one, or patches ``chimera.providers.LLMGateway``, which is respected).
+    And the extraction threads are joined before the test is over, inside the network guard's window,
+    so whatever one of them does is charged to the test that started it. Defined after the guard on
+    purpose: teardown runs in reverse order.
+    """
+    import chimera.providers as providers
+    from chimera.memory import extract as extract_mod
+
+    real_gateway = providers.LLMGateway
+    original = extract_mod.MemoryExtractor._safely
+
+    def safely(self: Any, user_message: str, answer: str, tainted: bool) -> None:
+        if self.backend is None and providers.LLMGateway is real_gateway:
+            self.backend = _NoProviderInTests()
+        original(self, user_message, answer, tainted)
+
+    monkeypatch.setattr(extract_mod.MemoryExtractor, "_safely", safely)
+    yield
+    for thread in threading.enumerate():
+        if thread.name == "memory-extract" and thread is not threading.current_thread():
+            thread.join(timeout=15)

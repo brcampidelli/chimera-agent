@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Repository hygiene.** Removed five tracked execution outputs, synced stale docstrings, made `chimera tui` refuse to start without a terminal, made `chimera init` hide the key and keep `.env` owner-only, and pinned the chart CDN scripts. (#1276)
+
 - **CI now audits distributed Python extras and blocks fixable CVEs.** Add full-extra install smoke coverage across Linux, Windows and macOS, enforce locked CI environments, and keep advisories without a published fix visible. (#1263)
 
 - **`solve` now judges its work like the app does.** It reads the project's own test command (gated by where the command came from), a reviewer running on the same model that wrote the patch is advisory instead of a veto, and every run receipt records who judged and where the check came from. (#1256)

@@ -7,6 +7,7 @@ name defined here.
 from __future__ import annotations
 
 import json
+import os
 import platform
 from pathlib import Path
 from typing import Any
@@ -72,8 +73,6 @@ def init(
     home: str = typer.Option(None, "--home", help="Project dir for the .env (default: cwd)."),
 ) -> None:
     """First-run setup: create .env, set a provider key, and point you at a real example."""
-    import os
-
     from chimera.providers.catalog import PROVIDERS_BY_NAME, provider_names
 
     chosen = PROVIDERS_BY_NAME.get(provider.strip().lower())
@@ -92,18 +91,25 @@ def init(
     if env_path.exists():
         console.print(f".env already exists at [bold]{env_path}[/bold] — leaving it in place.")
     elif example.exists():
-        env_path.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+        _create_private(env_path, example.read_text(encoding="utf-8"))
         console.print(f"[green]Created[/green] {env_path} from .env.example")
     else:
-        env_path.write_text("# Chimera configuration\n", encoding="utf-8")
+        _create_private(env_path, "# Chimera configuration\n")
         console.print(f"[green]Created[/green] {env_path}")
+    # An existing .env may be 0644 from before this rule. Restrict it now, before any prompt can
+    # leave the interactive flow half-done with the key readable by other accounts.
+    _restrict_env(env_path)
 
     # 2. Provider key (flag wins; prompt only when interactive).
     secret = (key or openrouter_key or "").strip()
     if not secret and not yes:
         console.print(f"Get a key at [bold]{chosen.keys_url}[/bold].")
+        # hide_input: the key is a secret, and a terminal that echoes it keeps it in scrollback.
         secret = typer.prompt(
-            f"Paste your {chosen.label} API key (leave blank to skip)", default="", show_default=False
+            f"Paste your {chosen.label} API key (leave blank to skip)",
+            default="",
+            show_default=False,
+            hide_input=True,
         ).strip()
     if secret:
         _set_env_var(env_path, chosen.env, secret)
@@ -167,6 +173,20 @@ def init(
                 title="[yellow]One more step[/yellow]",
             )
         )
+
+
+def _create_private(path: Path, text: str) -> None:
+    """Create ``path`` as 0600 from its first byte, so a key is never in a world-readable file."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
+def _restrict_env(path: Path) -> None:
+    """Make an existing ``.env`` 0600. Called before the interactive flow, so a file that predates
+    this rule is private while the prompts run. Windows has no such mode bits to set."""
+    if os.name != "nt" and path.exists():
+        os.chmod(path, 0o600)
 
 
 def _doctor_fixes(settings: Any, *, cwd: Path | None = None) -> list[str]:

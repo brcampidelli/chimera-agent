@@ -517,7 +517,7 @@ def solve(
     # Takes precedence over --fuse (the cascade already has fusion as its top rung).
     if cascade or settings.cascade:
         backend = _cascade_backend(gateway, settings)
-    # --fuse (explicit) or CHIMERA_AUTO_FUSE (production default) both route the worker
+    # --fuse (explicit) or CHIMERA_AUTO_FUSE (off by default, config.py) both route the worker
     # through the cost-aware router, so deep/error-sensitive turns fuse and cheap/tool
     # turns stay single-model.
     elif fuse or settings.auto_fuse:

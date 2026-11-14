@@ -1265,7 +1265,7 @@ def tui(
     from chimera.tools.references import foreground_instructions
 
     try:
-        from chimera.tui.app import ChimeraTUI
+        from chimera.tui.app import ChimeraTUI, NoTerminalError
         from chimera.tui.confirm import ModalGate
     except ImportError:  # Textual is a base dep, but degrade gracefully if the install was slimmed.
         console.print(
@@ -1313,6 +1313,19 @@ def tui(
 
     settings = get_settings()
     _require_valid_policy(settings, "tui")
+    # An invalid deployment policy is a security stop and answers first, on every surface. The
+    # terminal comes next: a person in a pipe should be told that, not that a key is missing. Done
+    # here and not only in `ChimeraTUI.run` because the provider check below would otherwise answer
+    # first. `getattr`: the tests substitute a fake
+    # app (driven by a non-TTY CliRunner) that has no such method, and must keep working.
+    require_terminal = getattr(ChimeraTUI, "require_terminal", None)
+    if require_terminal is not None:
+        try:
+            require_terminal()
+        except NoTerminalError as exc:
+            console.print(f"[red]{escape(str(exc))}. Use 'chimera chat' or 'chimera run' in a pipe.[/red]")
+            raise typer.Exit(code=1) from exc
+
     if not settings.can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
@@ -1445,6 +1458,9 @@ def tui(
     )
     try:
         screen.run()
+    except NoTerminalError as exc:
+        console.print(f"[red]{escape(str(exc))}. Use 'chimera chat' or 'chimera run' in a pipe.[/red]")
+        raise typer.Exit(code=1) from exc
     finally:
         # Belt and braces with `on_unmount`. A crash between the last frame and the process exiting
         # would otherwise leave the gate claiming a screen that is gone, and a question asked in
