@@ -2152,9 +2152,16 @@ def bypass_owner_for(
 
     Read per question, not when the turn was built: a conversation's switch can be turned on while
     its turn runs, and the very next tool call must be released by it. Off, every question goes to
-    the owner's approver unchanged. On, a question is released only when it is not a block, a warn,
-    a bridge's, nor one a rule or the policy holds, and the release is recorded in the audit and
-    announced on the turn's stream.
+    the owner's approver unchanged. On, a question is released only when the switch's one rule
+    (`bypass.release_by_bypass`) says so, and the release is recorded in the audit and announced on
+    the turn's stream.
+
+    This approver is where the tool boundary goes when the floor said no (`governed_tool`,
+    `ledger_tool`: floor no -> ``approve``), so it must apply the same floor: the copy it had of its
+    own (audit 2026-11, a07-01) never did, and answered yes to the force push, the ``+main``, the
+    ``.env`` upload and the ``-EncodedCommand`` the floor had just kept for the owner. The call is
+    judged on its real arguments when the boundary named it (`pending.asking_for_call`), and on the
+    card's text otherwise.
     """
 
     @functools.wraps(original_owner)
@@ -2163,19 +2170,25 @@ def bypass_owner_for(
             return bool(original_owner(*args))
         first = args[0] if args else None
         action = str(args[1] if len(args) > 1 else getattr(first, "action", "") or "")
-        decision = str(getattr(getattr(first, "decision", None), "value", "review")).lower()
-        if decision in {"block", "warn"}:
-            return bool(original_owner(*args))
-        from chimera.governance.approval_rules import matching_rule, tool_and_action
+        from chimera.governance.bypass import card_call, release_by_bypass
+        from chimera.governance.pending import asked_call
 
-        tool, shown = tool_and_action(action)
-        if matching_rule(home, ws, tool, shown) is not None:
+        call = asked_call()
+        if call is not None and not _question_is_for(call, action):
+            # A call left in the thread's context by another question must not lend this card its
+            # arguments: this question is not the one the boundary named, so the owner answers it.
             return bool(original_owner(*args))
-        if tool in {"open_pull_request", "browser", "ask_user"}:
-            return bool(original_owner(*args))
-        from chimera.governance.policy import Decision, RuleSet
-        verdict = RuleSet().evaluate(shown)
-        if verdict is not None and verdict.decision in {Decision.BLOCK, Decision.WARN}:
+        if call is not None:
+            # `shown` only when the kernel named it (annotated, so its facts block can be cut); the
+            # ledger's question text is read whole, like any other card's.
+            tool, call_args, evaluation, shown = call.tool, call.args, call.evaluation, call.shown
+        else:
+            (tool, call_args), evaluation, shown = card_call(action), None, ""
+        question = SimpleNamespace(action=action, decision=getattr(first, "decision", None))
+        if not release_by_bypass(
+            tool, call_args, evaluation, shown=shown, workspace=ws, home=None, question=question,
+            rules_home=home,
+        ):
             return bool(original_owner(*args))
         audit.record("bypass_permissions", {"action": action, "reason": "bypass_permissions", "tool": tool, "run_id": run_id or ""})
         if approval_sink is not None and getattr(approval_sink, "emit", None):
@@ -2184,6 +2197,20 @@ def bypass_owner_for(
 
     bypass_owner.__dict__.update(getattr(original_owner, "__dict__", {}))
     return bypass_owner
+
+
+def _question_is_for(call: Any, action: str) -> bool:
+    """Whether a card's text is the question the boundary asked for ``call``.
+
+    The kernel hands its approver the exact text it named the call with (``shown``); the taint
+    ledger names no text, and its card's first line starts with the tool. A mismatch is a question
+    asked on this thread for something else, and it must not be judged on another call's arguments.
+    """
+    from chimera.governance.approval_rules import tool_and_action
+
+    if call.shown:
+        return bool(action == call.shown)
+    return bool(tool_and_action(action)[0] == call.tool)
 
 
 def _owner_allows(

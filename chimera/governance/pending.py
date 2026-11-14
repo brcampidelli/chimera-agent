@@ -199,6 +199,16 @@ def asking_for_call(
         _CALL_CONTEXT.call = previous
 
 
+def asked_call() -> AskedCall | None:
+    """The call the question being asked on this thread is for (:func:`asking_for_call`), or ``None``.
+
+    Read by the owner's permission switch on the card path (`code_api.bypass_owner_for`): the card's
+    text is all a question carries, and the floor (`bypass.release_by_bypass`) judges the real
+    arguments when the boundary that asked named them.
+    """
+    return getattr(_CALL_CONTEXT, "call", None)
+
+
 def waiting_call(request_id: str) -> AskedCall | None:
     """The call behind a question this process is waiting on, or ``None``."""
     with _OWNER_LOCK:

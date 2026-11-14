@@ -248,8 +248,13 @@ class GovernedTool(Tool):
         audit: Any = None,
         package_facts: bool | None = None,
         run_id: str = "",
+        bypass_workspace: Any = None,
     ) -> None:
         self.inner = inner
+        # The project the owner's switch judges a call's targets against, for a tool that has no
+        # workspace of its own (the shell has one): `profile` used to pass it in a closure that ran half
+        # the switch's rule a second time; the rule itself now takes it (`bypass.release_by_bypass`).
+        self.bypass_workspace = bypass_workspace
         # Whether a `package_install` question carries what PyPI says (study 30, S30-28). Handed in
         # by the assembly, which holds the `Settings` the surface was given and knows whether any
         # person will read the card: a surface given a `Settings` must not read the process-wide
@@ -331,6 +336,24 @@ class GovernedTool(Tool):
             return refusal(f"[governance: BLOCKED — {verdict.reason}] "
                            f"The tool did NOT run. A fixed signature refused it, not the governance "
                            f"mode: no approver can release it. Do not report this as done.")
+        if verdict.decision in (Decision.ALLOW, Decision.WARN):
+            # What the owner's floor keeps (`bypass.floor_review_reason`: a secret file sent or read,
+            # `-EncodedCommand`, a rewrite of main/master) is a REVIEW whatever the rules said. The
+            # rules have no signature for `git push origin +main` or `powershell -enc`, so the kernel
+            # ALLOWed them, no card was raised, and the floor was never consulted: the switch's
+            # promise that these come back to the owner held only where some rule happened to ask
+            # (review of the P0-01 fix). The floor's own reading, not a second regex for the same
+            # thing, so the two cannot drift; it only ever raises a verdict, in every mode.
+            from chimera.governance.bypass import floor_review_reason
+
+            floor = floor_review_reason(
+                judged, judged_args,
+                workspace=getattr(self.inner, "workspace", None) or self.bypass_workspace,
+            )
+            if floor is not None:
+                verdict = replace(verdict, decision=Decision.REVIEW, reason=floor, rule="owner_floor")
+                if self.audit is not None:
+                    self.audit.record("owner_floor", {"tool": name, "reason": floor, "run_id": self.run_id})
         if verdict.decision == Decision.REVIEW:
             # No approver, no card: the refusal below is read by the model alone, and the lookup
             # would still send the package's name to PyPI and wait up to its timeout. `chimera agent
@@ -355,10 +378,12 @@ class GovernedTool(Tool):
                 and self.bypass_permissions()
                 and verdict.decision != Decision.BLOCK
             ):
-                from chimera.governance.bypass import bypass_safe
+                from chimera.governance.bypass import release_by_bypass
 
-                safe = bypass_safe(
-                    judged, judged_args, verdict, workspace=getattr(self.inner, "workspace", None),
+                # The shared rule, on the call and on the card's text (`bypass.release_by_bypass`).
+                safe = release_by_bypass(
+                    judged, judged_args, verdict, shown=shown,
+                    workspace=getattr(self.inner, "workspace", None) or self.bypass_workspace,
                 )
                 if safe and self.bypass_safe is not None:
                     safe = self.bypass_safe(judged, shown)
@@ -479,6 +504,7 @@ def govern_registry(
     bypass_permissions: Callable[[], bool] | None = None,
     bypass_safe: Callable[[str, str], bool] | None = None,
     audit: Any = None,
+    bypass_workspace: Any = None,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`GovernedTool`.
 
@@ -493,6 +519,7 @@ def govern_registry(
                 tool, kernel, approve=approve, context=context, ledger=ledger,
                 no_approver=no_approver, lineage=lineage, package_facts=package_facts,
                 bypass_permissions=bypass_permissions, bypass_safe=bypass_safe, audit=audit,
+                bypass_workspace=bypass_workspace,
             )
         )
     return governed

@@ -224,17 +224,11 @@ def test_the_new_case_only_ever_adds_refusals(
     assert with_d == without_d, "none of these prior cases is a recursive write outside"
 
 
-# --- the card path (P0-01, not fixed here) -------------------------------------------------------
+# --- the card path (P0-01) -------------------------------------------------------------------------
+# Until P0-01 `code_api.bypass_owner_for`, the approver behind the card, released without calling the
+# floor, so (d) did not reach this path; this test was a strict xfail waiting for that fix.
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "P0-01: `code_api.bypass_owner_for`, the approver behind the card, releases without calling "
-        "bypass_safe, so (d) does not reach this path yet. Strict, so the fix flips it to a failure "
-        "that asks for this marker to come off."
-    ),
-)
 @pytest.mark.parametrize("probe", [PROBE_RMTREE, PROBE_REMOVE_ITEM])
 def test_through_the_card_the_probe_reaches_the_owner(probe: str, tmp_path: Path) -> None:
     from types import SimpleNamespace

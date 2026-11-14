@@ -44,7 +44,7 @@ from chimera.tools.ssh_remote import (
     glob_regex,
     is_secret_name,
     refuse_nul,
-    secret_component,
+    secret_in,
     startup_reason,
 )
 from chimera.tools.workspace import decode_for_edit, encode_after_edit
@@ -409,7 +409,11 @@ class RemoteListDir(RemoteFileTool):
         # A credential file is left out of a listing, not just refused when read: not even its name,
         # so a listing is not an invitation to try another spelling (the local tool does the same
         # for Chimera's own `.env`).
-        entries = sorted(e for e in self.files.listing(target) if not is_secret_name(e.rstrip("/")))
+        entries = sorted(
+            e for e in self.files.listing(target)
+            if not is_secret_name(e.rstrip("/"))
+            and secret_in("", posixpath.join(target.real, e.rstrip("/"))) is None
+        )
         return "\n".join(entries) if entries else "(empty)"
 
 
@@ -429,7 +433,7 @@ class RemoteGrep(RemoteFileTool):
         lines: list[str] = []
         for path, number, text in hits:
             rel = posixpath.relpath(path, target.root)
-            if rel.startswith("..") or secret_component(rel) is not None:
+            if rel.startswith("..") or secret_in(rel, path) is not None:
                 continue  # the host was told to skip these; a name that slipped through is dropped here
             lines.append(f"{rel}:{number}: {text.strip()[:200]}")
         if len(hits) >= limit:
@@ -447,8 +451,8 @@ class RemoteGlob(RemoteFileTool):
         paths, cut = self.files.files(target)
         matched = sorted(
             rel
-            for rel in (posixpath.relpath(p, target.root) for p in paths)
-            if not rel.startswith("..") and secret_component(rel) is None and regex.fullmatch(rel)
+            for p, rel in ((p, posixpath.relpath(p, target.root)) for p in paths)
+            if not rel.startswith("..") and secret_in(rel, p) is None and regex.fullmatch(rel)
         )[:limit]
         note = "\n... [the host's file listing was cut; narrow the pattern]" if cut else ""
         return ("\n".join(matched) + note) if matched else "no files match" + note
