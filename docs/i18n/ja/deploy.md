@@ -1,5 +1,5 @@
 ---
-source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
+source_sha256: ded4f1799194e9f44cf268e7e309fba1b6befe25a2dd3b52fbca4cda40ced559
 ---
 
 # サーバー(VPS)へのChimeraのデプロイ
@@ -48,6 +48,18 @@ docker compose ps          # status + health
 ```bash
 git pull && docker compose up -d --build
 ```
+
+**root で動いていたイメージからの更新:**
+
+イメージは非特権ユーザー(uid 10001)で動作するようになりました。古いイメージが作成した `chimera-data` ボリュームは root 所有のため、最初の書き込みで失敗する代わりに、コンテナはこのメッセージとともに起動を拒否します(終了コード 78)。更新の前に、所有者を一度だけ修正してください:
+
+```bash
+docker compose run --rm --no-deps --user 0 --entrypoint chown chimera -R 10001:10001 /data
+```
+
+Docker Compose はボリューム名を `<プロジェクト>_chimera-data`(プロジェクトはフォルダ名)にします。そのため `-v chimera-data:/data` では名前の違う空のボリュームの所有者を変えるだけです。上のコマンドは Compose 経由なので実際のボリュームに届きます。ボリュームは `docker compose config --volumes` と `docker volume ls` で確認できます。`/data` がボリュームではなくバインドマウントの場合は、`sudo chown -R 10001:10001 <ホストのパス>` を実行してください。
+
+root のまま動かしたい場合は、以前のイメージタグを使い続けてください。現在のイメージは root では動きません。
 
 ---
 

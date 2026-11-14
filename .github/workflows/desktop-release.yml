@@ -26,12 +26,22 @@ on:
     types: [published]
   workflow_dispatch: {}
 
-permissions:
-  contents: write # attach installer assets to the release
+# Nothing by default. A workflow-level `contents: write` handed the release token to every job that
+# is ever added to this file, including one that only reads a log; each job below asks for what it
+# uses, so a new job starts with no token and has to say why it needs one.
+permissions: {}
 
 jobs:
   build:
     name: ${{ matrix.os }} (${{ matrix.bundles }})
+    # Still the widest job in the repo: it compiles the sidecar, the SPA (`npm ci`) and the Rust
+    # shell, holds TAURI_SIGNING_PRIVATE_KEY, AND has a write token to the release. Splitting it —
+    # build with `contents: read` and no key, a second job that downloads the unsigned bundles,
+    # signs them with `tauri signer sign` and uploads — is the next step; it moves the signing
+    # out of the reach of third-party build scripts, and is left for its own change because it
+    # rewrites the artifact hand-off of all four matrix legs.
+    permissions:
+      contents: write # attach installer assets + .sig files to the release
     strategy:
       fail-fast: false
       matrix:
@@ -143,6 +153,9 @@ jobs:
       # was off for every installed user, for every release.
       - name: The frozen sidecar knows its own version
         shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           BIN=apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend
           # `if`, not `[ … ] && …`: this step runs under `bash -e`, where a false test on the last
@@ -161,9 +174,18 @@ jobs:
           # And that it is the RIGHT version, not merely a non-zero one. The rule above was written
           # for `0.0.0+source` and encodes "not zero"; a sidecar stamped with the PREVIOUS release
           # passes it, which is the way a version is actually wrong — plausibly, not obviously.
-          # Empty on a manual dispatch, where there is no release to compare against.
-          ESPERADA="${{ github.event.release.tag_name }}"
-          ESPERADA="${ESPERADA#v}"
+          # A manual dispatch has no release and no inputs, so there is nothing to compare there. A
+          # RELEASE event must carry a tag, and that tag must be a version: the same grammar
+          # `scripts/cut_release.py` accepts (X.Y.Z, optionally a/b/rcN), with the leading `v`.
+          # Text a release author chooses arrives through env and is validated before use; pasted
+          # into this script it ran as shell in a job holding a write token.
+          ESPERADA="${RELEASE_TAG#v}"
+          if [ "$EVENT_NAME" = "release" ] || [ -n "$RELEASE_TAG" ]; then
+            if ! printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$'; then
+              echo "::error::the release tag is not a version (expected vX.Y.Z or vX.Y.ZrcN)"
+              exit 1
+            fi
+          fi
           if [ -n "$ESPERADA" ] && [ "$VERSION" != "$ESPERADA" ]; then
             echo "::error::the frozen sidecar reports $VERSION inside a $ESPERADA release"
             exit 1
@@ -206,7 +228,7 @@ jobs:
           esac
 
       - name: Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@c8037a86dde8214a8310e9f54a8fc61ab362aa31 # v2
