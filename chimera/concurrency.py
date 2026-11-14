@@ -188,7 +188,7 @@ def _spawn(
             gate.acquire()
         try:
             outcome.value = fn()
-        except Exception as exc:  # noqa: BLE001 — a crashing unit is a failed unit, not a crash
+        except Exception as exc:  # a crashing unit is a failed unit, not a crash
             outcome.error = exc
         finally:
             if gate is not None:

@@ -171,7 +171,7 @@ def _sandbox_state(tmp_path: Path, **env: str) -> dict[str, Any]:
 
     from chimera.api import build_api_app
     from chimera.interface import ChatSession
-    from tests.test_api import _FakeAgent  # noqa: PLC0415
+    from tests.test_api import _FakeAgent
 
     settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), **env)  # type: ignore[arg-type]
     client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings))
@@ -289,7 +289,7 @@ def test_doctor_names_the_same_python_the_tool_runs(
 
 
 def test_the_doctor_endpoint_carries_it(tmp_path: Path) -> None:
-    from tests.test_api import _client  # noqa: PLC0415
+    from tests.test_api import _client
 
     body = _client(tmp_path).get("/api/doctor").json()
 
@@ -327,7 +327,7 @@ def _answers(monkeypatch: pytest.MonkeyPatch, code: int) -> list[list[str]]:
     calls: list[list[str]] = []
 
     def run(argv: list[str], **_kw: Any) -> Any:
-        import subprocess  # noqa: PLC0415
+        import subprocess
 
         calls.append(list(argv))
         return subprocess.CompletedProcess(argv, code, b"", b"Python was not found")
@@ -396,7 +396,7 @@ def test_the_config_reports_the_verifiers_own_network_exception(tmp_path: Path, 
 
 
 def test_the_config_endpoint_carries_it(tmp_path: Path) -> None:
-    from tests.test_api import _client  # noqa: PLC0415
+    from tests.test_api import _client
 
     body = _client(tmp_path).get("/api/config").json()
 

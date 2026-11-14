@@ -20,15 +20,15 @@ from typing import Any, cast
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.api import build_api_app  # noqa: E402
-from chimera.api import screen_credential as sc  # noqa: E402
-from chimera.api.bridge_routes import ROUTES  # noqa: E402
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.core import element_pick  # noqa: E402
-from chimera.core.dev_servers import manager  # noqa: E402
-from chimera.core.element_pick import (  # noqa: E402
+from chimera.api import build_api_app
+from chimera.api import screen_credential as sc
+from chimera.api.bridge_routes import ROUTES
+from chimera.config import Settings, get_settings
+from chimera.core import element_pick
+from chimera.core.dev_servers import manager
+from chimera.core.element_pick import (
     PAGE_ELEMENT_MARK,
     ElementPicker,
     PickRefused,
@@ -36,10 +36,10 @@ from chimera.core.element_pick import (  # noqa: E402
     record_page_origin,
     validate,
 )
-from chimera.core.launch_config import load_launch_config  # noqa: E402
-from chimera.governance.ledger import TaintLedger  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
-from chimera.interface.session import SupportsRun  # noqa: E402
+from chimera.core.launch_config import load_launch_config
+from chimera.governance.ledger import TaintLedger
+from chimera.interface import ChatSession
+from chimera.interface.session import SupportsRun
 
 TOKEN = "owner-bearer-token-for-picker-tests-0123456789"
 SCREEN = "desktop-screen-credential-for-picker-tests-0123456789"
@@ -610,6 +610,6 @@ def test_the_real_script_under_node_survives_a_page_that_replaces_its_dom_functi
         "let out; try { out = eval('(' + src + ')')([1, 1]); } catch (e) { out = {threw: true}; }\n"
         "console.log(JSON.stringify(out));\n"
     )
-    done = subprocess.run([node, "-e", program], capture_output=True, text=True, timeout=30)  # noqa: S603
+    done = subprocess.run([node, "-e", program], capture_output=True, text=True, timeout=30)
     result = json.loads(done.stdout.strip().splitlines()[-1])
     assert result.get("threw") or validate(result, page="p", server="web") is None

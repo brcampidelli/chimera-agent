@@ -224,7 +224,7 @@ class GuestServer:
         if self._before_close is not None:
             try:
                 self._before_close()
-            except Exception as exc:  # noqa: BLE001 -- closing the listener matters more
+            except Exception as exc:  # closing the listener matters more
                 _log.warning("could not end the guest streams before closing the door: %s", exc)
         if server is not None:
             server.should_exit = True

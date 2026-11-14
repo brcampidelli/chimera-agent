@@ -173,7 +173,7 @@ def gh(path: str) -> Any:
     This makes about ninety calls and the anonymous ceiling is sixty an hour, so running it
     without a token gets you a partial catalogue and a confusing error rather than a refusal.
     """
-    request = urllib.request.Request(  # noqa: S310 -- a fixed https api.github.com URL
+    request = urllib.request.Request(  # a fixed https api.github.com URL
         f"https://api.github.com/{path.lstrip('/')}",
         headers={
             "User-Agent": "chimera-catalog-refresh",
@@ -182,7 +182,7 @@ def gh(path: str) -> Any:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 -- as above
+        with urllib.request.urlopen(request, timeout=30) as response:  # as above
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403, 429):
@@ -220,14 +220,14 @@ def skill_md(path: str) -> tuple[dict[str, Any], str]:
     a single API call for the tree and eighty-two ordinary file fetches.
     """
     url = f"https://raw.githubusercontent.com/{REPO}/{REF}/{path}"
-    request = urllib.request.Request(url, headers={"User-Agent": "chimera-catalog-refresh"})  # noqa: S310 -- fixed https host
+    request = urllib.request.Request(url, headers={"User-Agent": "chimera-catalog-refresh"})  # fixed https host
     # Eighty-two fetches in a row trips a rate limit that is about the RATE, not the count, and a
     # maintenance script that hammers somebody else's host and then reports "the source is broken"
     # is blaming the wrong party. Pace, and back off when asked to.
     text = ""
     for attempt in range(5):
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 -- as above
+            with urllib.request.urlopen(request, timeout=30) as response:  # as above
                 text = response.read().decode("utf-8", errors="replace")
             break
         except urllib.error.HTTPError as exc:

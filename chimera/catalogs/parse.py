@@ -102,7 +102,7 @@ class _PluginStars(_Lenient):
 
 class _PluginCard(_Lenient):
     id: str = ""
-    displayName: str = ""  # noqa: N815 -- the repository's field name
+    displayName: str = ""  # the repository's field name
     category: str = ""
     secondary: list[str] = Field(default_factory=list)
     license: str | None = None

@@ -18,8 +18,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from bench.verified_cascade.harness import THRESHOLD  # noqa: E402
-from bench.verified_cascade.replay import (  # noqa: E402
+from bench.verified_cascade.harness import THRESHOLD
+from bench.verified_cascade.replay import (
     GRADERS,
     RunData,
     is_wrong,
@@ -29,7 +29,7 @@ from bench.verified_cascade.replay import (  # noqa: E402
     read_key,
     shipped_label,
 )
-from bench.verified_cascade.stats import (  # noqa: E402
+from bench.verified_cascade.stats import (
     auroc,
     bootstrap_ratio,
     brier,

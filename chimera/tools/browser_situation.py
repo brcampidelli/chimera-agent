@@ -411,7 +411,7 @@ def _url_of(driver: BrowserDriver) -> str:
     """The loaded page's address when the driver can say (`PlaywrightDriver.url`), else ""."""
     try:
         return str(getattr(driver, "url", "") or "")
-    except Exception:  # noqa: BLE001 — an address is a courtesy in the handover's text
+    except Exception:  # an address is a courtesy in the handover's text
         return ""
 
 
@@ -429,7 +429,7 @@ def _drawn_frames(driver: BrowserDriver) -> list[str]:
             for address, width, height in boxes(is_provider_frame)
             if width >= _MIN_WIDGET_PX and height >= _MIN_WIDGET_PX
         ]
-    except Exception as exc:  # noqa: BLE001 — the HTML scan still runs; see the module docstring
+    except Exception as exc:  # the HTML scan still runs; see the module docstring
         _log.debug("browser frame tree unread: %s", exc)
         return []
 
@@ -485,7 +485,7 @@ class BrowserSituation:
             return
         try:
             settle(self.settle_seconds)
-        except Exception as exc:  # noqa: BLE001 — the look still happens, on the page as it is
+        except Exception as exc:  # the look still happens, on the page as it is
             _log.debug("browser settle skipped: %s", exc)
 
     def _hand_over(self, wall: Wall) -> str:
@@ -497,6 +497,6 @@ class BrowserSituation:
     def _probe(look: Callable[[], Wall | None]) -> Wall | None:
         try:
             return look()
-        except Exception as exc:  # noqa: BLE001 — a failed look is no wall; see the module docstring
+        except Exception as exc:  # a failed look is no wall; see the module docstring
             _log.debug("browser wall probe skipped: %s", exc)
             return None

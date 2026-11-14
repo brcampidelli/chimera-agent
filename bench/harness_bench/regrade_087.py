@@ -66,7 +66,7 @@ def main() -> None:
         before = stored(hid)
         try:
             result = grader.score_workspace(Path(path))
-        except Exception as exc:  # noqa: BLE001 — a grader that dies on one workspace must not stop the sweep
+        except Exception as exc:  # a grader that dies on one workspace must not stop the sweep
             print(f"  {hid}  GRADER RAISED: {type(exc).__name__}: {exc}")
             continue
         after = float(result.get("outcome_score", float("nan")))

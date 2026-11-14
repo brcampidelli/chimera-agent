@@ -85,7 +85,7 @@ def build_container_command(
 def _load_base_agent() -> Any:
     """Import terminal_bench's BaseAgent lazily; raise a friendly error if the extra is absent."""
     try:
-        from terminal_bench.agents.base_agent import BaseAgent  # type: ignore[import-not-found]
+        from terminal_bench.agents.base_agent import BaseAgent
     except ImportError as exc:  # pragma: no cover - exercised only without the extra
         raise ImportError(
             "the terminal-bench adapter needs an extra — install with: "

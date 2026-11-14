@@ -117,7 +117,7 @@ class _FakePsutil:
 
         return _V()
 
-    def Process(self) -> Any:  # noqa: N802 - mirrors psutil's own name
+    def Process(self) -> Any:  # mirrors psutil's own name
         class _P:
             def memory_info(self) -> Any:
                 class _M:

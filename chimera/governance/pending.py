@@ -614,7 +614,7 @@ def ask_user_durably(
         return None
     try:
         announce(request_id, question_data)
-    except Exception as exc:  # noqa: BLE001 — unanswered is safer than a broken turn
+    except Exception as exc:  # unanswered is safer than a broken turn
         _log.warning("user question not announced: %s", exc)
     deadline = clock() + max(0.0, wait_seconds)
     answer_path = directory / f"{request_id}.user-answer.json"
@@ -1209,7 +1209,7 @@ def ask_durably(
                     allow_key=str(named.get("allow_key") or "")[:2000],
                 )
             )
-        except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
+        except Exception as exc:  # the question is on disk; the notice is a courtesy
             _log.warning("approval request not announced: %s", exc)
     if deliver is not None:
         how = (
@@ -1241,7 +1241,7 @@ def ask_durably(
         for number, part in enumerate(parts, start=1):
             try:
                 deliver(part if len(parts) == 1 else f"({number}/{len(parts)}) {part}")
-            except Exception as exc:  # noqa: BLE001 — a failed delivery must not fail the run
+            except Exception as exc:  # a failed delivery must not fail the run
                 _log.warning("approval request not delivered: %s", exc)
 
     try:
@@ -1524,7 +1524,7 @@ def _record(
                     "reason": reason,
                 },
             )
-        except Exception as exc:  # noqa: BLE001 — a failed append must not fail the decision
+        except Exception as exc:  # a failed append must not fail the decision
             _log.warning("could not chain approval %s into the audit log: %s", request_id, exc)
 
 

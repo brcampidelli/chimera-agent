@@ -99,7 +99,7 @@ class MemoryManager:
             return
         try:
             self._audit.record(event_type, payload)
-        except Exception as exc:  # noqa: BLE001 — the write stands; only the record is lost
+        except Exception as exc:  # the write stands; only the record is lost
             _log.warning("could not chain memory %s into the audit log: %s", event_type, exc)
 
     def add(
@@ -616,7 +616,7 @@ class MemoryManager:
                     if on_layer is not None:
                         on_layer("semantic")
                     return hits
-            except Exception as exc:  # noqa: BLE001 — degrade to lexical, never fail recall
+            except Exception as exc:  # degrade to lexical, never fail recall
                 _log.warning("semantic recall failed, falling back to keyword: %s", exc)
         backend_search = getattr(self.store, "search", None)
         if callable(backend_search) and not self._supersession:  # e.g. SQLite/FTS5

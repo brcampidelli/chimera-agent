@@ -433,13 +433,13 @@ def _run_one(
             )
         passed, conjuncts = _verdict(scenario.check(ctx))
         error = ""
-    except Exception as exc:  # noqa: BLE001 — a crashing scenario is a failure, not an abort
+    except Exception as exc:  # a crashing scenario is a failure, not an abort
         passed, error = False, f"{type(exc).__name__}: {exc}"
     active: bool | None = None
     if scenario.mechanism is not None:
         try:
             active = bool(scenario.mechanism(ctx))
-        except Exception:  # noqa: BLE001 — an unreadable mask is "did not fire", never "fired"
+        except Exception:  # an unreadable mask is "did not fire", never "fired"
             active = False
     return ScenarioOutcome(
         id=scenario.id,
@@ -543,8 +543,8 @@ def _sha_from_git(start: Path) -> str:
     from chimera.proc.decode import console_text
 
     try:
-        done = subprocess.run(  # noqa: S603 — fixed argv, no shell
-            ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
+        done = subprocess.run(  # fixed argv, no shell
+            ["git", "rev-parse", "--short", "HEAD"],
             cwd=start,
             capture_output=True,
             timeout=15,

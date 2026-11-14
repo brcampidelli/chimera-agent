@@ -284,7 +284,7 @@ def test_a_reader_and_a_writer_do_not_take_each_other_down(tmp_path: Path) -> No
         try:
             for i in range(60):
                 writer_store.add(_item(f"w{i}"))
-        except BaseException as exc:  # noqa: BLE001 - the point is to report it, not handle it
+        except BaseException as exc:  # the point is to report it, not handle it
             errors.append(exc)
         finally:
             stop.set()
@@ -293,7 +293,7 @@ def test_a_reader_and_a_writer_do_not_take_each_other_down(tmp_path: Path) -> No
         try:
             while not stop.is_set():
                 assert MemoryStore(path).all(), "recall came back empty mid-write"
-        except BaseException as exc:  # noqa: BLE001
+        except BaseException as exc:
             errors.append(exc)
 
     threads = [threading.Thread(target=write), threading.Thread(target=read)]

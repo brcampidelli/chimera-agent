@@ -42,7 +42,7 @@ def look(d, requests):
         box = None
         try:
             box = f.frame_element().bounding_box()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             box = str(exc)[:40]
         p = urlsplit(f.url)
         frames.append({"frame": f"{p.hostname}{p.path[:40]}#{(p.fragment or '')[:30]}", "box": box})
@@ -74,7 +74,7 @@ for url in PAGES:
         row["after_settle"] = look(d, requests)
         time.sleep(5)
         row["after_5s_more"] = look(d, requests)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         row["error"] = str(exc)[:200]
     finally:
         d.close()

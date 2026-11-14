@@ -424,7 +424,7 @@ class GovernedTool(Tool):
             return ""
         try:
             return str(self.lineage() or "")
-        except Exception:  # noqa: BLE001 — see docstring
+        except Exception:  # see docstring
             return ""
 
     def _context(self) -> str:
@@ -438,7 +438,7 @@ class GovernedTool(Tool):
             return ""
         try:
             return str(self.context() or "")
-        except Exception:  # noqa: BLE001 — see docstring: never block a tool over a missing reason
+        except Exception:  # see docstring: never block a tool over a missing reason
             return ""
 
 

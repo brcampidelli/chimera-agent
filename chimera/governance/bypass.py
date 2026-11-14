@@ -68,7 +68,7 @@ def bypass_safe(
     """
     try:
         return _bypass_safe(tool, args, kernel_evaluation, workspace=workspace, home=home)
-    except Exception:  # noqa: BLE001 - a call this floor cannot read stays with the owner
+    except Exception:  # a call this floor cannot read stays with the owner
         return False
 
 

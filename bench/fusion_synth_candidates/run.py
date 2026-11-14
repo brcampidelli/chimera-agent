@@ -73,7 +73,7 @@ def _call_local(endpoint: str, model: str, prompt: str) -> str:
     request = urllib.request.Request(base + "/api/chat", data=body,
                                      headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=600) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=600) as response:
             result = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"local endpoint call failed: {exc}") from exc

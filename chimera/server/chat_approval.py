@@ -294,7 +294,7 @@ class ChatApprovals:
         """
         try:
             return self._intercept(message)
-        except Exception as exc:  # noqa: BLE001 — see the docstring: fail closed, never stop the bot
+        except Exception as exc:  # see the docstring: fail closed, never stop the bot
             sender = f"{getattr(message, 'platform', '?')}:{getattr(message, 'user', '?')}"
             _log.error(
                 "chat approval check failed (%s); message from %s held back",

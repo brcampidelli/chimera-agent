@@ -125,7 +125,7 @@ def _nvidia_gpus() -> tuple[list[Gpu], str]:
     if smi is None:
         return [], ""
     try:
-        proc = subprocess.run(  # noqa: S603 — argv list, never a shell string
+        proc = subprocess.run(  # argv list, never a shell string
             [
                 smi,
                 "--query-gpu=name,memory.total,memory.used,utilization.gpu",
@@ -223,7 +223,7 @@ def snapshot(*, cpu_interval: float = 0.0) -> Resources:
                 percent=float(virtual.percent),
             )
             out.process_mb = int(psutil.Process().memory_info().rss / 1_048_576)
-        except Exception as exc:  # noqa: BLE001 — telemetry must not take the server with it
+        except Exception as exc:  # telemetry must not take the server with it
             _log.debug("psutil reading failed: %s", exc)
             out.notes.append("the system reading failed")
 

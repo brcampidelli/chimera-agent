@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-139 directories: 124 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
+140 directories: 125 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
@@ -136,7 +136,8 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`swe_bench`](swe_bench/) | with result | 1 | 1 |
 | [`terminal_bench`](terminal_bench/) | with result | 0 | 1 |
 | [`test_gate_two_sided`](test_gate_two_sided/) | with result | 1 | 1 |
-| [`tool_defer`](tool_defer/) | with result | 1 | 1 |
+| [`token_baseline`](token_baseline/) | with result | 1 | 1 |
+| [`tool_defer`](tool_defer/) | with result | 2 | 1 |
 | [`tool_loop_escalation`](tool_loop_escalation/) | with result | 1 | 1 |
 | [`tool_loop_fix`](tool_loop_fix/) | with result | 1 | 1 |
 | [`tool_loop_fork`](tool_loop_fork/) | with result | 1 | 1 |

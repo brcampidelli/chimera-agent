@@ -38,7 +38,7 @@ class _Redacting(logging.Filter):
                 record.exc_text = logging.Formatter().formatException(record.exc_info)
             if record.exc_text:
                 record.exc_text = redact(record.exc_text)
-        except Exception:  # noqa: BLE001 — a record that cannot be masked is not written at all
+        except Exception:  # a record that cannot be masked is not written at all
             return False
         return True
 
@@ -67,7 +67,7 @@ def attach_file_log(path: Path) -> Path | None:
     except OSError:
         return None
     handler.setLevel(logging.WARNING)
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s [turn=%(turn_id)s]: %(message)s"))
     handler.addFilter(_Redacting())
     root.addHandler(handler)
     _FILE_LOG = path.resolve()

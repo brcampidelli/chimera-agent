@@ -30,7 +30,7 @@ def _download(url: str, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists() and dest.stat().st_size > 0:
         return dest
-    with urllib.request.urlopen(url, timeout=120) as resp:  # noqa: S310 — pinned https URLs above
+    with urllib.request.urlopen(url, timeout=120) as resp:  # pinned https URLs above
         dest.write_bytes(resp.read())
     return dest
 

@@ -191,7 +191,7 @@ class AcpConnection:
             return
         try:
             result = handler(params if isinstance(params, dict) else {})
-        except Exception as exc:  # noqa: BLE001 — becomes the agent's error reply, not our crash
+        except Exception as exc:  # becomes the agent's error reply, not our crash
             _log.warning("%s: handler for %s failed: %s", self.name, method, exc)
             # The message goes to another program's log, so it carries the reason and not a
             # traceback: an agent that is told "refused: outside the write region" can adapt, and

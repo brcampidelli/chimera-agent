@@ -100,7 +100,7 @@ def _work(
     board.move(card.id, "doing")
     try:
         result = runner.run(card)
-    except Exception as exc:  # noqa: BLE001 — a lane failure parks the card for review
+    except Exception as exc:  # a lane failure parks the card for review
         result = LaneResult(success=False, answer=f"error: {exc}")
     board.record_result(card.id, success=result.success, result=result.answer)
     target: Column = "done" if result.success else "review"

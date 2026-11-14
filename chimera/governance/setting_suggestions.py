@@ -393,7 +393,7 @@ def resolve(
                 _end(home, s, "approved", agora, via, "invalid")
                 _log.warning("suggestion %s not applied: %s", s.id, exc)
                 return "invalid", str(exc)
-        except Exception as exc:  # noqa: BLE001 — reported to the owner, never swallowed
+        except Exception as exc:  # reported to the owner, never swallowed
             # Not a refusal: the reading or the write itself broke (``.env`` held open by another
             # reader on Windows, a full disk). Before this it escaped as a 500 that left the card
             # waiting and the screen silent — the owner's yes vanished. Left waiting on purpose: the

@@ -83,7 +83,7 @@ def check_site(fail: Failures) -> dict[str, Any]:
 def check_server(origin: str, fail: Failures) -> None:
     def get(path: str) -> tuple[int, str]:
         try:
-            with urllib.request.urlopen(origin + path, timeout=10) as resp:  # noqa: S310 — our own local server
+            with urllib.request.urlopen(origin + path, timeout=10) as resp:  # our own local server
                 return resp.status, resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             return exc.code, ""
@@ -153,7 +153,7 @@ def run_scripts(origin: str, fail: Failures) -> dict[str, dict[str, Any]]:
                 try:
                     answer = t.solve(Script(tool, arm, origin, driver))
                     error = ""
-                except Exception as exc:  # noqa: BLE001 — reported as an unreachable target
+                except Exception as exc:  # reported as an unreachable target
                     answer, error = "", f"{type(exc).__name__}: {exc}"
                 calls = tool.log.calls[before:]
                 ok = fail.need(not error and t.check.passes(answer),

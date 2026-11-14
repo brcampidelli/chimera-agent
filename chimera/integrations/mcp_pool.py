@@ -103,7 +103,7 @@ def connect_named(settings: Settings, names: list[str]) -> tuple[Any, dict[str, 
             configured = [cfg for cfg in _configured(settings) if cfg.name in pending]
             try:
                 outcomes.update(_fill(_named, configured, settings.home / "mcp.json"))
-            except Exception as exc:  # noqa: BLE001 — a broken server must not break the owner's turn
+            except Exception as exc:  # a broken server must not break the owner's turn
                 _log.exception("MCP: named connect failed")
                 for cfg in configured:
                     outcomes.setdefault(cfg.name, type(exc).__name__)
@@ -222,7 +222,7 @@ def shutdown() -> None:
     for session in sessions:
         try:
             session.close()
-        except Exception:  # noqa: BLE001 — a close that fails must not stop the others closing
+        except Exception:  # a close that fails must not stop the others closing
             _log.warning("MCP: a session did not close cleanly during shutdown")
 
 
@@ -243,7 +243,7 @@ def _build_background(settings: Settings, done: threading.Event) -> None:
         if built is not None:
             with _lock:
                 _pool = built
-    except Exception:  # noqa: BLE001 — logged; the flag still clears below
+    except Exception:  # logged; the flag still clears below
         _log.exception("MCP: background build failed")
     finally:
         with _lock:
@@ -293,7 +293,7 @@ def _run_background(
     global _building
     try:
         _fill(pool, servers, mcp_path)
-    except Exception:  # noqa: BLE001 — logged; the flag still clears
+    except Exception:  # logged; the flag still clears
         _log.exception("MCP: background connect failed")
     finally:
         with _lock:
@@ -346,7 +346,7 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> dict[str, str | None
             _untrack(session)
             _log.warning("MCP: refused server %r, %s", cfg.name, exc)
             outcomes[cfg.name] = str(exc)[:300]
-        except Exception as exc:  # noqa: BLE001 — a broken server must never break a turn
+        except Exception as exc:  # a broken server must never break a turn
             # The MESSAGE, not just the class. `ModuleNotFoundError` on its own is the least useful
             # half of "the MCP SDK is not installed — install it with: pip install
             # 'chimera-agent[mcp]'": the sentence was written precisely so this case would stop
@@ -437,7 +437,7 @@ def pool_state(settings: Settings) -> PoolState:
         if _pool is not None:
             try:
                 nomes = tuple(_pool.names())
-            except Exception:  # noqa: BLE001 -- a broken pool must not break a status read
+            except Exception:  # a broken pool must not break a status read
                 nomes = ()
         elif _tried:
             # Built and came back empty (no servers, or every one failed to connect). That is a real

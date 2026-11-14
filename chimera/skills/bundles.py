@@ -320,9 +320,9 @@ def _get_once(url: str, *, accept: str = "application/vnd.github+json",
     headers = {"User-Agent": _USER_AGENT, "Accept": accept}
     if token and parsed.hostname in _ALLOWED_HOSTS:
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)  # noqa: S310 -- scheme and host checked above
+    req = urllib.request.Request(url, headers=headers)  # scheme and host checked above
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 -- as above
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # as above
             body: bytes = resp.read(limit + 1)
             if len(body) > limit:
                 # Refused, not returned short. A truncated read handed back as though it were the
@@ -350,7 +350,7 @@ def _get_once(url: str, *, accept: str = "application/vnd.github+json",
         raise BundleError(f"the source answered {exc.code}") from exc
     except BundleError:
         raise
-    except Exception as exc:  # noqa: BLE001 -- the caller decides whether to try again
+    except Exception as exc:  # the caller decides whether to try again
         # Transport, not protocol: a reset connection, a DNS blip, a timeout. `_get` retries these
         # and turns the last one into a BundleError; anything above this line is an answer the
         # server gave, and answers do not change on a second ask.
@@ -593,7 +593,7 @@ def installed(home: Path) -> list[InstalledBundle]:
                     record.status, record.reconfirm = "pending", True
                 out.append(record)
                 continue
-            except Exception as exc:  # noqa: BLE001 -- a bad record must not hide the directory
+            except Exception as exc:  # a bad record must not hide the directory
                 _log.warning("unreadable bundle.json in %s: %s", child.name, exc)
         out.append(InstalledBundle(name=child.name, description="", status="unknown"))
     from chimera.deployment_policy import integration_denied

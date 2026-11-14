@@ -87,5 +87,5 @@ def test_the_browser_module_declares_it_waits_for_the_next_conversation() -> Non
     """Read when the registry builds the browser tool and when the agent is built, as headless is;
     a chat holds both for its lifetime. The other two are read per Code turn: the next call."""
     assert APPLIES_WHEN["CHIMERA_BROWSER_SITUATION"] == "next_conversation"
-    assert "CHIMERA_RESEARCH_AGENT" not in APPLIES_WHEN
-    assert "CHIMERA_EXPLORER_CONTRACT" not in APPLIES_WHEN
+    assert APPLIES_WHEN["CHIMERA_RESEARCH_AGENT"] == "now"
+    assert APPLIES_WHEN["CHIMERA_EXPLORER_CONTRACT"] == "now"

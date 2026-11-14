@@ -63,7 +63,7 @@ def _retrying(call: Any, *, tries: int = 6, wait: float = 20.0) -> Any:
     for attempt in range(tries):
         try:
             return call()
-        except Exception as exc:  # noqa: BLE001 — only the rate-limit shape is retried
+        except Exception as exc:  # only the rate-limit shape is retried
             text = str(exc)
             if attempt == tries - 1 or ("429" not in text and "rate-limit" not in text.lower()):
                 raise
@@ -417,7 +417,7 @@ def main() -> int:
             a, arm, iid, pos, rep = futures[fut]
             try:
                 c = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a provider hiccup must not lose the file
+            except Exception as exc:  # a provider hiccup must not lose the file
                 print(f"  {a.split('/')[-1]:<32} {arm:<8} {iid:<22} {pos:<6} r{rep} ERROR {type(exc).__name__}: {str(exc)[:100]}", flush=True)
                 continue
             spent += c.usd or 0.0

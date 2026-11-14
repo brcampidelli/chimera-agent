@@ -45,7 +45,7 @@ def benchmark_report(*, snapshot_file: Path | None = None) -> dict[str, Any]:
             "external": data.get("external", []),
             "generated_for": data.get("generated_for"),
         }
-    except Exception:  # noqa: BLE001 — missing/corrupt snapshot is honest "unavailable", not a 500
+    except Exception:  # missing/corrupt snapshot is honest "unavailable", not a 500
         return _unavailable()
 
 

@@ -10,6 +10,12 @@ counting it ran past its time budget, or when its location is unknown here; ``0`
 counted and nothing was there. A partial count is not a measurement either: a lower bound shown as
 a size is believed as one.
 
+The worktrees are read one by one with their age and WHY each still exists (:func:`_retention`), and
+the report says when their total passes the owner's limit and which idle conversations could be
+ARCHIVED to let the existing thirty-day clean-up (`worktree_expiry`) do the rest. This module only
+reads for that: it never removes a worktree and never archives — the archive is the owner's click on
+the conversation list's own route.
+
 What may be removed from here is deliberately short: orphaned worktrees
 (:func:`chimera.core.worktree.prune_worktree_dirs`), one rotation of the diagnostic traces
 (:func:`rotate_logs`) and the response cache folder (:func:`clear_cache`). Sessions, memory, history, approvals and schedules are measured and never
@@ -25,7 +31,7 @@ import shutil
 import sys
 import threading
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -55,6 +61,19 @@ REPORT_BUDGET_SECONDS = 20.0
 #: one walk of the disk between them, not two at once. Short, and dropped by every action that
 #: changes what it counts, so a screen never shows a size a button just changed.
 SHARED_REPORT_SECONDS = 5.0
+
+#: Where the worktree total starts to warn, in GiB, and how many idle days make a conversation worth
+#: offering to archive. Both are PROPOSALS read off one measured machine (`study/auditoria-2026-11/
+#: areas/a12-worktrees-medicao.md`: 89 checkouts, median 0.77 GiB, all idle 14-21 days), not laws:
+#: the owner changes them in Settings. 10 GiB would have warned at the 14th checkout.
+WORKTREE_LIMIT_GB = 50.0
+WORKTREE_IDLE_DAYS = 14.0
+
+#: A bytes figure for a worktree stays good this long when the report asks again. Counting 89
+#: checkouts of ~45 000 files takes minutes and a report has 20 s, so each look keeps what it
+#: counted and the next one continues; a size is a few percent stale at worst, and says nothing it
+#: did not count. Used only by `measure_shared` (the screen), never by a plain `measure`.
+SIZE_CACHE_SECONDS = 900.0
 
 #: The traces `rotate_logs` may move aside. Only files whose writers ALREADY rotate them at a cap
 #: (`chimera/core/steplog.py`, renamed to `.1` keeping one generation): rotating them earlier is a
@@ -269,12 +288,148 @@ def _home_categories(
     )
 
 
-def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
+@dataclass(frozen=True)
+class WorktreeOwner:
+    """One conversation whose workspace is a worktree folder, as the Storage report needs it.
+
+    Built by the caller from the conversation list's own records (`chimera/api/storage_api.py`), so
+    the rules for "archived", "due" and "kept" stay where they are decided
+    (`worktree_expiry.removal_view`): this module copies none of them.
+    """
+
+    session_id: str
+    title: str
+    archived: bool
+    #: The worktree folder as the conversation stores it (case kept), so a project other than the
+    #: server's own is listed too.
+    folder: str = ""
+    #: Days since the conversation was last written to or brought back; None once archived.
+    idle_days: float | None = None
+    #: When the automatic clean-up may remove its worktree (epoch seconds), None while that is off or
+    #: the conversation is not archived.
+    due_at: float | None = None
+    #: The refusal the last clean-up pass recorded ("dirty", "unpushed", ...), "" when none.
+    kept: str = ""
+
+
+def owner_key(path: Path | str) -> str:
+    """The form a folder is looked up by: resolved and case-folded where the platform folds case."""
+    try:
+        return os.path.normcase(str(Path(path).expanduser().resolve()))
+    except OSError:
+        return os.path.normcase(str(path))
+
+
+def _retention(owners: Sequence[WorktreeOwner]) -> dict[str, Any]:
+    """Why a worktree still exists, as a fixed word a screen translates.
+
+    ``conversation`` - a conversation that is not archived uses it, and nothing here lets it go.
+    ``archived`` - every conversation using it is archived: ``retention_due_at`` is when the clean-up
+    may remove it, and ``retention_kept`` is why the last pass kept it (dirty tree, a commit not
+    pushed...). ``no_conversation`` - no conversation points at it. The refusals themselves stay the
+    clean-up's; this only reads what it wrote down.
+    """
+    if not owners:
+        return {"retention": "no_conversation", "retention_due_at": None, "retention_kept": ""}
+    live = [o for o in owners if not o.archived]
+    if live:
+        first = min(live, key=lambda o: o.idle_days if o.idle_days is not None else 0.0)
+        return {
+            "retention": "conversation", "retention_due_at": None, "retention_kept": "",
+            "session_id": first.session_id, "title": first.title,
+        }
+    due = [o.due_at for o in owners if o.due_at is not None]
+    kept = next((o.kept for o in owners if o.kept), "")
+    return {
+        "retention": "archived",
+        "retention_due_at": max(due) if due else None,
+        "retention_kept": kept,
+        "session_id": owners[0].session_id, "title": owners[0].title,
+    }
+
+
+def _worktree_size(
+    path: Path, deadline: float, cache: dict[str, tuple[float, Size]] | None
+) -> Size:
+    """The size of one worktree: from ``cache`` when it holds a recent count, else counted now. A count
+    that ran out of time is not cached - "not measured" is asked again next time."""
+    key = owner_key(path)
+    if cache is not None:
+        hit = cache.get(key)
+        if hit is not None and clock() - hit[0] < SIZE_CACHE_SECONDS:
+            return hit[1]
+    size = tree_size(path, deadline=deadline)
+    if cache is not None and size.bytes is not None:
+        cache[key] = (clock(), size)
+    return size
+
+
+def _archive_candidates(
+    rows: list[dict[str, Any]],
+    owners: Mapping[str, Sequence[WorktreeOwner]],
+    idle_days: float,
+) -> list[dict[str, Any]]:
+    """The idle conversations that could be archived: not archived, idle at least ``idle_days``, and
+    holding a worktree this report lists that no run of this process is using. The biggest first.
+    A list, not an action - nothing is archived until the owner presses the button, and archiving
+    touches nothing on disk."""
+    found: list[dict[str, Any]] = []
+    for row in rows:
+        if row["state"] == "live":
+            continue
+        for owner in owners.get(owner_key(row["path"]), ()):
+            if owner.archived or owner.idle_days is None or owner.idle_days < idle_days:
+                continue
+            found.append({
+                "session_id": owner.session_id, "title": owner.title,
+                "idle_days": round(owner.idle_days, 1), "path": row["path"], "bytes": row["bytes"],
+            })
+    found.sort(key=lambda c: (c["bytes"] is None, -(c["bytes"] or 0), -c["idle_days"]))
+    return found
+
+
+def _worktree_folders(
+    workspace: Path | None,
+    owners: Mapping[str, Sequence[WorktreeOwner]],
+    find: Callable[[Path | None], list[Path]],
+) -> list[Path]:
+    """Every conversation worktree folder worth listing: the ones the folders of this project hold,
+    and the ones a conversation points at wherever they are (another project's durable folder).
+    Only a folder named like a conversation's worktree and present on disk; each listed once."""
+    from chimera.core.worktree import WORKTREE_PREFIX
+
+    folders = {owner_key(p): p for p in find(workspace)}
+    for group in owners.values():
+        for owner in group:
+            path = Path(owner.folder) if owner.folder else None
+            if path is None or not path.name.startswith(WORKTREE_PREFIX):
+                continue
+            try:
+                if path.is_dir():
+                    folders.setdefault(owner_key(path), path)
+            except OSError:
+                continue
+    return sorted(folders.values())
+
+
+def measure(
+    home: Path,
+    workspace: Path | None = None,
+    *,
+    owners: Mapping[str, Sequence[WorktreeOwner]] | None = None,
+    limit_gb: float = WORKTREE_LIMIT_GB,
+    idle_days: float = WORKTREE_IDLE_DAYS,
+    size_cache: dict[str, tuple[float, Size]] | None = None,
+) -> dict[str, Any]:
     """The whole report: categories, the worktrees one by one, and the drives they sit on.
 
     ``workspace`` is the project a run would make its worktree from. ``worktree_dir`` is where THAT
     worktree goes, so the screen's "the next worktree goes to" is what `GitWorktree.create` will do:
-    a configured folder inside the project is passed over for temp there, and must be here too.
+    a configured folder inside the project is passed over for temp there, and must be here too. The
+    worktrees listed are the ones of THAT project too (its durable folder beside it), not only temp's.
+
+    ``owners`` maps a worktree folder (:func:`owner_key`) to the conversations that use it; without it
+    every worktree reads as having none. ``limit_gb`` and ``idle_days`` are the owner's two settings.
     """
     from chimera.core.worktree import classify_worktree_dir, find_worktree_dirs, worktree_parent
 
@@ -295,14 +450,28 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
 
     worktrees: list[dict[str, Any]] = []
     sizes: list[Size] = []
-    for path in find_worktree_dirs():
+    by_folder = owners or {}
+    now = time.time()
+    for path in _worktree_folders(workspace, by_folder, find_worktree_dirs):
         state = classify_worktree_dir(path)
-        size = tree_size(path, deadline=_budget(report_deadline))
+        size = _worktree_size(path, _budget(report_deadline), size_cache)
         sizes.append(size)
-        worktrees.append(
-            {"path": str(path), "bytes": size.bytes, "state": state.state, "reason": state.reason}
-        )
+        try:
+            age: float | None = round(max(0.0, now - path.stat().st_mtime) / 86400.0, 1)
+        except OSError:
+            age = None
+        worktrees.append({
+            "path": str(path), "bytes": size.bytes, "state": state.state, "reason": state.reason,
+            "age_days": age, "session_id": "", "title": "",
+            **_retention(by_folder.get(owner_key(path), ())),
+        })
     by_key["worktrees"] = Category("worktrees", _sum(sizes), [str(parent)])
+    counted = sum(s.bytes for s in sizes if s.bytes is not None)
+    unmeasured = sum(1 for s in sizes if s.bytes is None)
+    limit_bytes = int(max(limit_gb, 0.0) * 1024**3)
+    # Over the limit is certain from what WAS counted (a part can only add); under it is certain only
+    # when everything was counted. Otherwise the report does not know, and says so rather than "no".
+    over: bool | None = True if counted > limit_bytes else (False if unmeasured == 0 else None)
 
     browsers, why = playwright_dir()
     by_key["browsers"] = Category(
@@ -325,6 +494,12 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
         "worktree_dir": str(parent),
         "categories": [by_key[k].as_dict() for k in CATEGORY_KEYS],
         "worktrees": worktrees,
+        "worktrees_counted_bytes": counted,
+        "worktrees_unmeasured": unmeasured,
+        "worktrees_limit_gb": limit_gb,
+        "worktrees_over_limit": over,
+        "archive_idle_days": idle_days,
+        "archive_candidates": _archive_candidates(worktrees, by_folder, idle_days),
         "disks": drives,
         "rotatable_logs": list(ROTATABLE_LOGS),
     }
@@ -333,22 +508,32 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
 _shared_lock = threading.Lock()
 _shared: dict[tuple[str, str, str], tuple[float, dict[str, Any]]] = {}
 _flights: dict[tuple[str, str, str], threading.Lock] = {}
+#: What each screen look counted of the worktrees, so the next look continues instead of starting over.
+_worktree_sizes: dict[str, tuple[float, Size]] = {}
 
 
-def measure_shared(home: Path, workspace: Path | None = None) -> dict[str, Any]:
+def measure_shared(
+    home: Path,
+    workspace: Path | None = None,
+    *,
+    owners: Callable[[], Mapping[str, Sequence[WorktreeOwner]]] | None = None,
+    limit_gb: float = WORKTREE_LIMIT_GB,
+    idle_days: float = WORKTREE_IDLE_DAYS,
+) -> dict[str, Any]:
     """:func:`measure`, with one walk serving every caller that asks at about the same time.
 
     A request that arrives while a measurement of the same thing is running waits for it instead of
     starting a second walk of the same disk; one that arrives within ``SHARED_REPORT_SECONDS`` after
-    it gets its result. Keyed by the worktree setting too, so saving a new folder is seen at once.
-    Callers get a copy — nothing they do to it reaches the next caller.
+    it gets its result. Keyed by the worktree setting and the two limits too, so saving a new one is
+    seen at once. Callers get a copy — nothing they do to it reaches the next caller. ``owners`` is a
+    function, called only when a walk is actually made.
     """
     from chimera.config import get_settings
 
     key = (
         os.path.normcase(str(Path(home).resolve())),
         str(workspace or ""),
-        (get_settings().worktree_dir or "").strip(),
+        f"{(get_settings().worktree_dir or '').strip()}|{limit_gb}|{idle_days}",
     )
     with _shared_lock:
         flight = _flights.setdefault(key, threading.Lock())
@@ -357,7 +542,10 @@ def measure_shared(home: Path, workspace: Path | None = None) -> dict[str, Any]:
             cached = _shared.get(key)
         if cached is not None and clock() - cached[0] < SHARED_REPORT_SECONDS:
             return copy.deepcopy(cached[1])
-        report = measure(home, workspace)
+        report = measure(
+            home, workspace, owners=owners() if owners is not None else None,
+            limit_gb=limit_gb, idle_days=idle_days, size_cache=_worktree_sizes,
+        )
         with _shared_lock:
             _shared[key] = (clock(), report)
         return copy.deepcopy(report)

@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from effects_with_087_corrected import BITS, HOME, TASKS, cells  # noqa: E402
+from effects_with_087_corrected import BITS, HOME, TASKS, cells
 
 SE = "Software Engineering & Codebase Maintenance"
 SEED = 20260915

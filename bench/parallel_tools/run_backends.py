@@ -145,7 +145,7 @@ def main() -> int:
                 f"provedores={sorted({s['provider'] or '(vazio)' for s in steps})} "
                 f"usd={result.usd or 0:.4f} {time.time() - started:.0f}s"
             )
-        except Exception as exc:  # noqa: BLE001 — a dead run is a row that is absent, not a crash
+        except Exception as exc:  # a dead run is a row that is absent, not a crash
             print(f"  [{index + 1:3}/{args.runs}] FALHOU {str(exc)[:80]}")
         finally:
             shutil.rmtree(root, ignore_errors=True)

@@ -624,7 +624,7 @@ def arms_on_recalled_lessons() -> bool:
         from chimera.config import get_settings
 
         return bool(get_settings().arm_on_recalled_lessons)
-    except Exception as exc:  # noqa: BLE001 - unreadable settings keep the shipped default
+    except Exception as exc:  # unreadable settings keep the shipped default
         _log.debug("could not read arm_on_recalled_lessons: %s", exc)
         return False
 
@@ -782,7 +782,7 @@ class AutonomousAgent:
             return
         try:
             self.on_event(event)
-        except Exception as exc:  # noqa: BLE001 — a broken sink must not fail the run
+        except Exception as exc:  # a broken sink must not fail the run
             _log.warning("event sink raised, dropping event: %s", exc)
 
     def _emit_edit(self, path: str, patch: str) -> None:
@@ -1321,7 +1321,7 @@ class AutonomousAgent:
                             verify_command=_verify_command_of(self.verifier),
                         )
                     ]
-                except Exception as exc:  # noqa: BLE001 — record-only, see above
+                except Exception as exc:  # record-only, see above
                     _log.warning("verifier-integrity rule failed, no flags recorded: %s", exc)
                     integrity_flags = []
                 # The tree AS VERIFIED: `_verify()` ran just above, so this capture is the state the
@@ -1794,7 +1794,7 @@ class AutonomousAgent:
                         evidence_text=(task, feedback),
                         evaluator_text=evaluator_text,
                     )
-                except Exception as exc:  # noqa: BLE001 — surface hook defects after logging them
+                except Exception as exc:  # surface hook defects after logging them
                     _log.error("auto-evolution hook failed: %s", exc)
                     raise
 
@@ -2157,7 +2157,7 @@ class AutonomousAgent:
             _log.info("trabalho revertido guardado em %s", destino)
             _podar_descartados(destino.parent)
             return str(destino)
-        except Exception as exc:  # noqa: BLE001 — guardar nunca pode impedir reverter
+        except Exception as exc:  # guardar nunca pode impedir reverter
             _log.warning("nao consegui guardar o trabalho revertido: %s", exc)
             return ""
 
@@ -2194,7 +2194,7 @@ class AutonomousAgent:
             from chimera.core.checkpoint import fingerprint as _impressao
 
             return _impressao(self.guard.snapshot()) == esperada
-        except Exception as exc:  # noqa: BLE001 -- never break a receipt to report on one
+        except Exception as exc:  # never break a receipt to report on one
             _log.debug("delivery check skipped: %s", type(exc).__name__)
             return None
 
@@ -2251,7 +2251,7 @@ class AutonomousAgent:
             if anchor is not None:
                 receipt = receipt.model_copy(update=anchor.fields())
             append_run(self.run_log, receipt)
-        except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal
+        except Exception as exc:  # receipt persistence is best-effort, never fatal
             _log.warning("run receipt failed to persist (%s: %s); writing a minimal row instead",
                          type(exc).__name__, exc)
             self._persist_minimal_receipt(result, task, exc)
@@ -2296,7 +2296,7 @@ class AutonomousAgent:
             self.run_log.parent.mkdir(parents=True, exist_ok=True)
             with self.run_log.open("a", encoding="utf-8") as handle:
                 handle.write(_json.dumps(row, ensure_ascii=True) + "\n")
-        except Exception as exc:  # noqa: BLE001 — still never fatal
+        except Exception as exc:  # still never fatal
             _log.warning("minimal run receipt also failed: %s", exc)
 
     def _save_checkpoint(
@@ -2366,7 +2366,7 @@ class AutonomousAgent:
             return ""
         try:
             hits = search(task, k=k)
-        except Exception as exc:  # noqa: BLE001 — recall is advisory, never fail the run
+        except Exception as exc:  # recall is advisory, never fail the run
             _log.debug("memory readback failed: %s", exc)
             return ""
         lines: list[str] = []
@@ -2405,7 +2405,7 @@ class AutonomousAgent:
             return
         try:
             self.taint.record_fetch(ref, content)
-        except Exception as exc:  # noqa: BLE001 - recall is advisory; a ledger fault must be loud, not fatal
+        except Exception as exc:  # recall is advisory; a ledger fault must be loud, not fatal
             _log.warning("could not record a tainted memory recall in the ledger: %s", exc)
 
     def run_tainted(self) -> bool:

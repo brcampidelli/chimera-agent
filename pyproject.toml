@@ -289,14 +289,23 @@ target-version = "py311"
 extend-exclude = ["bench/**/tampered_*"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+# RUF100 makes every `# noqa` a claim the linter checks. One naming a rule that is not enabled (the
+# repository carried 643 of them, almost all BLE001, a rule nobody had switched on) or silencing
+# nothing reads as a reviewed exception and is not one: the suppression outlives the line it
+# excused and the next reader trusts it.
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF100"]
 ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
-warn_unused_ignores = false
+# CI type-checks on Linux. On Windows the `ctypes.windll` ignores would read as unused (the attribute
+# exists there) and push a developer to delete the comments Linux needs; pinning the platform gives
+# every machine the same answer, which is what makes the flag below safe to turn on.
+# An ignore that silences nothing hides the next real error on its line.
+platform = "linux"
+warn_unused_ignores = true
 
 # Do not type-check inside third-party packages we merely import. This surfaced when the `stt` extra
 # pulled numpy in: its shipped stubs use `type` statements, which are Python 3.12 syntax, and we
@@ -319,6 +328,7 @@ faulthandler_timeout = 900
 addopts = "-m 'not integration'"
 markers = [
     "product_default: the test asserts the product default, so the suite-wide deferral pin is skipped",
+    "network: the test reaches a real server on purpose, so the suite-wide socket guard is skipped",
     "integration: live test that calls a real provider API (needs OPENROUTER_API_KEY)",
 ]
 

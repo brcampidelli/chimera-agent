@@ -48,7 +48,7 @@ class SenderRegistry:
             return f"{_NO_SENDER}{platform!r} (connected: {have})"
         try:
             return sender.send(chat_id, text)
-        except Exception as exc:  # noqa: BLE001 - a platform error must not crash the agent loop
+        except Exception as exc:  # a platform error must not crash the agent loop
             return f"error: send to {platform} failed: {exc}"
 
 

@@ -132,7 +132,10 @@ describe("the owner's side of a shared conversation", () => {
     });
     expect(screen.getAllByText("say hello")).toHaveLength(1);
     expect(screen.queryByTestId("exchange-author")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Hello")).toHaveLength(1);
+    // Tokens are drawn on the next animation frame, not on arrival (#1247): both
+    // copies of "Hello " sit in the same buffer, so one flush shows either one
+    // line or the duplicate this test exists to catch.
+    await waitFor(() => expect(screen.getAllByText("Hello")).toHaveLength(1));
   });
 
   it("puts a question a guest's turn raised on this screen's card, and names who is here", async () => {

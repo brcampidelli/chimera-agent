@@ -124,7 +124,7 @@ def tail_kind(calls: list[Any], k: int) -> str:
     return f"{kind}, {'distinct' if distinct else 'identical'} args"
 
 
-def main() -> None:  # noqa: C901 — one pass, one report
+def main() -> None:  # one pass, one report
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", type=Path)
     a = ap.parse_args()

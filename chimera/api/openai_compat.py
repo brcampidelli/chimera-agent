@@ -159,7 +159,7 @@ def _usage(report: TurnReport) -> dict[str, int]:
     }
     if report.cache_read_tokens is not None:
         usage["prompt_tokens_details"] = {"cached_tokens": int(report.cache_read_tokens)}
-    return usage  # type: ignore[return-value]
+    return usage
 
 
 def build_completion(report: TurnReport, *, model: str, completion_id: str, created: int) -> dict[str, Any]:
@@ -259,7 +259,7 @@ def register_openai_compat(
         if not req.stream:
             try:
                 report = turn_fn(session, message)
-            except Exception as exc:  # noqa: BLE001 — surface as a 500 with no internals leaked
+            except Exception as exc:  # surface as a 500 with no internals leaked
                 _log.warning("openai-compat turn failed: %s", exc)
                 raise HTTPException(status_code=500, detail="the agent turn failed") from exc
             return build_completion(report, model=req.model, completion_id=completion_id, created=created)
@@ -270,7 +270,7 @@ def register_openai_compat(
             # (intermediate steps are not the answer). Clients still get a valid stream + [DONE].
             try:
                 report = turn_fn(session, message)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _log.warning("openai-compat stream turn failed: %s", exc)
                 # NOT `finish_reason: "stop"` with an empty delta. That is a successful turn that
                 # produced nothing, and no client can tell it from a model that legitimately

@@ -661,7 +661,7 @@ def _owner_instructions(home: object) -> str:
         from chimera.core.instructions import render as render_identity
 
         return render_identity(load_identity(_Path(str(home))))
-    except Exception:  # noqa: BLE001 -- see the docstring
+    except Exception:  # see the docstring
         return ""
 
 
@@ -946,7 +946,7 @@ def register_orchestration_api(
                 # single-agent fallback the empty fan-out routes into never reaches a provider.
                 _log.info("hierarchy run stopped on its spend ceiling: %s", exc)
                 emit("error", {"message": str(exc)})
-            except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
+            except Exception as exc:  # surfaced to the client as an error frame
                 _log.warning("hierarchy run failed: %s", exc)
                 emit("error", {"message": "the run failed"})
             finally:
@@ -1118,7 +1118,7 @@ def register_orchestration_api(
                 # "the crew failed", which would describe a ceiling doing its job as a fault.
                 _log.info("crew run stopped on its spend ceiling: %s", exc)
                 emit("error", {"message": str(exc)})
-            except Exception as exc:  # noqa: BLE001 -- surfaced to the client as an error frame
+            except Exception as exc:  # surfaced to the client as an error frame
                 _log.warning("crew run failed: %s", exc)
                 emit("error", {"message": "the crew failed"})
             finally:

@@ -214,7 +214,7 @@ def _one(item: it.Item, length: int, arm: str, cpt: float, cap: float) -> dict[s
             if not got["prompt_tokens"]:
                 raise EmptyResponse("the route answered without reading the prompt (0 prompt tokens)")
             break
-        except Exception as exc:  # noqa: BLE001 -- a failed call is a halt, counted, never a zero
+        except Exception as exc:  # a failed call is a halt, counted, never a zero
             got = None
             row["error"] = f"{type(exc).__name__}: {exc}"[:300]
             if attempt < retries:

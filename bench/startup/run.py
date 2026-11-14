@@ -43,10 +43,10 @@ def _health(url: str, seconds: float) -> float | None:
     began = time.perf_counter()
     while time.perf_counter() - began < seconds:
         try:
-            with urllib.request.urlopen(f"{url}/api/health", timeout=1) as resp:  # noqa: S310
+            with urllib.request.urlopen(f"{url}/api/health", timeout=1) as resp:
                 if resp.status == 200:
                     return time.perf_counter() - began
-        except Exception:  # noqa: BLE001 — not bound yet
+        except Exception:  # not bound yet
             time.sleep(0.005)
     return None
 

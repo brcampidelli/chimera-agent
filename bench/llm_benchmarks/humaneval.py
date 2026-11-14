@@ -65,7 +65,7 @@ def grade(solution_src: str, problem: dict[str, Any]) -> bool:
         script = grade_dir / "grade_it.py"
         script.write_text(runner, encoding="utf-8")
         try:
-            proc = subprocess.run(  # noqa: S603 — fixed argv, isolated dir
+            proc = subprocess.run(  # fixed argv, isolated dir
                 [sys.executable, "-B", str(script)],  # -B: never grade a stale .pyc
                 cwd=str(grade_dir),
                 capture_output=True,

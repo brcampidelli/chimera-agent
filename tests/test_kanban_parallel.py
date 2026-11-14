@@ -201,7 +201,7 @@ def test_the_board_survives_being_written_from_several_threads(tmp_path: Path) -
                 board.record_result(card_id, success=True, result="ok")
                 board.move(card_id, "done")
                 board.cards("done")
-        except BaseException as exc:  # noqa: BLE001 - the point is that nothing escapes
+        except BaseException as exc:  # the point is that nothing escapes
             erros.append(exc)
 
     threads = [threading.Thread(target=finish, args=(i,)) for i in ids]

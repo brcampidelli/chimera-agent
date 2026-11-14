@@ -137,7 +137,7 @@ def main() -> None:
     ap.add_argument("--clef-jevbench-rerun", action="store_true", help="Amendment 1: clef-q4 JevBench rerun only")
     args = ap.parse_args()
     if args.clef_jevbench_rerun:
-        from bench.local_decider_bakeoff.rerun_clef import rerun  # noqa: PLC0415
+        from bench.local_decider_bakeoff.rerun_clef import rerun
 
         rerun(args, ARMS["clef-q4"])
         return

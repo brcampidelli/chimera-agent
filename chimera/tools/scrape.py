@@ -62,7 +62,7 @@ class ScrapeTool(Tool):
             return f"error: unknown render {render!r} (use auto/http/browser/firecrawl)"
         try:
             page = fetch_page(url, render=render)
-        except Exception as exc:  # noqa: BLE001 — a fetch failure is a tool error, not a crash
+        except Exception as exc:  # a fetch failure is a tool error, not a crash
             return f"error: scrape failed: {exc}"
         header = f"[source: {page.source} · {page.url}" + (f" · status {page.status}]" if page.status else "]")
         title = f"# {page.title}\n" if page.title else ""
@@ -129,7 +129,7 @@ class ExtractTool(Tool):
         if url:
             try:
                 page = fetch_page(url, render="auto")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 return f"error: extract could not fetch {url}: {exc}"
             content, html = page.markdown, page.html
         if not content.strip() and not html.strip():
@@ -149,7 +149,7 @@ class ExtractTool(Tool):
                 content = html  # nothing to feed the LLM but the raw HTML
             try:
                 result = extract_structured(content, missing, self._get_backend(), model=self._model)
-            except Exception as exc:  # noqa: BLE001 — an LLM/credential failure is a tool error
+            except Exception as exc:  # an LLM/credential failure is a tool error
                 return f"error: extract failed: {exc}"
             if result.ok:
                 for name in missing:
@@ -184,7 +184,7 @@ class MapTool(Tool):
         limit = int(kwargs.get("limit") or 100)
         try:
             urls = map_site(url, search=search, limit=limit)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return f"error: map failed: {exc}"
         if not urls:
             return fence(f"(no URLs found for {url})")
@@ -247,7 +247,7 @@ class CrawlTool(Tool):
                 state_path=self._state_path(url, limit, max_depth, include, exclude),
                 resume=kwargs.get("resume", True) is not False,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return f"error: crawl failed: {exc}"
         head = (
             f"crawled {len(result.pages)} new page(s)"

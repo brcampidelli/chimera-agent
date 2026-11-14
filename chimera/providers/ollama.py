@@ -133,7 +133,7 @@ def installed_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> 
         response = call_with_deadline(
             lambda: httpx.get(f"{base}/api/tags", timeout=budget), timeout_s
         )
-    except Exception as exc:  # noqa: BLE001 — an absent Ollama is a normal state, not a 500
+    except Exception as exc:  # an absent Ollama is a normal state, not a 500
         _log.debug("ollama tag list failed at %s: %s", base, exc)
         return InstalledModels(base, False, reason="unreachable")
     if response.status_code >= 400:
@@ -143,7 +143,7 @@ def installed_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> 
     try:
         payload = response.json()
         entries = payload["models"]
-    except Exception:  # noqa: BLE001 — a 200 from something that is not Ollama
+    except Exception:  # a 200 from something that is not Ollama
         return InstalledModels(base, False, reason="not_ollama")
     if not isinstance(entries, list):
         return InstalledModels(base, False, reason="not_ollama")

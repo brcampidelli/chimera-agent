@@ -130,7 +130,7 @@ def main() -> None:
     clone = args.jevbench.resolve()
     pinned(clone)
     sys.path.insert(0, str(clone))
-    from jevbench.scoring import score_task  # noqa: PLC0415 — their code, from the pinned clone
+    from jevbench.scoring import score_task  # their code, from the pinned clone
 
     items = load(clone)
     if args.limit:

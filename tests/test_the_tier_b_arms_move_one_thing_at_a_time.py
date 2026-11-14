@@ -123,9 +123,9 @@ def test_a_run_with_no_matching_arms_refuses_instead_of_writing_an_empty_meta(tm
 def test_the_claim_noul_state_carries_no_task_identity() -> None:
     """PROTOCOL §7 — the arm cannot tell which task it is looking at, or the leak-free claim dies."""
     sys.path.insert(0, str(REPO / "bench" / "claim_vs_diff"))
-    import claims  # noqa: E402
+    import claims
 
-    from bench.jev_decisions.run_claim_noul import state_of  # noqa: E402
+    from bench.jev_decisions.run_claim_noul import state_of
 
     solve = claims.Solve(
         task="oc-bench-v2-011-code-debug", hid="arm-000-r0", claim="I fixed parser.py",
@@ -141,9 +141,9 @@ def test_a_long_diff_is_truncated_from_the_end_not_the_head() -> None:
     """The head of a patch carries the file headers a summary talks about; a truncated tail is the
     smaller distortion."""
     sys.path.insert(0, str(REPO / "bench" / "claim_vs_diff"))
-    import claims  # noqa: E402
+    import claims
 
-    from bench.jev_decisions.run_claim_noul import state_of  # noqa: E402
+    from bench.jev_decisions.run_claim_noul import state_of
 
     solve = claims.Solve(
         task="t", hid="h", claim="c", self_report=True, oracle=1.0,

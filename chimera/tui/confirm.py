@@ -271,7 +271,7 @@ class ModalGate:
                     app.push_screen_wait, ConfirmScreen(title, body, why, timeout=self.timeout)
                 )
             )
-        except Exception:  # noqa: BLE001 — a screen that cannot be drawn is a refusal, never a crash
+        except Exception:  # a screen that cannot be drawn is a refusal, never a crash
             self.unanswerable += 1
             _log.warning("the TUI could not draw its question; refusing: %s", body[:200])
             return False

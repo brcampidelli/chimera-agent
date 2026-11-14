@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ListChecks, Search } from "lucide-react";
 import { getRuns } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { focusRing } from "@/components/ui/focus";
 import { useT, type TFunc } from "@/lib/i18n";
+import { formatHash } from "@/lib/router";
 import { cn } from "@/lib/utils";
 import type { AttemptReceipt, RunReceipt } from "@/lib/types";
 
@@ -199,7 +201,14 @@ export function Runs({
         </Panel>
       ) : runs.length === 0 ? (
         <Panel>
-          <EmptyState text={t("runs.empty")} />
+          <EmptyState
+            text={t("runs.empty")}
+            action={
+              <Button size="sm" variant="outline" onClick={() => { window.location.hash = formatHash("code"); }}>
+                {t("runs.empty.action")}
+              </Button>
+            }
+          />
         </Panel>
       ) : (
         <>

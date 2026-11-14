@@ -1130,7 +1130,7 @@ class LLMGateway:
                             },
                         )
                     return result
-                except Exception as exc:  # noqa: BLE001 — classify, then recover per the taxonomy
+                except Exception as exc:  # classify, then recover per the taxonomy
                     if tools and candidate.startswith("openrouter/") and "no endpoints found that support tool use" in str(exc).lower():
                         _log.warning("OpenRouter has no tool-use endpoint for %s; retrying once without tools", candidate)
                         result = self.complete(

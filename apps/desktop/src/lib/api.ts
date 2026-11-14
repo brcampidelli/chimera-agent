@@ -2026,7 +2026,15 @@ export interface CodeBrowserFrame {
 export interface CodeTurnHandlers {
   /** The conversation's id, and this turn's — the second is what lets a screen that also watches
    *  the conversation live tell its own turn's frames from a guest's. */
-  onSession?: (id: string, turnId?: string, startedAt?: number) => void;
+  onSession?: (
+    id: string,
+    turnId?: string,
+    startedAt?: number,
+    /** Present when the turn opened in a worktree Chimera made for it: `warning` is the server's
+     *  sentence when that worktree did NOT start from the remote's tip (no upstream, fetch failed,
+     *  the local HEAD behind), which the screen shows rather than lets pass. */
+    placed?: { warning?: string },
+  ) => void;
   onToken?: (text: string) => void;
   /** A steering instruction was read at a step boundary. */
   onGuidance?: (text: string) => void;
@@ -2403,6 +2411,9 @@ function applyCodeTurnFrame(
       payload.session_id as string,
       payload.turn_id as string | undefined,
       typeof payload.started_at === "number" ? payload.started_at : undefined,
+      typeof payload.warning === "string" && payload.warning
+        ? { warning: payload.warning }
+        : undefined,
     );
   else if (event === "token") h.onToken?.(payload.text as string);
   else if (event === "guidance") h.onGuidance?.(String(payload.text ?? ""));

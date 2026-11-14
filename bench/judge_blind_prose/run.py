@@ -189,7 +189,7 @@ def run(out: Path, composition: str = "trio") -> None:
                     continue
                 try:
                     r = make(item, arm, rotation, order, seed)
-                except Exception as exc:  # noqa: BLE001 — a run the providers could not finish is a halt, skipped
+                except Exception as exc:  # a run the providers could not finish is a halt, skipped
                     print(f"  {item.id:<14} {arm:<6} r{rotation} {order:<7} SKIPPED {type(exc).__name__}: {str(exc)[:80]}", flush=True)
                     continue
                 spent += r.usd or 0.0

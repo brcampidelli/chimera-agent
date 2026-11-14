@@ -90,7 +90,7 @@ def test_the_store_answers_from_a_thread_it_was_not_made_on(tmp_path: Path) -> N
             store.add(MemoryItem(id="b", content="written from another thread"))
             seen.append([i.content for i in store.search("login")])
             seen.append(len(store))
-        except Exception as exc:  # noqa: BLE001 — the failure IS the finding
+        except Exception as exc:  # the failure IS the finding
             seen.append(exc)
 
     thread = threading.Thread(target=worker)

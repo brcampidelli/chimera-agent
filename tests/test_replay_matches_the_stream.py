@@ -30,13 +30,13 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings  # noqa: E402
-from chimera.core.agent import Agent, AgentConfig  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
-from chimera.orchestration import runlog  # noqa: E402
-from chimera.tools.registry import ToolRegistry  # noqa: E402
+from chimera.config import Settings
+from chimera.core.agent import Agent, AgentConfig
+from chimera.interface import ChatSession
+from chimera.orchestration import runlog
+from chimera.tools.registry import ToolRegistry
 
 #: The fields the SSE client lifts OUT of the payload and onto the frame itself. Everything else
 #: belongs under `data` — the same split `api.ts` performs, kept in one place so the two cannot

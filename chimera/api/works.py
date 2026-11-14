@@ -236,7 +236,7 @@ class WorkManager:
         self._announce(work)
         try:
             self._launch(work)
-        except Exception as exc:  # noqa: BLE001 — a launch that fails is a failed work, not a crash
+        except Exception as exc:  # a launch that fails is a failed work, not a crash
             self.fail(work.id, f"could not start: {exc}")
 
     @staticmethod

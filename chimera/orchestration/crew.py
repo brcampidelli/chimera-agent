@@ -75,7 +75,7 @@ def parallel_review(reviewers: list[RoleAgent], subject: str, *, max_workers: in
         # exception and discard every other reviewer's completed work.
         try:
             return AgentMessage(agent.name, agent.act(subject))
-        except Exception as exc:  # noqa: BLE001 — degrade to N-1 reviewers, never crash the run
+        except Exception as exc:  # degrade to N-1 reviewers, never crash the run
             return AgentMessage(agent.name, f"[error] {exc}")
 
     with ThreadPoolExecutor(max_workers=min(max_workers, len(reviewers))) as pool:
@@ -306,7 +306,7 @@ class IsolatedCrew:
             return
         try:
             self.on_event(OrchEvent(kind, text, task_id, dict(data)))  # type: ignore[arg-type]
-        except Exception as exc:  # noqa: BLE001 -- see the docstring
+        except Exception as exc:  # see the docstring
             _log.debug("crew event sink raised (ignored): %s", exc)
 
     def run(
@@ -379,7 +379,7 @@ class IsolatedCrew:
                         project_root=ws,
                     )
                     answer = agent_answer = agent.act(task)
-                except Exception as exc:  # noqa: BLE001 -- one worker crashing is its own failure
+                except Exception as exc:  # one worker crashing is its own failure
                     self._emit("worker_failed", task_id=name, text=str(exc)[:300])
                     raise
                 # BEFORE the no-verify branch, not after it. There were exactly two stop checks
@@ -554,7 +554,7 @@ class IsolatedCrew:
 
         try:
             outcome = CommandVerifier(verify, workspace, source=verify_source).verify()
-        except Exception as exc:  # noqa: BLE001 -- see the docstring
+        except Exception as exc:  # see the docstring
             result.reverify, result.reverify_output = "failed", f"{type(exc).__name__}: {exc}"
             return
         if outcome.abstained:

@@ -162,7 +162,7 @@ def rule_summariser(
                 spend.record_result(result)
                 settle_failed_attempts(spend, result, prompt, asked)
             answer = result.content
-        except Exception as exc:  # noqa: BLE001 — a compaction must not fail on a summariser
+        except Exception as exc:  # a compaction must not fail on a summariser
             _log.warning("compaction summariser failed, using the structural note: %s", exc)
             return to_note(older)
 

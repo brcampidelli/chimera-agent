@@ -322,7 +322,7 @@ def _run_cancel(cancel: Callable[[], object]) -> None:
     # the turn; the failure is logged, not raised into the request that pressed Stop.
     try:
         cancel()
-    except Exception:  # noqa: BLE001
+    except Exception:
         _log.warning("cancelling a turn's external agent failed", exc_info=True)
 
 

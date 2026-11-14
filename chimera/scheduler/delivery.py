@@ -435,6 +435,6 @@ def deliver_to_webhook(url: str, text: str, *, timeout: float = TIMEOUT_S) -> De
         detalhe = (exc.read().decode("utf-8", "replace") or "")[:200].strip()
         _log.warning("delivery to %s refused: HTTP %s", webhook_host_only(url), exc.code)
         return Delivered(False, f"HTTP {exc.code}: {detalhe}" if detalhe else f"HTTP {exc.code}")
-    except Exception as exc:  # noqa: BLE001 — a chat outage must not fail a job that worked
+    except Exception as exc:  # a chat outage must not fail a job that worked
         _log.warning("delivery to %s failed: %s", webhook_host_only(url), type(exc).__name__)
         return Delivered(False, f"{type(exc).__name__}: {exc}")

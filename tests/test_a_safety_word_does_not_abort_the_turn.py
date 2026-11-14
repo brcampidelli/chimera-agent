@@ -205,7 +205,7 @@ def _run(monkeypatch: pytest.MonkeyPatch, primary_error: BaseException) -> tuple
 
     try:
         result: Any = LLMGateway().complete([Message(role="user", content="hi")], model="prov/primary")
-    except Exception as exc:  # noqa: BLE001 — the test reads what came out either way
+    except Exception as exc:  # the test reads what came out either way
         result = exc
     return result, seen
 

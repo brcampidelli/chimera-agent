@@ -529,7 +529,7 @@ def main() -> int:
             key, seed = futures[fut]
             try:
                 item = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a provider hiccup must not lose the file
+            except Exception as exc:  # a provider hiccup must not lose the file
                 print(f"  {key:<18} #{seed} ERROR {type(exc).__name__}: {str(exc)[:120]}", flush=True)
                 continue
             if item is None:

@@ -298,7 +298,7 @@ def list_wsl_distros() -> list[str]:
     if not wsl_supported():
         return []
     try:
-        done = subprocess.run(  # noqa: S603 - fixed argv, no shell
+        done = subprocess.run(  # fixed argv, no shell
             [WSL_EXE, "-l", "-q"],
             capture_output=True,
             timeout=_LIST_TIMEOUT,

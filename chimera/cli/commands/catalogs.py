@@ -56,7 +56,7 @@ def catalog_pins(check: bool = _CHECK_OPT) -> None:
         if check:
             try:
                 head = _head(pin.owner, pin.repo)
-            except Exception as exc:  # noqa: BLE001 -- one unreachable repo is a row, not a crash
+            except Exception as exc:  # one unreachable repo is a row, not a crash
                 failed += 1
                 row.append(f"[red]unreachable: {escape(str(exc))}[/red]")
             else:

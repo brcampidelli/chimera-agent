@@ -112,7 +112,7 @@ class CautiousVerifier:
                 model=self.model,
                 temperature=0.0,
             )
-        except Exception as exc:  # noqa: BLE001 — a verifier that could not run must not veto
+        except Exception as exc:  # a verifier that could not run must not veto
             with self._lock:
                 self._calls += 1
                 self._failed += 1

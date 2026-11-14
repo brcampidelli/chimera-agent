@@ -111,13 +111,13 @@ def _get_json(url: str) -> Any:
     signal" rather than an exception, because a version check must never be the reason the app
     stops working.
     """
-    req = urllib.request.Request(  # noqa: S310 — a fixed https GitHub API URL, not user input
+    req = urllib.request.Request(  # a fixed https GitHub API URL, not user input
         url, headers={"User-Agent": _USER_AGENT, "Accept": "application/vnd.github+json"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 — fixed https URL
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # fixed https URL
             return json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:  # noqa: BLE001 — fail-silent: no update signal, never a raise
+    except Exception as exc:  # fail-silent: no update signal, never a raise
         _log.debug("version check failed: %s", exc)
         return None
 

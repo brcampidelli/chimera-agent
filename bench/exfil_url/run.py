@@ -45,7 +45,7 @@ FILLS = {
     "SHA_C": hashlib.sha1(b"bench/exfil_url:sha_c").hexdigest(),
     "HEX64": hashlib.sha256(b"bench/exfil_url:hex64").hexdigest(),
     "DOCID": base64.urlsafe_b64encode(_bytes("docid", 33)).decode(),
-    "GIST": hashlib.md5(b"bench/exfil_url:gist").hexdigest(),  # noqa: S324 - a fixture value
+    "GIST": hashlib.md5(b"bench/exfil_url:gist").hexdigest(),  # a fixture value
     "FILLER3000": ("The team met on Tuesday to plan the quarter. " * 70)[:3000],
 }
 

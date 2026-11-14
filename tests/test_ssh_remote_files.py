@@ -208,7 +208,7 @@ class _Popen:
         self.pid = 1
         Path(target[target.index("-E") + 1]).write_bytes(b"")
 
-    def communicate(self, input: bytes | None = None, timeout: float | None = None) -> tuple[bytes, bytes]:  # noqa: A002
+    def communicate(self, input: bytes | None = None, timeout: float | None = None) -> tuple[bytes, bytes]:
         _Popen.seen.append({"target": self.target, "input": input, **self.kwargs})
         return b"fine", b""
 

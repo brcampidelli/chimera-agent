@@ -61,7 +61,7 @@ class VerifierSelector:
         for scorer in self.scorers:
             try:
                 value = scorer(task, answer)
-            except Exception as exc:  # noqa: BLE001 — a broken scorer is skipped, not fatal
+            except Exception as exc:  # a broken scorer is skipped, not fatal
                 _log.debug("scorer failed on a candidate, skipping it: %s", exc)
                 continue
             # An abstention is skipped like a broken scorer, not averaged in as a zero.

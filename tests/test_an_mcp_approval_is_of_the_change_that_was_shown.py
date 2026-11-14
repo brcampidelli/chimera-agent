@@ -171,7 +171,7 @@ def test_a_check_waits_for_the_file_lock_another_process_holds(tmp_path: Path) -
         try:
             comecou.set()
             check_manifest(mcp, "files", [_tool("Read a file.")])
-        except BaseException as exc:  # noqa: BLE001 — surfaced by the assert below
+        except BaseException as exc:  # surfaced by the assert below
             erros.append(exc)
 
     with locked(caminho) as got:

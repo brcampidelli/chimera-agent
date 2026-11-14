@@ -604,7 +604,7 @@ def _persist_crashed_run(
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("a", encoding="utf-8") as handle:
             handle.write(_json.dumps(row, ensure_ascii=True) + "\n")
-    except Exception as exc:  # noqa: BLE001 — never let the reporter fail the report
+    except Exception as exc:  # never let the reporter fail the report
         _log.warning("crashed-run receipt not written: %s", exc)
 
 
@@ -725,12 +725,20 @@ def build_api_app(
     # the CLI tells it the port (`attach`). See `chimera/api/desktop_bridge.py`.
     desktop_bridge = DesktopBridge(live_settings)
 
+    # FastAPI's three documentation pages are HTML on this origin, and it serves them with no policy.
+    # `/redoc` and `/docs/oauth2-redirect` were never meant to exist here: the docs moved under
+    # `/api` and those two stayed at FastAPI's defaults, outside the token guard (it covers `/api/`
+    # only), so a page loading a CDN script ran on the app's origin, beside its localStorage. They are
+    # off; `/api/docs` is registered below with a policy of its own (`page_csp.DOCS_PAGE_CSP`).
     app = FastAPI(
         title="Chimera Desktop API",
         version="1",
-        docs_url="/api/docs",
+        docs_url=None,
+        redoc_url=None,
+        swagger_ui_oauth2_redirect_url=None,
         openapi_url="/api/openapi.json",
     )
+    _register_api_docs(app)
     # The authenticated Chrome host is app-local, paired by a per-installation key, and stopped with
     # this API. It uses only a named pipe / Unix socket; never an HTTP port reachable from a page.
     from chimera.browser_link import BrowserLink
@@ -856,6 +864,27 @@ def build_api_app(
             request.scope[DESKTOP_SCREEN_SCOPE_KEY] = desktop
             request.scope[BROWSER_SCOPE_KEY] = session.id if session is not None else ""
         return await call_next(request)
+
+    @app.exception_handler(Exception)
+    async def an_unhandled_error_says_nothing_about_itself(request: Request, exc: Exception) -> JSONResponse:
+        """The last stop for an exception no route caught: a generic 500, the detail in the log.
+
+        Starlette's default is a plain-text "Internal Server Error", which is safe but does not match
+        the `{"detail": ...}` every other refusal here uses, so the desktop's error reader printed
+        it as "the server accepted the request and sent nothing". Worse is what a route's own
+        `except Exception as exc: raise HTTPException(500, str(exc))` does: it puts a provider's
+        answer, a path or a SQL fragment on the screen. This handler never reads `exc` into the
+        response; the `error_id` is how a person finds the same failure in `backend.log`.
+        """
+        error_id = uuid.uuid4().hex[:12]
+        _log.error(
+            "unhandled error %s on %s %s", error_id, request.method, request.url.path,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "internal server error", "error_id": error_id},
+        )
 
     @app.get("/api/health", response_model=HealthOut)
     def health() -> dict[str, Any]:
@@ -1167,7 +1196,7 @@ def build_api_app(
             transport = getattr(app.state, "endpoint_test_transport", None)
             models = probe_models(endpoint, transport=transport)
             return {"name": name, "host": endpoint_host(endpoint), "ok": True, "models": models, "error": None}
-        except Exception as exc:  # noqa: BLE001 — expose no request headers or credentials
+        except Exception as exc:  # expose no request headers or credentials
             return {"name": name, "host": endpoint_host(endpoint), "ok": False, "models": None, "error": f"Endpoint test failed ({type(exc).__name__})"}
 
     # Moving the keys between `.env` and the OS vault, either way (study 29, P7.7). Not in the
@@ -1264,7 +1293,7 @@ def build_api_app(
                 blueprint = MetaAgent(
                     LLMGateway(), allowed_tools=default_registry().names()
                 ).design(req.description)
-            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+            except Exception as exc:  # a model hiccup is not a server error
                 _log.warning("agent design failed: %s", exc)
                 return {"note": "the design call did not complete"}
             if blueprint is None:
@@ -1777,7 +1806,7 @@ def build_api_app(
         configured = (live.sandbox or "auto").lower()
         try:
             isolated = sandbox_is_isolated(get_sandbox(live))
-        except Exception:  # noqa: BLE001 — an unbuildable sandbox is a host sandbox, the safe read
+        except Exception:  # an unbuildable sandbox is a host sandbox, the safe read
             isolated = False
         if isolated:
             backend = (
@@ -1853,7 +1882,7 @@ def build_api_app(
             try:
                 plan = Planner(LLMGateway()).plan(req.task, context="")
                 return {"steps": list(plan.steps), "text": plan.as_text(), "note": ""}
-            except Exception as exc:  # noqa: BLE001 — a model hiccup is an honest empty plan, never a 500
+            except Exception as exc:  # a model hiccup is an honest empty plan, never a 500
                 _log.warning("plan preview failed: %s", exc)
                 return {"steps": [], "text": "", "note": "the planner call did not complete"}
 
@@ -1881,7 +1910,7 @@ def build_api_app(
                 return {"items": [], "note": ""}
             try:
                 items = RequirementChecklist(LLMGateway()).extract(req.task)
-            except Exception as exc:  # noqa: BLE001 — a model hiccup is not a server error
+            except Exception as exc:  # a model hiccup is not a server error
                 _log.warning("requirement extraction failed: %s", exc)
                 return {"items": [], "note": "the extraction call did not complete"}
             # `extract` swallows its own failures and returns []. Empty means either "nothing to
@@ -1989,7 +2018,7 @@ def build_api_app(
                         "stopped_reason": getattr(result, "stopped_reason", ""),
                     },
                 )
-            except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
+            except Exception as exc:  # surfaced to the client as an error event
                 # "the run failed" was the whole message, and it was the whole message for a run
                 # that had already written a file and paid for the calls that wrote it. Four words,
                 # no cause, and nothing in the run log — so the Cost screen could not see the spend
@@ -2752,7 +2781,7 @@ def build_api_app(
                 return
             try:
                 record(session_id, done)
-            except Exception as exc:  # noqa: BLE001 — a failed record must not fail the batch
+            except Exception as exc:  # a failed record must not fail the batch
                 _log.warning("batch not recorded in conversation %s: %s", session_id, exc)
 
         def work() -> None:
@@ -2797,7 +2826,7 @@ def build_api_app(
                 # never holds the board's result back.
                 if req.session_id:
                     _record_batch_in_conversation(req.session_id, done)
-            except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
+            except Exception as exc:  # surfaced to the client as an error event
                 _log.warning("agents batch failed: %s", exc)
                 emit("error", {"message": "the batch failed"})
             finally:
@@ -3218,7 +3247,7 @@ def build_api_app(
                     run_id=run_id,
                 )
                 push({"kind": "exit", "code": code})
-            except Exception as exc:  # noqa: BLE001 — surfaced to the client as a non-zero exit
+            except Exception as exc:  # surfaced to the client as a non-zero exit
                 _log.warning("exec failed: %s", exc)
                 push({"kind": "exit", "code": 1})
             finally:
@@ -3507,7 +3536,7 @@ def build_api_app(
                     manager.persist(session_id)  # durable transcript now includes this turn
                     _append_usage(report, session_id, settings)
                 emit("done", _report_dict(report, session_id, fused=swap))
-            except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
+            except Exception as exc:  # surfaced to the client as an error event
                 _log.warning("chat turn failed: %s", exc)
                 emit("error", {"message": "the agent turn failed"})
             finally:
@@ -3718,6 +3747,23 @@ _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 _OFF_WORDS = {"false", "0", "no", "off", "f", "n"}
 
 
+def _register_api_docs(app: FastAPI) -> None:
+    """``/api/docs``: FastAPI's Swagger page, unchanged, with a Content-Security-Policy on it.
+
+    The same page ``docs_url`` used to serve. It loads Swagger UI from jsDelivr and starts it with an
+    inline script, so the policy names exactly that and nothing more (see ``DOCS_PAGE_CSP``).
+    """
+    from fastapi.openapi.docs import get_swagger_ui_html
+    from fastapi.responses import HTMLResponse
+
+    from chimera.api.page_csp import DOCS_PAGE_CSP
+
+    @app.get("/api/docs", include_in_schema=False)
+    def _api_docs() -> HTMLResponse:
+        page = get_swagger_ui_html(openapi_url="/api/openapi.json", title=f"{app.title} - Swagger UI")
+        return HTMLResponse(bytes(page.body), headers={"Content-Security-Policy": DOCS_PAGE_CSP})
+
+
 def _index_html(index: Path, request: Request) -> Any:
     """Serve index.html, injecting the bearer token as a meta tag ONLY for a loopback client.
 
@@ -3781,7 +3827,7 @@ def _run_was_tainted(agent: Any) -> bool:
         return True
     try:
         return bool(probe())
-    except Exception:  # noqa: BLE001 — a broken probe is an unknown, and unknown is tainted
+    except Exception:  # a broken probe is an unknown, and unknown is tainted
         return True
 
 
@@ -4343,8 +4389,11 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
             if candidate.is_file() and static_dir.resolve() in candidate.parents:
                 # A page reached by its file name (`/index.html`, `/guest.html`) is still a page of
                 # this origin: without the policy it would be the one way around it.
-                if candidate.suffix.lower() == ".html":
-                    from chimera.api.page_csp import APP_PAGE_CSP
+                # Every suffix a browser renders as a page, not only `.html`: a stray `x.htm` at the
+                # root was served same-origin with no policy at all.
+                from chimera.api.page_csp import APP_PAGE_CSP, serves_as_page
+
+                if serves_as_page(candidate.name):
 
                     return FileResponse(candidate, headers={"Content-Security-Policy": APP_PAGE_CSP})
                 return FileResponse(candidate)

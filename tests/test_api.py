@@ -14,11 +14,14 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings, get_settings  # noqa: E402
-from chimera.core.agent import AgentResult, ToolActivity  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.config import Settings, get_settings
+from chimera.core.agent import AgentResult, ToolActivity
+from chimera.interface import ChatSession
+
+# The server token is documented but is a secret the settings screen must never write.
+_NOT_EDITABLE_BUT_DOCUMENTED = frozenset({"CHIMERA_SERVER_TOKEN"})
 
 
 class _FakeAgent:
@@ -1230,8 +1233,14 @@ def test_bearer_token_guards_chat_when_configured(monkeypatch: Any, tmp_path: An
 
 
 def test_reads_require_token_when_configured(monkeypatch: Any, tmp_path: Any) -> None:
+    from chimera.api import version_api
     from chimera.config import get_settings
 
+    # `/api/version` asks GitHub for the latest release. This test is about the token, not about GitHub:
+    # left alone it made a real HTTPS call from a hermetic suite (found when the suite began refusing
+    # sockets that leave the machine), and cached whatever that call returned for every later test.
+    monkeypatch.setattr(version_api, "_get_json", lambda url: None)
+    monkeypatch.setattr(version_api, "_cache", {})
     client = _token_client(monkeypatch, tmp_path, "s3cret")
     # A GET read now requires the token too (transcripts/memory/config must not be readable without it).
     assert client.get("/api/config").status_code == 401
@@ -1317,7 +1326,7 @@ def test_read_config_declares_when_a_saved_setting_starts_applying(tmp_path: Any
     true when a read moves — a list maintained in the frontend would go stale silently, which is the
     exact failure the label exists to prevent.
     """
-    from chimera.api.config_api import _EDITABLE_SETTINGS, APPLIES_WHEN, read_config
+    from chimera.api.config_api import _EDITABLE_SETTINGS, ALLOWED_KEYS, APPLIES_WHEN, read_config
 
     cfg = read_config(Settings(CHIMERA_HOME=str(tmp_path)))
     applies = cfg["applies"]
@@ -1330,14 +1339,17 @@ def test_read_config_declares_when_a_saved_setting_starts_applying(tmp_path: Any
     assert applies["CHIMERA_CASCADE"] == "next_conversation"
     assert applies["CHIMERA_GUARD_CHAT"] == "next_conversation"
     assert applies["CHIMERA_CHAT_MEMORY"] == "next_conversation"
-    # Absence is the claim "this applies to the next call" — the default after the gateway and the
-    # request handlers stopped holding a boot-time snapshot. Naming one of these would be a caveat
-    # about a delay that no longer exists.
-    assert "CHIMERA_DEFAULT_MODEL" not in applies
-    assert "CHIMERA_CACHE" not in applies
-    assert "CHIMERA_SANDBOX" not in applies
+    # Absence used to be the claim "this applies to the next call". It could not be told apart from a
+    # variable nobody had looked at, so each is now stated: `now` (read at the moment of use) where
+    # the consumer was traced, and `commands_now` for the sandbox factory, whose kind and image are
+    # read in the same call as the network.
+    assert applies["CHIMERA_DEFAULT_MODEL"] == "now"
+    assert applies["CHIMERA_CACHE"] == "now"
+    assert applies["CHIMERA_SANDBOX"] == "commands_now"
     # A delay declared for something nobody can change from the screen is dead text.
-    assert set(APPLIES_WHEN) <= _EDITABLE_SETTINGS
+    assert set(APPLIES_WHEN) - _NOT_EDITABLE_BUT_DOCUMENTED <= _EDITABLE_SETTINGS
+    assert _NOT_EDITABLE_BUT_DOCUMENTED <= ALLOWED_KEYS
+    assert _NOT_EDITABLE_BUT_DOCUMENTED.isdisjoint(_EDITABLE_SETTINGS)
 
 
 def test_patch_config_rejects_unknown_keys(tmp_path: Any) -> None:

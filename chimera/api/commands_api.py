@@ -492,7 +492,7 @@ def register_commands_api(
             return CodeReviewOut(status="incomplete", reason="the review ran out of time").model_dump()
         except MissingCredentialsError:
             raise HTTPException(status_code=409, detail="no model is configured to answer") from None
-        except Exception as exc:  # noqa: BLE001 - the detail goes to the log, never to the card
+        except Exception as exc:  # the detail goes to the log, never to the card
             _log.warning("code review failed: %s: %s", type(exc).__name__, exc)
             return CodeReviewOut(
                 status="incomplete", reason="the review failed; the server log has the detail",

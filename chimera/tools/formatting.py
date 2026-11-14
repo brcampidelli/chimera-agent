@@ -97,7 +97,7 @@ def format_after_edit(
         return "formatter skipped: host commands need approval in this folder"
     try:
         selected = _formatter(resolved, root)
-    except Exception as exc:  # noqa: BLE001 — config parsing cannot turn a landed edit into failure
+    except Exception as exc:  # config parsing cannot turn a landed edit into failure
         return f"formatter error: {str(exc)[:_OUTPUT_LIMIT]}"
     if selected is None:
         return "formatter skipped: no configured formatter available for this file"
@@ -106,7 +106,7 @@ def format_after_edit(
         before = _digest(resolved)
         run = executor or _run_local_argv
         result = run(argv, timeout=_FORMAT_TIMEOUT, cwd=root)
-    except Exception as exc:  # noqa: BLE001 — formatting must never undo a successful edit
+    except Exception as exc:  # formatting must never undo a successful edit
         return f"formatter error ({name}): {str(exc)[:_OUTPUT_LIMIT]}"
     if result.timed_out:
         return f"formatter error ({name}): timed out after {_FORMAT_TIMEOUT}s"
@@ -170,7 +170,7 @@ def observe_format(path: Path, workspace: Path) -> str:
         if not enabled:
             return ""
         allowed = host_formatter_allowed()
-    except Exception as exc:  # noqa: BLE001 — config errors must not turn a landed write into a failure
+    except Exception as exc:  # config errors must not turn a landed write into a failure
         return f"formatter error: {str(exc)[:_OUTPUT_LIMIT]}"
     return format_after_edit(path, workspace, enabled=True, host_exec_allowed=allowed)
 

@@ -333,7 +333,7 @@ def _attempt(tool: Any, **kwargs: Any) -> str:
     """A write tool's answer: a refusal string, or the message of the guard it raised."""
     try:
         return str(tool.run(**kwargs))
-    except Exception as exc:  # noqa: BLE001 — the workspace guards raise; both are refusals
+    except Exception as exc:  # the workspace guards raise; both are refusals
         return f"error: {exc}"
 
 
@@ -450,7 +450,7 @@ def test_the_desktop_reads_the_error_on_a_status_route(tmp_path: Path) -> None:
 
     from chimera.api import build_api_app
     from chimera.interface import ChatSession
-    from tests.test_api import _FakeAgent  # noqa: PLC0415
+    from tests.test_api import _FakeAgent
 
     _break_policy()
     client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent()), settings=get_settings()))

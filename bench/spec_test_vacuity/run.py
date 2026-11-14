@@ -184,7 +184,7 @@ def main() -> int:
             tid = futures[fut]
             try:
                 r = fut.result()
-            except Exception as exc:  # noqa: BLE001 — a provider hiccup must not lose the file
+            except Exception as exc:  # a provider hiccup must not lose the file
                 print(f"  {tid:<24} ERROR {type(exc).__name__}: {str(exc)[:100]}", flush=True)
                 continue
             spent += r.usd or 0.0

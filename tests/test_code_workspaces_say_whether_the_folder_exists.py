@@ -15,11 +15,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings  # noqa: E402
-from chimera.core.code_projects import folder_exists, folder_key  # noqa: E402
-from chimera.interface.session import ChatSession  # noqa: E402
+from chimera.config import Settings
+from chimera.core.code_projects import folder_exists, folder_key
+from chimera.interface.session import ChatSession
 
 
 class _NeverRuns:

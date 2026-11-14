@@ -195,7 +195,7 @@ def _measure_text(element: Any) -> tuple[dict[str, str], dict[str, float]] | Non
         if not text or box is None:
             return None
         return {"text": text, "style": element.evaluate(_TEXT_STYLE_JS)}, box
-    except Exception as exc:  # noqa: BLE001 - one unmeasurable element must not stop the export
+    except Exception as exc:  # one unmeasurable element must not stop the export
         _log.warning("design PPTX export: a text element was left in the picture: %s", exc)
         return None
 

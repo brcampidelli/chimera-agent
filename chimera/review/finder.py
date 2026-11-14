@@ -106,7 +106,7 @@ def _priority(value: Any) -> Priority:
     text = str(value or "").strip()
     upper = text.upper()
     if upper in PRIORITIES:
-        return upper  # type: ignore[return-value]
+        return upper
     return _PRIORITY_WORDS.get(text.lower(), "P2")
 
 
@@ -174,7 +174,7 @@ def find(backend: SupportsComplete, model: str, rendered_diff: str) -> FinderRep
             model=model,
             temperature=0.0,
         )
-    except Exception as exc:  # noqa: BLE001 — a failed call is reported as an incomplete review
+    except Exception as exc:  # a failed call is reported as an incomplete review
         return FinderReply(ok=False, error=f"{type(exc).__name__}: {exc}"[:300])
     reply = read_reply(result.content or "")
     reply.prompt_tokens = int(result.prompt_tokens or 0)

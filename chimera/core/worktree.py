@@ -252,10 +252,17 @@ def worktree_parents(repo_root: Path | None = None) -> list[Path]:
     return parents
 
 
-def find_worktree_dirs() -> list[Path]:
-    """Every ``chimera-wt-*`` directory in the folders a worktree may have been made in."""
+def find_worktree_dirs(repo_root: Path | None = None) -> list[Path]:
+    """Every ``chimera-wt-*`` directory in the folders a worktree may have been made in.
+
+    Without ``repo_root`` that is temp and the configured folder — what the prune collects from, and
+    it stays so. A READ that wants to SEE the conversations' worktrees (the Storage card) passes the
+    project: those live in the repository's own durable folder (:func:`durable_worktree_folder`),
+    which the call without it never looks in. Measured 2026-11-12: 89 durable checkouts, 72.9 GiB, and
+    the card listed the 67 empty ones in temp.
+    """
     found: list[Path] = []
-    for parent in worktree_parents():
+    for parent in worktree_parents(repo_root):
         with suppress(OSError):
             found.extend(p for p in parent.glob(f"{WORKTREE_PREFIX}*") if p.is_dir())
     return sorted(set(found))

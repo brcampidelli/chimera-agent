@@ -199,7 +199,7 @@ class RecallHistoryTool(Tool):
                     hits = rerank_history_hits(query, hits, Decider(backend), limit=k)[:k]
                 finally:
                     backend._client.close()
-            except Exception:  # noqa: BLE001 — opt-in ranking must never make recall unavailable
+            except Exception:  # opt-in ranking must never make recall unavailable
                 hits = hits[:k]
         else:
             hits = hits[:k]

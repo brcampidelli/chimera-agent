@@ -174,7 +174,7 @@ def _turn(gateway: Any, fx: dict[str, Any], arm: str, root: Path, budget: Any) -
             "hits": [s15._brief(f) for f in s15.hits(located, seed)], "verified": checked,
             "log": pinned.log, "usd": _usd(arm, pinned.log), "error": None,
         }
-    except Exception as exc:  # noqa: BLE001 — a harness failure is a halt, never raised
+    except Exception as exc:  # a harness failure is a halt, never raised
         return {**empty, "status": "error", "error": f"{type(exc).__name__}: {exc}"[:300],
                 "usd": _usd(arm, pinned.log)}
     finally:
@@ -241,7 +241,7 @@ def probe() -> None:
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 data = json.loads(response.read())
-        except Exception as exc:  # noqa: BLE001 — reported, the run does not start on it
+        except Exception as exc:  # reported, the run does not start on it
             print(f"{name} {arm.model}: FAILED {type(exc).__name__}: {str(exc)[:200]}")
             continue
         usage = data.get("usage") or {}

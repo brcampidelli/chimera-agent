@@ -249,7 +249,7 @@ def _cache_path(root: Path) -> Path | None:
 
         digest = hashlib.sha256(str(root).encode("utf-8")).hexdigest()[:16]
         return get_settings().home / "repomap" / f"{digest}.json"
-    except Exception as exc:  # noqa: BLE001 — the cache is an optimisation, never a requirement
+    except Exception as exc:  # the cache is an optimisation, never a requirement
         _log.debug("repo-map cache unavailable: %s", exc)
         return None
 
@@ -260,7 +260,7 @@ def _load_cache(path: Path | None) -> dict[str, dict[str, Any]]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.debug("repo-map cache unreadable, reparsing: %s", exc)
         return {}
 
@@ -271,7 +271,7 @@ def _save_cache(path: Path | None, entries: dict[str, dict[str, Any]]) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(entries), encoding="utf-8")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         _log.debug("repo-map cache not written: %s", exc)
 
 

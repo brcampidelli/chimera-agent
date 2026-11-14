@@ -265,7 +265,7 @@ def test_selection_is_deterministic_on_lines_then_files_then_order() -> None:
     assert select_worker([], checked=True) is None
 
 
-def _unit(files: dict[str, str]):  # noqa: ANN202 -- returns a unit fn
+def _unit(files: dict[str, str]):  # returns a unit fn
     def run(ws: Path) -> bool:
         for rel, content in files.items():
             (ws / rel).parent.mkdir(parents=True, exist_ok=True)

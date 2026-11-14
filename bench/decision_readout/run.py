@@ -136,7 +136,7 @@ def main() -> None:
     clone = args.jevbench.resolve()
     pinned(clone)
     sys.path.insert(0, str(clone))
-    from jevbench.scoring import score_task  # noqa: PLC0415
+    from jevbench.scoring import score_task
     jev_items = load(clone)
     governance = two_sided_items()
     # Per JevBench item: baseline, numeric, two swap calls, K rotations (K <= 10), and neutral +

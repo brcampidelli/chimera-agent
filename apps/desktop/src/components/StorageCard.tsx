@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
-import { clearCache, getStorage, pruneWorktrees, rotateLogs } from "@/lib/api";
+import { archiveCodeSession, clearCache, getStorage, pruneWorktrees, rotateLogs } from "@/lib/api";
 import { useI18n, useT } from "@/lib/i18n";
 import type { StorageCategory } from "@/lib/types";
 
@@ -27,6 +27,22 @@ const LABELS = new Map<string, string>(Object.entries({
   worktrees: "settings.storage.cat.worktrees",
   browsers: "settings.storage.cat.browsers",
 }));
+
+/** Why a conversation's worktree was kept by the last clean-up pass, one literal key per refusal it
+ *  can record (the same words the archived row uses). Any other code reads as "could not be removed". */
+const KEPT_KEYS = new Map<string, string>(Object.entries({
+  dirty: "code.sessions.worktreeKeptDirty",
+  unpushed: "code.sessions.worktreeKeptUnpushed",
+  no_upstream: "code.sessions.worktreeKeptUnpushed",
+  ignored_files: "code.sessions.worktreeKeptIgnored",
+}));
+
+/** How many idle conversations the offer lists before saying "and N more". */
+const OFFER_ROWS = 10;
+/** How many worktrees the "why is it here" list shows, the biggest first. */
+const LIST_ROWS = 15;
+
+const GIB = 1024 ** 3;
 
 /** A size in the CHOSEN language's digits and units — `1.5 GB`, `1,5 GB`. Null stays null: the
  *  caller says "not measured", never `0 B` (the contract of `GET /api/storage`). */
@@ -89,6 +105,8 @@ export function StorageCard({
   const qc = useQueryClient();
   const report = useQuery({ queryKey: ["storage"], queryFn: () => getStorage(), retry: false });
   const [confirming, setConfirming] = useState<"prune" | "rotate" | "cache" | null>(null);
+  // The idle conversation the owner pressed "Archive" on and has not confirmed yet.
+  const [archiving, setArchiving] = useState<string | null>(null);
   const [dir, setDir] = useState(worktreeDir);
   const [prefix, setPrefix] = useState(branchPrefix);
   const refresh = () => qc.invalidateQueries({ queryKey: ["storage"] });
@@ -99,6 +117,9 @@ export function StorageCard({
   // The cache category only (C7); the server removes `<home>/cache` and nothing beside it, then asks
   // the desktop app to restart the backend, which still holds the cache in memory.
   const cache = useMutation({ mutationFn: () => clearCache(), onSuccess: refresh });
+  // The conversation list's own archive route: it moves a timestamp and removes no folder. The
+  // thirty-day clean-up, with all its refusals, decides about the worktree afterwards.
+  const archive = useMutation({ mutationFn: (id: string) => archiveCodeSession(id), onSuccess: refresh });
 
   const size = (row: StorageCategory) =>
     row.bytes === null ? t("settings.storage.notMeasured") : bytes(row.bytes);
@@ -115,6 +136,26 @@ export function StorageCard({
   const live = worktrees.filter((w) => w.state === "live").length;
   const logs = data?.categories.find((c) => c.key === "logs");
   const cached = data?.categories.find((c) => c.key === "cache");
+  const candidates = data?.archive_candidates ?? [];
+  const listed = [...worktrees]
+    .sort((a, b) => (b.bytes ?? -1) - (a.bytes ?? -1))
+    .slice(0, LIST_ROWS);
+  const why = (w: (typeof worktrees)[number]): string => {
+    if (w.retention === "conversation")
+      return t("settings.storage.wtWhyConversation", { title: w.title });
+    if (w.retention === "archived") {
+      if (w.retention_kept)
+        return t(KEPT_KEYS.get(w.retention_kept) ?? "code.sessions.worktreeKeptOther");
+      if (w.retention_due_at != null) {
+        const days = Math.max(1, Math.ceil((w.retention_due_at * 1000 - Date.now()) / 86_400_000));
+        return days === 1
+          ? t("code.sessions.worktreeRemovalDueOne")
+          : t("code.sessions.worktreeRemovalDue", { days });
+      }
+      return t("settings.storage.wtWhyArchived");
+    }
+    return t("settings.storage.wtWhyNone");
+  };
 
   return (
     <section className="surface overflow-hidden" aria-labelledby={headingId}>
@@ -252,6 +293,113 @@ export function StorageCard({
                 {t("settings.storage.clearCache")}
               </Button>
             </div>
+            {data.worktrees_over_limit === true && (
+              <p role="status" className="text-xs text-warn-foreground">
+                {t("settings.storage.wtOver", {
+                  size: bytes(data.worktrees_counted_bytes),
+                  limit: bytes(data.worktrees_limit_gb * GIB),
+                })}
+              </p>
+            )}
+            {data.worktrees_unmeasured > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {t("settings.storage.wtUnmeasured", { count: data.worktrees_unmeasured })}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={report.isFetching}
+                  onClick={() => void refresh()}
+                >
+                  {t("settings.storage.wtMore")}
+                </Button>
+              </div>
+            )}
+            {listed.length > 0 && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground">
+                  {t("settings.storage.wtListTitle", { count: worktrees.length })}
+                </summary>
+                <ul className="mt-1 space-y-1">
+                  {listed.map((w) => (
+                    <li key={w.path} className="break-all" title={w.path}>
+                      {t("settings.storage.wtRow", {
+                        name: w.path.split(/[\\/]/).pop() ?? w.path,
+                        size: w.bytes === null ? t("settings.storage.notMeasured") : bytes(w.bytes),
+                        days: Math.round(w.age_days ?? 0),
+                        reason: why(w),
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {candidates.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-xs font-medium">
+                  {t("settings.storage.archiveHeading", { days: Math.round(data.archive_idle_days) })}
+                </div>
+                {candidates.slice(0, OFFER_ROWS).map((c) => (
+                  <div key={c.session_id} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate" title={c.title}>
+                        {t("settings.storage.archiveRow", {
+                          title: c.title,
+                          days: Math.round(c.idle_days),
+                          size: c.bytes === null ? t("settings.storage.notMeasured") : bytes(c.bytes),
+                        })}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={archive.isPending}
+                        onClick={() => setArchiving(c.session_id)}
+                      >
+                        {t("settings.storage.archiveButton")}
+                      </Button>
+                    </div>
+                    {archiving === c.session_id && (
+                      <div className="flex flex-col gap-2">
+                        <p className="text-xs text-warn-foreground">
+                          {t("settings.storage.archiveConfirm", { title: c.title })}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              archive.mutate(c.session_id);
+                              setArchiving(null);
+                            }}
+                          >
+                            {t("settings.storage.confirm")}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setArchiving(null)}>
+                            {t("common.cancel")}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {candidates.length > OFFER_ROWS && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("settings.storage.archiveMore", { count: candidates.length - OFFER_ROWS })}
+                  </p>
+                )}
+                {archive.isSuccess && (
+                  <p role="status" className="text-xs text-muted-foreground">
+                    {t("settings.storage.archiveDone")}
+                  </p>
+                )}
+                {archive.isError && (
+                  <p role="status" className="text-xs text-bad-foreground">
+                    {t("settings.storage.archiveFailed")}
+                  </p>
+                )}
+              </div>
+            )}
             {confirming && (
               <div className="flex flex-col gap-2">
                 <p className="text-xs text-warn-foreground">

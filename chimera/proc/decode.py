@@ -66,7 +66,7 @@ def console_encoding() -> str:
         import ctypes
 
         page = int(ctypes.windll.kernel32.GetOEMCP())  # type: ignore[attr-defined]
-    except Exception:  # noqa: BLE001 — a machine that cannot answer gets the safe answer
+    except Exception:  # a machine that cannot answer gets the safe answer
         return "utf-8"
     if page in (65001, 0):  # the console was already set to UTF-8, or the call gave nothing
         return "utf-8"

@@ -27,7 +27,7 @@ PAGE = """
 
 
 class _Page(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+    def do_GET(self) -> None:  # the stdlib's name
         body = PAGE.encode()
         self.send_response(200)
         self.send_header("content-type", "text/html")
@@ -46,7 +46,7 @@ def driver() -> Iterator[Any]:
 
     try:
         made = PlaywrightDriver(allowed=lambda url: True)
-    except Exception as exc:  # noqa: BLE001 — no Chromium here
+    except Exception as exc:  # no Chromium here
         pytest.skip(f"no browser: {exc}")
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Page)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -92,6 +92,6 @@ def test_a_point_on_nothing_is_none_or_the_page_and_a_lying_page_cannot_write_th
     )
     try:
         found = driver.element_at(40, 30)
-    except Exception:  # noqa: BLE001 — a page that breaks the reader is refused, which is the point
+    except Exception:  # a page that breaks the reader is refused, which is the point
         found = None
     assert found is None or validate(found, page="p", server="web") is None

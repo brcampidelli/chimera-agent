@@ -134,8 +134,18 @@ export function TaskSuggestionCards({
                 </div>
               ) : null}
             </div>
+            {starting && card.fetchingBase ? (
+              <p role="status" className="mt-2 text-xs text-muted-foreground">
+                {t("code.task.fetchingBase")}
+              </p>
+            ) : null}
             {card.status === "started" ? (
               <p className="mt-2 text-xs text-muted-foreground">{t("code.task.started")}</p>
+            ) : null}
+            {card.status === "started" && card.baseWarning ? (
+              <p role="alert" className="mt-1 text-xs font-medium text-warn-foreground">
+                {t("code.task.baseWarning", { warning: card.baseWarning })}
+              </p>
             ) : null}
             {card.status === "failed" ? (
               <p role="alert" className="mt-2 text-xs text-bad-foreground">

@@ -22,11 +22,11 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("sse_starlette")
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from chimera.config import Settings  # noqa: E402
-from chimera.core.context_budget import RunState  # noqa: E402
-from chimera.interface import ChatSession  # noqa: E402
+from chimera.config import Settings
+from chimera.core.context_budget import RunState
+from chimera.interface import ChatSession
 
 FAKE = Path(__file__).with_name("acp_fake_agent.py")
 

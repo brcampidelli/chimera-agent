@@ -55,6 +55,6 @@ def test_provider(model: str | None = None) -> dict[str, Any]:
         return {"ok": False, "model": resolved, "error": _short(str(exc))}
     except MissingCredentialsError:
         return {"ok": False, "model": resolved, "error": "No provider key configured."}
-    except Exception as exc:  # noqa: BLE001 — any provider/network error is a failed test, not a crash
+    except Exception as exc:  # any provider/network error is a failed test, not a crash
         return {"ok": False, "model": resolved, "error": _short(str(exc))}
     return {"ok": True, "model": result.model or resolved, "error": None}

@@ -14,8 +14,8 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from chimera.tools.browser_playwright import PlaywrightDriver  # noqa: E402
-from chimera.tools.browser_situation import detect_wall  # noqa: E402
+from chimera.tools.browser_playwright import PlaywrightDriver
+from chimera.tools.browser_situation import detect_wall
 
 PAGES = [
     "https://accounts.hcaptcha.com/demo",
@@ -50,7 +50,7 @@ for url in PAGES:
             "at_load": {"wall": w0 and (w0.kind, w0.evidence), "frames": frames(at_load)[:6]},
             "after_5s_and_a_read": {"wall": w1 and (w1.kind, w1.evidence), "frames": frames(later)[:6]},
         }))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(json.dumps({"url": url, "error": str(exc)[:160]}))
     finally:
         d.close()
