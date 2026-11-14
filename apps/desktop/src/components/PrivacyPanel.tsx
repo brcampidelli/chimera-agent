@@ -43,6 +43,7 @@ export function PrivacyPanel({
   const deny = privacy.openrouter_data_collection === "deny";
   const routes = privacy.routes ?? [];
   const unscoped = privacy.unscoped ?? [];
+  const retention = privacy.retention_required ?? [];
   const egress = config.autonomy.egress_allow ?? [];
   const bots = Object.entries(config.messaging?.allowed_users ?? {}).sort(([a], [b]) =>
     a.localeCompare(b),
@@ -83,6 +84,35 @@ export function PrivacyPanel({
           {deny ? t("governance.privacy.retentionDeny") : t("governance.privacy.retentionAllow")}
         </Line>
         {privacy.openrouter_zdr ? <Line>{t("governance.privacy.zdr")}</Line> : null}
+        {/* A model the provider serves only while keeping the prompt (Fable 5.2: 30 days). Listed
+            whether or not a preference is set — the owner chose the model, and this is what it costs
+            in retention — and flagged when it contradicts the preference above. */}
+        {retention.map((row) => (
+          <div key={row.model} className="flex flex-col gap-0.5">
+            <Line>
+              {t("governance.privacy.retentionRequired", {
+                model: row.model,
+                days: String(row.days),
+                roles: (row.roles ?? []).join(", "),
+              })}
+            </Line>
+            {row.conflicts ? (
+              <span className="text-xs text-warn-foreground">
+                {/* Two different things: the preference is sent on this route and the turn fails,
+                    or it is never sent there and the prompt is simply kept. */}
+                {/* Three different facts: the preference is sent here and a fallback exists (this model is
+                    unavailable, the turn can still finish); it is sent here and nothing else is
+                    configured (the turn fails); or it is never sent on this route (the model runs and
+                    the prompt is kept). */}
+                {row.enforced
+                  ? row.fallback
+                    ? t("governance.privacy.retentionUnavailable")
+                    : t("governance.privacy.retentionConflict")
+                  : t("governance.privacy.retentionNotEnforced")}
+              </span>
+            ) : null}
+          </div>
+        ))}
         {/* Only matters once a preference is set: without one there is nothing this surface skips.
             `decisions_fallback` is the default install with an OpenRouter key — the common case,
             and the one the card used to miss. */}

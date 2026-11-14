@@ -1521,6 +1521,23 @@ class PromptRouteOut(BaseModel):
     """``default``, ``weak``, ``fusion_judge``, ``embeddings``, ``decisions``… — why it is listed."""
 
 
+class RetentionRequiredOut(BaseModel):
+    """A configured model whose provider keeps the prompt (``retention_required``)."""
+
+    model: str
+    days: int
+    """How long the provider keeps it, in days."""
+    roles: list[str] = Field(default_factory=list)
+    conflicts: bool = False
+    """The owner asked for ``deny`` or zero-retention routing, which this model cannot be served under."""
+    enforced: bool = False
+    """That preference is actually sent on this model's route (OpenRouter slugs only). False with
+    ``conflicts`` true = a direct route that never carries it: the model runs and the prompt is kept."""
+    fallback: bool = False
+    """A configured fallback model that does not itself require retention exists, so a refused model
+    costs a different model rather than the turn."""
+
+
 class PrivacyCfgOut(BaseModel):
     """The Security screen's privacy card (``chimera/providers/privacy.py``). Read-only facts plus
     the two OpenRouter switches; a server without the block is on the shipped defaults, which send
@@ -1534,6 +1551,8 @@ class PrivacyCfgOut(BaseModel):
     on by default). On, the provider keys saved there can reach the model; off, that one file is
     refused or hidden by every read tool."""
     routes: list[PromptRouteOut] = Field(default_factory=list)
+    retention_required: list[RetentionRequiredOut] = Field(default_factory=list)
+    """Models in use that are served only with data retention (Fable 5.2: 30 days)."""
     telemetry: bool = False
     """Whether anything is exported: OpenTelemetry asked for (``CHIMERA_OTEL`` or
     ``OTEL_EXPORTER_OTLP_ENDPOINT``) AND the ``[otel]`` extra installed."""

@@ -14268,6 +14268,8 @@ export interface components {
              * @default false
              */
             openrouter_zdr: boolean;
+            /** Retention Required */
+            retention_required?: components["schemas"]["RetentionRequiredOut"][];
             /** Routes */
             routes?: components["schemas"]["PromptRouteOut"][];
             /**
@@ -14834,6 +14836,33 @@ export interface components {
             notes: string[];
             /** Process Mb */
             process_mb: number | null;
+        };
+        /**
+         * RetentionRequiredOut
+         * @description A configured model whose provider keeps the prompt (``retention_required``).
+         */
+        RetentionRequiredOut: {
+            /**
+             * Conflicts
+             * @default false
+             */
+            conflicts: boolean;
+            /** Days */
+            days: number;
+            /**
+             * Enforced
+             * @default false
+             */
+            enforced: boolean;
+            /**
+             * Fallback
+             * @default false
+             */
+            fallback: boolean;
+            /** Model */
+            model: string;
+            /** Roles */
+            roles?: string[];
         };
         /** RetiredOut */
         RetiredOut: {

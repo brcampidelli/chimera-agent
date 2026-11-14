@@ -849,6 +849,9 @@ class HierarchicalOrchestrator:
             profitable_estimate=gate.profitable,
             cache_read_tokens=budget.cache_read or None,
             cache_write_tokens=budget.cache_write or None,
+            # The one receipt whose tokens are a SUM over the worker's calls; the others describe one
+            # call and stay exact.
+            aggregate=True,
         )
         if not verified:
             # Two different failures, kept apart. "The worker produced nothing" is a budget or a

@@ -52,6 +52,19 @@ def _sum_usage(results: list[CompletionResult], field_name: str) -> int | None:
     return sum(values) if values else None
 
 
+def _sum_cost(samples: list[CompletionResult]) -> float | None:
+    """What the samples cost, each priced alone; None when any of them cannot be priced."""
+    from chimera.orchestration.receipts import price_completion
+
+    total = 0.0
+    for sample in samples:
+        cost = price_completion(sample)
+        if cost.unpriced is not None:
+            return None
+        total += cost.usd
+    return round(total, 6)
+
+
 def default_gate(result: CompletionResult) -> bool:
     """Free acceptance gate: non-empty and not an refusal/apology opener.
 
@@ -228,6 +241,18 @@ class CascadeBackend:
                     # about, so k summed prompts beside ONE sample's reads bill k-1 reads at 1x.
                     "cache_read_tokens": _sum_usage(samples, "cache_read_tokens"),
                     "cache_write_tokens": _sum_usage(samples, "cache_write_tokens"),
+                    # The sums above are k calls, and the AVERAGE of their prompts hides the one that
+                    # was long (a 150k sample beside one the local cache served prices as two of 75k)
+                    # and turns a cached sample's tokens into a discount. So the cost is kept as the
+                    # sum of what each sample cost on its own, priced as it arrived; the cache-served
+                    # one cost nothing and adds nothing.
+                    "calls": len(samples),
+                    "usd": _sum_cost(samples),
+                    # With no exact cost (a sample that reported no usage cannot be priced) the totals
+                    # above must not stand in for it: the average of the ones that DID report priced
+                    # 150k + a sample with None at 0.0155 instead of 0.0775. Flagged as a sum, the
+                    # result is of unknown cost, which a strict spend ceiling refuses.
+                    "aggregate": True,
                 })
             return None
         if self.gate(samples[0]):

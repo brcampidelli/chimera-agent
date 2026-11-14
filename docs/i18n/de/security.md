@@ -1,5 +1,5 @@
 ---
-source_sha256: 7f5fca41b1aee08855e7e093378dcbb321639030f29b4fc89c219aaf65167e16
+source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -359,6 +359,12 @@ Die Desktop-Brücke (`chimera mcp desktop`) hat drei Schalter, jeder ohne den vo
   eigene Liste schreibt.
 
 **Der Abschlusszyklus pusht selbstständig.** Wenn die Prüfung eines Code-Turns besteht und seine Diff-Prüfung sauber ist, committet Chimera die Änderungen des Turns auf den Branch des Arbeitsbereichs und pusht diesen Branch nach `origin`, um einen Pull Request zu öffnen. Er pusht nie auf den Standard-Branch und erzwingt nie einen Push. Gemergt wird nur, wenn der Eigentümer `CHIMERA_CLOSE_LOOP_MERGE` eingeschaltet hat, und dann nie ein Pull Request, der Abrechnung, eine destruktive Migration, Row-Level-Security, einen Grant oder ein Geheimnis betrifft. Gestartet wird er nur vom Bildschirm des Eigentümers; Bridge, Kanäle und Hintergrundarbeit nicht.
+
+### Modelle, die Datenspeicherung verlangen
+
+Manche Modelle werden nur bereitgestellt, solange der Anbieter den Prompt aufbewahrt. **Claude Fable 5.2 verlangt 30 Tage Datenspeicherung und ist unter Zero Data Retention (ZDR) nicht verfügbar**, es sei denn, Anthropic erlaubt es ausdrücklich (Modellseite von Anthropic, gelesen am 2026-11-14). Wer es als Standard, als Tier, als Fusionsrolle oder in einer anderen Modelleinstellung wählt, schickt Prompts, abgerufenen Speicher eingeschlossen, auf eine Route, die sie 30 Tage behält, gleichgültig, was der Besitzer für die Route verlangt hat.
+
+Das steht außerdem im Konflikt mit den beiden OpenRouter-Schaltern, und was geschieht, hängt von der Route ab. Über OpenRouter (`openrouter/anthropic/claude-fable-5.2`) sendet das Gateway mit jedem Aufruf `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` oder `CHIMERA_OPENROUTER_ZDR=true`, also kann keine Route Fable 5.2 bedienen: Die Präferenz wird eingehalten, und das Modell ist auf der Route nicht verfügbar. Der Turn scheitert nur, wenn auch die konfigurierten Fallback-Modelle erschöpft sind; mit einem konfigurierten Fallback kann er dort enden. Direkt angesprochen (`anthropic/claude-fable-5-2`) wird die Präferenz nie gesendet, das Modell läuft also, und Anthropic behält den Prompt 30 Tage, unabhängig vom Schalter: Nichts wird blockiert, nichts wird eingehalten. Die Datenschutzkarte im Sicherheitsbildschirm listet jedes konfigurierte Modell, das Speicherung verlangt, mit den Rollen, die es nutzen, und markiert die, die der geltenden Präferenz widersprechen, und sagt dazu, ob diese Präferenz auf der Route des Modells durchgesetzt wird (das Modell ist dort nicht verfügbar) oder nicht (das Modell läuft und der Prompt wird gespeichert). Der Katalog hält die Anforderung pro Modell fest (`ModelCaps.retention_days` in `chimera/providers/catalog.py`), und kein Preset und kein Standard verwendet ein solches Modell.
 
 ## Ehrliche Grenzen
 

@@ -880,6 +880,9 @@ class _UsageTally:
     # REQUESTED model produced a plausible-looking figure for calls that never happened.
     usd: float = 0.0
     unpriced: str | None = None
+    #: How many model calls the totals above add up. A run's token counts are SUMS, so nothing
+    #: downstream may read a per-request price tier off them (see `AgentResult.aggregate`).
+    calls: int = 0
     #: Subagents this run delegated to (`spawn_subagent`). A count rather than a spend: each one's
     #: tokens are already folded in by `add_nested`, but how MANY there were is what tells a
     #: fan-out of twelve from one, and nothing else in the result says.
@@ -892,6 +895,7 @@ class _UsageTally:
         self.completion += result.completion_tokens or 0
         self.cache_read += result.cache_read_tokens or 0
         self.cache_write += result.cache_write_tokens or 0
+        self.calls += getattr(result, "calls", None) or 1
         cost = price_completion(result)
         self.usd += cost.usd
         if cost.unpriced is not None and self.unpriced is None:
@@ -907,6 +911,7 @@ class _UsageTally:
         self.completion += spent.completion_tokens or 0
         self.cache_read += getattr(spent, "cache_read_tokens", 0) or 0
         self.cache_write += getattr(spent, "cache_write_tokens", 0) or 0
+        self.calls += getattr(spent, "calls", None) or 1
         if spent.usd is not None:
             self.usd += spent.usd
         elif self.unpriced is None:
@@ -1031,6 +1036,8 @@ class AgentResult:
     completion_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    calls: int | None = None
+    """How many model calls the token counts above add up (None = not recorded)."""
     usd: float | None = None
     #: The id this run was written to the trace under, or "" when no trace was written. It is what
     #: lets a receipt, a usage record and a trace line be joined back into one run — the join that
@@ -1043,6 +1050,17 @@ class AgentResult:
     steplog: StepLog = field(default_factory=StepLog)
     # Per-turn fusion/cascade trace from the backend (UI-ready JSON), or None for a single-model turn.
     route_meta: dict[str, Any] | None = None
+
+    @property
+    def aggregate(self) -> bool:
+        """True when the token counts are a SUM over several calls (read by `price_completion`).
+
+        A per-request price tier (Haiku 5.5 above 100,000 prompt tokens) cannot be read off such a
+        sum: three 60,000-token calls are not one 180,000-token call. The run's own ``usd`` is already
+        priced call by call; this only stops anyone who prices the totals again from applying the
+        long tier to them.
+        """
+        return (self.calls or 0) > 1
 
 
 class Agent:
@@ -2733,6 +2751,7 @@ class Agent:
             completion_tokens=usage.completion,
             cache_read_tokens=usage.cache_read,
             cache_write_tokens=usage.cache_write,
+            calls=usage.calls or None,
             usd=usd,
             run_id=run_id,
             tool_names=tool_names,
