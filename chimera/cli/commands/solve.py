@@ -459,7 +459,7 @@ def solve(
     )
     from chimera.core.failure_class import RECOVERY_MODES
     from chimera.core.tool_router import ToolRouter as _ToolRouter
-    from chimera.core.verify import CommandVerifier
+    from chimera.core.verify_infer import cli_verifier
     from chimera.evolution import build_evolution_context
     from chimera.fusion.probe_log import ProbeLog as _ProbeLog
     from chimera.providers import LLMGateway, MissingCredentialsError
@@ -833,6 +833,7 @@ def solve(
             skill_cards=skill_cards,
         )
 
+        run_verifier, verify_origin = cli_verifier(verify, ws, gen_tests=gen_tests)
         auto = AutonomousAgent(
             worker,
             escalate_worker=escalate_worker,
@@ -882,8 +883,8 @@ def solve(
                 review_model_for(roles) or model,
                 use_rubric=rubric,
             ),
-            # `--verify` was typed in the same breath as the run: authorised by construction.
-            verifier=CommandVerifier(verify, ws, source="user") if verify else None,
+            verifier=run_verifier,
+            verify_source=verify_origin,
             # PROBE (M18-5): record (arm, cheap manager proxy, verified reward) per attempt.
             probe_log=_ProbeLog(settings.home / "probe.jsonl") if probe_log else None,
             guard=WorkspaceGuard(ws),
