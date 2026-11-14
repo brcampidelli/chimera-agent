@@ -94,6 +94,11 @@ class AttemptReceipt(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""  # the model that actually answered (the EDITOR's, under role routing)
+    #: What the attempt SENT, ``#effort`` included only when the effort reached the wire (none with thinking
+    #: off), and the effort alone. ``model`` says only what answered: two equal ``model`` values cannot tell
+    #: "escalated and served by the same route" from "never escalated".
+    requested_model: str = ""
+    effort: str = ""
     #: Prompt tokens the provider served from its cache across the attempt. ``None`` is "the route
     #: reported nothing", which is not a miss. Recorded because a year of receipts went to disk
     #: without it and the question "did this pair run under cache hits?" became unanswerable —
@@ -366,6 +371,8 @@ def build_receipt(
             prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),
+            requested_model=str(getattr(a, "requested_model", "") or ""),
+            effort=str(getattr(a, "effort", "") or ""),
             provider=str(getattr(a, "provider", "") or ""),
             host=str(getattr(a, "route_host", "") or ""),
             discarded_at=str(getattr(a, "discarded_at", "") or ""),

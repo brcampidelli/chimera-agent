@@ -22,7 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, HTTPException, UploadFile, params
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -466,7 +466,18 @@ def register_plugins_api(app: FastAPI, guard: params.Depends, settings: Settings
             raise _http(exc) from exc
         return describe(home, record)
 
-    @app.get("/api/plugins/{name}/update", dependencies=[guard], response_model=PluginUpdateOut)
+    # Checking for an update fetches and copies the source: a GET another site's `<img src>` could send.
+    from chimera.api.host_guard import refuse_cross_site
+
+    update_no_cross_site = Depends(
+        refuse_cross_site(
+            lambda: [o.strip() for o in str(getattr(settings, "allowed_origins", "") or "").split(",") if o.strip()]
+        )
+    )
+
+    @app.get(
+        "/api/plugins/{name}/update", dependencies=[guard, update_no_cross_site], response_model=PluginUpdateOut
+    )
     async def check_plugin_update(name: str, source: str = "") -> dict[str, Any]:
         """Whether the source changed, and the diff, changing nothing on disk."""
         from chimera.plugins.registry import check_update

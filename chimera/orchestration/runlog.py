@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from chimera.core.redact import redact_json
 from chimera.telemetry import get_logger
 
 _log = get_logger("orchestration.runlog")
@@ -84,7 +85,10 @@ def append(
         directory = run_dir(home, run_id, area=area)
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "frames.jsonl"
-        line = json.dumps({"event": event, **payload}, ensure_ascii=False, default=str)
+        # Masked in the writer: frames carry tool output and the owner's text, and the file is kept.
+        # Round-tripped first so a value `default=str` would stringify is a string when redacted.
+        frame = json.loads(json.dumps({"event": event, **payload}, ensure_ascii=False, default=str))
+        line = json.dumps(redact_json(frame), ensure_ascii=False)
         with _write_lock:
             if path.exists() and path.stat().st_size > MAX_BYTES:
                 return

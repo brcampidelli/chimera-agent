@@ -505,6 +505,9 @@ class BatchCancelRequest(BaseModel):
 
 _MAX_AGENT_TASKS = 8
 
+#: The largest body `/v1/chat/completions` reads: a long conversation, not an upload.
+MAX_OPENAI_BODY_BYTES = 16 * 1024 * 1024
+
 # The honest degradation message when the browser runtime isn't available — the UI surfaces this
 # verbatim; no placeholder image is ever fabricated.
 _BROWSER_MISSING_HINT = "Browser not installed — run: playwright install chromium"
@@ -521,7 +524,7 @@ def _require_token() -> Callable[[Request], None]:
     Reads the token from ``get_settings()`` on each call — NOT a build-time snapshot — so a token set at
     runtime (via ``PATCH /api/config``, which clears the settings cache) takes effect immediately.
     """
-    import hmac
+    from chimera.core.bearer import bearer_matches
 
     def check(request: Request) -> None:
         token = get_settings().server_token
@@ -531,9 +534,7 @@ def _require_token() -> Callable[[Request], None]:
         # (`chimera/api/device_door.py`); what it may reach was decided there.
         if request.scope.get(DEVICE_SCOPE_KEY):
             return
-        header = request.headers.get("authorization", "")
-        expected = f"Bearer {token}"
-        if not hmac.compare_digest(header, expected):
+        if not bearer_matches(request.headers.get("authorization", ""), token):
             raise HTTPException(status_code=401, detail="unauthorized")
 
     return check
@@ -828,7 +829,8 @@ def build_api_app(
         authenticate themselves, and the MCP bridge keeps its own token. Restricting this to `/api`
         left the root page's injected credential reachable to any local process querying an open route.
         """
-        import hmac
+        from chimera.api.host_guard import cross_site_request
+        from chimera.core.bearer import bearer_matches
 
         path = request.url.path
         # A paired device's request (`chimera/api/device_door.py`): the door verified its cookie and
@@ -839,10 +841,23 @@ def build_api_app(
         # not inject its secret into that public HTML; its initialization script supplies it instead.
         if path.startswith("/api/") and not path.startswith("/api/bridge/"):
             token = get_settings().server_token
-            if token and not device:
-                expected = f"Bearer {token}"
-                if not hmac.compare_digest(request.headers.get("authorization", ""), expected):
-                    return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+            if token and not device and not bearer_matches(request.headers.get("authorization", ""), token):
+                return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+            # No token is the desktop default, and then nothing but the network stops a page open in the
+            # owner's browser from POSTing to 127.0.0.1 (a `text/plain` body is a CORS simple request:
+            # no preflight, the browser only hides the answer). A browser always says where a write
+            # came from, so a write from another origin is refused here, for every route. A client that
+            # is not a browser (the CLI, a script) sends neither header and is not turned away.
+            # Not applied with a token: the bearer is not something a cross-site page can attach.
+            if (
+                not token
+                and not device
+                and request.method.upper() not in SAFE_METHODS
+                and cross_site_request(request, lambda: origins, strict_host=False)
+            ):
+                return JSONResponse(
+                    status_code=403, content={"detail": "refusing a write sent from another site"}
+                )
             # Past the owner's token, whether the request also came from the owner's SCREEN — the
             # one thing the approval card's code-less yes needs (`chimera/api/screen_credential.py`).
             # Always written, so a scope can never carry a True it did not earn here. A paired device
@@ -867,6 +882,16 @@ def build_api_app(
             request.scope[screen_credential.SCOPE_KEY] = bool(header_screen or session)
             request.scope[DESKTOP_SCREEN_SCOPE_KEY] = desktop
             request.scope[BROWSER_SCOPE_KEY] = session.id if session is not None else ""
+        # `/v1/*` is the OpenAI-compatible door and is not under `/api/`, so the branch above never saw
+        # it: its bearer was checked by the route's dependency, which FastAPI runs AFTER it has read the
+        # whole body. With a token set, answer 401 before reading anything, and bound the declared size.
+        if path.startswith("/v1/") and request.method.upper() not in SAFE_METHODS:
+            v1_token = get_settings().server_token
+            if v1_token and not device and not bearer_matches(request.headers.get("authorization", ""), v1_token):
+                return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+            declared = request.headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > MAX_OPENAI_BODY_BYTES:
+                return JSONResponse(status_code=413, content={"detail": "the request is too large"})
         return await call_next(request)
 
     @app.exception_handler(Exception)
@@ -3492,6 +3517,15 @@ def build_api_app(
                     # the turn is composed panel → judge → synthesizer and carries the trace.
                     agent: Any = getattr(session, "agent", None)
                     swap = bool(req.fuse) and fuse_backend is not None and hasattr(agent, "backend")
+                    # Fusion does not tool-call, and a conversation agent always carries tools: a
+                    # turn that would have fused is answered by ONE model instead, and the `done`
+                    # frame says so (`fuse_downgraded`) rather than reporting a fusion that did not run.
+                    from chimera.providers.fusion_guard import agent_carries_tools
+
+                    fuse_downgraded = swap and agent_carries_tools(agent)
+                    if fuse_downgraded:
+                        swap = False
+                        _log.warning("fuse this turn: the agent carries tools, answering on one model")
                     original = agent.backend if swap else None
                     if swap:
                         agent.backend = fuse_backend
@@ -3532,7 +3566,7 @@ def build_api_app(
                             sink.emit = restore
                     manager.persist(session_id)  # durable transcript now includes this turn
                     _append_usage(report, session_id, settings)
-                emit("done", _report_dict(report, session_id, fused=swap))
+                emit("done", _report_dict(report, session_id, fused=swap, fuse_downgraded=fuse_downgraded))
             except Exception as exc:  # surfaced to the client as an error event
                 _log.warning("chat turn failed: %s", exc)
                 emit("error", {"message": "the agent turn failed"})
@@ -4003,23 +4037,14 @@ def _build_solve_agent(
     # rung (single-model). --cascade takes precedence over --fuse (the cascade's top rung is fusion).
     backend: SupportsComplete = gateway
     planner_backend: SupportsComplete = gateway
-    escalate_backend: SupportsComplete | None = None
     if req.cascade:
-        from chimera.fusion import RoutedBackend, RoutingPolicy
-        from chimera.fusion.factory import fusion_engine
-
         backend = _api_cascade_backend(gateway, settings)
-        escalate_backend = RoutedBackend(
-            gateway, fusion_engine(gateway), RoutingPolicy(mode="always")
-        )
     elif req.fuse:
-        from chimera.fusion import RoutedBackend, RoutingPolicy
+        from chimera.fusion import RoutedBackend
         from chimera.fusion.factory import fusion_engine
 
         engine = fusion_engine(gateway)
         backend = RoutedBackend(gateway, engine)
-        # Observed-difficulty escalation: a retry (the task already proved hard) fuses always.
-        escalate_backend = RoutedBackend(gateway, engine, RoutingPolicy(mode="always"))
         # Planning is a deep, tool-free reasoning turn — route the plan through fusion under --fuse.
         planner_backend = engine
 
@@ -4096,8 +4121,13 @@ def _build_solve_agent(
         trace_path=settings.home / "traces.jsonl",
     )
     worker = Agent(backend, registry, cfg)
-    escalate_worker = (
-        Agent(escalate_backend, registry, cfg) if escalate_backend is not None else None
+    # Observed difficulty: a retry asks for more effort, then the next single model up — never
+    # fusion, which the router would send to the same model for any turn with tools.
+    from chimera.core.escalation import build_escalation
+
+    escalation = build_escalation(
+        gateway, settings, registry, cfg,
+        first_model=settings.tier_ladder().mid if req.cascade else None,
     )
     # Plan mode: an approved/edited plan is injected verbatim (parsed the same way the planner parses
     # its own output), so the run follows the human-reviewed steps and makes no planning call.
@@ -4138,7 +4168,7 @@ def _build_solve_agent(
     return _AutonomousAgent(
         worker,
         should_stop=should_stop,
-        escalate_worker=escalate_worker,
+        escalation=escalation,
         planner=Planner(planner_backend, roles.models.plan or req.model),
         plan=provided_plan,
         # review_model_for refuses to let the reviewer be the model that wrote the patch:
@@ -4274,7 +4304,9 @@ def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
     )
 
 
-def _report_dict(report: Any, session_id: str, *, fused: bool = False) -> dict[str, Any]:
+def _report_dict(
+    report: Any, session_id: str, *, fused: bool = False, fuse_downgraded: bool = False
+) -> dict[str, Any]:
     """Serialize a TurnReport for the ``done`` event (all real signals; ``usd`` may be null).
 
     ``fused`` is not decoration. A fused turn cannot call tools — ``FusionEngine.complete`` drops the
@@ -4287,6 +4319,9 @@ def _report_dict(report: Any, session_id: str, *, fused: bool = False) -> dict[s
     return {
         "session_id": session_id,
         "fused": fused,
+        # True when the client asked to fuse this turn and it was answered by one model instead:
+        # fusion does not tool-call, so a turn that carries tools is never fused.
+        "fuse_downgraded": fuse_downgraded,
         "answer": report.answer,
         "prompt_tokens": report.prompt_tokens,
         "completion_tokens": report.completion_tokens,

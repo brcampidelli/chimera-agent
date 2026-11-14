@@ -4,7 +4,12 @@ name: Publish to PyPI
 # token stored in the repo or entered by anyone. PyPI verifies the workflow's
 # short-lived OIDC identity instead. One-time setup on PyPI (pending publisher):
 #   https://pypi.org/manage/account/publishing/
-#   Owner: brcampidelli · Repo: chimera-agent · Workflow: publish.yml · Env: (blank)
+#   Owner: brcampidelli · Repo: chimera-agent · Workflow: publish.yml · Env: pypi
+#
+# The `pypi` environment is what actually stands between a ref and the token. In GitHub it must have a
+# required reviewer and a deployment-branch rule (main + `v*` tags); this file only DECLARES it. The
+# `guard` job below is a second, cheaper line — it runs from the same ref as this file, so it cannot
+# protect against someone who edits the file on a branch; the environment rule can.
 
 on:
   release:
@@ -15,6 +20,26 @@ permissions:
   contents: read
 
 jobs:
+  # Fails a manual dispatch from anywhere but `main`, and a release whose tag differs from the version
+  # in pyproject.toml, BEFORE any job that builds or holds the OIDC token starts. See
+  # scripts/check_release_ref.py for what each refusal is guarding against.
+  guard:
+    name: Is this ref allowed to publish
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Full history: the check asks whether the tagged commit is an ancestor of origin/main.
+          fetch-depth: 0
+
+      - name: Check the ref, the tag against pyproject.toml, and that the commit is on main
+        # The tag is attacker-chosen text: it goes through env, never through `${{ }}` in the script.
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: python scripts/check_release_ref.py ref
+
   # The desktop UI is bundled into the wheel (chimera/_desktop_dist via force-include), so the built
   # SPA must exist before `uv build`. This job runs `npm ci` (which executes arbitrary dependency
   # lifecycle scripts) and is deliberately kept UNPRIVILEGED — no `id-token` here. It hands the built
@@ -22,6 +47,7 @@ jobs:
   # OIDC-privileged step that mints the PyPI trusted-publishing token.
   build-ui:
     name: Build the desktop UI
+    needs: guard
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
@@ -54,9 +80,12 @@ jobs:
 
   pypi-publish:
     name: Build and publish to PyPI
-    needs: build-ui
+    needs: [guard, build-ui]
     timeout-minutes: 20
     runs-on: ubuntu-latest
+    # Declared here, configured in GitHub (Settings -> Environments -> pypi): required reviewer and
+    # deployment branches. Without those rules this line gates nothing.
+    environment: pypi
     permissions:
       id-token: write  # mint the OIDC token PyPI checks — this is the whole point
     steps:
@@ -82,6 +111,12 @@ jobs:
       - name: Build wheel + sdist
         run: uv build
 
+      # Same check, on the files themselves: the tag was compared to pyproject.toml in `guard`, this
+      # compares what `uv build` produced, so a stale `dist/` or a build backend that stamped another
+      # version cannot slip between the two.
+      - name: The files to upload carry the version in pyproject.toml
+        run: python scripts/check_release_ref.py dist dist
+
       - name: Verify the wheel actually bundles the desktop UI
         run: |
           WHL=$(ls dist/*.whl)
@@ -96,4 +131,4 @@ jobs:
         run: python scripts/scan_artifact.py dist/*.whl dist/*.tar.gz
 
       - name: Publish to PyPI (Trusted Publishing — no token)
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3

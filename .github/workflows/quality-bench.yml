@@ -28,13 +28,13 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install (with dev extras for pytest)
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
       - name: Run the quality gauge
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           BENCH_MODEL: ${{ github.event.inputs.model }}
           BENCH_TIMEOUT: ${{ github.event.inputs.timeout }}
-        run: uv run --no-sync python bench/local_lift/run_ci.py
+        run: uv run --locked --no-sync python bench/local_lift/run_ci.py
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

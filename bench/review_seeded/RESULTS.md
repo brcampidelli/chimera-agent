@@ -1,5 +1,11 @@
 # Results: S15, `chimera review` on seeded defects
 
+> **Emenda, 2026-11-14 (auditoria a12-10).** O revisor padrão citado abaixo como "G, glm-5.3 (the default
+> reviewer)" deixou de ser o padrão. Hoje `chimera review` percorre a lista de revisores medidos em
+> `chimera/review/family.py` (`MEASURED_REVIEWERS`), e glm-5.3 aparece ali como o que fugiu do limite de
+> saída (4 de 18 revisões incompletas, a cerca de 44 vezes o custo do modelo padrão). Os números abaixo
+> não mudaram e continuam sendo a medição de 2026-09 com os modelos que foram usados na época.
+
 2026-09-25. Pre-registered in `PREREGISTRATION.md` (`afc0628e`), amended before the relaunch (`98c59c2d`). Product `3f5e5936`, prompt hashes `3a480dab0478` (finder) and `ee9d780a9f4b` (verifier), fixtures `b2f9e29a5fd3`, all recorded in `results/run.json`. Both arms were pinned to DeepInfra with fallbacks off. Measurement spend: **US$ 1.73** against a US$ 2.00 cap:
 - run 1, discarded: US$ 0.686;
 - run 2: US$ 1.039, of which D was US$ 0.073 and G US$ 0.966.

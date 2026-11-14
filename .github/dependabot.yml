@@ -84,3 +84,18 @@ updates:
       npm-runtime:
         dependency-type: "production"
         update-types: ["minor", "patch"]
+
+  # The Tauri shell is Rust, and its crates end up inside every installer. Dependabot did not look at
+  # `Cargo.lock` at all, so a vulnerable crate stayed in the desktop app until someone happened to
+  # read an advisory. Same weekly batch of minors and patches as the other ecosystems; a major
+  # (tauri itself, wry) is a migration and arrives alone.
+  - package-ecosystem: "cargo"
+    directory: "/apps/desktop/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      cargo:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
