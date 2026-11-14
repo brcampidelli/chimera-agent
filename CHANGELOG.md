@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Keyboard focus is now easy to see.** The focus ring is a solid outline that reaches 3:1 against every surface in every theme and accent, gets thicker in High contrast and stays visible in Windows High Contrast, and tabs now correctly name the panels they control for screen readers. (#1258)
+
 - **Every HTML page the server hands out now carries a Content-Security-Policy.** FastAPI's `/redoc` and `/docs/oauth2-redirect`, served outside the token guard with no policy and loading a CDN script onto the app's origin, are off; `/api/docs` sends a policy naming exactly what Swagger loads; a stray `.htm` or `.xhtml` at the bundle root is policed like `.html`; and a new test requests every page and enumerates every route outside the API so the next one cannot ship without a policy. (#1248)
 
 - **Two tests that depended on timing now measure what they claim.** The shared-conversation test waits for the animation frame that draws streamed tokens since #1247, and the pathological-command test warms the shell parser up before starting its 1 s clock; both limits are unchanged. (#1250)
