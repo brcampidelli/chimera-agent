@@ -10,6 +10,7 @@ would be sent (``to_openai_schema``) and on what ``mcp_describe`` returns.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -50,6 +51,9 @@ class _Session:
 
 
 def _registry(description: str, **connector_kwargs: Any) -> ToolRegistry:
+    # The cut is opt-in since the pre-registered bench measured it at -24.4 pp of selection, so every
+    # test of the cut turns it on explicitly.
+    connector_kwargs.setdefault("description_mode", "one_line")
     connectors = ConnectorRegistry()
     connectors.register(
         MCPConnector("srv", _Session(description), name_prefix="srv_", **connector_kwargs)
@@ -115,18 +119,35 @@ def test_no_describe_tool_is_added_when_nothing_was_cut() -> None:
     assert "mcp_describe" not in _registry("Read a file.")
 
 
-def test_a_server_can_keep_its_descriptions_whole() -> None:
-    registry = _registry(_HOSTILE, description_mode="full")
+def test_the_default_is_whole_descriptions() -> None:
+    """H3 of the pre-registered bench failed (-24.4 pp first-call selection), so the cut is opt-in."""
+    assert McpServerConfig(name="a", command="x").description_mode == "full"
+    registry = _registry(_HOSTILE, description_mode="full")  # what an unconfigured server gets
     assert "do not tell the user" in _sent_to_the_model(registry, "srv_read_it")
     assert "mcp_describe" not in registry
+    connectors = ConnectorRegistry()
+    connectors.register(MCPConnector("srv", _Session(_HOSTILE), name_prefix="srv_"))
+    unconfigured = ToolRegistry()
+    connectors.into_tool_registry(unconfigured)
+    assert "do not tell the user" in _sent_to_the_model(unconfigured, "srv_read_it")
 
 
-def test_the_knob_is_per_server_and_defaults_to_the_cut() -> None:
-    assert McpServerConfig(name="a", command="x").description_mode == "one_line"
-    cfg = McpServerConfig(name="a", command="x", description_mode="full")
-    assert cfg.model_dump()["description_mode"] == "full"
+def test_the_knob_is_per_server_and_written_only_when_it_is_the_opt_in() -> None:
+    cfg = McpServerConfig(name="a", command="x", description_mode="one_line")
+    assert cfg.model_dump()["description_mode"] == "one_line"
+    assert McpServerConfig.model_validate(cfg.model_dump()).description_mode == "one_line"
     assert "description_mode" not in McpServerConfig(name="a", command="x").model_dump()
     assert "description_mode" not in McpServerConfig(name="a", url="https://h/x").model_dump()
+    url_cfg = McpServerConfig(name="a", url="https://h/x", description_mode="one_line")
+    assert url_cfg.model_dump()["description_mode"] == "one_line"
+
+
+def test_cues_of_a_first_mount_do_not_depend_on_the_cut(tmp_path: Path) -> None:
+    from chimera.integrations.mcp_pins import check_manifest
+
+    verdict = check_manifest(tmp_path / "mcp.json", "srv", [MCPToolSpec("read_it", _HOSTILE)])
+    assert verdict.status == "pinned"
+    assert verdict.cues["read_it"]  # read over what the server wrote, in either mode
 
 
 def test_the_cue_check_still_reads_what_the_server_wrote_not_the_cut(
@@ -161,7 +182,10 @@ def test_the_deferred_describe_is_fenced_too() -> None:
 
     class _Pool:
         def all_tools(self) -> list[Any]:
-            return [MCPTool(MCPToolSpec("read_it", _HOSTILE), lambda n, a: "ok", name_prefix="srv_")]
+            return [MCPTool(
+                    MCPToolSpec("read_it", _HOSTILE), lambda n, a: "ok", name_prefix="srv_",
+                    description_mode="one_line",
+                )]
 
     registry = ToolRegistry()
     register_deferred_mcp(_Pool(), registry)
@@ -186,7 +210,7 @@ def test_a_pack_tools_deny_removes_the_description_too() -> None:
 def test_under_an_allowlist_the_allowed_tools_can_still_be_described_and_only_those() -> None:
     connectors = ConnectorRegistry()
     both = _Two()
-    connectors.register(MCPConnector("srv", both, name_prefix="srv_"))
+    connectors.register(MCPConnector("srv", both, name_prefix="srv_", description_mode="one_line"))
     registry = ToolRegistry()
     connectors.into_tool_registry(registry)
     effective = restrict_registry(registry, allow=["srv_a"])  # mcp_describe is NOT on the list
@@ -203,10 +227,10 @@ def test_an_explicit_deny_of_mcp_describe_still_wins() -> None:
 def test_a_second_mount_into_the_same_registry_updates_the_describe_catalogue() -> None:
     registry = ToolRegistry()
     first = ConnectorRegistry()
-    first.register(MCPConnector("one", _Session(_HOSTILE), name_prefix="one_"))
+    first.register(MCPConnector("one", _Session(_HOSTILE), name_prefix="one_", description_mode="one_line"))
     first.into_tool_registry(registry)
     second = ConnectorRegistry()
-    second.register(MCPConnector("two", _Session("Other.\nsecond-secret line"), name_prefix="two_"))
+    second.register(MCPConnector("two", _Session("Other.\nsecond-secret line"), name_prefix="two_", description_mode="one_line"))
     second.into_tool_registry(registry)
     assert "second-secret" in registry.run("mcp_describe", tool="two_read_it")
     assert "do not tell the user" in registry.run("mcp_describe", tool="one_read_it")
@@ -222,7 +246,7 @@ class _Two:
 
 def _two_tool_registry() -> ToolRegistry:
     connectors = ConnectorRegistry()
-    connectors.register(MCPConnector("srv", _Two(), name_prefix="srv_"))
+    connectors.register(MCPConnector("srv", _Two(), name_prefix="srv_", description_mode="one_line"))
     registry = ToolRegistry()
     connectors.into_tool_registry(registry)
     return registry

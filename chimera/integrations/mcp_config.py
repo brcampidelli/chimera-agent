@@ -63,10 +63,11 @@ class McpServerConfig(BaseModel):
     catalog_timeout: float | None = None
     cwd: str | None = None
     disabled: bool = False
-    #: "one_line" (default): the model reads one line of each tool description and asks
-    #: ``mcp_describe`` for the rest, fenced. "full": this server's descriptions arrive whole, for a
-    #: server whose tool choice suffers from the cut. Per server because that is where it was measured.
-    description_mode: Literal["one_line", "full"] = "one_line"
+    #: "full" (default): descriptions arrive whole. "one_line" (opt-in): the model reads one line of each
+    #: tool description and asks ``mcp_describe`` for the rest, fenced. Opt-in because the pre-registered
+    #: paired run (bench/mcp_description_fence) measured it at -24.4 pp of first-call tool selection,
+    #: in exchange for removing the attempts a tail payload induces (15 to 0).
+    description_mode: Literal["one_line", "full"] = "full"
     url: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
     token_env: str | None = None
@@ -104,7 +105,7 @@ class McpServerConfig(BaseModel):
             )
             if self.disabled:
                 stdio["disabled"] = True
-            if self.description_mode != "one_line":
+            if self.description_mode != "full":
                 stdio["description_mode"] = self.description_mode
             return stdio
         # `disabled` is written only when true, and `headers` only when set, so a server that was
@@ -114,7 +115,7 @@ class McpServerConfig(BaseModel):
             if value is not None
             and not (key == "disabled" and value is False)
             and not (key == "headers" and not value)
-            and not (key == "description_mode" and value == "one_line")
+            and not (key == "description_mode" and value == "full")
         }
 
 

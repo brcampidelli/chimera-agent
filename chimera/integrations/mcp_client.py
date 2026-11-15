@@ -52,8 +52,10 @@ DESCRIPTION_LINE_CHARS = 160
 #: Appended to a description that was cut, so the model knows there is more and where to ask.
 DESCRIPTION_MORE = " [truncated; mcp_describe has the rest]"
 
-#: ``one_line`` is the default and what the audit asked for; ``full`` is the per-server opt-out for
-#: a server whose tool choice measurably suffers from the cut (P0-16, acceptance).
+#: ``full`` is the default: the pre-registered selection pair (bench/mcp_description_fence) measured the
+#: cut at -24.4 pp of first-call tool choice, and on tasks whose answer is in the tail it is a coin flip.
+#: ``one_line`` is the per-server opt-in for whoever prefers containing hostile descriptions (it removed
+#: the tail-payload attempts, 15 to 0) at that cost.
 DESCRIPTION_MODES = ("one_line", "full")
 
 
@@ -117,7 +119,7 @@ class MCPTool(Tool):
         name_prefix: str = "",
         error_text_mode: str | None = None,
         payload_sink: PayloadSink | None = None,
-        description_mode: str = "one_line",
+        description_mode: str = "full",
     ) -> None:
         self.name = f"{name_prefix}{spec.name}"
         #: What the server wrote, whole. Never sent to the model unfenced: it is for the cue check,
@@ -221,7 +223,7 @@ class MCPConnector(Connector):
         session: MCPSession,
         *,
         name_prefix: str = "",
-        description_mode: str = "one_line",
+        description_mode: str = "full",
     ) -> None:
         self.name = name
         self._session = session
@@ -770,7 +772,7 @@ class StdioMCPSession:
                 self._session = await stack.enter_async_context(ClientSession(read, write))
                 # The InitializeResult (and its server `instructions`) is dropped on purpose: it is
                 # untrusted server text and nothing fences it as data. Not a boundary, though — the
-                # same server's tool descriptions reach the model in list_tools() (cut to one line since
+                # same server's tool descriptions reach the model in list_tools() (one line only for a server in `one_line` mode, since
                 # P0-16; the rest only through the fenced mcp_describe). Recorded
                 # in docs/mcp.md (study 30, S30-21(h)); passing it fenced under taint is open.
                 await self._session.initialize()
