@@ -296,6 +296,9 @@ def _hooked_hand(
     (home / HOOKS_FILE_NAME).write_text(json.dumps({"hooks": [hook]}), encoding="utf-8")
     monkeypatch.setenv("CHIMERA_HOOKS", "true")
     monkeypatch.setenv("CHIMERA_APPROVAL_MODE", "deny")
+    # Pinned: the report below is about the hook layer alone, and a home with no prior state now
+    # defaults to `observe` (first_boot), which adds the kernel's lines to the same surface.
+    monkeypatch.setenv("CHIMERA_GOVERNANCE", "off")
     get_settings.cache_clear()
     registry = ToolRegistry()
     registry.register(tool)

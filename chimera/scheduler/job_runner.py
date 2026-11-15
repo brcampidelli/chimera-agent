@@ -165,8 +165,8 @@ def make_run_job(
             )
 
         def run_at(job_root: Path) -> JobOutcome:
-            # Governance on the path that runs unattended. In `observe` this refuses nothing and
-            # records what enforcement would have cost; the count is reported below, per job, which is
+            # Governance on the path that runs unattended. In `observe` nothing is asked and no review is
+            # refused; what enforcement would have cost is recorded (hard BLOCKs still refuse); the count is reported below, per job, which is
             # the whole point of having a middle state.
             #
             # `on_ledger` hands back the TaintLedger this call built, so it can reach the autonomous

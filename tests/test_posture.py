@@ -376,6 +376,7 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
         "host_exec": "deny",
         "denied_tools": ["run_shell", "browser"],
         "governance": "enforce",
+        "governance_notice": False,
         # Whether one is configured, never which. The URL is a credential — whoever holds it can
         # post into that channel — and this dict is served over HTTP to a screen.
         "approval_webhook_set": True,

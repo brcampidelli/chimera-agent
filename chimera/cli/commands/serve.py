@@ -31,7 +31,7 @@ from chimera.cli.commands.memory import _memory_manager, _recall_graph
 from chimera.cli.commands.ops import _cron_store
 from chimera.cli.service_cmd import AppMode, AppServerOptions, record_install
 from chimera.config import get_settings
-from chimera.governance import governed_profile
+from chimera.governance import announce_existing_install, governed_profile
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -94,6 +94,7 @@ def serve(
     # Before anything below writes to home (the memory store creates memory.db): a first run read
     # after that point looks like an upgrade, and the bot would start open instead of pairing.
     home_was_empty = home_is_empty(settings)
+    announce_existing_install(settings)  # the log half of the existing-install notice
 
     # The same warnings-and-errors file as `chimera app` (plan M5), and only after the first-run
     # check above, because creating `logs/` makes home look used. Only the app attached it before,
@@ -456,6 +457,7 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
 
+    announce_existing_install(get_settings(), desktop=True)  # before the desktop's own default
     _kernel_observes_unless_told_otherwise()
     settings = get_settings()
     # One server per data folder, claimed before anything is built. A server keeps in memory the

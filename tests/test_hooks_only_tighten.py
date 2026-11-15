@@ -485,6 +485,9 @@ def test_govern_step_leaves_the_registry_alone_while_hooks_are_off(
     _write(tmp_path / "home", {"event": "pre_tool", "decision": "deny"})
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
     monkeypatch.delenv("CHIMERA_HOOKS", raising=False)
+    # Governance is pinned off: this is about hooks being off, and a home with no prior state now
+    # defaults to `observe` (first_boot), which wraps the registry for reasons unrelated to hooks.
+    monkeypatch.setenv("CHIMERA_GOVERNANCE", "off")
     get_settings.cache_clear()
     try:
         registry = _registry(_Recorder())

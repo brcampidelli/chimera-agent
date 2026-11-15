@@ -1819,6 +1819,11 @@
             "title": "Governance",
             "type": "string"
           },
+          "governance_notice": {
+            "default": false,
+            "title": "Governance Notice",
+            "type": "boolean"
+          },
           "hooks": {
             "default": false,
             "title": "Hooks",

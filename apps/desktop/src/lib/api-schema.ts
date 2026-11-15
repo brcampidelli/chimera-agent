@@ -7370,6 +7370,11 @@ export interface components {
              */
             governance: string;
             /**
+             * Governance Notice
+             * @default false
+             */
+            governance_notice: boolean;
+            /**
              * Hooks
              * @default false
              */
