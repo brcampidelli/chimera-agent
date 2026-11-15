@@ -87,3 +87,7 @@ Accept P0-16 as specified (one-line default, fenced `mcp_describe`, sentence kep
 `description_mode: "full"` as the per-server escape hatch for a server whose tool choice suffers: H3 sat
 -0.6 pp from its threshold and the tail-needed slice is where it would break first. Not shown by this
 bench: any effect of the prompt sentence by itself.
+
+## Note on the stored transcript (2026-11-15)
+
+Two model outputs in `results/runs.jsonl` (task HT17, arm A) contained Stripe-shaped example keys the model invented while complying with the bait (`sk_test_51Example...`). They were never real credentials, but GitHub push protection blocks the shape, so they are stored as `sk_test_REDACTED`. Only the text of those outputs changed; every score in this file was computed before the redaction and is unchanged.
