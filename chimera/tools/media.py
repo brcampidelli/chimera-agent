@@ -903,6 +903,27 @@ def _transcribe_openai(path: str, key: str, language: str | None) -> str:
     return str(resp.json().get("text", ""))
 
 
+#: How a decoder-readable "list of other files" starts. ffmpeg/libav chooses the demuxer by CONTENT, not
+#: by the file's name, so the extension cannot be what refuses these.
+_MANIFEST_STARTS = (
+    b"#extm3u", b"[playlist]", b"ffconcat", b"<?xml", b"<asx", b"<playlist", b"v=0", b"#ext-x-",
+    b"file '", b"file \"", b"ext-x-",
+)
+_MANIFEST_SUFFIXES = (".m3u", ".m3u8", ".pls", ".xspf", ".asx", ".ffconcat", ".concat", ".sdp", ".txt")
+
+
+def _is_manifest(path: Path) -> bool:
+    """Whether ``path`` is a playlist or concat manifest rather than audio (see ``_MANIFEST_STARTS``)."""
+    if path.suffix.lower() in _MANIFEST_SUFFIXES:
+        return True
+    try:
+        with path.open("rb") as stream:
+            head = stream.read(256).lstrip(b"\xef\xbb\xbf \t\r\n").lower()
+    except OSError:
+        return False
+    return head.startswith(_MANIFEST_STARTS)
+
+
 class TranscribeAudioTool(Tool):
     """Speech-to-text — the symmetric partner to image-gen + TTS. Chimera *orchestrates* a Whisper
     model (it doesn't train one): local faster-whisper if the `stt` extra is installed, else the
@@ -938,6 +959,11 @@ class TranscribeAudioTool(Tool):
         path = resolve_for(self, rel, verb="read")
         if not path.is_file():
             return f"error: audio file not found: {rel}"
+        if _is_manifest(path):
+            return (
+                "error: a playlist or manifest (m3u/m3u8/pls/xspf/concat/sdp) is not audio: the decoder "
+                "would open whatever it lists, on this machine"
+            )
         # `str(None)` is `"None"` — a five-character string that is not empty, so `or None` never
         # fires and the literal word travels on as a language code. faster-whisper then refuses the
         # whole call with `'None' is not a valid language code`, and dictation in the desktop app

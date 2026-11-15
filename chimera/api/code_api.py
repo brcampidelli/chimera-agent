@@ -76,6 +76,12 @@ from chimera.api.code_session_queue import (
 )
 from chimera.api.durable_undo import DurableUndo
 from chimera.api.folder_locks import FolderLocks
+from chimera.api.guest_audience import (
+    GUEST_UNVERIFIED_OUTPUT,
+    denied_roots,
+    guest_governance_settings,
+    guest_runs_nothing,
+)
 from chimera.api.manual_gate import (
     NEEDS_SCREEN,
     ManualAllowances,
@@ -1127,6 +1133,7 @@ def _explorer_registry(
     home: Path,
     allowed: list[str] | None,
     denied: list[str],
+    guest: bool = False,
 ) -> ToolRegistry:
     """The Explorer's read-only tools under the Code turn's same governance and taint ledger."""
     from chimera.api.posture import deployment_fence
@@ -1137,6 +1144,11 @@ def _explorer_registry(
     from chimera.governance.profile import govern_step
 
     inner = read_only_registry(workspace, trust_workspace=trust_workspace)
+    if guest:
+        # The explorer's own tools inherit the guest's confinement (private folders absent, own .env hidden).
+        from chimera.api.guest_audience import confine_to_conversation
+
+        confine_to_conversation(inner, "", settings=settings)
 
     effective_audit = audit if audit is not None else AuditLog(home / "audit.jsonl")
     deployment_denied, deployment_allowed = deployment_fence(settings)
@@ -1157,7 +1169,7 @@ def _explorer_registry(
     )
     step = govern_step(
         inner,
-        settings=settings,
+        settings=guest_governance_settings(settings) if guest else settings,
         audit=effective_audit,
         surface="code:explorer",
         attended=attended,
@@ -1199,6 +1211,7 @@ def assemble_registry(
     chart_sink: Any = None,
     task_tray: Any = None,
     guest: bool = False,
+    session_id: str = "",
     on_pull_request: Callable[[str], None] | None = None,
     design: DesignOffer | None = None,
     browser_link: Any = None,
@@ -1249,6 +1262,9 @@ def assemble_registry(
     It gets no OpenAPI connector: a connector's GET runs with the owner's key and needs no
     approval, so on a guest's turn it would read the owner's private API for whoever holds the
     link — the exposure the bots are closed to (``unattended_surface_may_load``).
+
+    ``session_id`` is the conversation the turn belongs to; jobs the shell starts are stamped with it, and
+    a guest's job tools see only the jobs of that conversation (`chimera.api.guest_audience`).
 
     ``on_pull_request`` is told the URL of every pull request ``open_pull_request`` opened, after
     the owner's yes — how a Code turn records the PR on its conversation for the sidebar's count.
@@ -1361,6 +1377,16 @@ def assemble_registry(
     # In-process Python can import and mutate the service's governance state. The subprocess
     # execute_code tool remains available behind the host-execution gate.
     registry = restrict_registry(registry, deny={"code_interpreter"})
+    # Jobs carry the conversation that started them, so a job tool can be confined to one conversation.
+    shell_for_session = registry.get("run_shell") if "run_shell" in registry else None
+    if shell_for_session is not None and hasattr(shell_for_session, "job_session"):
+        shell_for_session.job_session = session_id
+    if guest:
+        # The guest's reach (`chimera.api.guest_audience`): decided in one place, not beside each source.
+        from chimera.api.guest_audience import WITHHELD_TOOLS, confine_to_conversation
+
+        confine_to_conversation(registry, session_id, settings=settings)
+        registry = restrict_registry(registry, deny=WITHHELD_TOOLS)
     if dev_turn is not None:
         from chimera.tools.defer import _unwrapped
         from chimera.tools.preview import PreviewTool
@@ -1444,7 +1470,8 @@ def assemble_registry(
 
         registry.register(
             ResearchWebTool(
-                gateway, lambda: registry, model=resolve_role_plan(seams, settings).models.explore
+                gateway, lambda: registry, model=resolve_role_plan(seams, settings).models.explore,
+                guest=guest,
             )
         )
     # The owner's approver — the object the taint ledger and, since #495, the policy kernel are
@@ -1458,7 +1485,7 @@ def assemble_registry(
     audit = AuditLog(settings.home / "audit.jsonl")
     owner = _owner_allows(
         settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit,
-        wait_forever=wait_forever,
+        wait_forever=wait_forever, guest=guest,
     )
     if bypass_permissions and not guest:
         owner = bypass_owner_for(
@@ -1571,7 +1598,9 @@ def assemble_registry(
     if task_tray is not None and surface == "api:turn" and approval_sink is not None and not guest:
         registry.register(SuggestTaskTool(task_tray))
         registry.register(DismissTaskTool(task_tray))
-    if approval_sink is not None:
+    # Never for a guest: a path outside the conversation's folder is refused, not put to a card the
+    # owner may approve without reading (the share link is not the owner's reach).
+    if approval_sink is not None and not guest:
         for tool in registry.tools():
             if hasattr(tool, "workspace"):
                 tool.ask_outside = owner  # type: ignore[attr-defined]
@@ -1635,7 +1664,9 @@ def assemble_registry(
         surface == "api:turn" and not guest and not bot_floor and not settings.mcp_autoload
     )
     mentioned_names = _mentioned_mcp_names(owner_message or "", settings) if owner_mention else []
-    pool = mcp_pool.connectors(settings)
+    # A guest's turn mounts no MCP server at all: a server the owner configured by hand carries the
+    # owner's credentials, and only the plugins' servers were ever narrowed for a scope.
+    pool = None if guest else mcp_pool.connectors(settings)
     if mentioned_names:
         # Autoload is off, so `pool` is None here: only what the owner named is connected, through
         # the same sessions, timeout and pinned manifest as the autoload path, and everything
@@ -1825,11 +1856,12 @@ def assemble_registry(
             ExploreRepositoryTool(
                 gateway, ws, model=explore_model, max_turns=steps,
                 contract=settings.explorer_contract,
+                guest=guest,
                 registry_factory=lambda: _explorer_registry(
                     ws, trust_workspace=bool(getattr(settings, "trust_workspace", True)),
                     settings=settings, audit=audit, ledger=ledger,
                     allowed=allowed, denied=denied,
-                    narrow_on_taint=narrow,
+                    narrow_on_taint=narrow, guest=guest,
                     # The Code surface can show approval cards, but exploration itself is read-only;
                     # do not block a folder's research on a question with no visible answer here.
                     attended=False, home=settings.home,
@@ -1931,7 +1963,8 @@ def assemble_registry(
     # `screen`: the owner's approver reaches the kernel only under `enforce`, where a yes is a yes.
     step = govern_step(
         registry,
-        settings=settings,
+        # A guest's turn runs no hook of the owner's (`guest_governance_settings`).
+        settings=guest_governance_settings(settings) if guest else settings,
         audit=audit,
         surface=surface,
         attended=False,
@@ -2228,6 +2261,7 @@ def _question_is_for(call: Any, action: str) -> bool:
 def _owner_allows(
     settings: Settings, sink: Any = None, *, run_id: str | None = None, surface: str = "",
     project: Path | None = None, audit: Any = None, wait_forever: bool = False,
+    guest: bool = False,
 ) -> Any:
     """The approver this deployment chose — and for the default, `ask`, one that actually asks.
 
@@ -2260,6 +2294,9 @@ def _owner_allows(
     `plant_backdoor` and `self_modify_skill` at 0% blocked without the narrowing.
     """
     mode = (settings.approval_mode or "ask").strip().lower()
+    if guest and mode == "allow":
+        # The owner's standing yes is a choice about the owner's own turns. A guest's turn asks.
+        mode = "ask"
     from chimera.governance.approval import allow, ask_elsewhere, deliverer_for, deny
 
     if mode == "allow":
@@ -3106,8 +3143,6 @@ def register_code_api(
     from chimera.core.code_projects import CodeProjectRegistry
     from chimera.core.code_session import CodeSession, CodeSessionStore
     from chimera.core.events import tool as tool_event
-    from chimera.core.instructions import load as load_identity
-    from chimera.core.instructions import render as render_identity
     from chimera.core.jobs import finished_note
     from chimera.interface.profile import owner_instructions
     from chimera.interface.session import recall_facts
@@ -3401,6 +3436,7 @@ def register_code_api(
             chart_sink=chart_sink,
             task_tray=task_tray,
             guest=guest,
+            session_id=req.session_id or "",
             bypass_permissions=bypass_permissions,
             wait_forever=wait_forever,
             manual_allowances=manual_allowances,
@@ -3436,7 +3472,7 @@ def register_code_api(
                 )
         project_setup(ws)
         # Said up front, per turn, so the agent does not learn it by failing (study 34, item 15).
-        if commands_are_off(req, live(), ws):
+        if guest or commands_are_off(req, live(), ws):
             from chimera.tools.shell import COMMANDS_OFF_NOTE
 
             note = (note + "\n\n" if note else "") + COMMANDS_OFF_NOTE
@@ -3519,6 +3555,8 @@ def register_code_api(
             AgentConfig(
                 # The owner's own surface, never a shared-link guest's turn (`guest`, above).
                 user_claude_md=not guest,
+                guest=guest,
+                denied_roots=denied_roots(settings) if guest else (),
                 model=model,
                 system_prompt=system_prompt,
                 turn_context=True,
@@ -3551,8 +3589,9 @@ def register_code_api(
                 # then the reference folders: the order the terminal and the bots use, from the same
                 # function. A shared-link guest gets the identity only, as before, and never the
                 # owner's profile: those are facts about a person, not about the app.
+                # A guest's turn carries none of it: the identity file is the owner's (`agent.json`).
                 instructions=(
-                    render_identity(load_identity(settings.home))
+                    ""
                     if guest
                     else owner_instructions(
                         settings.home,
@@ -3571,7 +3610,7 @@ def register_code_api(
             # Read-only: `build_evolution_context` is asked for the retriever alone, with skill
             # evolution off, because minting a card needs a verify-or-revert signal this path does
             # not have. Advisory either way — the card suggests, the verifier decides.
-            cards=_card_retriever(live(), gateway),
+            cards=None if guest else _card_retriever(live(), gateway),
         )
         if req.open_file:
             # Path only, never content: what a compaction must restore is *which* file is being
@@ -4688,7 +4727,11 @@ def register_code_api(
         # this turn, absent from the stored transcript, like the image note above — so "the
         # download finished, exit 0" reaches the person through the agent instead of through
         # nobody. See `finished_note`.
-        jobs_note = finished_note(live().home, ws)
+        # A guest is told only of its own conversation's jobs; the owner's other work in the same
+        # folder stays unreported, for the owner's next turn.
+        jobs_note = finished_note(
+            live().home, ws, session_id=(req.session_id or "") if (bool(author) and not req.channel_origin) else None
+        )
         if jobs_note:
             note = (note + "\n\n" if note else "") + jobs_note
 
@@ -5257,7 +5300,9 @@ def register_code_api(
                 if stop_signal() or not live_turns.claim_start(turn_id):
                     raise _StoppedWhileWaiting
 
-                guard = WorkspaceGuard(ws)
+                # A guest's turn never asks git (`WorkspaceGuard(git=False)`): git runs scripts the
+                # repository's configuration names, and the guest can have rewritten them.
+                guard = WorkspaceGuard(ws, git=not guest_runs_nothing(author, req))
                 before = guard.snapshot()
                 # Bind project-configured verification to the exact command present before the
                 # agent can modify the workspace through shell or code execution.
@@ -5270,7 +5315,8 @@ def register_code_api(
                     if captured_verify_source == "project" else ""
                 )
                 from chimera.core.verify_infer import project_setup
-                captured_setup = project_setup(ws)
+                # A guest's turn runs no setup command either (`guest_audience`).
+                captured_setup = None if guest_runs_nothing(author, req) else project_setup(ws)
                 captured_setup_hash = (
                     hashlib.sha256(captured_setup.command.encode("utf-8")).hexdigest()
                     if captured_setup is not None else ""
@@ -5434,9 +5480,12 @@ def register_code_api(
                             command is not None and source == "project"
                             and _verify_file_hash(verify_file) != verify_file_hash
                         )
-                        if changed_during_turn:
+                        if changed_during_turn or guest_runs_nothing(author, req):
                             state = "abstained"
-                            output = "project: verify command changed during the turn"
+                            output = (
+                                GUEST_UNVERIFIED_OUTPUT if guest_runs_nothing(author, req)
+                                else "project: verify command changed during the turn"
+                            )
                             outcome["verified"] = state
                             emit("verified", {
                                 "command": command, "source": source, "state": state,

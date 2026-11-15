@@ -302,8 +302,12 @@ class ContextExplorer:
         max_turns: int = 8,
         contract: bool | None = None,
         registry_factory: Any | None = None,
+        guest: bool = False,
     ) -> None:
         self.backend = backend
+        #: A share link's guest turn: the agent built here inherits it (`AgentConfig.guest`), so the
+        #: sub-agent does not read the owner's global instructions the parent was denied.
+        self.guest = guest
         self.workspace = (workspace or Path.cwd()).resolve()
         self.model = model
         self.max_turns = max_turns
@@ -346,6 +350,7 @@ class ContextExplorer:
                 max_steps=steps,
                 temperature=0.1,
                 system_prompt=EXPLORER_CONTRACT_SYSTEM,
+                guest=self.guest,
             ),
         )
         result = agent.run(
@@ -379,6 +384,7 @@ class ContextExplorer:
                 max_steps=self.max_turns,
                 temperature=0.1,
                 system_prompt=EXPLORER_SYSTEM,
+                guest=self.guest,
             ),
         )
         # The transcript stays here, not returned; what the run cost goes with the evidence.
@@ -433,10 +439,11 @@ class ExploreRepositoryTool(Tool):
         max_turns: int = 8,
         contract: bool | None = None,
         registry_factory: Any | None = None,
+        guest: bool = False,
     ) -> None:
         self._explorer = ContextExplorer(
             backend, workspace, model=model, max_turns=max_turns, contract=contract,
-            registry_factory=registry_factory,
+            registry_factory=registry_factory, guest=guest,
         )
         #: What the last exploration spent. Inside a run it is on that run's bill already; this is
         #: how a caller that ran the tool on its own reads it, having no bill to look at.

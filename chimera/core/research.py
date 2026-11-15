@@ -302,8 +302,12 @@ class WebResearcher:
         model: str | None = None,
         max_turns: int = DEFAULT_RESEARCH_STEPS,
         registry: ToolRegistry | None = None,
+        guest: bool = False,
     ) -> None:
         self.backend = backend
+        #: A share link's guest turn: the agent built here inherits it (`AgentConfig.guest`), so the
+        #: sub-agent does not read the owner's global instructions the parent was denied.
+        self.guest = guest
         #: Where the web tools come from, resolved per call for the reason `SubAgentTool` gives: a
         #: caller registers this tool and then wraps its registry in governance and the taint
         #: ledger, and only a late lookup sees the wrapped tools.
@@ -344,6 +348,7 @@ class WebResearcher:
                 # The date is in the turn context, and "resolve dates" is not possible without it.
                 turn_context=True,
                 inject_skill_context=False,
+                guest=self.guest,
             ),
         )
         task = _TASK_TEMPLATE.format(
@@ -408,8 +413,11 @@ class ResearchWebTool(Tool):
         *,
         model: str | None = None,
         max_turns: int = DEFAULT_RESEARCH_STEPS,
+        guest: bool = False,
     ) -> None:
-        self._researcher = WebResearcher(backend, source, model=model, max_turns=max_turns)
+        self._researcher = WebResearcher(
+            backend, source, model=model, max_turns=max_turns, guest=guest
+        )
         #: What the last research spent. Inside a run it is on that run's bill already; this is how
         #: a caller that ran the tool on its own reads it, having no bill to look at.
         self.last_spend: ResearchResult | None = None

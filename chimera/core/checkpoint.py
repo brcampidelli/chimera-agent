@@ -44,6 +44,7 @@ from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from chimera.core.contained import contained_path
 from chimera.core.target_path import validate_target
 from chimera.proc.stdio import no_window
 from chimera.telemetry import get_logger
@@ -105,6 +106,19 @@ def git_listed(workspace: Path) -> list[Path] | None:
         rel = part.decode("utf-8", "surrogateescape").replace("\\", "/")
         paths.append(workspace / rel)
     return paths
+
+
+def _escapes(path: Path, workspace: Path) -> bool:
+    """Whether ``path`` is a symlink whose target lies outside ``workspace``.
+
+    A snapshot exists to put back what a turn changed INSIDE the workspace. Following a link out of it
+    stored somebody else's file in the snapshot (a guest's turn read the owner's `agent.json` through
+    `private.json -> ../agent.json`) and, on restore, wrote through the link into the outside file. The
+    judgement is on the REAL location of the whole path (`chimera.core.contained`), so a link or a
+    junction in a parent directory counts, not only in the file. A link that stays inside is followed
+    as before: it is the same file the workspace already holds.
+    """
+    return contained_path(workspace, path) is None
 
 
 def _read_exact(path: Path, *, errors: str = "strict") -> str:
@@ -273,7 +287,10 @@ def fingerprint(snap: FileSnapshot) -> str:
             h.update(rel.encode("utf-8", "surrogateescape"))
             h.update(b"\x00")
             try:
-                value = _read_exact(snap.workspace / rel) if snap.workspace is not None else snap.files.get(rel)
+                value = (
+                    None if _escapes(snap.workspace / rel, snap.workspace)
+                    else _read_exact(snap.workspace / rel)
+                ) if snap.workspace is not None else snap.files.get(rel)
             except (OSError, UnicodeDecodeError, subprocess.SubprocessError):
                 value = None
             h.update(b"?" if value is None else hashlib.sha256(value.encode("utf-8")).digest())
@@ -344,9 +361,17 @@ def snapshot_changed_paths(before: FileSnapshot, after: FileSnapshot) -> set[str
 class WorkspaceGuard:
     """Snapshots and restores a workspace directory."""
 
-    def __init__(self, workspace: Path, *, max_files: int = 5000) -> None:
+    def __init__(self, workspace: Path, *, max_files: int = 5000, git: bool = True) -> None:
         self.workspace = Path(workspace).resolve()
         self.max_files = max_files
+        #: False: never ask git anything, and read the folder as a plain directory (a walk). `git status`
+        #: and `git cat-file --filters` run what the repository's own configuration names
+        #: (`core.fsmonitor`, a `smudge` filter), usually a script inside the project; on a share
+        #: link's guest turn that script is one the guest can have rewritten (`guest_audience`).
+        self._git = git
+        if not git:
+            self._cached_prefix = ""
+            return
         try:
             prefix = subprocess.run(["git", "-C", str(self.workspace), "rev-parse", "--show-prefix"],
                                     capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
@@ -359,12 +384,17 @@ class WorkspaceGuard:
         """Every file under the workspace, never entering a pruned directory. Sorted, so the cap
         keeps the same files from one snapshot to the next."""
         for dirpath, dirnames, filenames in os.walk(self.workspace):
-            dirnames[:] = sorted(d for d in dirnames if not _pruned(d))
+            # A junction is not reported as a link by Python 3.12's walk, which then descends into it:
+            # the directory's real location is what decides whether it is entered.
+            dirnames[:] = sorted(
+                d for d in dirnames
+                if not _pruned(d) and contained_path(self.workspace, Path(dirpath) / d) is not None
+            )
             for name in sorted(filenames):
                 yield Path(dirpath) / name
 
     def _iter_files(self) -> Iterator[Path]:
-        listed = git_listed(self.workspace)
+        listed = git_listed(self.workspace) if self._git else None
         if listed is not None:
             dirty = self._git_dirty_paths() or set()
             # Deleted tracked entries are absent from the index path listing but part of the
@@ -381,12 +411,16 @@ class WorkspaceGuard:
                 info = path.stat()
             except OSError:
                 continue
+            if _escapes(path, self.workspace):
+                continue
             # git lists a submodule as a path that is a directory; a walk lists only files.
             if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_FILE_BYTES:
                 continue
             yield path
 
     def _git_head(self) -> str | None:
+        if not self._git:
+            return None
         try:
             proc = subprocess.run(
                 ["git", "-C", str(self.workspace), "rev-parse", "--verify", "HEAD"],
@@ -409,6 +443,8 @@ class WorkspaceGuard:
 
     def _git_dirty_paths(self) -> set[str] | None:
         """Paths that differ from the index/worktree, including untracked non-ignored files."""
+        if not self._git:
+            return None
         try:
             proc = subprocess.run(
                 ["git", "-C", str(self.workspace), "-c", "core.quotepath=false", "status", "--porcelain=v1", "-z",
@@ -599,6 +635,8 @@ class WorkspaceGuard:
 
     def _workspace_state(self, rel: str) -> FileState:
         path = self.workspace / rel
+        if _escapes(path, self.workspace):
+            return (False, None)
         try:
             info = path.stat()
         except OSError:
@@ -771,7 +809,7 @@ class WorkspaceGuard:
 
     def _state(self, rel: str) -> FileState:
         path = self.workspace / rel
-        if not path.is_file():
+        if _escapes(path, self.workspace) or not path.is_file():
             return (False, None)
         try:
             return (True, _read_exact(path))

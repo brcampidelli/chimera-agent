@@ -131,6 +131,19 @@ def is_own_env(target: Path) -> bool:
     return any(_is_env(target, own) for own in own_env_files())
 
 
+def private_to_owner(target: Path, denied: tuple[Path, ...]) -> bool:
+    """Whether ``target`` is private to the owner for a turn that was given ``denied`` roots.
+
+    THE one question every reader of a guest's turn asks (the file tools' jail, the instruction loader
+    and its ``@imports``): inside one of the denied folders, or one of Chimera's own ``.env`` files by
+    identity. With no ``denied`` roots (the owner's turn) the answer is always no: the owner's own
+    protections live in :func:`protected_reason` and `hides_own_env`, unchanged.
+    """
+    if not denied:
+        return False
+    return any(within(target, root) for root in denied) or is_own_env(Path(target))
+
+
 def protected_reason(target: Path, home: Path | None) -> str | None:
     """Why no tool or file route may touch ``target``, or None: Chimera's own ``.env`` (its keys and
     its posture) and its data folder (approvals, memory, the ledgers)."""

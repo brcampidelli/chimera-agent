@@ -241,7 +241,14 @@ def _validate_shape(spec: dict[str, Any]) -> str | None:
     return None
 
 
-def _reaches_outside(node: Any, *, in_data: bool = False) -> bool:
+#: What the SERVER's static renderer (vl-convert) goes and fetches: a data URL, a lookup's, an image
+#: mark's. A link (`href`) is only followed by a person's click, so it is not in this set.
+_FETCH_KEYS = frozenset({"url"})
+
+
+def _reaches_outside(
+    node: Any, *, in_data: bool = False, keys: frozenset[str] = _REACHING_KEYS
+) -> bool:
     """Whether a spec names anything to load or follow, at any depth.
 
     Inline rows are not read: ``values`` under a ``data`` and the tables in ``datasets`` are inert,
@@ -252,15 +259,15 @@ def _reaches_outside(node: Any, *, in_data: bool = False) -> bool:
     """
     if isinstance(node, dict):
         for key, value in node.items():
-            if key in _REACHING_KEYS:
+            if key in keys:
                 return True
             if key == "datasets" or (in_data and key == "values"):
                 continue
-            if _reaches_outside(value, in_data=key == "data"):
+            if _reaches_outside(value, in_data=key == "data", keys=keys):
                 return True
         return False
     if isinstance(node, list):
-        return any(_reaches_outside(item, in_data=in_data) for item in node)
+        return any(_reaches_outside(item, in_data=in_data, keys=keys) for item in node)
     return False
 
 
@@ -405,6 +412,15 @@ class RenderChartTool(Tool):
         shape_error = _validate_shape(spec)
         if shape_error:
             return f"error: invalid Vega-Lite spec: {shape_error}"
+        if fmt != "html" and _reaches_outside(spec, keys=_FETCH_KEYS):
+            # vl-convert fetches `data.url` itself, on this machine and with no network policy: a
+            # model-written spec could read the local API (127.0.0.1) or a file and print it into the
+            # picture. Static rendering draws only what the spec carries inline. The HTML form is
+            # not affected: it fetches in the viewer's own browser, under the viewer's own rules.
+            return (
+                "error: a PNG/SVG chart is drawn on this machine and fetches nothing: put the rows in "
+                "data.values (or format html, which a browser draws) instead of a data url"
+            )
         out = resolve_for(self, str(kwargs.get("out") or f"chart.{fmt}"), verb="write")
         if err := refuse_write(self.workspace, out, self.write_region):
             return err
