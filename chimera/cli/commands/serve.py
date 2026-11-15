@@ -376,7 +376,7 @@ def _kernel_observes_unless_told_otherwise() -> None:
     PATCH to ``off`` writes ``.env`` and is honoured at the next launch, and ``chimera serve``, the
     CLI and the VPS are untouched: this is the desktop's default, not the package's.
     """
-    from chimera.config import get_settings
+    announce_existing_install(get_settings(), desktop=True)  # before the desktop's own default
 
     if "governance_mode" in get_settings().model_fields_set:
         return
@@ -457,7 +457,6 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
 
-    announce_existing_install(get_settings(), desktop=True)  # before the desktop's own default
     _kernel_observes_unless_told_otherwise()
     settings = get_settings()
     # One server per data folder, claimed before anything is built. A server keeps in memory the
