@@ -181,3 +181,7 @@ the full 540.
 (`description_mode: "full"`) and the prompt sentence stays. This bench does not show that the sentence
 helps on its own (repository-file channel: -8.3 pp, interval spans 0). The "Consequence for the change"
 paragraph above, which recommended accepting P0-16 as specified, is withdrawn.
+
+## Note on reruns (2026-11-15)
+
+The run above was measured with the five switches that became default-on on 2026-11-10 (`CHIMERA_DEFER_TOOLS`, `CHIMERA_SKILL_CARDS`, `CHIMERA_CODE_CLOSE_LOOP`, `CHIMERA_PULL_REQUESTS`, `CHIMERA_CHAT_INBOUND_MEDIA`) **on**. `run.py` and `reread.py` now declare that state before calling `pin_legacy_defaults()`, so a rerun reproduces this system rather than the pre-2026-11-10 one.

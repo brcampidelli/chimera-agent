@@ -90,4 +90,18 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import os as _os
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+    # This bench was measured on 2026-11-15, AFTER the five switches became default-on (2026-11-10).
+    # Declaring that state first makes the pin below a no-op for them, so a rerun measures the system
+    # these numbers came from rather than the pre-2026-11-10 one.
+    for _name in ("CHIMERA_DEFER_TOOLS", "CHIMERA_SKILL_CARDS", "CHIMERA_CODE_CLOSE_LOOP",
+                  "CHIMERA_PULL_REQUESTS", "CHIMERA_CHAT_INBOUND_MEDIA"):
+        _os.environ.setdefault(_name, "1")
+    from _legacy_defaults import pin_legacy_defaults
+
+    pin_legacy_defaults()
     main()
