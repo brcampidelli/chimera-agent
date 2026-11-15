@@ -1311,6 +1311,10 @@ const en: Dict = {
     "enforce — refuse what the policy stops",
   "settings.governance.cost":
     "Measured on 33 real tool calls from this repository: 20 allowed, 2 warned, 3 sent for review, 8 refused. The 8 are fixed signatures and are refused in observe too. Applies to the next chat turn and the next run; the cron daemon and the messaging adapters keep what they started with until the app is relaunched.",
+  "settings.governance.notice":
+    "This install already had data when governance became configurable, so serve, cron, MCP and the bots on it still run with governance off. New installs start in observe, which asks nothing and does not refuse what enforce would send to review, it only records it; the fixed hard blocks (such as rm -rf /) refuse in every mode but off. Nothing was changed for you: pick observe above to try it, then read it with chimera report governance.",
+  "settings.governance.notice.dismiss":
+    "Dismiss",
   "settings.row.approvalWebhook":
     "Where approvals are asked",
   "settings.hint.approvalWebhook":
@@ -5235,6 +5239,10 @@ const pt: Dict = {
     "aplicar — recusa o que a política barra",
   "settings.governance.cost":
     "Medido em 33 chamadas reais de ferramenta deste repositório: 20 liberadas, 2 com aviso, 3 para revisão, 8 recusadas. As 8 são assinaturas fixas e são recusadas também em observar. Vale a partir do próximo turno de conversa e da próxima execução; o cron e os adaptadores de mensagem mantêm o que começaram até o app ser reaberto.",
+  "settings.governance.notice":
+    "Esta instalação já tinha dados quando a governança passou a ser configurável, então serve, cron, MCP e os bots dela continuam com a governança desligada. Instalações novas começam em observar, que não pede aprovação e não recusa o que aplicar mandaria para revisão, só registra; os bloqueios duros (como rm -rf /) recusam em qualquer modo exceto desligado. Nada foi mudado por você: escolha observar acima para experimentar e leia o resultado com chimera report governance.",
+  "settings.governance.notice.dismiss":
+    "Dispensar",
   "settings.row.approvalWebhook":
     "Onde as aprovações são pedidas",
   "settings.hint.approvalWebhook":
