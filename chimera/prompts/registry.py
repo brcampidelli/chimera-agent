@@ -178,7 +178,8 @@ def _i(
 SECTIONS: tuple[PromptSection, ...] = (
     # ---- the agent loop ------------------------------------------------------------------------
     _c("loop.untrusted_data_rule", "chimera.core.agent:UNTRUSTED_DATA_RULE", "core",
-       _ALL + ("S6", "S12"), "measured", "bench/right_hand_governance (0/12 → 12/12)",
+       _ALL + ("S6", "S12"), "measured", "bench/right_hand_governance (0/12 → 12/12) for the fence sentence; the "
+       "forged-notice sentence added by P0-16 is unmeasured until its pre-registered bench runs",
        note="appended to any loop prompt that lacks it (Agent.compose_system_prompt)"),
     _c("loop.default", "chimera.core.agent:DEFAULT_SYSTEM_PROMPT", "core", _ALL, "measured",
        "ask exception: tests/test_the_agent_may_ask.py (paired run); fence: bench/right_hand_governance"),

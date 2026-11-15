@@ -169,6 +169,16 @@ def tool_cues(description: str, input_schema: Any) -> list[str]:
     return selection_cues("\n".join([description, *_schema_strings(input_schema)]))
 
 
+def manifest_cues(manifest: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Cue codes per tool of ``manifest``; tools with none are left out. Annotation, never a gate."""
+    out: dict[str, list[str]] = {}
+    for tool in manifest:
+        cues = tool_cues(str(tool.get("description", "")), tool.get("input_schema"))
+        if cues:
+            out[str(tool["name"])] = cues
+    return out
+
+
 def _change(
     name: str,
     kind: str,
@@ -227,6 +237,9 @@ class PinCheck:
 
     status: str  # "pinned" (first sight), "unchanged" or "held"
     changes: list[dict[str, Any]] = field(default_factory=list)
+    #: tool name -> cue codes, for a server seen for the FIRST time. First sight mounts on trust, so
+    #: this is the one moment a description hostile from day one can still be noticed (P0-16).
+    cues: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def held(self) -> bool:
@@ -252,7 +265,7 @@ def check_manifest(mcp_path: Path, name: str, specs: Iterable[Any]) -> PinCheck:
         if pinned is None:
             pins[name] = {"digest": digest, "manifest": manifest, "pinned_at": time.time()}
             _try_save(path, pins, name)
-            return PinCheck("pinned")
+            return PinCheck("pinned", cues=manifest_cues(manifest))
         assert isinstance(record, dict)  # _manifest_in returned a list only for a dict record
         if manifest_digest(pinned) == digest:
             if "pending" in record:

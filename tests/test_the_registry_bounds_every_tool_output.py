@@ -257,6 +257,7 @@ _UNDER_THE_CEILING = {
     "chimera.api.works.WorkUndoTool",
     "chimera.core.explorer.ExploreRepositoryTool",
     "chimera.core.research.ResearchWebTool",
+    "chimera.integrations.mcp_defer.DeclaredDescribeTool",
     "chimera.integrations.mcp_defer.McpDescribeTool",
     "chimera.integrations.mcp_defer.McpListTool",
     "chimera.integrations.messaging.SendMessageTool",

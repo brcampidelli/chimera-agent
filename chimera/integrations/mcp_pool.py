@@ -337,7 +337,12 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> dict[str, str | None
             # Namespaced, so a server cannot publish a tool called `read_file` and shadow the one
             # that respects the write region. `into_tool_registry` skips collisions anyway, but a
             # prefix means there is nothing to collide over.
-            pool.register(MCPConnector(cfg.name, pinned, name_prefix=f"{cfg.name}_"))
+            pool.register(
+                MCPConnector(
+                    cfg.name, pinned, name_prefix=f"{cfg.name}_",
+                    description_mode=cfg.description_mode,
+                )
+            )
             outcomes[cfg.name] = None
         except CmdArgumentRefused as exc:
             # Named as refused, not as a skipped server: the remedy is in the arguments, not in the
@@ -405,6 +410,18 @@ def pinned_session(mcp_path: Path, name: str, session: Any) -> Any:
             name,
         )
         return None
+    if verdict.cues:
+        # First sight mounts on trust, so this is the only place a description that is hostile from
+        # day one is named before the model reads it. Tool names and cue CODES only: the text is the
+        # server's, and a log line is not where it gets read. `chimera mcp test` shows it whole.
+        _log.warning(
+            "MCP: server %r is mounting for the first time and %d of its tools carry selection "
+            "cues (%s); review with `chimera mcp test %s` or on the MCP screen",
+            name,
+            len(verdict.cues),
+            "; ".join(f"{tool}: {', '.join(codes)}" for tool, codes in sorted(verdict.cues.items()))[:300],
+            name,
+        )
     return PinnedSession(session, specs)
 
 

@@ -43,6 +43,36 @@ def valid_tool_name(name: str) -> bool:
     return _TOOL_NAME.fullmatch(name) is not None
 
 
+#: How much of a third-party tool description the model reads unasked (P0-16). One line: what the
+#: tool does, enough to choose it. The rest is reached with ``mcp_describe``, which returns it inside
+#: the ``<<external-data>>`` fence; a description is server-authored text and in the declared shape
+#: it used to arrive in the tool list, outside any fence, in full (MCPTox, arXiv 2508.14925).
+DESCRIPTION_LINE_CHARS = 160
+
+#: Appended to a description that was cut, so the model knows there is more and where to ask.
+DESCRIPTION_MORE = " [truncated; mcp_describe has the rest]"
+
+#: ``one_line`` is the default and what the audit asked for; ``full`` is the per-server opt-out for
+#: a server whose tool choice measurably suffers from the cut (P0-16, acceptance).
+DESCRIPTION_MODES = ("one_line", "full")
+
+
+def one_line_description(text: str, limit: int = DESCRIPTION_LINE_CHARS) -> str:
+    """The first non-empty line of ``text``, marker included, at most ``limit`` characters.
+
+    The ceiling is on what the model reads, so the marker counts: a cut description is exactly
+    ``limit`` characters or fewer. Unchanged when the description already is one line that fits, so a
+    well-behaved server is not touched. Whitespace inside the line is collapsed: a run of spaces is
+    a way to push text off the end of a screen, never a way to say something.
+    """
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    first = " ".join(lines[0].split()) if lines else ""
+    if len(lines) <= 1 and len(first) <= limit:
+        return first
+    room = max(limit - len(DESCRIPTION_MORE), 0)
+    return first[:room].rstrip() + DESCRIPTION_MORE
+
+
 @dataclass
 class MCPToolSpec:
     """A tool description advertised by an MCP server."""
@@ -87,9 +117,15 @@ class MCPTool(Tool):
         name_prefix: str = "",
         error_text_mode: str | None = None,
         payload_sink: PayloadSink | None = None,
+        description_mode: str = "one_line",
     ) -> None:
         self.name = f"{name_prefix}{spec.name}"
-        self.description = spec.description
+        #: What the server wrote, whole. Never sent to the model unfenced: it is for the cue check,
+        #: the pin and ``mcp_describe``. ``description`` is what the tool list carries.
+        self.full_description = spec.description
+        self.description = (
+            spec.description if description_mode == "full" else one_line_description(spec.description)
+        )
         self.parameters = spec.input_schema or {"type": "object", "properties": {}}
         self._remote_name = spec.name
         self._caller = caller
@@ -179,10 +215,18 @@ def bind_payloads(tool: Tool, sink: PayloadSink) -> Tool:
 class MCPConnector(Connector):
     """Exposes an MCP server's tools as Chimera tools."""
 
-    def __init__(self, name: str, session: MCPSession, *, name_prefix: str = "") -> None:
+    def __init__(
+        self,
+        name: str,
+        session: MCPSession,
+        *,
+        name_prefix: str = "",
+        description_mode: str = "one_line",
+    ) -> None:
         self.name = name
         self._session = session
         self._name_prefix = name_prefix
+        self._description_mode = description_mode
 
     def tools(self) -> list[Tool]:
         """The server's tools, minus any whose advertised name is not a plain identifier.
@@ -205,7 +249,14 @@ class MCPConnector(Connector):
                 _log.warning("MCP server %r advertised a tool with an invalid name (%r); not registered",
                              self.name, spec.name[:80])
                 continue
-            tools.append(MCPTool(spec, self._session.call_tool, name_prefix=self._name_prefix))
+            tools.append(
+                MCPTool(
+                    spec,
+                    self._session.call_tool,
+                    name_prefix=self._name_prefix,
+                    description_mode=self._description_mode,
+                )
+            )
         return tools
 
 
@@ -719,7 +770,8 @@ class StdioMCPSession:
                 self._session = await stack.enter_async_context(ClientSession(read, write))
                 # The InitializeResult (and its server `instructions`) is dropped on purpose: it is
                 # untrusted server text and nothing fences it as data. Not a boundary, though — the
-                # same server's tool descriptions reach the model unfenced in list_tools(). Recorded
+                # same server's tool descriptions reach the model in list_tools() (cut to one line since
+                # P0-16; the rest only through the fenced mcp_describe). Recorded
                 # in docs/mcp.md (study 30, S30-21(h)); passing it fenced under taint is open.
                 await self._session.initialize()
                 _log.debug("MCP stdio session connected: %s", self.command)

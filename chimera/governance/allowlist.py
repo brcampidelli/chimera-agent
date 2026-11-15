@@ -14,6 +14,7 @@ from collections.abc import Iterable
 
 from chimera.governance.audit import AuditLog
 from chimera.telemetry import get_logger
+from chimera.tools.base import Tool
 from chimera.tools.registry import ToolRegistry
 
 _log = get_logger("governance.allowlist")
@@ -72,6 +73,10 @@ def restrict_registry(
         else:
             excluded.append(tool.name)
 
+    if _keep_mcp_describe_reachable(registry, kept, deny_set | owner_denied) and "mcp_describe" in excluded:
+        # Put back on purpose (see the helper): it was not excluded, and the audit must not say so.
+        excluded.remove("mcp_describe")
+
     # Said once, where the list is applied, because this is the only place that knows an allowlist
     # is in force AND which tools it kept. WARNING rather than debug: the whole value of an
     # allowlist is the belief that it bounds the session, and a list that does not is a belief
@@ -112,3 +117,59 @@ def restrict_registry(
             },
         )
     return kept
+
+
+def _wrapper_chain(tool: Tool) -> list[Tool]:
+    """``tool`` and what it wraps, outermost first: the ledger, governance and other wrappers all keep
+    the tool they run in ``inner``."""
+    chain = [tool]
+    while isinstance(getattr(chain[-1], "inner", None), Tool):
+        chain.append(chain[-1].inner)  # type: ignore[attr-defined]
+    return chain
+
+
+def _keep_mcp_describe_reachable(
+    source: ToolRegistry, kept: ToolRegistry, denied: set[str]
+) -> bool:
+    """Point the declared ``mcp_describe`` at the registry this filter produced (P0-16).
+
+    That tool answers for the tools of the registry it was built against, so after a filter it would
+    describe tools the session, the project (`tools_deny`) or the deployment removed. A copy is made
+    over ``kept``: it describes only tools that survived, and only those whose description was cut.
+    The shared original is never touched, because a parent run still uses it.
+
+    The tool may be wrapped (`ledger_registry`, `govern_registry`), in either order with this filter.
+    The wrappers are walked through ``inner``, the one place they keep what they run, and the SAME
+    layers are shallow-copied around the rebuilt tool, so the ledger and governance protections stay
+    on it exactly as they were.
+
+    **Chosen: implicitly allowed.** Under an allowlist the cut descriptions of the ALLOWED tools have
+    no other road to their remainder, and the owner who allowed ``srv_read_it`` allowed the tool,
+    description and all. It is added only when at least one kept tool is cut and never over an
+    explicit deny of ``mcp_describe``; it grants nothing beyond text the kept tools already carry,
+    so it is not a way to reach a tool the list left out. (The alternative, switching the allowed
+    servers to ``full`` automatically, would put the unfenced text back in the tool list.)
+
+    Returns whether ``mcp_describe`` is now present in ``kept`` because of this function.
+    """
+    import copy
+
+    from chimera.integrations.mcp_defer import DeclaredDescribeTool
+
+    if "mcp_describe" not in source or "mcp_describe" in denied:
+        return False
+    chain = _wrapper_chain(source.get("mcp_describe"))
+    original = chain[-1]
+    if not isinstance(original, DeclaredDescribeTool):
+        return False
+    rebuilt = original.bound_to_registry(kept) or DeclaredDescribeTool([], kept)
+    had_cut = bool(rebuilt.catalogue.by_name)
+    if not had_cut and "mcp_describe" not in kept:
+        return False
+    outer: Tool = rebuilt
+    for layer in reversed(chain[:-1]):
+        clone = copy.copy(layer)
+        clone.inner = outer  # type: ignore[attr-defined]
+        outer = clone
+    kept.register(outer, replace=True)
+    return had_cut
