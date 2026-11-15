@@ -93,6 +93,7 @@ def is_branch_prefix(word: str) -> bool:
 
 if TYPE_CHECKING:
     from chimera.providers.catalog import TierLadder
+    from chimera.providers.routing import RoutingTable
 
 # Two of these three were WITHDRAWN by their providers and nobody noticed until the catalogue was
 # audited on 2026-08-18 — so the default fusion panel, the feature whose entire premise is several
@@ -1979,6 +1980,12 @@ class Settings(BaseSettings):
         from chimera.providers.catalog import resolve_tiers
 
         return resolve_tiers(self)
+
+    def routing_table(self) -> RoutingTable:
+        """Which model each role runs on and where that choice came from (see ``providers.routing``)."""
+        from chimera.providers.routing import build_routing_table
+
+        return build_routing_table(self)
 
     def credential_pool(self, provider: str) -> list[str]:
         """Only the explicit multi-key pool (``CHIMERA_<PROVIDER>_KEYS``), [] if unset.

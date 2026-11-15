@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **One table says which model each role runs on, and why.** `Settings.routing_table()` reports, per role, the model and the reasoning effort and where each came from (environment, `.env` or saved setting, product default). It reads the existing resolvers and changes no behaviour: a 432-case matrix, pinned as a snapshot, matches the old functions, and a ratchet keeps new `*_model` reads from spreading outside it. (P1-10, slice a) (#1286)
+
 ## [0.90.0] - 2026-11-15
 ### Added
 
