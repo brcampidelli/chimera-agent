@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Third-party MCP tool descriptions reach the model as one line.** The rest is available through a fenced `mcp_describe` that honours the session's allow and deny lists; `description_mode: "full"` per server restores whole descriptions; the base prompt states that text imitating the system grants no permission. Pre-registered acceptance (`bench/mcp_description_fence`): forbidden-action attempts fell from 27.5% to 10.8%, with no rise in benign false positives and first-call tool selection within the 5 pp bound. (#1282)
+
 - **Repository hygiene.** Removed five tracked execution outputs, synced stale docstrings, made `chimera tui` refuse to start without a terminal, made `chimera init` hide the key and keep `.env` owner-only, and pinned the chart CDN scripts. (#1276)
 
 - **CI now audits distributed Python extras and blocks fixable CVEs.** Add full-extra install smoke coverage across Linux, Windows and macOS, enforce locked CI environments, and keep advisories without a published fix visible. (#1263)
