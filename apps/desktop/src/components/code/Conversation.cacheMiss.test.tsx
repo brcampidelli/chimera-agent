@@ -62,6 +62,19 @@ describe("TurnReceipt cache miss", () => {
     expect(screen.queryByText(/code\.chat\.miss\./)).not.toBeInTheDocument();
   });
 
+  it("shows a warning badge only on the turn that carries the cache warning", () => {
+    const { unmount } = renderWithProviders(
+      <TurnReceipt
+        done={{ ...DONE, cache_warning: { rate: 0.6, threshold: 0.8, cause: "ttl_expired", turns: 3 } }}
+        t={t}
+      />,
+    );
+    expect(screen.getByText(/status\.cacheWarning/)).toBeInTheDocument();
+    unmount();
+    renderWithProviders(<TurnReceipt done={{ ...DONE, cache_warning: null }} t={t} />);
+    expect(screen.queryByText(/status\.cacheWarning/)).not.toBeInTheDocument();
+  });
+
   it("shows the shortened history with its estimated sizes when a pause shortened it", () => {
     renderWithProviders(
       <TurnReceipt

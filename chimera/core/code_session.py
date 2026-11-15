@@ -38,6 +38,12 @@ from typing import TYPE_CHECKING, Any, Protocol
 from chimera.core.agent import AgentResult, ToolActivity, is_guidance
 from chimera.core.agent_batch_note import batch_note_message, is_batch_note
 from chimera.core.bypass_switches import BypassSwitches, open_switches
+from chimera.core.cache_miss import (
+    CACHE_WINDOW_TURNS,
+    CacheTurn,
+    CacheWarning,
+    cache_warning_between,
+)
 from chimera.core.checkout import Checkout, checkout_of
 from chimera.core.code_session_marks import (
     CodeSessionMarks,
@@ -350,6 +356,14 @@ class CodeSession:
     None for a conversation no turn has finished (every file written before this field), which is
     also what makes the first turn's miss read as a first turn rather than as an expiry."""
 
+    cache_turns: list[dict[str, Any]] = field(default_factory=list)
+    """What each finished turn contributed to this conversation's cache rate
+    (:class:`chimera.core.cache_miss.CacheTurn` records), newest last and bounded.
+
+    The warning that a conversation is paying for its prompt again is about the conversation, not a
+    turn, so the window has to outlive one: it is stored with the file and read back after a restart.
+    Absent in every file written before this field, which reads as no turns yet."""
+
     idle_view: dict[str, Any] | None = None
     """What the model is SENT in place of the oldest messages, after a long pause.
 
@@ -360,6 +374,17 @@ class CodeSession:
 
     Stored, because the next turn inside the cache's lifetime has to send the same prefix this one
     just cached; sending the full history again would pay for a prefix nobody has cached."""
+
+    def record_cache_turn(self, turn: CacheTurn) -> CacheWarning | None:
+        """Add a finished turn to the window and say whether it took the cache rate under the
+        threshold (:func:`chimera.core.cache_miss.session_cache_warning`). Call once per turn."""
+        # Two windows, each exactly what is retained at that moment: the one the conversation held
+        # before this turn, and the one it holds after (this turn in, the oldest out at the cap).
+        # Comparing a 201-turn window and keeping 200 judged a rate nobody was looking at.
+        before = [t for t in (CacheTurn.from_record(r) for r in self.cache_turns) if t is not None]
+        self.cache_turns = [*self.cache_turns, turn.to_record()][-CACHE_WINDOW_TURNS:]
+        after = [t for t in (CacheTurn.from_record(r) for r in self.cache_turns) if t is not None]
+        return cache_warning_between(before, after)
 
     def history_for_model(self) -> list[MessageLike]:
         """The history a turn sends: the stored messages, with the idle compaction applied when set."""
@@ -640,6 +665,7 @@ class CodeSession:
             **({"environment": dict(self.environment)} if self.environment else {}),
             **({"last_turn": dict(self.last_turn)} if self.last_turn is not None else {}),
             **({"idle_view": dict(self.idle_view)} if self.idle_view else {}),
+            **({"cache_turns": [dict(t) for t in self.cache_turns]} if self.cache_turns else {}),
         }
 
     def remember_receipt(self, receipt: dict[str, Any]) -> None:
@@ -699,6 +725,14 @@ def _idle_view_of(raw: object) -> dict[str, Any] | None:
     ):
         return {"covers": raw["covers"], "lead": list(raw["lead"])}
     return None
+
+
+def _cache_turns_of(raw: object) -> list[dict[str, Any]]:
+    """The stored cache window, keeping only what reads back as a turn."""
+    if not isinstance(raw, list):
+        return []
+    kept = [r for r in raw if CacheTurn.from_record(r) is not None]
+    return [dict(r) for r in kept][-CACHE_WINDOW_TURNS:]
 
 
 def _last_turn_of(raw: object) -> dict[str, Any] | None:
@@ -1263,6 +1297,7 @@ class CodeSessionStore:
         # since the last turn that ended, and that is what a stored conversation holds.
         session.last_turn = stored.last_turn
         session.idle_view = stored.idle_view
+        session.cache_turns = list(stored.cache_turns)
         if not session.pin_changed:
             session.selected_model = stored.selected_model
 
@@ -1300,6 +1335,7 @@ class CodeSessionStore:
             environment=environment_record(data.get("environment")),
             last_turn=_last_turn_of(data.get("last_turn")),
             idle_view=_idle_view_of(data.get("idle_view")),
+            cache_turns=_cache_turns_of(data.get("cache_turns")),
         )
 
     def _latest_pull_request(self, session_id: str, legacy: object) -> dict[str, Any] | None:

@@ -2572,6 +2572,15 @@ class CronJobOut(BaseModel):
     """The permission mode the task runs under, or empty. Never wider than Settings."""
     worktree: bool = False
     """Runs in a new git worktree of its folder."""
+    model: str = ""
+    """The model this task runs on. Empty = the one the app runs on, as before."""
+    effort: str = ""
+    """Reasoning effort for this task (`low`, `medium`, `high`). Empty = the model as it is."""
+    max_steps: int | None = None
+    """Steps per attempt for this task. None = the app's own."""
+    suggested_tools: list[str] = Field(default_factory=list)
+    """A smaller tool set this task's prompt suggests, worked out from its words. Only a
+    suggestion: it is never applied, and it is empty for a task that already names its tools."""
 
 
 class CronResultOut(BaseModel):
@@ -2712,6 +2721,13 @@ class CronCreateIn(BaseModel):
     worktree: bool = False
     """Run in a new git worktree of the task's folder; kept, with its path in the history, only
     when the run left work behind."""
+    model: str = ""
+    """The model this task runs on (`provider/model`); empty inherits the app's, the previous
+    behaviour. A name that is not a model slug is a 400."""
+    effort: Literal["", "low", "medium", "high"] = ""
+    """Reasoning effort for this task; empty leaves the model as it is."""
+    max_steps: int | None = None
+    """Steps per attempt, 1 to 40; omitted inherits the app's. Out of range is a 400."""
 
 
 class CronPermissionModeIn(BaseModel):

@@ -28,8 +28,8 @@ from chimera.scheduler.history import CronHistory, HistoryRow, history_path
 from chimera.scheduler.job_permission import JobPermission
 from chimera.scheduler.job_permission import resolve as resolve_job_permission
 from chimera.scheduler.job_worktree import run_in_job_worktree
-from chimera.scheduler.models import CronJob, JobOutcome, kill_flag_path
-from chimera.scheduler.surface import scheduled_run_note
+from chimera.scheduler.models import CronJob, JobOutcome, kill_flag_path, validate_run_config
+from chimera.scheduler.surface import last_delivery_note, scheduled_run_note
 from chimera.tools.builtin import default_registry
 
 
@@ -81,6 +81,85 @@ def _warn_missing_tools(job: CronJob, registry: Any, warn: Callable[[str], None]
     missing = sorted({name.strip() for name in job.tools if name.strip()} - held)
     if missing:
         warn(f"cron '{job.name}': runs without {', '.join(missing)} (no such tool, or not allowed)")
+
+
+def _default_model(settings: Any) -> str:
+    """The default model, read through the routing table (P1-10) rather than the raw setting.
+
+    "" when there is no table (a test double) or when the deployment policy denies every route, so
+    a job that names no model of its own falls back to the serve loop's model, as before.
+    """
+    from chimera.providers.gateway import ProviderDeniedError
+
+    table = getattr(settings, "routing_table", None)
+    if not callable(table):
+        return ""
+    try:
+        return str(table().route("default").model or "")
+    except ProviderDeniedError:
+        return ""
+
+
+def _job_run_config(
+    job: CronJob, model: str | None, max_steps: int, default_model: str, warn: Callable[[str], None]
+) -> tuple[str | None, int, bool]:
+    """The model and step budget THIS job runs with: its own when it names them, else the loop's.
+
+    ``effort`` rides on the slug as the ``#effort`` variant, which is how every other surface asks
+    for it. A job that names an effort and no model takes the loop's model (or the install's
+    default when the loop has none), because a variant needs a model to be a variant of.
+
+    A job's fields are checked here as well as where they are written: ``jobs.json`` can be edited
+    by hand, and an unattended run must not die at 07:00 on a model name nobody can correct. An
+    invalid set is NOT applied — the run inherits, and says so — rather than half-applied.
+    """
+    from chimera.providers.catalog import base_slug
+
+    try:
+        validate_run_config(job.model, job.effort, job.max_steps)
+    except ValueError as exc:
+        warn(f"cron '{job.name}': its model/effort/max_steps were ignored ({exc})")
+        return model, max_steps, False
+    chosen = job.model.strip() or model
+    if job.effort:
+        chosen = f"{base_slug(chosen or default_model)}#{job.effort}"
+    return chosen, job.max_steps or max_steps, True
+
+
+def _single_model_backend(job: CronJob, backend: Any, warn: Callable[[str], None]) -> Any:
+    """The backend a job that PINS a model runs on: one model, outside any routing.
+
+    Under ``CHIMERA_CASCADE`` (or ``--fuse``) the serve loop's backend picks the model itself from
+    its tiers, so a job's ``model`` / ``effort`` only changed the config and the call still went to
+    the router's model, at the router's price. A job that names its own has asked for exactly that
+    model, so it gets the gateway the router wraps. (The alternative, refusing the combination when
+    saved, cannot be decided there: the Cascade is a live Settings toggle, on or off by the time the
+    job fires.) A plain gateway, or a test backend, is used as it is.
+    """
+    if not (job.model or job.effort):
+        return backend
+    from chimera.fusion.cascade import CascadeBackend
+    from chimera.fusion.router import RoutedBackend
+
+    inner = (
+        backend.gateway if isinstance(backend, CascadeBackend)
+        else backend.single if isinstance(backend, RoutedBackend) else None
+    )
+    if inner is None:
+        return backend
+    warn(f"cron '{job.name}': runs on its own model, outside the Cascade/fusion routing")
+    return inner
+
+
+def _turn_notes(job: CronJob, permission: JobPermission | None, home: Path) -> str:
+    """The run's turn-context note: what a scheduled run is, then, LAST, what it said last time.
+
+    The previous delivery goes at the end because it is the part that changes run to run, and a
+    provider's prefix cache stops at the first byte that differs — everything before it stays shared.
+    """
+    note = scheduled_run_note(job) + (f" {permission.note}" if permission is not None else "")
+    last = last_delivery_note(job, home / "scheduler" / "cron_results.jsonl")
+    return f"{note}\n\n{last}" if last else note
 
 
 def make_run_job(
@@ -143,6 +222,11 @@ def make_run_job(
         # fires for months: "wherever the app was pointing when it went off" is not a root anybody
         # chose, and on a packaged build the process root is the install directory.
         job_root = Path(job.workspace).expanduser() if job.workspace else workspace
+        # The job's own model, effort and step budget when it names them; otherwise the serve
+        # loop's, which is what every job used before the fields existed.
+        run_model, run_steps, accepted = _job_run_config(job, model, max_steps, _default_model(settings), warn)
+        # Only when the job's own values were accepted: an invalid set inherits, router included.
+        job_backend = _single_model_backend(job, backend, warn) if accepted else backend
 
         # The job's permission mode, when it names one: a ceiling that is never above the install's
         # own posture (`job_permission`). Resolved before anything is built, and an invalid one
@@ -207,11 +291,11 @@ def make_run_job(
             kill_path = kill_flag_path(settings.home, job.id)
             should_stop: Callable[[], bool] = lambda: kill_path.exists()  # noqa: E731
             agent = Agent(
-                backend,
+                job_backend,
                 job_registry,
                 AgentConfig(
-                    model=model,
-                    max_steps=max_steps,
+                    model=run_model,
+                    max_steps=run_steps,
                     max_usd=job.max_usd,
                     # The same workspace the job's tools are rooted in. A scheduled job is the surface
                     # LEAST able to be told the conventions any other way — nobody is at a terminal to
@@ -227,8 +311,7 @@ def make_run_job(
                     # What this run is: unattended, its answer delivered as it stands, nobody to answer
                     # a question, and a fixed reply for "nothing new" (study 28, P3). In the turn
                     # context rather than the system prompt, which stays the same bytes for a cache.
-                    turn_notes=scheduled_run_note(job)
-                + (f" {permission.note}" if permission is not None else ""),
+                    turn_notes=_turn_notes(job, permission, settings.home),
                     # And the one nudge that fits a run nobody attends: a run that answered with
                     # questions is told to assume and act. Not `insist_on_action` — that also pushes
                     # back a prose answer with no tool call, which for a report job is the job done.
@@ -317,7 +400,7 @@ def make_run_job(
                     # this path (None = the settings default), so the empty string is the last resort —
                     # a usage row with no model is still a usage row, and inventing a name would be
                     # worse than leaving the field blank.
-                    model=(attempts[-1].model if attempts else None) or model or "",
+                    model=(attempts[-1].model if attempts else None) or run_model or "",
                     prompt_tokens=sum(int(a.prompt_tokens or 0) for a in attempts),
                     completion_tokens=sum(int(a.completion_tokens or 0) for a in attempts),
                     usd=None if any(v is None for v in usd_values) else sum(v or 0.0 for v in usd_values),

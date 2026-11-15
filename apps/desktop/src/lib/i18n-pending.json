@@ -5,6 +5,21 @@
   "maxPending": 25,
   "keys": [
     "settings.governance.notice",
-    "settings.governance.notice.dismiss"
+    "settings.governance.notice.dismiss",
+    "status.cacheWarning",
+    "code.worth.perResolved",
+    "code.worth.perVerified",
+    "code.worth.perResolvedNote",
+    "code.worth.resolvedN",
+    "code.worth.coverage",
+    "cron.add.model",
+    "cron.add.effort",
+    "cron.add.effort.none",
+    "cron.add.effort.low",
+    "cron.add.effort.medium",
+    "cron.add.effort.high",
+    "cron.add.steps",
+    "cron.add.runHint",
+    "cron.suggestedTools"
   ]
 }
