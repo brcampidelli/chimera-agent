@@ -12,7 +12,7 @@ import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
 import { useAgent } from "@/lib/agent-context";
 import { useRunSession } from "@/lib/run-session";
-import { missLabelKey, shownMissCause } from "@/lib/cache-miss";
+import { cacheWarningText, missLabelKey, shownMissCause } from "@/lib/cache-miss";
 import { useI18n, useNum, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +47,7 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
   // Quiet only when the chip that says the same thing is actually on screen, on the chat screen, with
   // no run involved.
   const localAnnouncer = viewKey === "code" && chatAnnounces === true && !run.running && !runSeen.current;
+  const cacheWarning = cacheWarningText(report?.cache_warning, t, (n) => `${num(n)}%`);
   // Not `.at(-1)`: the project targets ES2020, and widening lib for one call is a
   // disproportionate change.
   const lastTool = tools.length > 0 ? tools[tools.length - 1] : undefined;
@@ -123,6 +124,13 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
                   : t("status.cacheUnknown"),
             })}
           </span>
+          {/* Set only on the turn that took the conversation's cache rate under 80%: the cost of
+              this conversation is higher than it needs to be, and the cause is named beside it. */}
+          {cacheWarning ? (
+            <span className="text-warn" data-testid="cache-warning">
+              {cacheWarning}
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={onOpenUsage}

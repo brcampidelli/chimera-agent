@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import { missLabelKey, shownMissCause } from "@/lib/cache-miss";
+import { cacheWarningText, missLabelKey, shownMissCause } from "@/lib/cache-miss";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AppWindow,
@@ -536,6 +536,7 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
   // believe the other nine.
   const stopped = STOP_REASONS[done.stopped_reason ?? ""];
   const missCause = shownMissCause(done.cache_miss_cause, done.cache_read_tokens);
+  const cacheWarning = cacheWarningText(done.cache_warning, t, (n) => `${num(n)}%`);
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {/* First, ahead of every measurement, because it is what decides how to read them. */}
@@ -594,6 +595,7 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       ) : null}
       {/* Only when nothing was read from the cache: the short reason the cache did not answer. */}
       {missCause ? <Badge>{t(missLabelKey(missCause))}</Badge> : null}
+      {cacheWarning ? <Badge tone="warn">{cacheWarning}</Badge> : null}
       {/* A pause longer than the cache lived shortened this turn's history before it was sent. The
           sizes are estimates, which the badge says. */}
       {done.idle_compaction ? (

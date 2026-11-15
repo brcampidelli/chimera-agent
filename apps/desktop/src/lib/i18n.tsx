@@ -33,6 +33,7 @@ const en: Dict = {
   "settings.hint.idleCompaction": "After a pause longer than the provider's cache lifetime (5 minutes on Anthropic) the cache has already expired, so the history is shortened before the next turn. Off sends the whole history.",
   "settings.search.terms.idleCompaction": "compaction, cache, idle, pause, history, context, TTL, tokens",
   "status.cacheMiss": "Last cache miss: {cause}",
+  "status.cacheWarning": "Cache is serving {rate} of this conversation (below {threshold}). Main cause: {cause}",
   "code.chat.idleCompacted": "History shortened after a pause: {before} → {after} tokens (estimated)",
   "code.chat.miss.first_turn": "first turn, nothing cached yet",
   "code.chat.miss.ttl_expired": "cache expired during the pause",
@@ -3100,6 +3101,12 @@ const en: Dict = {
     "Of the passes, how many were judged by an executable command rather than by a model reading the answer.",
   "code.worth.attempts": "attempts",
   "code.worth.cost": "cost",
+  "code.worth.perResolved": "per resolved",
+  "code.worth.perVerified": "per verified",
+  "code.worth.perResolvedNote":
+    "Cost per resolved is the group's whole spend, failed runs included, divided by the runs that passed. It is blank when nothing passed or when any run has no known price. Not an experiment: it is not ranked.",
+  "code.worth.resolvedN": "{n} resolved",
+  "code.worth.coverage": "{pct} of runs priced",
   "code.worth.costUnknown": "{known}/{runs} priced",
   "code.worth.noProfile": "none",
   "code.worth.empty":
@@ -3958,6 +3965,7 @@ const pt: Dict = {
   "settings.hint.idleCompaction": "Após uma pausa maior que a vida do cache do provedor (5 minutos na Anthropic), o cache já expirou, então o histórico é encurtado antes do próximo turno. Desligado envia o histórico inteiro.",
   "settings.search.terms.idleCompaction": "compactação, cache, ociosa, pausa, histórico, contexto, TTL, tokens",
   "status.cacheMiss": "Último miss de cache: {cause}",
+  "status.cacheWarning": "O cache atende {rate} desta conversa (abaixo de {threshold}). Causa principal: {cause}",
   "code.chat.idleCompacted": "Histórico encurtado após a pausa: {before} → {after} tokens (estimado)",
   "code.chat.miss.first_turn": "primeiro turno, nada em cache ainda",
   "code.chat.miss.ttl_expired": "o cache expirou durante a pausa",
@@ -7031,6 +7039,12 @@ const pt: Dict = {
     "Das aprovações, quantas foram julgadas por um comando executável em vez de um modelo lendo a resposta.",
   "code.worth.attempts": "tentativas",
   "code.worth.cost": "custo",
+  "code.worth.perResolved": "por resolvida",
+  "code.worth.perVerified": "por verificada",
+  "code.worth.perResolvedNote":
+    "O custo por resolvida é o gasto inteiro do grupo, execuções que falharam incluídas, dividido pelas que passaram. Fica em branco quando nada passou ou quando alguma execução não tem preço conhecido. Não é experimento: não há ranking.",
+  "code.worth.resolvedN": "{n} resolvidas",
+  "code.worth.coverage": "{pct} das execuções com preço",
   "code.worth.costUnknown": "{known}/{runs} com preço",
   "code.worth.noProfile": "nenhum",
   "code.worth.empty":
