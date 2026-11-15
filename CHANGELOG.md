@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.90.0] - 2026-11-15
 ### Added
 
 - **`chimera report governance` and a governed `chimera agent`.** The report counts, per surface over the last N days, what governance granted, refused, raised to review and withheld, and under `observe` what `enforce` would have refused or put before an approver. `chimera agent` now runs on the same governed assembly as chat, assist and tui, so its hooks come from the project it works in and `--deny-tools` reaches deferred MCP tools. (#1283)
