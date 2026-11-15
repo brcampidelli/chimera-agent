@@ -64,6 +64,7 @@ class ConnectorRegistry:
         a connector whose tools you do want to override.
         """
         count = 0
+        registered: list[Tool] = []
         for tool in self.all_tools():
             if tool.name in registry:
                 _log.warning(
@@ -72,5 +73,11 @@ class ConnectorRegistry:
                 )
                 continue
             registry.register(bind(tool) if bind is not None else tool)
+            registered.append(tool)
             count += 1
+        # A description cut to one line (P0-16) has to be askable for in full.
+        from chimera.integrations.mcp_client import MCPTool
+        from chimera.integrations.mcp_defer import register_describe_for_declared
+
+        register_describe_for_declared([t for t in registered if isinstance(t, MCPTool)], registry)
         return count

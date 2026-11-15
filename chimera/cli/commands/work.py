@@ -103,6 +103,9 @@ def mcp_add(
     add_server(_mcp_path(), cfg)
     description = url or command or ""
     console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({description})")
+    # Before its first mount: the tool descriptions are the server's text and the model reads them
+    # as written (unless the server is set to one_line). Test shows them whole, with the cues that say when one is pushy.
+    console.print(f"[dim]review its tools before first use: chimera mcp test {name}[/dim]")
 
 
 @mcp_app.command("list")

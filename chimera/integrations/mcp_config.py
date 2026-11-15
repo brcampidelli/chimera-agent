@@ -22,7 +22,7 @@ import re
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -63,6 +63,11 @@ class McpServerConfig(BaseModel):
     catalog_timeout: float | None = None
     cwd: str | None = None
     disabled: bool = False
+    #: "full" (default): descriptions arrive whole. "one_line" (opt-in): the model reads one line of each
+    #: tool description and asks ``mcp_describe`` for the rest, fenced. Opt-in because the pre-registered
+    #: paired run (bench/mcp_description_fence) measured it at -24.4 pp of first-call tool selection,
+    #: in exchange for removing the attempts a tail payload induces (15 to 0).
+    description_mode: Literal["one_line", "full"] = "full"
     url: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
     token_env: str | None = None
@@ -100,6 +105,8 @@ class McpServerConfig(BaseModel):
             )
             if self.disabled:
                 stdio["disabled"] = True
+            if self.description_mode != "full":
+                stdio["description_mode"] = self.description_mode
             return stdio
         # `disabled` is written only when true, and `headers` only when set, so a server that was
         # written before either field existed keeps its exact bytes on disk.
@@ -108,6 +115,7 @@ class McpServerConfig(BaseModel):
             if value is not None
             and not (key == "disabled" and value is False)
             and not (key == "headers" and not value)
+            and not (key == "description_mode" and value == "full")
         }
 
 
@@ -395,7 +403,12 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
         session.start()
         connector = MCPConnector(cfg.name, session)
         return [
-            {"name": tool.name, "description": tool.description, "input_schema": tool.parameters}
+            {
+                "name": tool.name,
+                # Whole: the cues and the pin read what the server wrote, not what the model is shown.
+                "description": getattr(tool, "full_description", tool.description),
+                "input_schema": tool.parameters,
+            }
             for tool in connector.tools()
         ]
     finally:
@@ -436,7 +449,12 @@ def autoload_into_registry(
                 mounted = pinned_session(mcp_path, cfg.name, session)
                 if mounted is None:
                     continue
-            connectors.register(MCPConnector(cfg.name, mounted, name_prefix=f"{cfg.name}_"))
+            connectors.register(
+                MCPConnector(
+                    cfg.name, mounted, name_prefix=f"{cfg.name}_",
+                    description_mode=cfg.description_mode,
+                )
+            )
         except Exception as exc:  # a broken server must never break agent boot
             _log.warning("MCP autoload: skipping server %r (%s)", cfg.name, type(exc).__name__)
     return connectors.into_tool_registry(registry)

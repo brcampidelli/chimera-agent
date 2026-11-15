@@ -58,6 +58,12 @@ _log = get_logger("integrations.mcp_defer")
 _MAX_LISTED = 60
 
 
+def full_description(tool: Tool) -> str:
+    """What the server wrote for ``tool``, whole. ``description`` is the one-line form the model
+    reads unasked (P0-16); the catalogue's own filtering and ``mcp_describe`` need the full text."""
+    return str(getattr(tool, "full_description", tool.description) or "")
+
+
 def _one_line(text: str) -> str:
     """First sentence-ish of a description. The catalogue is for choosing, not for reading."""
     flat = " ".join((text or "").split())
@@ -111,7 +117,7 @@ class McpListTool(Tool):
         rows = [
             f"{name}: {_one_line(tool.description)}"
             for name, tool in sorted(self.catalogue.by_name.items())
-            if not query or query in name.lower() or query in (tool.description or "").lower()
+            if not query or query in name.lower() or query in full_description(tool).lower()
         ]
         if not rows:
             return "no MCP tool matches" if query else "no MCP tools are connected"
@@ -145,11 +151,23 @@ class McpDescribeTool(Tool):
         tool = self.catalogue.by_name.get(name)
         if tool is None:
             return _unknown(name, self.catalogue)
-        return json.dumps(
-            {"name": tool.name, "description": tool.description, "parameters": tool.parameters},
+        return self._answer(tool)
+
+    def _answer(self, tool: Tool) -> str:
+        """The server's own words about ``tool``, whole and FENCED as external data.
+
+        The fence is applied here, in the tool, and not left to the ledger: the ledger exists only
+        when ``guard_chat`` is on, and this text is the longest server-authored text a run reads
+        (P0-16). Defanged first and fenced after, in the order ``MCPTool.run`` uses.
+        """
+        from chimera.governance.sanitize import fence, sanitize_untrusted
+
+        body = json.dumps(
+            {"name": tool.name, "description": full_description(tool), "parameters": tool.parameters},
             ensure_ascii=False,
             indent=2,
         )
+        return fence(sanitize_untrusted(body))
 
 
 class McpCallTool(Tool):
@@ -231,6 +249,78 @@ def register_deferred_mcp(
             continue
         registry.register(tool)
     return len(catalogue.by_name)
+
+
+class DeclaredDescribeTool(McpDescribeTool):
+    """``mcp_describe`` for the declared shape, where every MCP tool is registered under its own name.
+
+    The tool list carries one line per description; this is where the rest is asked for. It answers
+    only for a tool that is in the EFFECTIVE registry of the run, read at call time. A session
+    allowlist, a pack's ``tools_deny`` or a deployment fence applied after the mount builds a
+    filtered registry, and ``restrict_registry`` points this tool at it (:meth:`bound_to`), so a
+    description the project removed is not one question away.
+    """
+
+    description = (
+        "Show the full description and parameter schema of one MCP tool, by its exact registered "
+        "name. Tool descriptions in the tool list are cut to one line; this returns the rest, as "
+        "untrusted external data."
+    )
+
+    def __init__(self, tools: list[Tool], registry: ToolRegistry) -> None:
+        super().__init__(_McpTools(tools, frozenset(), None))
+        self._registry = registry
+
+    def absorb(self, tools: list[Tool], registry: ToolRegistry) -> None:
+        """A later mount into the same registry: its cut descriptions become askable too."""
+        self._registry = registry
+        for tool in tools:
+            self.catalogue.by_name.setdefault(tool.name, tool)
+
+    def bound_to_registry(self, registry: ToolRegistry) -> DeclaredDescribeTool | None:
+        """A copy answering for ``registry``, or None when none of its tools has a cut description."""
+        cut = [t for n, t in self.catalogue.by_name.items() if n in registry and is_cut(t)]
+        return DeclaredDescribeTool(cut, registry) if cut else None
+
+    def run(self, **kwargs: Any) -> str:
+        name = str(kwargs.get("tool") or "").strip()
+        if name not in self._registry or self._fenced_off(name):
+            return _unknown(name, self.catalogue)
+        return super().run(**kwargs)
+
+    @staticmethod
+    def _fenced_off(name: str) -> bool:
+        """Whether this deployment's denylist or allowlist removes ``name``, read at call time."""
+        from chimera.api.posture import deployment_fence
+        from chimera.config import get_settings
+
+        denied, allowed = deployment_fence(get_settings())
+        return name in denied or (allowed is not None and name not in allowed)
+
+
+def is_cut(tool: Tool) -> bool:
+    """Whether the description the model reads for ``tool`` is shorter than the server's own."""
+    return full_description(tool) != (tool.description or "")
+
+
+def register_describe_for_declared(tools: list[Tool], registry: ToolRegistry) -> bool:
+    """Register ``mcp_describe`` when any declared MCP tool had its description cut. True if it did.
+
+    Not registered when nothing was cut. A second mount into a registry that already has the
+    declared describe tool adds its tools to that catalogue (a stale catalogue answers "unavailable"
+    for the newest server). A name held by the DEFERRED proxy is left alone: it answers there.
+    """
+    cut = [t for t in tools if is_cut(t)]
+    if not cut:
+        return False
+    if "mcp_describe" in registry:
+        existing = registry.get("mcp_describe")
+        if isinstance(existing, DeclaredDescribeTool):
+            existing.absorb(cut, registry)
+            return True
+        return False
+    registry.register(DeclaredDescribeTool(cut, registry))
+    return True
 
 
 def mount(pool: Any, registry: ToolRegistry, settings: Any) -> None:

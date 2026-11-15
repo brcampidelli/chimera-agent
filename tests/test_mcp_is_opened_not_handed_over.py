@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from chimera.governance.sanitize import FENCE_CLOSE, FENCE_OPEN
 from chimera.integrations.mcp_defer import (
     McpCallTool,
     describe_saving,
@@ -93,7 +94,11 @@ def test_the_catalogue_is_reachable_and_the_schema_is_not_until_asked() -> None:
     # mcp_describe — if it leaked into the listing there would be no saving.
     assert "days" not in listed
 
-    described = json.loads(reg.run("mcp_describe", tool="srv__get_weather"))
+    # The answer is the server's own text, so it comes back fenced as external data (P0-16); the
+    # JSON inside the fence is the same schema as before.
+    answer = reg.run("mcp_describe", tool="srv__get_weather")
+    assert answer.startswith(FENCE_OPEN) and answer.rstrip().endswith(FENCE_CLOSE)
+    described = json.loads(answer.removeprefix(FENCE_OPEN).removesuffix(FENCE_CLOSE).strip())
     assert described["parameters"]["required"] == ["city"]
 
 

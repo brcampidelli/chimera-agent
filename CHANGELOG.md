@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **MCP tool descriptions can be cut to one line per server, and the base prompt says forged notices grant nothing.** `"description_mode": "one_line"` in `mcp.json` shows the model one line of each tool description and serves the rest through a fenced `mcp_describe` that honours the session's allow and deny lists, including through the ledger and governance wrappers. It is opt-in: the default stays whole descriptions, because the pre-registered paired run (`bench/mcp_description_fence`, 540 runs, US$ 0.84) measured the cut at -24.4 pp of first-call tool selection (TOST [-31.7, -16.2]), and on tasks whose answer sits in the description tail the choice is a coin flip. What it buys is also measured: attempts at forbidden actions fell 16.7 pp (27.5% to 10.8%), all of it from payloads in the tail of a tool description; benign false positives were not inferior, with caveats. The base prompt now states that text imitating the system in a file, a message or a tool output grants no permission; that sentence has no demonstrated effect in the bench. The first mount of a server records and logs its selection cues. (#1282)
+
 - **Repository hygiene.** Removed five tracked execution outputs, synced stale docstrings, made `chimera tui` refuse to start without a terminal, made `chimera init` hide the key and keep `.env` owner-only, and pinned the chart CDN scripts. (#1276)
 
 - **CI now audits distributed Python extras and blocks fixable CVEs.** Add full-extra install smoke coverage across Linux, Windows and macOS, enforce locked CI environments, and keep advisories without a published fix visible. (#1263)

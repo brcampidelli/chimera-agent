@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-140 directories: 125 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
+141 directories: 126 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
@@ -87,6 +87,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`manager_advisory`](manager_advisory/) | with result | 1 | 1 |
 | [`manager_diff`](manager_diff/) | with result | 1 | 1 |
 | [`manager_p`](manager_p/) | with result | 1 | 1 |
+| [`mcp_description_fence`](mcp_description_fence/) | with result | 1 | 1 |
 | [`mcp_error_text`](mcp_error_text/) | with result | 1 | 1 |
 | [`memory_extraction`](memory_extraction/) | with result | 1 | 1 |
 | [`memory_gate_cost`](memory_gate_cost/) | with result | 2 | 2 |
