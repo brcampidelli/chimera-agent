@@ -83,6 +83,23 @@ def _warn_missing_tools(job: CronJob, registry: Any, warn: Callable[[str], None]
         warn(f"cron '{job.name}': runs without {', '.join(missing)} (no such tool, or not allowed)")
 
 
+def _default_model(settings: Any) -> str:
+    """The default model, read through the routing table (P1-10) rather than the raw setting.
+
+    "" when there is no table (a test double) or when the deployment policy denies every route, so
+    a job that names no model of its own falls back to the serve loop's model, as before.
+    """
+    from chimera.providers.gateway import ProviderDeniedError
+
+    table = getattr(settings, "routing_table", None)
+    if not callable(table):
+        return ""
+    try:
+        return str(table().route("default").model or "")
+    except ProviderDeniedError:
+        return ""
+
+
 def _job_run_config(
     job: CronJob, model: str | None, max_steps: int, default_model: str, warn: Callable[[str], None]
 ) -> tuple[str | None, int, bool]:
@@ -207,9 +224,7 @@ def make_run_job(
         job_root = Path(job.workspace).expanduser() if job.workspace else workspace
         # The job's own model, effort and step budget when it names them; otherwise the serve
         # loop's, which is what every job used before the fields existed.
-        run_model, run_steps, accepted = _job_run_config(
-            job, model, max_steps, str(getattr(settings, "default_model", "") or ""), warn
-        )
+        run_model, run_steps, accepted = _job_run_config(job, model, max_steps, _default_model(settings), warn)
         # Only when the job's own values were accepted: an invalid set inherits, router included.
         job_backend = _single_model_backend(job, backend, warn) if accepted else backend
 
