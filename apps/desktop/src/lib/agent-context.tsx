@@ -1,3 +1,4 @@
+import type { CacheWarning } from "@/lib/cache-miss";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { Status } from "@/components/Activity";
@@ -37,6 +38,8 @@ export interface AgentReport {
   cache_read_tokens?: number | null;
   /** The cause of the last miss, shown on the status bar's tooltip (`lib/cache-miss.ts`). */
   cache_miss_cause?: string | null;
+  /** Set only on the turn that took the conversation's cache rate under its threshold. */
+  cache_warning?: CacheWarning | null;
   /** Scoped to the screen that produced the receipt so shell navigation does not attribute it to another. */
   viewKey?: string;
   memory_facts_used?: number;
