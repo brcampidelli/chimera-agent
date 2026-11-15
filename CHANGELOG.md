@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **An MCP server whose code changed under the same tool listing is held before it starts.** A change to its package version, script, module, executable or load-affecting environment now holds the server for approval ("command changed"); a pin from before this check is held once to record its identity, and the MCP screen says what could not be verified offline. Untrusted text in Code turns, the CI fix turn, the reviewer evidence and the quarantined reader now share one data fence, and the affective self-claim check covers Portuguese. (P1-12) (#1291)
+
 - **Screen readers hear a failed turn as failed, and keyboard focus shows where it is.** A turn that ends in an error is announced as "Failed: <reason>", never as complete; the conversation announces working, waiting and complete instead of reading the answer token by token; an approval that pauses the agent is announced once, not again after minimising and reopening it; and focus is visible on the settings tab panels, the Connections fields, the file editor and the command palette. (P1-20) (#1290)
 
 ## [0.90.0] - 2026-11-15
