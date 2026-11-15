@@ -284,8 +284,17 @@ class LedgeredTool(Tool):
         home: Path | None = None,
         bypass_permissions: bool | Callable[[], bool] = False,
         run_id: str = "",
+        surface: str = "",
+        mode: str = "",
     ) -> None:
         self.inner = inner
+        # The kernel mode whose approver this wrapper was handed (`observe` = one that says yes to
+        # everything). Written on its audit lines so the weekly report can tell a question that was
+        # asked from one that enforcement WOULD have asked. Empty: the approver is a real one.
+        self.mode = mode
+        # Written on this wrapper's audit lines so the weekly governance report can group them by
+        # surface; empty for callers that name none.
+        self.surface = surface
         # A write inside the workspace after untrusted input is a WARNING, not a card, where the
         # surface says a person is watching (`warn_workspace_writes`). Off by default: every bench
         # and every unattended surface keeps the narrowing it was measured with. What still asks is
@@ -368,7 +377,7 @@ class LedgeredTool(Tool):
             if self.audit is not None:
                 self.audit.record(
                     "taint_write_warned",
-                    {"tool": name, "path": _excerpt(target, 300), "sources": sources},
+                    {"tool": name, "path": _excerpt(target, 300), "sources": sources, **self._on()},
                 )
             if self.notify is not None:
                 self.notify(
@@ -400,7 +409,7 @@ class LedgeredTool(Tool):
             if self.audit is not None:
                 self.audit.record(
                     "taint_narrowed",
-                    {"tool": name, "reason": reason, "action": action, "sources": sources},
+                    {"tool": name, "reason": reason, "action": action, "sources": sources, **self._on()},
                 )
             assessment = SequenceAssessment(
                 True, Decision.REVIEW, reason, action=action, sources=sources,
@@ -435,6 +444,7 @@ class LedgeredTool(Tool):
                         "decision": assessment.decision.value,
                         "reason": assessment.reason,
                         "tainted_refs": assessment.tainted_refs,
+                        **self._on(),
                     },
                 )
             approved = False
@@ -614,6 +624,13 @@ class LedgeredTool(Tool):
     def bypass_permissions(self, value: bool | Callable[[], bool]) -> None:
         self._bypass_permissions = value
 
+    def _on(self) -> dict[str, str]:
+        """The surface, as an audit field — absent when this wrapper was given none."""
+        return {
+            **({"surface": self.surface} if self.surface else {}),
+            **({"mode": self.mode} if self.mode else {}),
+        }
+
     def _record_bypass(self, action: str) -> None:
         if self.audit is not None:
             self.audit.record(
@@ -681,7 +698,7 @@ class LedgeredTool(Tool):
         if self.audit is not None:
             self.audit.record(
                 "recipient_unseen",
-                {"tool": name, "recipients": unseen, "card": asked or ask},
+                {"tool": name, "recipients": unseen, "card": asked or ask, **self._on()},
             )
         if not ask or self.approve is None:
             return None
@@ -898,6 +915,8 @@ def ledger_registry(
     home: Path | None = None,
     bypass_permissions: bool | Callable[[], bool] = False,
     run_id: str = "",
+    surface: str = "",
+    mode: str = "",
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`LedgeredTool`.
 
@@ -918,7 +937,8 @@ def ledger_registry(
                 ask_unseen_recipient=ask_unseen_recipients,
                 rope_lite=rope_lite,
                 warn_workspace_writes=warn_workspace_writes, notify=notify, home=home,
-                bypass_permissions=bypass_permissions, run_id=run_id,
+                bypass_permissions=bypass_permissions, run_id=run_id, surface=surface,
+                mode=mode,
             )
         )
     return wrapped

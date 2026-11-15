@@ -121,7 +121,15 @@ class TrustKernel:
         precedents: PrecedentStore | None = None,
         default: Decision = Decision.ALLOW,
         band: DecisionBand | None = None,
+        surface: str = "",
+        mode: str = "",
     ) -> None:
+        # Which surface built this kernel and under which mode (`off`/`observe`/`enforce`), written on
+        # every verdict it records. Without them a line `decision=review` cannot be told apart in the
+        # weekly governance report: under `observe` it is what enforcement WOULD have refused, under
+        # `enforce` it is a question that was asked. Empty for the callers that name neither.
+        self.surface = surface
+        self.mode = mode
         self.ruleset = ruleset or RuleSet()
         self.learned = RuleSet(use_defaults=False)
         self.judge = judge
@@ -255,6 +263,8 @@ class TrustKernel:
                     "rule": verdict.rule,
                     "reason": verdict.reason,
                     "source": source,
+                    **({"surface": self.surface} if self.surface else {}),
+                    **({"mode": self.mode} if self.mode else {}),
                     # Truncated like ``action`` above, and omitted when empty so the log does not
                     # grow a column of empty strings for the callers that have no context to give.
                     **({"context": context[:200]} if context else {}),

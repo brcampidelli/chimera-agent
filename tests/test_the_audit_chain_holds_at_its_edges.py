@@ -57,7 +57,7 @@ def test_the_digest_is_sha256_over_sorted_compact_utf8_json() -> None:
 def test_an_entry_keeps_its_key_order_and_its_text_unescaped(tmp_path: Path) -> None:
     log = _log(tmp_path)
     entry = log.record("decision", {"action": "café", "seq": 99})
-    assert list(entry) == ["seq", "type", "action", "prev", "hash"]
+    assert list(entry) == ["seq", "type", "action", "ts", "prev", "hash"]
     assert entry["seq"] == 0
     # Written as text a person can read, not as \u escapes.
     assert "café" in log.path.read_text(encoding="utf-8")

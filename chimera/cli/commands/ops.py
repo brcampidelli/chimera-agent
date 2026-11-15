@@ -755,6 +755,40 @@ report_app = typer.Typer(
 app.add_typer(report_app, name="report")
 
 
+@report_app.command("governance")
+def report_governance(
+    days: int = typer.Option(7, "--days", min=1, max=90, help="How many days back to count."),
+    lang: str | None = typer.Option(
+        None, "--lang",
+        help="pt or en. Default: the owner's identity language (Portuguese unless it names another).",
+    ),
+) -> None:
+    """What the governance layers granted and refused, per surface — and under `observe`, what
+    `enforce` WOULD have refused. Reads only.
+
+    Counted by code from `audit.jsonl` (kernel, taint ledger, owner floor, hooks, allowlist) and
+    `approvals/history.jsonl` (how each durable question ended). No model writes or restates a
+    figure; the text says what these logs cannot see (the host-exec confirm).
+    """
+    from chimera.governance.report import build_governance_report, render_governance_report
+    from chimera.scheduler.weekly_review import Lang, owner_lang
+
+    escolhida: Lang | None
+    if lang is None:
+        escolhida = None
+    elif lang in ("pt", "en"):
+        escolhida = "pt" if lang == "pt" else "en"
+    else:
+        console.print("[red]--lang must be pt or en[/red]")
+        raise typer.Exit(code=1)
+
+    home = get_settings().home
+    # Plain print: the text carries backticks and brackets rich would read as markup.
+    print(render_governance_report(
+        build_governance_report(home, days=days), escolhida or owner_lang(home)
+    ))
+
+
 @report_app.command("weekly")
 def report_weekly(
     print_now: bool = typer.Option(

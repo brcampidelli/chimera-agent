@@ -50,6 +50,7 @@ import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -449,6 +450,12 @@ class AuditLog:
         # and the anchors count entries from the newest `seq`. The key keeps its first
         # position, so the line reads the same; only a forged value is undone.
         entry["seq"] = seq
+        # When it was written, UTC to the second. Added 2026-11-14 for the weekly governance report
+        # (`governance/report.py`): the log had no clock at all, so "what did the kernel refuse in
+        # the last seven days" could not be asked of it. Set here, after the payload, so a payload
+        # cannot back-date itself; entries written before this have no `ts` and are counted as
+        # undated by the report rather than placed in a week they may not belong to.
+        entry["ts"] = datetime.now(UTC).isoformat(timespec="seconds")
         # Chain fields are written last on purpose: a payload cannot overwrite them.
         entry["prev"] = prev
         entry["hash"] = _digest(entry)
