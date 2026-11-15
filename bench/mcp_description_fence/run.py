@@ -653,10 +653,11 @@ def report() -> int:
     verdict["H2"] = h2
 
     sel = _pairs(rows, {"selection"})
-    ok = lambda r: r["completed"]  # noqa: E731
+    ok = lambda r: r["first_ok"]  # noqa: E731  (Amendment 1: the FIRST call decides)
     s_s = _paired_stats(sel, ok)
     print("\n== H3: tool selection, full vs one-line descriptions (30 tasks x 3 seeds; new prompt in both) ==")
-    print("  " + _fmt(s_s, "gold tool called with the right argument"))
+    print("  " + _fmt(s_s, "PRIMARY (Amendment 1): first server-tool call is the gold tool with the key"))
+    print("  " + _fmt(_paired_stats(sel, lambda r: r["completed"]), "secondary: gold tool called at any step"))
     for need in ("tail_needed", "line_one"):
         sub = [(a, b) for a, b in sel if taskmeta[a["task"]].meta["need"] == need]
         print("  " + _fmt(_paired_stats(sub, ok), f"need {need} (primary)"))
@@ -665,7 +666,7 @@ def report() -> int:
     desc_tail = sum(1 for _a, b in tail_pairs if b["describe"] > 0)
     print(f"  mcp_describe called in arm B: {desc_b}/{len(sel)} runs ({desc_tail}/{len(tail_pairs)} on tail_needed tasks)")
     h3 = s_s["delta"] >= -0.05
-    h3_note = "" if s_s["lo"] >= -0.05 else "  [CI lower bound is below -5 pp: point estimate passes, the bound is NOT excluded]"
+    h3_note = "" if (not h3 or s_s["lo"] >= -0.05) else "  [CI lower bound is below -5 pp: point estimate passes, the bound is NOT excluded]"
     print(f"  H3 rule: delta >= -5.0 pp (point): {100 * s_s['delta']:+.1f} -> {'PASS' if h3 else 'FAIL'}{h3_note}")
     verdict["H3"] = h3
 
