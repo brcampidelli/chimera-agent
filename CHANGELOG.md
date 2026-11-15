@@ -5,12 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **A scheduled job can name its own model, effort and step budget, and sees its last delivery.** `cron add/edit --model --effort --max-steps` and the Schedule screen set them (empty inherits from `serve`, as before); invalid values are refused at save and, for a hand-edited `jobs.json`, inherited with a warning instead of dropping the job. The job's last delivered answer (2 KB, fenced as data) closes its context so it stops repeating itself; a delivery the destination refused counts toward the failure brake and is never treated as delivered. A webhook job naming these fields is refused. (P1-03) (#1287)
 
 - **One table says which model each role runs on, and why.** `Settings.routing_table()` reports, per role, the model and the reasoning effort and where each came from (environment, `.env` or saved setting, product default). It reads the existing resolvers and changes no behaviour: a 432-case matrix, pinned as a snapshot, matches the old functions, and a ratchet keeps new `*_model` reads from spreading outside it. (P1-10, slice a) (#1286)
+
+### Changed
+
+- **Governance starts in `observe` on a new data folder.** A folder that is missing or empty gets `observe` once, recorded in `governance_default.json`; an existing folder keeps `off` and gets a notice (in the log at the start of `serve`/the app, and a dismissible note in Settings). An explicit `CHIMERA_GOVERNANCE` still wins, and an empty one counts as unset. Behaviour change: under `observe` the kernel's fixed hard blocks (`rm -rf /`, `mkfs`, curl into a shell, ...) refuse, so a new install now refuses those commands; what `enforce` would only send to review is recorded, not asked. (P0-15, part 2) (#1289)
 
 ### Fixed
 

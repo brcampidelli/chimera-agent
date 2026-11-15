@@ -1083,6 +1083,11 @@ class AutonomyCfgOut(BaseModel):
     ``off``, so on a stock install the only thing between the model and a `git push --force`
     inside the workspace is the folder jail."""
 
+    governance_notice: bool = False
+    """True on an EXISTING install whose governance is still ``off`` because nobody chose a mode
+    (``chimera/governance/first_boot.py``): new installs start in ``observe``, this one was left
+    alone, and the Settings screen says so once, dismissibly. Never true when a mode was chosen."""
+
     egress_allow: list[str] = Field(default_factory=list)
     """Hosts where a query-string GET is not treated as a way out while the run holds untrusted
     content. Empty by default: nothing is exempt until the owner names it.
