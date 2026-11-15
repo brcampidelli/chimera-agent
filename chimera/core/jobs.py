@@ -183,7 +183,7 @@ class JobRegistry:
     # --- starting ---------------------------------------------------------------------------
 
     def start(self, command: str, *, cwd: Path, env: dict[str, str], argv: list[str] | str,
-              shell: bool) -> Job:
+              shell: bool, extra: dict[str, Any] | None = None) -> Job:
         """Spawn ``argv`` detached and record it. Raises :class:`JobLimitError` when the cap is
         reached and ``OSError`` when the spawn itself fails — the tool turns both into an error
         observation, the way a foreground failure is."""
@@ -215,6 +215,7 @@ class JobRegistry:
                 id=job_id, command=command, cwd=str(cwd), pid=proc.pid,
                 started_at=time.time(), log=str(log_path), owner=_PROCESS_TOKEN,
                 max_runtime=float(self.max_runtime) if self.hard_runtime else 0.0,
+                extra=dict(extra or {}),
             )
             with self._lock:
                 self._procs[job_id] = proc
@@ -438,17 +439,25 @@ class JobRegistry:
         text = console_text(raw)
         return text[-want:] if len(text) > want else text
 
-    def finished_unreported(self, within: Path | None = None) -> list[Job]:
+    def finished_unreported(
+        self, within: Path | None = None, session_id: str | None = None
+    ) -> list[Job]:
         """Jobs that ended and have not been handed to a turn yet — and are, now.
 
         ``within``: only jobs that ran inside this folder. A job's news used to go to the next turn
         of ANY project, which marked it reported and could not read its output (the job tools are
         fenced to the turn's folder), so the project that started it never heard.
+
+        ``session_id``: only jobs started in this conversation (a share link's guest is told of its
+        own conversation's jobs, never of the owner's other work in the same folder). A job left
+        unreported by this filter stays unreported, for the owner's next turn.
         """
         root = Path(within).resolve() if within is not None else None
         out: list[Job] = []
         for job in self.all():
             if root is not None and not _inside(Path(job.cwd), root):
+                continue
+            if session_id is not None and job.extra.get("session_id") != session_id:
                 continue
             if job.state in ENDED and not job.reported:
                 job.reported = True
@@ -678,7 +687,7 @@ def jobs_for(home: Path) -> JobRegistry:
         return registry
 
 
-def finished_note(home: Path, within: Path) -> str:
+def finished_note(home: Path, within: Path, session_id: str | None = None) -> str:
     """The turn note for the background jobs in ``within`` that ended since a turn last looked.
 
     ``""`` when none did. Each job is reported once (``finished_unreported`` marks it). The model is
@@ -690,7 +699,12 @@ def finished_note(home: Path, within: Path) -> str:
     its timeout becomes a job on every surface, and the terminal and the chat bot never said when
     one finished, so the news went to nobody.
     """
-    finished = jobs_for(home).finished_unreported(within=within)
+    registry = jobs_for(home)
+    finished = (
+        registry.finished_unreported(within=within)
+        if session_id is None
+        else registry.finished_unreported(within=within, session_id=session_id)
+    )
     if not finished:
         return ""
     lines = [

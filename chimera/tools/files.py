@@ -12,6 +12,7 @@ from chimera.tools.base import Tool
 from chimera.tools.formatting import append_format_observation
 from chimera.tools.workspace import (
     atomic_write_text,
+    denied_of,
     hides_own_env,
     read_text_for_edit,
     resolve_for,
@@ -25,11 +26,17 @@ _MAX_READ_CHARS = 20_000
 class _WorkspaceTool(Tool):
     """Base for tools bound to a workspace root (with an optional declared write-region)."""
 
+    #: See `chimera.tools.edit._WorkspaceTool.formats`.
+    formats: bool = True
+
     def __init__(
         self, workspace: Path | None = None, *, write_region: WriteRegion | None = None
     ) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
         self.write_region = write_region
+
+    def formatted(self, result: str, path: Path) -> str:
+        return append_format_observation(result, path, self.workspace) if self.formats else result
 
 
 class ReadFileTool(_WorkspaceTool):
@@ -274,7 +281,7 @@ class WriteFileTool(_WorkspaceTool):
         # Atomic write: never OS-translate the model's newlines or truncate on interruption.
         atomic_write_text(path, content.replace("\r\n", "\n"), newline=newline)
         receipt = f"wrote {len(content)} chars to {shown_path(self.workspace, path)}"
-        return append_format_observation(receipt, path, self.workspace)
+        return self.formatted(receipt, path)
 
 
 class ListDirTool(_WorkspaceTool):
@@ -309,7 +316,9 @@ class ListDirTool(_WorkspaceTool):
             for p in path.iterdir()
             # Chimera's own .env, when the owner keeps it from the agent's read tools: not even its
             # name, so a listing is not an invitation to try another spelling.
-            if not hides_own_env(p, forced=bool(getattr(self, "hide_own_env", False)))
+            if not hides_own_env(
+                p, forced=bool(getattr(self, "hide_own_env", False)), denied=denied_of(self)
+            )
             and (p.resolve() == bound or bound in p.resolve().parents)
         )
         return "\n".join(entries) if entries else "(empty)"

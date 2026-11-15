@@ -91,7 +91,11 @@ class SubAgentTool(Tool):
         markdown_agents: dict[str, MarkdownAgent] | None = None,
         workspace: Path | None = None,
         trust_workspace: bool = True,
+        guest: bool = False,
     ) -> None:
+        #: A share link's guest turn: the agent built here inherits it (`AgentConfig.guest`), so the
+        #: sub-agent does not read the owner's global instructions the parent was denied.
+        self._guest = guest
         self._workspace = Path(workspace) if workspace is not None else Path.cwd()
         #: Whether the repository's own text (an agent file, its memory notes) is the owner's.
         #: False, the checkout was declared untrusted (`CHIMERA_TRUST_WORKSPACE=0`) and what a named
@@ -272,6 +276,7 @@ class SubAgentTool(Tool):
                 max_steps=max_steps,
                 temperature=0.2,
                 system_prompt=system_prompt,
+                guest=self._guest,
             ),
         )
         # The transcript stays here; only the answer is returned. What the run spent goes on the
