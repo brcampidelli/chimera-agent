@@ -66,6 +66,22 @@ def resolve_program(name: str) -> str:
     return shutil.which(name) or name
 
 
+def launch_program(command: str, cwd: str | os.PathLike[str] | None = None, path: str | None = None) -> str | None:
+    """The file a subprocess started with ``cwd`` will actually execute for ``command``, or None.
+
+    THE one rule, used both to spawn an MCP server and to compute its artifact identity (P1-12), so
+    the identity cannot describe a different file than the one that runs. A command with a path
+    separator (``./server``, ``bin/x``) is relative to the SERVER's ``cwd`` when one is set, and to the
+    process's otherwise; a bare name is looked up on ``path`` (default: the process ``PATH``).
+    """
+    if os.sep in command or (os.altsep and os.altsep in command):
+        candidate = os.path.expanduser(command)
+        if not os.path.isabs(candidate):
+            candidate = os.path.join(os.fspath(cwd) if cwd else os.getcwd(), candidate)
+        return candidate if os.path.exists(candidate) else None
+    return shutil.which(command, path=path)
+
+
 def is_batch_launcher(program: str) -> bool:
     """Whether running ``program`` means running cmd.exe.
 

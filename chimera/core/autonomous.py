@@ -69,6 +69,7 @@ from chimera.evolution.experience import ExperienceBuffer, format_lessons
 from chimera.evolution.playbook import Playbook
 from chimera.evolution.stagnation import StagnationDetector
 from chimera.evolution.trace_probe import anti_pattern_hint
+from chimera.governance.sanitize import fence
 from chimera.orchestration.budget import SpendBudget, SpendCappedBackend, SpendExceeded
 from chimera.providers.catalog import base_slug, split_effort
 from chimera.telemetry import get_logger
@@ -1428,12 +1429,8 @@ class AutonomousAgent:
                     body = file_diff.patch[:budget]
                     budget -= len(body)
                     bodies.append("--- " + file_diff.path + "\n" + body)
-                evidence_ctx = (
-                    "<<what-this-attempt-changed-on-disk>>\n"
-                    + diff_summary
-                    + "\n"
-                    + "\n".join(bodies)
-                    + "\n<<end>>"
+                evidence_ctx = "What this attempt changed on disk:\n" + fence(
+                    diff_summary + "\n" + "\n".join(bodies)
                 )
             # No branch for "measured and nothing changed": `audit_summary()` already says
             # `diff: no productive change`, so that case arrives through the line above with the

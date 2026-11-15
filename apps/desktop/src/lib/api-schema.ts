@@ -12881,6 +12881,8 @@ export interface components {
         McpServerOut: {
             /** Args */
             args: string[];
+            /** Artifact Unverifiable */
+            artifact_unverifiable?: string[];
             /** Command */
             command: string;
             /**

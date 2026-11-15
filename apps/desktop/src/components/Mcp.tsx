@@ -133,6 +133,9 @@ const CHANGE_TEXT: Record<string, string> = {
   added: "mcp.held.added",
   removed: "mcp.held.removed",
   changed: "mcp.held.changed",
+  // The launch line, not a tool: what the server RUNS changed, or is being recorded for the first time.
+  "command changed": "mcp.held.commandChanged",
+  "artifact identity to record": "mcp.held.identityToRecord",
 };
 
 /** One side of a changed parameter schema, as the indented JSON the server sent. */
@@ -321,6 +324,12 @@ function ServerRow({
           onDisconnect={() => onDisconnect?.()}
           t={t}
         />
+      )}
+
+      {(server.artifact_unverifiable ?? []).length > 0 && (
+        <p className="text-xs text-muted-foreground" data-testid="mcp-unverifiable">
+          {t("mcp.unverifiable", { reasons: (server.artifact_unverifiable ?? []).join("; ") })}
+        </p>
       )}
 
       {server.manifest_held && (

@@ -4013,6 +4013,10 @@ class McpServerOut(BaseModel):
     last_test: McpLastTestOut | None = None
     # Null unless this server's tools changed since they were approved; then no run receives it.
     manifest_held: McpManifestHeldOut | None = None
+    # Why what this server RUNS could not be fully verified when it was pinned (an unpinned package
+    # version, a module outside cwd/PYTHONPATH, a folder over the hashing limits). Not a hold: the
+    # owner is told. Empty when the identity is complete, or for a URL server.
+    artifact_unverifiable: list[str] = Field(default_factory=list)
     # The host of a streamable-HTTP server; null for stdio. Never the whole URL (a query string may
     # carry a key).
     url_host: str | None = None

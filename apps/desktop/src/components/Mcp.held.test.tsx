@@ -220,3 +220,75 @@ describe("a held MCP server", () => {
     expect(screen.getAllByText(/tries to steer which tool is picked/i)).toHaveLength(1);
   });
 });
+
+/**
+ * P1-12. The pin covers what a server RUNS. A change of the launch line is held through the same
+ * block as a change of a tool, labelled in the owner's language (not as the raw string the server
+ * side sends), and what could not be verified offline is said on the row — it is not a hold.
+ */
+describe("what a server runs", () => {
+  const RUNS = {
+    name: "files",
+    command: "npx",
+    args: ["-y", "files-server@1.2.4"],
+    env_keys: [],
+    last_test: null,
+    artifact_unverifiable: [],
+    manifest_held: {
+      seen_at: 1_787_000_000,
+      digest: "d2",
+      changes: [
+        {
+          tool: "(launch command)",
+          change: "command changed",
+          description_changed: true,
+          schema_changed: false,
+          old_description: "npx -y files-server@1.2.3",
+          new_description: "[changed: args; package] npx -y files-server@1.2.4",
+          cues: [],
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getConfig).mockResolvedValue({ mcp: { autoload: true } } as never);
+    vi.mocked(getMcpCatalog).mockResolvedValue({ entries: [], count: 0 } as never);
+  });
+
+  it("shows a changed launch command as such, with old and new line", async () => {
+    vi.mocked(getMcpServers).mockResolvedValue({ servers: [RUNS], count: 1 } as never);
+    renderWithProviders(<Mcp />);
+
+    expect(await screen.findByText(/launch command changed/i)).toBeInTheDocument();
+    expect(screen.getByText("npx -y files-server@1.2.3")).toBeInTheDocument();
+    expect(screen.getByText("[changed: args; package] npx -y files-server@1.2.4")).toBeInTheDocument();
+    expect(screen.queryByText("command changed")).not.toBeInTheDocument();
+  });
+
+  it("says when what a server runs could not be verified, without holding it", async () => {
+    const unverifiable = {
+      ...RUNS,
+      manifest_held: null,
+      artifact_unverifiable: ["package 'pkg' has no exact version (unpinned)"],
+    };
+    vi.mocked(getMcpServers).mockResolvedValue({ servers: [unverifiable], count: 1 } as never);
+    renderWithProviders(<Mcp />);
+
+    const note = await screen.findByTestId("mcp-unverifiable");
+    expect(note).toHaveTextContent(/could not be fully verified offline/i);
+    expect(note).toHaveTextContent(/no exact version/);
+    expect(screen.queryByRole("button", { name: /approve the change/i })).not.toBeInTheDocument();
+  });
+
+  it("shows nothing when the identity is complete", async () => {
+    vi.mocked(getMcpServers).mockResolvedValue(
+      { servers: [{ ...RUNS, manifest_held: null }], count: 1 } as never,
+    );
+    renderWithProviders(<Mcp />);
+
+    await screen.findByText("files");
+    expect(screen.queryByTestId("mcp-unverifiable")).not.toBeInTheDocument();
+  });
+});

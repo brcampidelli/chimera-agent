@@ -67,16 +67,28 @@ FENCE_CLOSE = "<<end-external-data>>"
 _FENCE_PLACEHOLDER = "⟦fence⟧"  # visible, so a neutralized marker is auditable, never silently dropped
 
 
+def neutralize_markers(content: str) -> str:
+    """``content`` with the fence markers replaced by a visible placeholder.
+
+    The ONE escaper of the data fence. The close marker is a constant in an open-source repo, so an
+    attacker knows it exactly: without this, a fetched page containing ``<<end-external-data>>``
+    would close the fence early and make its trailing lines read as if they were outside the data
+    region (a trivial breakout). Before P1-12 two other places spelled the same replacement by hand
+    (``agents_md`` and ``close_loop``) and a third wrapped a fence of its own with no escaping at all
+    (``code_api``'s repair turn); each had to be right separately, and one was not. A caller that
+    needs to neutralise a marker calls this, or :func:`fence`, and writes no ``.replace`` of its own.
+    """
+    return content.replace(FENCE_CLOSE, _FENCE_PLACEHOLDER).replace(FENCE_OPEN, _FENCE_PLACEHOLDER)
+
+
 def fence(content: str) -> str:
     """Wrap untrusted content in the data-fence markers.
 
-    Neutralizes the fixed, public fence markers if the untrusted content embeds them: the close
-    marker is a constant in an open-source repo, so an attacker knows it exactly — without this,
-    a fetched page containing ``<<end-external-data>>`` would close the fence early and make its
-    trailing lines read as if they were outside the data region (a trivial breakout).
+    The single fence syntax of the package (``<<external-data``): a model told about one marker
+    cannot be expected to recognise four. Embedded markers are neutralised by
+    :func:`neutralize_markers`.
     """
-    safe = content.replace(FENCE_CLOSE, _FENCE_PLACEHOLDER).replace(FENCE_OPEN, _FENCE_PLACEHOLDER)
-    return f"{FENCE_OPEN}\n{safe}\n{FENCE_CLOSE}"
+    return f"{FENCE_OPEN}\n{neutralize_markers(content)}\n{FENCE_CLOSE}"
 
 
 def sanitize_untrusted(content: str) -> str:
@@ -87,6 +99,24 @@ def sanitize_untrusted(content: str) -> str:
 def strip_leaked_control_tokens(text: str) -> str:
     """Remove control tokens the model may have echoed from tainted content, on the way *out*."""
     return _CONTROL_TOKEN_RE.sub(_PLACEHOLDER, text)
+
+
+def escape_angle_brackets(text: str) -> str:
+    """``&``, ``<`` and ``>`` as entities: no tag, role marker or turn delimiter survives in it."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def fence_untrusted(content: str) -> str:
+    """:func:`fence` for text that lands in the AGENT'S prompt (a turn note), not in a tool result.
+
+    The fence neutralises only its own delimiters. Text read back as part of the system/turn prompt
+    also has to be unable to FORGE the context around the fence: ``</turn-context>``,
+    ``<|im_start|>system``, ``[INST]``. Before P1-12 the inline ``fence_safe`` escaped every angle
+    bracket, and the convergence on ``fence`` alone dropped that. Order matters: control tokens first
+    (visible placeholder), then our own markers (visible placeholder), then every remaining angle
+    bracket as an entity, then the fence.
+    """
+    return fence(escape_angle_brackets(neutralize_markers(sanitize_untrusted(content))))
 
 
 def has_control_tokens(text: str) -> bool:
