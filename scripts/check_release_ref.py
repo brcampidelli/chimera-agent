@@ -115,12 +115,22 @@ def check_dist(files: list[Path], version: str) -> list[str]:
     return problems
 
 
+def upload_set(dist: Path) -> list[Path]:
+    """The files the upload step sends: what `dist/*` matches, so hidden files are not among them.
+
+    `uv build` writes `dist/.gitignore`. The publish action globs `dist/*`, which a shell does not
+    expand to dotfiles, so that file is never uploaded; checking it refused v0.90.0 for a file that
+    was never going to PyPI.
+    """
+    return sorted(p for p in dist.iterdir() if p.is_file() and not p.name.startswith("."))
+
+
 def main(argv: list[str]) -> int:
     version = project_version()
     if argv[:1] == ["ref"]:
         problems = check_ref(os.environ, version) or check_ancestry(os.environ.get("GITHUB_SHA", ""))
     elif argv[:1] == ["dist"] and len(argv) == 2:
-        problems = check_dist(sorted(p for p in Path(argv[1]).iterdir() if p.is_file()), version)
+        problems = check_dist(upload_set(Path(argv[1])), version)
     else:
         print(__doc__, file=sys.stderr)
         return 2

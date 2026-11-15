@@ -227,6 +227,26 @@ def test_the_built_files_are_checked_against_the_version_before_upload() -> None
     assert build < check < publish
 
 
+def test_the_dist_check_reads_what_the_upload_sends(tmp_path: Path) -> None:
+    """`uv build` leaves `dist/.gitignore`; the upload globs `dist/*` and skips it, so the check must
+    too. v0.90.0 was refused for that file. A stray visible file is still refused."""
+    mod = _load("check_release_ref")
+    (tmp_path / ".gitignore").write_bytes(b"*\n")
+    (tmp_path / "chimera_agent-0.90.0-py3-none-any.whl").write_bytes(b"")
+    (tmp_path / "chimera_agent-0.90.0.tar.gz").write_bytes(b"")
+    files = mod.upload_set(tmp_path)
+    assert [f.name for f in files] == ["chimera_agent-0.90.0-py3-none-any.whl", "chimera_agent-0.90.0.tar.gz"]
+    assert mod.check_dist(files, "0.90.0") == []
+    (tmp_path / "notes.txt").write_text("x", encoding="utf-8")
+    assert mod.check_dist(mod.upload_set(tmp_path), "0.90.0") == [
+        "notes.txt is not a chimera_agent distribution"
+    ]
+    only_hidden = tmp_path / "only_hidden"
+    only_hidden.mkdir()
+    (only_hidden / ".gitignore").write_bytes(b"*\n")
+    assert mod.check_dist(mod.upload_set(only_hidden), "0.90.0") == ["no distribution files to check"]
+
+
 GOOD = {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main"}
 
 
