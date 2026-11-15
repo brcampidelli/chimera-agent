@@ -17,6 +17,15 @@ export const focusRing =
   "focus-visible:outline-(length:--ring-width) focus-visible:outline-solid focus-visible:outline-ring focus-visible:outline-offset-2 focus-visible:relative focus-visible:z-10";
 
 /**
+ * The same ring drawn INSIDE the element (`-outline-offset-2`), for a focus target that fills a
+ * scrolling or clipping container — a tab panel, a full-bleed text editor, a field in a header row
+ * with `overflow-hidden` — where the ring at +2px would be cut off at the container's edge. Drawn
+ * outside and clipped, the ring is as good as absent.
+ */
+export const focusRingInset =
+  "focus-visible:outline-(length:--ring-width) focus-visible:outline-solid focus-visible:outline-ring focus-visible:-outline-offset-2";
+
+/**
  * Ink for a drawing inside a focusable `group` (a category tile's illustration): it takes the
  * accent when its parent has keyboard focus, as it does under the pointer. Kept here so the
  * focus styles still have one home.

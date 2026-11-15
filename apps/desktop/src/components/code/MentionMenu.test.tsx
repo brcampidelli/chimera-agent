@@ -116,7 +116,10 @@ describe("the composer's @ list", () => {
       "Login bug hunt",
     ]);
     expect(findPaths).toHaveBeenLastCalledWith("/proj", "login", 8);
-    expect(box).toHaveAttribute("aria-expanded", "true");
+    // Wired to the list it opened; `aria-expanded` is not allowed on a textbox, so it is gone
+    // (see SlashMenu.test.tsx) and the `status` count below carries the open state.
+    expect(box).toHaveAttribute("aria-controls", list.id);
+    expect(box).not.toHaveAttribute("aria-expanded");
     expect(screen.getByRole("status")).toHaveTextContent("Matches: 3");
   });
 

@@ -25,13 +25,12 @@ describe("the diff of an edit", () => {
 
   it("folds a large diff to its header, showing the counts", () => {
     mount(large);
-    expect(screen.getByText("src/app.py").closest("details")).not.toHaveAttribute("open");
-    expect(screen.getByText(`+${LARGE_DIFF_LINES + 5}/−0`)).toBeInTheDocument();
+    expect(screen.getByText(`+${LARGE_DIFF_LINES + 5}/−0`).closest("details")).not.toHaveAttribute("open");
   });
 
   it("opens a large diff when the detailed view is on", () => {
     mount(large, true);
-    expect(screen.getByText("src/app.py").closest("details")).toHaveAttribute("open");
+    expect(screen.getByText(`+${LARGE_DIFF_LINES + 5}/−0`).closest("details")).toHaveAttribute("open");
   });
 
   it("opens the file, not the fold, when the path is pressed", async () => {
@@ -41,6 +40,13 @@ describe("the diff of an edit", () => {
 
     await user.click(screen.getByRole("button", { name: "src/app.py" }));
     expect(onOpenFile).toHaveBeenCalledWith("src/app.py");
-    expect(screen.getByText("src/app.py").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText(`+${LARGE_DIFF_LINES + 5}/−0`).closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("keeps the path button outside the fold's summary (no nested interactive control)", () => {
+    mount(large);
+    const button = screen.getByRole("button", { name: "src/app.py" });
+    expect(button.closest("summary")).toBeNull();
+    expect(button.closest("details")).toBeNull();
   });
 });
