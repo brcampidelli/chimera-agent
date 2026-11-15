@@ -37,9 +37,17 @@ _HUNK_CLOSE = ">>>>>>> REPLACE"
 class _WorkspaceTool(Tool):
     """Base for tools bound to a workspace root (with an optional declared write-region)."""
 
+    #: Whether a write may run the project's formatter afterwards (`CHIMERA_FORMAT_AFTER_EDIT`). A
+    #: formatter reads configuration the turn itself can write (`.prettierrc.cjs` is code), so a
+    #: guest's turn turns it off (`chimera.api.guest_audience`).
+    formats: bool = True
+
     def __init__(self, workspace: Path | None = None, *, write_region: WriteRegion | None = None) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
         self.write_region = write_region
+
+    def formatted(self, result: str, path: Path) -> str:
+        return append_format_observation(result, path, self.workspace) if self.formats else result
 
 
 class EditFileTool(_WorkspaceTool):
@@ -89,7 +97,7 @@ class EditFileTool(_WorkspaceTool):
         updated = content.replace(old, new) if replace_all else content.replace(old, new, 1)
         atomic_write_text(path, updated, newline=newline)  # preserve the file's line endings; atomic
         where = f"{count} occurrences" if replace_all else "1 occurrence"
-        return append_format_observation(f"edited {rel}: replaced {where}", path, self.workspace)
+        return self.formatted(f"edited {rel}: replaced {where}", path)
 
 
 def _parse_hunks(patch: str) -> list[tuple[str, str]]:
@@ -199,7 +207,7 @@ class ApplyPatchTool(_WorkspaceTool):
         except ValueError as exc:
             return f"error: {exc}"
         atomic_write_text(path, updated, newline=newline)  # preserve line endings; atomic
-        return append_format_observation(f"applied {len(hunks)} hunk(s) to {rel}", path, self.workspace)
+        return self.formatted(f"applied {len(hunks)} hunk(s) to {rel}", path)
 
 
 class EditBatchTool(_WorkspaceTool):
@@ -327,7 +335,7 @@ class EditBatchTool(_WorkspaceTool):
             written.append(shown_path(self.workspace, path))
         notes: list[str] = []
         for path in planned:
-            note = append_format_observation("", path, self.workspace).strip()
+            note = self.formatted("", path).strip()
             if note:
                 notes.append(f"{shown_path(self.workspace, path)}: {note}")
         receipt = f"edited {len(written)} file(s) in one batch: {', '.join(written)}"

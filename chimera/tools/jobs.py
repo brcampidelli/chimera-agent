@@ -164,9 +164,14 @@ class _JobTool(Tool):
     def __init__(self, jobs: JobRegistry, workspace: Path | None = None) -> None:
         self._jobs = jobs
         self._workspace = workspace.resolve() if workspace is not None else None
+        #: When set, only jobs started in this conversation are visible (a share link's guest).
+        self.only_session: str | None = None
 
     def _visible(self, job: Job) -> bool:
-        """Inside this tool's workspace — the same test `run_shell` applies to its ``cwd``."""
+        """Inside this tool's workspace — the same test `run_shell` applies to its ``cwd`` — and, when
+        the tool is confined to a conversation, started in it."""
+        if self.only_session is not None and job.extra.get("session_id") != self.only_session:
+            return False
         if self._workspace is None:
             return True
         try:

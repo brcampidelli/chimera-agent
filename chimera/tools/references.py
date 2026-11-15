@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.core.own_files import contains, protected_reason, same_file, within
-from chimera.tools.workspace import PathEscapesWorkspaceError, refuse_own_env_read
+from chimera.tools.workspace import PathEscapesWorkspaceError, denied_of, refuse_own_env_read
 
 _ALIAS = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,39}\Z")
 
@@ -250,7 +250,9 @@ def resolve_reference(tool: Any, path: str, *, verb: str) -> Path | None:
     candidate = _contain(tool, alias, root, suffix)
     # Reference roots are read-only, but that does not make Chimera's own files readable.
     # Apply the same `.env` owner-boundary as ordinary workspace reads.
-    refuse_own_env_read(candidate, forced=bool(getattr(tool, "hide_own_env", False)))
+    refuse_own_env_read(
+        candidate, forced=bool(getattr(tool, "hide_own_env", False)), denied=denied_of(tool)
+    )
     return candidate
 
 

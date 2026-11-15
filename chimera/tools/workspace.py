@@ -77,12 +77,31 @@ def in_sign_in_store(path: Path) -> bool:
     return within(candidate, home / FOLDER)
 
 
-def hides_own_env(path: Path, *, forced: bool = False) -> bool:
+def denied_of(tool: Any) -> tuple[Path, ...]:
+    """The folders ``tool`` must treat as not there, whatever the verb (``tool.denied_roots``).
+
+    Empty for the owner's tools. A share link's guest turn names Chimera's data folder and the other
+    private folders here (`chimera.api.guest_audience.denied_roots`): when the data folder sits inside
+    the workspace (the legacy ``.chimera/`` default), the workspace jail alone would let a read, a
+    listing or a search reach ``agent.json``, the memory and the history.
+    """
+    return tuple(getattr(tool, "denied_roots", ()) or ())
+
+
+def under_denied(path: Path, denied: tuple[Path, ...]) -> bool:
+    """Whether ``path`` is one of ``denied`` or anything under one, by identity and by path."""
+    from chimera.core.own_files import private_to_owner
+
+    return private_to_owner(path, denied)
+
+
+def hides_own_env(path: Path, *, forced: bool = False, denied: tuple[Path, ...] = ()) -> bool:
     """Whether a read tool must leave ``path`` out: it is Chimera's own ``.env`` and the owner has
     switched the agent's reading of it off. Recognised by identity (`chimera/core/own_files.py`), so
     ``ENV~1``, ``.env `` and ``.env::$DATA`` are the same file here. The MCP sign-in store is left
-    out whatever the setting (:func:`in_sign_in_store`)."""
-    if in_sign_in_store(path):
+    out whatever the setting (:func:`in_sign_in_store`). ``denied``: folders the tool treats as absent
+    (:func:`denied_of`)."""
+    if in_sign_in_store(path) or under_denied(path, denied):
         return True
     if not forced and own_env_readable():
         return False
@@ -91,7 +110,9 @@ def hides_own_env(path: Path, *, forced: bool = False) -> bool:
     return is_own_env(path)
 
 
-def refuse_own_env_read(candidate: Path, *, forced: bool = False) -> None:
+def refuse_own_env_read(
+    candidate: Path, *, forced: bool = False, denied: tuple[Path, ...] = ()
+) -> None:
     """Refuse a read of Chimera's own ``.env`` when the owner has switched that off, and of the MCP
     sign-in store always."""
     if in_sign_in_store(candidate):
@@ -99,6 +120,8 @@ def refuse_own_env_read(candidate: Path, *, forced: bool = False) -> None:
             f"{candidate} is in Chimera's MCP sign-in store, which holds OAuth tokens no tool may "
             "read. Do not retry."
         )
+    if under_denied(candidate, denied):
+        raise ProtectedPathError(f"{candidate} is private to the owner and no tool of this turn may read it. Do not retry.")
     if hides_own_env(candidate, forced=forced):
         raise ProtectedPathError(
             f"{candidate} is Chimera's own .env, and the owner keeps it from the agent's read "
@@ -320,7 +343,9 @@ def resolve_for(tool: Any, path: str, *, verb: str) -> Path:
         # A bound alias under a write verb raises here — references are read-only.
         reference = resolve_reference(tool, path, verb=verb)
         if reference is not None:
-            _refuse_shell_owned(reference, verb, hidden=bool(getattr(tool, "hide_own_env", False)))
+            _refuse_shell_owned(
+                reference, verb, hidden=bool(getattr(tool, "hide_own_env", False)), denied=denied_of(tool)
+            )
             return reference
     try:
         inside = resolve_in_workspace(workspace, path)
@@ -331,7 +356,9 @@ def resolve_for(tool: Any, path: str, *, verb: str) -> Path:
         root = workspace.resolve()
         candidate = (root / path).resolve()
         # Before the question, not after it: a yes cannot grant this one (see SHELL_OWNED_ENV).
-        _refuse_shell_owned(candidate, verb, hidden=bool(getattr(tool, "hide_own_env", False)))
+        _refuse_shell_owned(
+            candidate, verb, hidden=bool(getattr(tool, "hide_own_env", False)), denied=denied_of(tool)
+        )
         name = str(getattr(tool, "name", "") or "tool")
         question = BoundaryQuestion(
             reason=f"{verb} outside the project folder: {candidate} — the project is {root}",
@@ -342,7 +369,9 @@ def resolve_for(tool: Any, path: str, *, verb: str) -> Path:
         raise PathEscapesWorkspaceError(
             f"path {path!r} escapes workspace {root} — a person was asked and refused. Do not retry."
         ) from None
-    _refuse_shell_owned(inside, verb, hidden=bool(getattr(tool, "hide_own_env", False)))
+    _refuse_shell_owned(
+        inside, verb, hidden=bool(getattr(tool, "hide_own_env", False)), denied=denied_of(tool)
+    )
     return inside
 
 
@@ -357,7 +386,16 @@ SHELL_OWNED_ENV = ("CHIMERA_SHELL_PREFS", "CHIMERA_SHELL_STATE")
 _READ_VERBS = frozenset({"read", "list", "search"})
 
 
-def _refuse_shell_owned(candidate: Path, verb: str, *, hidden: bool = False) -> None:
+def _refuse_shell_owned(
+    candidate: Path, verb: str, *, hidden: bool = False, denied: tuple[Path, ...] = ()
+) -> None:
+    # A folder the tool treats as absent is refused for EVERY verb (read, list, search, write, edit,
+    # patch, move, delete): a write over a private file would also publish its previous text in the
+    # diff the turn streams.
+    if under_denied(candidate, denied):
+        raise ProtectedPathError(
+            f"{candidate} is private to the owner and no tool of this turn may touch it. Do not retry."
+        )
     if verb in _READ_VERBS:
         # Reading: only Chimera's own `.env`, and only when the owner switched that off. A listing
         # or a search ROOTED at a folder is not refused for holding it; the tools leave the file

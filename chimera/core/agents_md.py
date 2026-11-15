@@ -301,10 +301,18 @@ class _Expansion:
     """The state of one source's expansion: its boundary, what it has inlined and what it read."""
 
     root: Path
+    denied: tuple[Path, ...] = ()
     chars: int = 0
     imports: int = 0
     inlined: set[Path] = field(default_factory=set)
     deps: dict[Path, str] = field(default_factory=dict)
+
+
+def _denied(path: Path, denied: tuple[Path, ...]) -> bool:
+    """Whether ``path`` is one of the folders a guest's turn treats as absent (`denied_roots`)."""
+    from chimera.core.own_files import private_to_owner
+
+    return private_to_owner(path, denied)
 
 
 def _lexically_followable(target: str) -> bool:
@@ -337,7 +345,10 @@ def _inside(path: Path, root: Path) -> Path | None:
     return resolved
 
 
-_EXPANSION_CACHE: dict[tuple[Path, Path, Path, frozenset[Path]], tuple[dict[Path, str], str, frozenset[Path]]] = {}
+_EXPANSION_CACHE: dict[
+    tuple[Path, Path, Path, frozenset[Path], tuple[Path, ...]],
+    tuple[dict[Path, str], str, frozenset[Path]],
+] = {}
 _EXPANSION_LOCK = threading.Lock()
 
 
@@ -358,6 +369,7 @@ def _expand_source(
     *,
     skip: frozenset[Path] = frozenset(),
     own: bool = False,
+    denied: tuple[Path, ...] = (),
 ) -> tuple[str, frozenset[Path]]:
     """A Claude source's text with its imports expanded, and every file that text is made of.
 
@@ -375,7 +387,9 @@ def _expand_source(
             raise OSError(f"{path} resolves outside the project")
         resolved = found
         base = resolved.parent
-    key = (resolved, root, base, skip)
+    if _denied(resolved, denied):
+        raise OSError(f"{path} is private to the owner")
+    key = (resolved, root, base, skip, denied)
     with _EXPANSION_LOCK:
         cached = _EXPANSION_CACHE.get(key)
     if cached is not None:
@@ -385,7 +399,7 @@ def _expand_source(
                 return text, used
         except OSError:
             pass
-    budget = _Expansion(root=root)
+    budget = _Expansion(root=root, denied=denied)
     budget.deps[resolved] = _stamp(resolved)
     budget.inlined.update(skip)
     budget.inlined.add(resolved)
@@ -438,6 +452,9 @@ def _follow(
     resolved = _inside(base / target, budget.root)
     if resolved is None:
         _log.debug("instruction import %r leaves the project and is not followed", target)
+        return None
+    if _denied(resolved, budget.denied):
+        _log.debug("instruction import %r is private to the owner and is not followed", target)
         return None
     if resolved in stack or not resolved.is_file() or resolved in budget.inlined:
         return None
@@ -501,6 +518,8 @@ def load_agent_instructions(
     closest_first: bool = False,
     seen: set[tuple[str, str]] | None = None,
     claude_compat: bool = False,
+    contain: bool = False,
+    denied: tuple[Path, ...] = (),
 ) -> ProjectInstructions:
     """Collect the project instructions in force for ``focus`` inside ``root``.
 
@@ -511,6 +530,12 @@ def load_agent_instructions(
     ``claude_compat`` adds Claude Code's files (``CLAUDE_NAMES``) beside AGENTS.md in every directory
     on the path, and follows ``@path`` imports inside ``root``. Off, the function reads AGENTS.md (and
     the fallbacks when it is missing) exactly as it did before the switch existed.
+
+    ``contain`` is a share link's guest turn: EVERY instruction file, AGENTS.md and the fallbacks
+    included, is read only when it resolves inside ``root``. For the owner AGENTS.md stays as it
+    always was (a symlink to a dotfiles repository is an ordinary owner setup, and the owner chose
+    the target); for a guest the link may have been planted, and its target is the owner's own
+    ``CHIMERA_HOME/AGENTS.md`` or any file the process can read.
 
     Returns an empty ``ProjectInstructions`` when there is nothing to say — which is the common
     case, and must stay free: a workspace with no ``AGENTS.md`` pays one ``is_file()`` per directory
@@ -532,6 +557,10 @@ def load_agent_instructions(
             path = directory / name
             if not path.is_file():
                 continue
+            if contain and _inside(path, root) is None:
+                continue
+            if _denied(path, denied):
+                continue
             if claude_compat and name != CANONICAL:
                 # A top file is read only if it resolves inside the root: a symlink or junction that
                 # leaves it is skipped, not followed.
@@ -543,7 +572,11 @@ def load_agent_instructions(
     if not found and not nested_only:
         for name in FALLBACKS:
             path = root / name
-            if path.is_file():
+            if (
+                path.is_file()
+                and (not contain or _inside(path, root) is not None)
+                and not _denied(path, denied)
+            ):
                 found.append((name, path))
                 break
     if not found:
@@ -559,6 +592,8 @@ def load_agent_instructions(
     shown_files: set[Path] = set()
     remaining = max_chars
     for rel, path in budget_order:
+        if _denied(path, denied):  # whichever way it was found: no reader below sees a private file
+            continue
         # AGENTS.md is read exactly as it always was. Only the Claude files are bounded, expanded and
         # deduplicated: a file already shown (a link to AGENTS.md, an import of it) is not shown twice.
         is_claude = claude_compat and PurePosixPath(rel).name != CANONICAL
@@ -568,7 +603,7 @@ def load_agent_instructions(
                 if top is None or top in shown_files:
                     _log.debug("project instructions: %s skipped (outside the project or already shown)", rel)
                     continue
-                raw, used = _expand_source(path, root, skip=frozenset(shown_files))
+                raw, used = _expand_source(path, root, skip=frozenset(shown_files), denied=denied)
             else:
                 raw, used = _source_text(path, root, imports=False), frozenset({path.resolve()})
         except OSError as exc:  # unreadable instructions must never break a run
