@@ -115,6 +115,12 @@ ADDED_SINCE: dict[str, list[dict[str, Any]]] = {
     "solve": [
         {"kind": "option", "name": "no_thinking", "opts": ["--no-thinking"], "required": False}
     ],
+    # P1-03: a job may name its own model, reasoning effort and step budget; omitted, it inherits.
+    "cron add": [
+        {"kind": "option", "name": "model", "opts": ["--model"], "required": False},
+        {"kind": "option", "name": "effort", "opts": ["--effort"], "required": False},
+        {"kind": "option", "name": "max_steps", "opts": ["--max-steps"], "required": False},
+    ],
 }
 
 

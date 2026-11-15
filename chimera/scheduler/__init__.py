@@ -12,10 +12,11 @@ from chimera.scheduler.learner import (
     describe_schedule,
     upcoming_firings,
 )
-from chimera.scheduler.models import CronJob
+from chimera.scheduler.models import CronJob, refuse_webhook_overrides
 from chimera.scheduler.store import CronStore
 
 __all__ = [
+    "refuse_webhook_overrides",
     "CronJob",
     "CronStore",
     "Scheduler",
