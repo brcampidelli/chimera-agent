@@ -12,6 +12,9 @@
     "cron.add.effort.high",
     "cron.add.steps",
     "cron.add.runHint",
-    "cron.suggestedTools"
+    "cron.suggestedTools",
+    "code.chat.failed",
+    "code.chat.failed.apiKey",
+    "code.chat.failed.unknown"
   ]
 }

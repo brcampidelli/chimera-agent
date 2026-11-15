@@ -53,6 +53,10 @@ export interface AgentState {
   /** The coding turn this state describes, when there is one. Lets the status bar tell the turn on
    *  screen from the others running in other conversations, which it lists beside it. */
   turnId?: string | null;
+  /** True while a screen that announces its own turn (the conversation's header chip) is actually
+   *  on screen. The status bar keeps quiet about the chat turn only then, so the same transition is
+   *  not read twice; absent or false, the bar is the announcer. */
+  chatAnnounces?: boolean;
   /** Publish what this screen's agent is doing, so the shell can show it from anywhere.
    *
    *  The provider owns the state now rather than receiving it from App. It used to be fed by the

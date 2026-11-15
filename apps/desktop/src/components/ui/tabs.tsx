@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { focusRing } from "@/components/ui/focus";
+import { focusRing, focusRingInset } from "@/components/ui/focus";
 
 export interface TabItem<T extends string> {
   value: T;
@@ -188,9 +188,11 @@ export function TabPanel({
       id={`${tabsId}-panel-${value}`}
       aria-labelledby={`${tabsId}-tab-${value}`}
       // Focusable so that tabbing out of the strip lands in the content it controls, rather than
-      // skipping over a panel that has no interactive elements of its own.
+      // skipping over a panel that has no interactive elements of its own. A focus target with no
+      // ring is a keyboard user lost on the page, so it gets the shared one, drawn inside: the
+      // panel fills a scrolling column and an outside ring would be clipped at its edge.
       tabIndex={0}
-      className="min-h-0 flex-1 focus-visible:outline-hidden"
+      className={cn("min-h-0 flex-1", focusRingInset)}
     >
       {children}
     </div>

@@ -730,6 +730,17 @@ export function TurnOutputs({
   );
 }
 
+/** The short reason a failed turn is announced with: a known kind in words, otherwise the error's
+ *  own first line (the server sends a kind such as `rate_limit`), capped so it stays one breath. */
+function failureReason(error: string | undefined, t: TFunc): string {
+  const raw = (error ?? "").trim();
+  if (!raw) return t("code.chat.failed.unknown");
+  if (/invalid[_ ]api[_ ]key|incorrect api key/i.test(raw)) return t("code.chat.failed.apiKey");
+  const line = raw.split("\n")[0];
+  return line.length > 80 ? `${line.slice(0, 79)}…` : line;
+}
+
+
 /** A coding conversation over one workspace: turns that read and edit, keeping their tool calls.
  *
  *  The composer has two buttons and they are not two modes of the same thing. **Send** is a turn:
@@ -1412,6 +1423,13 @@ export function Conversation({
     publishSide({ plan: view ? { ...view, clearAwaiting: clearPlanAwaiting } : null });
   }, [publishSide, planKey, clearPlanAwaiting]);
   const approvalWaiting = pendingApproval !== null;
+  // Each question is announced once. Minimising the card unmounts it and opening it remounts it, and
+  // a remount alone would raise the assertive alert again; the ids live here, in the parent that
+  // survives that, and are written after the commit that carried the alert.
+  const announcedApprovals = useRef(new Set<string>());
+  useEffect(() => {
+    if (pendingApproval) announcedApprovals.current.add(pendingApproval.id);
+  }, [pendingApproval]);
   useEffect(() => {
     publishSide({ approvalWaiting });
   }, [publishSide, approvalWaiting]);
@@ -2718,8 +2736,23 @@ export function Conversation({
             {workspace}
           </span>
         ) : null}
-        <span className="rounded-chip bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground" data-testid="conversation-status">
-          {busy ? t("code.chat.working") : pendingApproval || pendingUserQuestion ? t("code.chat.waiting") : t("code.chat.complete")}
+        <span
+          // The ONE place the turn's state is announced (politely, as a whole phrase): "Working…",
+          // "Waiting for you", "Failed: invalid API key", "Complete". The transcript below is
+          // silent on purpose, so a failure has to be said HERE or it is said nowhere; the global
+          // status bar leaves the chat turn to this chip (see AgentStatusBar) so it is not said twice.
+          aria-live="polite"
+          aria-atomic="true"
+          className="rounded-chip bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground"
+          data-testid="conversation-status"
+        >
+          {busy
+            ? t("code.chat.working")
+            : pendingApproval || pendingUserQuestion
+              ? t("code.chat.waiting")
+              : latestExchange?.failed
+                ? t("code.chat.failed", { reason: failureReason(latestExchange.error, t) })
+                : t("code.chat.complete")}
         </span>
         <LastTurnMetrics done={latestExchange?.done} />
         {/* Who else is in this conversation right now, by the names they gave. */}
@@ -2855,11 +2888,15 @@ export function Conversation({
       ) : null}
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        {/* `role="log"` tells a screen reader this region accumulates; `aria-busy` says the agent is
-            still writing. The streaming text is deliberately NOT a live region — announcing it would
-            re-read the whole growing answer on every token. */}
+        {/* `role="log"` tells a screen reader this region accumulates, and `aria-busy` says the agent
+            is still writing. A log is a polite live region BY DEFAULT, which is the opposite of what
+            this needs: left alone, NVDA and JAWS read out the text appended to it, i.e. the answer
+            token by token. `aria-live="off"` overrides that default, so the streaming text is NOT
+            announced. What is announced instead is the state — Working / Waiting for you / Complete,
+            in the status chip in the header — and a pending approval, from its own card. */}
         <div
           role="log"
+          aria-live="off"
           aria-busy={busy}
           className={cn("mx-auto space-y-3 p-3", transcriptWidth)}
         >
@@ -2996,7 +3033,11 @@ export function Conversation({
           // was left as. It minimises to one line and never closes.
           <CardChrome id={`approval:${pendingApproval.id}`} kind="approval" cards={cards}
             summary={t("layout.card.approvalWaiting")}>
-            <ApprovalCard question={pendingApproval} onAnswered={() => setPendingApproval(null)} />
+            <ApprovalCard
+              question={pendingApproval}
+              onAnswered={() => setPendingApproval(null)}
+              announce={!announcedApprovals.current.has(pendingApproval.id)}
+            />
           </CardChrome>
         ) : null}
         <MentionChips
@@ -3064,9 +3105,14 @@ export function Conversation({
           // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
           value={draft}
+          // Still a TEXTBOX. This box carried `aria-expanded` with no `role="combobox"` to back it,
+          // which ARIA does not allow on a textbox (axe `aria-allowed-attr`, on every Code screen) and
+          // which a screen reader ignores. The role cannot be added: HTML-ARIA gives a `textarea` no
+          // other role, and this one is a multi-line editor first. So what a textbox DOES support is
+          // kept — the list it controls, its autocomplete mode and the highlighted option — and the
+          // open/closed state is carried by the `status` line above, which says how many matches there are.
           aria-autocomplete="list"
           aria-controls={listbox?.id}
-          aria-expanded={listbox !== null}
           aria-activedescendant={listbox ? `${listbox.id}-${listbox.active}` : undefined}
           onChange={(ev) => {
             // An emptied box no longer holds the suggestion: what is typed next is the person's own.

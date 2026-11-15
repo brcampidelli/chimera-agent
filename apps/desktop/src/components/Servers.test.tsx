@@ -143,4 +143,15 @@ describe("choosing which Chimera the app talks to", () => {
     expect(campo).toHaveAccessibleName("Token");
     expect(campo).toHaveAccessibleDescription(/CHIMERA_SERVER_TOKEN/);
   });
+
+  it("gives the name, address and token fields the bordered .field look with its focus ring", async () => {
+    const user = userEvent.setup();
+    render(<Servers />);
+    await user.click(screen.getByRole("button", { name: /add a server/i }));
+    for (const label of [/^name$/i, /^address$/i, /^token$/i]) {
+      const input = screen.getByLabelText(label);
+      expect(input).toHaveClass("field");
+      expect(input.className).not.toMatch(/outline-(hidden|none)/);
+    }
+  });
 });
