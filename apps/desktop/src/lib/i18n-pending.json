@@ -9,6 +9,15 @@
     "code.worth.perVerified",
     "code.worth.perResolvedNote",
     "code.worth.resolvedN",
-    "code.worth.coverage"
+    "code.worth.coverage",
+    "cron.add.model",
+    "cron.add.effort",
+    "cron.add.effort.none",
+    "cron.add.effort.low",
+    "cron.add.effort.medium",
+    "cron.add.effort.high",
+    "cron.add.steps",
+    "cron.add.runHint",
+    "cron.suggestedTools"
   ]
 }

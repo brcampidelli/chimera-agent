@@ -52,6 +52,7 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`cron add`](#cron-add) | Add a cron, event- or webhook-triggered job. |
 | [`cron disable`](#cron-disable) | Disable a job without deleting it. |
 | [`cron doctor`](#cron-doctor) | Ask the schedule what it is not telling you: what never ran, and what ran and lost. |
+| [`cron edit`](#cron-edit) | Change the model, effort or step budget of an existing job. |
 | [`cron enable`](#cron-enable) | Enable a job (e.g. an agent-proposed one) and schedule its next run. |
 | [`cron fire`](#cron-fire) | Run every job registered for an event. |
 | [`cron kill`](#cron-kill) | Stop a job's running (or next) dispatch — one run, not the schedule. |
@@ -948,6 +949,9 @@ chimera cron add NAME SCHEDULE ACTION
 | `--max-attempts` | Attempts per dispatch. Worth raising only with --verify: without a gate nothing can tell a failed attempt from a finished one. | `1` |
 | `--notify` | When the answer is posted to the job's destination: always (every answer except the job's own 'nothing new' reply), on_change (skip an answer identical to the last one delivered), or failures_only. The result file gets every answer either way. Not with --webhook: a webhook job answers through the chat gateway. | `'always'` |
 | `--tools` | Comma-separated tools this job may use; the rest are removed from its registry. Omit for every tool (the previous behaviour). Refused with --webhook: a webhook job runs through the chat gateway, which does not apply the list. |  |
+| `--model` | Model this job runs on (provider/model). Omit to inherit the serve loop's. A cheaper rung is worth trying for a report job, measured on that job before it is trusted. | `''` |
+| `--effort` | Reasoning effort for this job: low, medium or high. Omit to leave the model as it is. | `''` |
+| `--max-steps` | Tool-calling steps per attempt for this job (1-40). Omit to inherit the serve loop's. |  |
 | `--deliver-to` | Chat webhook URL (Discord or Slack) the job's answers are posted to, per --notify; a run that could not run or finish is announced there too. The URL is a credential and is never printed in full. Refused with --webhook: that job answers through the chat gateway. |  |
 
 ## cron disable
@@ -982,6 +986,27 @@ chimera cron doctor
 | --- | --- | --- |
 | `--grace` | How late a job may be before it counts as missed. | `10.0` |
 | `--check` | Exit 1 when a job is late or failing, so a watcher outside Chimera alerts only then. |  |
+
+## cron edit
+
+Change the model, effort or step budget of an existing job.
+
+Only what is passed changes. The schedule, the prompt and every other field stay as written.
+
+```bash
+chimera cron edit JOB_ID
+```
+
+| Argument | |
+| --- | --- |
+| `JOB_ID` | The job id to change. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--model` | Model for this job (provider/model). Pass an empty string to inherit again. |  |
+| `--effort` | low, medium or high. Pass an empty string to clear it. |  |
+| `--max-steps` | Steps per attempt (1-40). |  |
+| `--inherit-steps` | Clear the job's own step budget; it inherits the serve loop's again. |  |
 
 ## cron enable
 

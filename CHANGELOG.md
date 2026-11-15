@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A scheduled job can name its own model, effort and step budget, and sees its last delivery.** `cron add/edit --model --effort --max-steps` and the Schedule screen set them (empty inherits from `serve`, as before); invalid values are refused at save and, for a hand-edited `jobs.json`, inherited with a warning instead of dropping the job. The job's last delivered answer (2 KB, fenced as data) closes its context so it stops repeating itself; a delivery the destination refused counts toward the failure brake and is never treated as delivered. A webhook job naming these fields is refused. (P1-03) (#1287)
+
 - **One table says which model each role runs on, and why.** `Settings.routing_table()` reports, per role, the model and the reasoning effort and where each came from (environment, `.env` or saved setting, product default). It reads the existing resolvers and changes no behaviour: a 432-case matrix, pinned as a snapshot, matches the old functions, and a ratchet keeps new `*_model` reads from spreading outside it. (P1-10, slice a) (#1286)
 
 ## [0.90.0] - 2026-11-15

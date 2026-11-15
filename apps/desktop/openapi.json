@@ -7421,10 +7421,37 @@
             ],
             "title": "Deliver To"
           },
+          "effort": {
+            "default": "",
+            "enum": [
+              "",
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Effort",
+            "type": "string"
+          },
           "max_attempts": {
             "default": 1,
             "title": "Max Attempts",
             "type": "integer"
+          },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
           },
           "name": {
             "title": "Name",
@@ -7687,6 +7714,11 @@
             "title": "Disabled By",
             "type": "string"
           },
+          "effort": {
+            "default": "",
+            "title": "Effort",
+            "type": "string"
+          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
@@ -7733,6 +7765,22 @@
             "title": "Max Attempts",
             "type": "integer"
           },
+          "max_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Steps"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -7777,6 +7825,13 @@
           "schedule_description": {
             "title": "Schedule Description",
             "type": "string"
+          },
+          "suggested_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Suggested Tools",
+            "type": "array"
           },
           "tools": {
             "anyOf": [

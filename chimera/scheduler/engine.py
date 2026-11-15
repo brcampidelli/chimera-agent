@@ -29,6 +29,7 @@ from chimera.scheduler.models import (
     DispatchStatus,
     Notify,
     kill_flag_path,
+    validate_run_config,
 )
 from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
@@ -299,6 +300,9 @@ class Scheduler:
         catch_up: CatchUp = "once",
         permission_mode: str = "",
         worktree: bool = False,
+        model: str = "",
+        effort: str = "",
+        max_steps: int | None = None,
     ) -> CronJob:
         """Register a job fired by a cron expression.
 
@@ -318,7 +322,11 @@ class Scheduler:
             none. Whether it is wider than the install's posture is NOT decided here — a scheduler
             has no settings — but where the owner's screen sets it, and again when the job runs.
         worktree: Run in a throwaway git worktree of the job's folder (`CronJob.worktree`).
+        model, effort, max_steps: Per-job run configuration (`CronJob.model`, `.effort`,
+            `.max_steps`); empty / None inherit the serve loop's, as every job did before. Refused
+            with a ``ValueError`` when invalid (`validate_run_config`).
         """
+        validate_run_config(model, effort, max_steps)
         if not croniter.is_valid(cron_expr):
             raise ValueError(f"invalid cron expression: {cron_expr!r}")
         if permission_mode and permission_mode not in JOB_PERMISSION_MODES:
@@ -349,6 +357,9 @@ class Scheduler:
             catch_up=catch_up,
             permission_mode=permission_mode,
             worktree=worktree,
+            model=model.strip(),
+            effort=effort,
+            max_steps=max_steps,
         )
         self.store.add(job)
         return job
@@ -365,6 +376,9 @@ class Scheduler:
         max_attempts: int = 1,
         notify: Notify = "always",
         tools: list[str] | None = None,
+        model: str = "",
+        effort: str = "",
+        max_steps: int | None = None,
     ) -> CronJob:
         """Register a job fired by a named event.
 
@@ -382,7 +396,9 @@ class Scheduler:
         notify: When the answer is posted to the job's destination (`CronJob.notify`); `always`
             is today's behaviour.
         tools: The only tools the job may use (`CronJob.tools`); None keeps every tool.
+        model, effort, max_steps: Per-job run configuration, as for :meth:`schedule_cron`.
         """
+        validate_run_config(model, effort, max_steps)
         job = CronJob(
             id=uuid.uuid4().hex[:8],
             name=name,
@@ -396,6 +412,9 @@ class Scheduler:
             max_attempts=max(1, max_attempts),
             notify=notify,
             tools=_clean_tools(tools),
+            model=model.strip(),
+            effort=effort,
+            max_steps=max_steps,
         )
         self.store.add(job)
         return job
@@ -411,6 +430,9 @@ class Scheduler:
         max_attempts: int = 1,
         notify: Notify = "always",
         tools: list[str] | None = None,
+        model: str = "",
+        effort: str = "",
+        max_steps: int | None = None,
     ) -> CronJob:
         """Register a job fired by an inbound HTTP POST to ``/webhook/<hook>``.
 
@@ -436,6 +458,12 @@ class Scheduler:
                 and is not, which is worse than no fence. Refused until the webhook path honours
                 them.
         """
+        if model or effort or max_steps is not None:
+            raise ValueError(
+                "a webhook job cannot take --model, --effort or --max-steps yet: it runs through "
+                "the chat gateway, which does not read them, so the listing would name a model the "
+                "run does not use"
+            )
         if tools is not None or notify != "always":
             raise ValueError(
                 "a webhook job cannot take --tools or --notify yet: it runs through the chat "
@@ -909,6 +937,9 @@ class Scheduler:
     @staticmethod
     def _record(job: CronJob, status: DispatchStatus, error: str | None) -> None:
         """Set the outcome on the job. `mark_ran` persists it a moment later, in the same tick."""
+        if status == "error" and not error and job._delivery_failed:
+            error = "the answer was not delivered to its destination"
+        job._delivery_failed = False
         job.last_status = status
         job.last_error = (error or "")[:300] or None
         # A budget refusal does not count as a failure: the job never ran, so nothing about it

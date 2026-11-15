@@ -92,6 +92,7 @@ _MEMORY_KINDS = {"working", "episodic", "semantic", "persona"}
 def _job_dict(job: Any) -> dict[str, Any]:
     from chimera.core.code_projects import folder_state
     from chimera.scheduler import describe_schedule, upcoming_firings
+    from chimera.scheduler.tool_suggestion import suggest_tools
 
     # No explicit zone: the engine computes `next_run` in the machine's own zone, and the preview
     # must follow the exact same chain or it promises times the daemon will not keep.
@@ -143,6 +144,11 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "catch_up": getattr(job, "catch_up", "once") or "once",
         "permission_mode": getattr(job, "permission_mode", "") or "",
         "worktree": bool(getattr(job, "worktree", False)),
+        "model": getattr(job, "model", "") or "",
+        "effort": getattr(job, "effort", "") or "",
+        "max_steps": getattr(job, "max_steps", None),
+        # A suggestion for a job that holds every tool; nothing for one that already named its own.
+        "suggested_tools": suggest_tools(job.action) if getattr(job, "tools", None) is None else [],
     }
 
 
@@ -1324,6 +1330,9 @@ def register_features(
                 catch_up=body.catch_up,
                 permission_mode=body.permission_mode,
                 worktree=body.worktree,
+                model=body.model,
+                effort=body.effort,
+                max_steps=body.max_steps,
             )
         except ValueError as exc:  # an invalid cron expression is a client error, not a 500
             raise HTTPException(status_code=400, detail=str(exc)) from exc
