@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **One table says which model each role runs on, and why.** `Settings.routing_table()` reports, per role, the model and the reasoning effort and where each came from (environment, `.env` or saved setting, product default). It reads the existing resolvers and changes no behaviour: a 432-case matrix, pinned as a snapshot, matches the old functions, and a ratchet keeps new `*_model` reads from spreading outside it. (P1-10, slice a) (#1286)
 
+### Fixed
+
+- **Screen readers hear a failed turn as failed, and keyboard focus shows where it is.** A turn that ends in an error is announced as "Failed: <reason>", never as complete; the conversation announces working, waiting and complete instead of reading the answer token by token; an approval that pauses the agent is announced once, not again after minimising and reopening it; and focus is visible on the settings tab panels, the Connections fields, the file editor and the command palette. (P1-20) (#1290)
+
 ## [0.90.0] - 2026-11-15
 ### Added
 
