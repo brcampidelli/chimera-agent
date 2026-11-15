@@ -3776,9 +3776,17 @@ export interface DesignFinding {
   message: string;
 }
 
+/** A part of the design the checks did not cover. Never shown as "no findings". */
+export interface DesignUnchecked {
+  artboard_id: string | null;
+  reason: string;
+  message: string;
+}
+
 export interface DesignCheck {
   revision: number;
   findings: DesignFinding[];
+  unchecked: DesignUnchecked[];
 }
 
 export interface DesignAudit {
@@ -3788,6 +3796,7 @@ export interface DesignAudit {
   passed_checks: string[];
   needs_user_decision: string[];
   findings: DesignFinding[];
+  unchecked: DesignUnchecked[];
   unverifiable: number;
   error: string | null;
   attempts: number;

@@ -129,11 +129,17 @@ Current document (summary with stable ids):
 Deterministic findings already measured (observed facts):
 {findings}
 
+HTML artboards, as extracted from their markup and CSS (observed facts; the structure and the visible texts, not the pixels):
+{html}
+
+What the deterministic checks did NOT cover (an empty findings list says nothing about these):
+{unchecked}
+
 Assess: completeness against the goal, hierarchy, alignment, legibility, contrast, use of tokens, \
 consistency between pages, responsiveness, placeholder text, rights and attribution of assets, and \
 elements outside the artboard.
 
-Separate observed problems from assumptions. Return one JSON object:
+Separate observed problems from assumptions. Never describe a part listed as not covered as passing or clean: say it was not checked. Return one JSON object:
 {{"issues": [{{"severity": "high|medium|low", "nodeId": "an id from the document or null", \
 "evidence": "what you observed in the data", "fix": "the suggested correction"}}],
   "passedChecks": ["..."],

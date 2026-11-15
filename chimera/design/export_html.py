@@ -371,7 +371,7 @@ def text_color(doc: DesignDocument, node: TextNode) -> str:
 
 IssueKind = Literal[
     "color_not_in_tokens", "font_not_from_tokens", "color_token_missing", "low_contrast",
-    "outside_artboard",
+    "outside_artboard", "spacing_not_in_tokens",
 ]
 
 
@@ -383,13 +383,41 @@ class TokenIssue:
     artboard_id: str | None = None
 
 
+@dataclass(frozen=True)
+class Unchecked:
+    """Something the checks did not cover, and why. Never a finding, and never "clean"."""
+
+    artboard_id: str | None
+    reason: str
+    message: str
+
+
+@dataclass(frozen=True)
+class CheckReport:
+    findings: list[TokenIssue]
+    unchecked: list[Unchecked]
+
+
 def check_against_tokens(doc: DesignDocument) -> list[TokenIssue]:
     """What in ``doc`` departs from its own tokens, or from legibility, as observed facts.
 
+    See :func:`check_report`: this is its findings, for callers that do not show coverage.
+    """
+    return check_report(doc).findings
+
+
+def check_report(doc: DesignDocument) -> CheckReport:
+    """The findings of :func:`check_against_tokens` plus a declared list of what was not measured.
+
     Limits, stated: contrast is measured against the artboard background only, not against a shape
     the text may sit on; "outside" means any part of the frame leaves the artboard, ignoring rotation.
+    An HTML artboard is measured from its CSS by :mod:`chimera.design.html_check`, which names its own
+    gaps; an artboard with nothing on it is reported as not checked rather than as clean.
     """
+    from chimera.design.html_check import check_html_artboard
+
     issues: list[TokenIssue] = []
+    unchecked: list[Unchecked] = []
     palette = {value.upper() for value in doc.tokens.colors.values()}
     for page in doc.pages:
         for board in page.artboards:
@@ -397,6 +425,12 @@ def check_against_tokens(doc: DesignDocument) -> list[TokenIssue]:
                 issues.append(TokenIssue("color_not_in_tokens", None,
                                          f"background {board.background} is not a token colour",
                                          board.id))
+            if board.html is not None:
+                found, gaps = check_html_artboard(board, doc.tokens)
+                issues += found
+                unchecked += gaps
+            elif not board.node_ids:
+                unchecked.append(Unchecked(board.id, "empty", "the artboard has no elements to check"))
             stack = list(board.node_ids)
             while stack:
                 node = doc.nodes[stack.pop()]
@@ -404,7 +438,7 @@ def check_against_tokens(doc: DesignDocument) -> list[TokenIssue]:
                     stack.extend(node.child_ids)
                 issues += _check_node(doc, node, board.id, board.width, board.height,
                                       board.background, palette)
-    return issues
+    return CheckReport(issues, unchecked)
 
 
 def _check_node(

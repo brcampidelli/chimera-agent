@@ -2,7 +2,7 @@ import { useId, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, Loader2, Sparkles } from "lucide-react";
 
 import { DesignPreview } from "@/components/design/DesignPreview";
-import { FindingList } from "@/components/design/FindingList";
+import { FindingList, UncheckedList } from "@/components/design/FindingList";
 import type { DesignSession } from "@/components/design/useDesignSession";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
@@ -282,6 +282,7 @@ export function DesignAssistant({
           <Bullets title={t("design.assistant.passed")} items={audit.passed_checks} />
           <Bullets title={t("design.assistant.decide")} items={audit.needs_user_decision} />
           <FindingList findings={audit.findings} onJump={onJump} />
+          <UncheckedList unchecked={audit.unchecked} />
         </Section>
       ) : null}
     </div>
