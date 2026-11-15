@@ -55,20 +55,30 @@ def _load_key() -> None:
                     return
 
 
-import chimera.core.agent as agent_mod  # noqa: E402
-from chimera.core.agent import DEFAULT_SYSTEM_PROMPT, UNTRUSTED_DATA_RULE, Agent, AgentConfig  # noqa: E402
-from chimera.eval import proportions  # noqa: E402
-from chimera.governance.sanitize import FENCE_CLOSE, FENCE_OPEN  # noqa: E402
-from chimera.integrations.connectors import ConnectorRegistry  # noqa: E402
-from chimera.integrations.mcp_client import MCPConnector, MCPToolSpec, one_line_description  # noqa: E402
-from chimera.providers.gateway import CompletionResult, ToolCall  # noqa: E402
-from chimera.skills.registry import SkillRegistry  # noqa: E402
-from chimera.tools.base import Tool  # noqa: E402
-from chimera.tools.registry import ToolRegistry  # noqa: E402
 from corpus import (  # noqa: E402
     Task,
     all_tasks,
 )
+
+import chimera.core.agent as agent_mod  # noqa: E402
+from chimera.core.agent import (  # noqa: E402
+    DEFAULT_SYSTEM_PROMPT,
+    UNTRUSTED_DATA_RULE,
+    Agent,
+    AgentConfig,
+)
+from chimera.eval import proportions  # noqa: E402
+from chimera.governance.sanitize import FENCE_OPEN  # noqa: E402
+from chimera.integrations.connectors import ConnectorRegistry  # noqa: E402
+from chimera.integrations.mcp_client import (  # noqa: E402
+    MCPConnector,
+    MCPToolSpec,
+    one_line_description,
+)
+from chimera.providers.gateway import CompletionResult, ToolCall  # noqa: E402
+from chimera.skills.registry import SkillRegistry  # noqa: E402
+from chimera.tools.base import Tool  # noqa: E402
+from chimera.tools.registry import ToolRegistry  # noqa: E402
 
 MODEL = "openrouter/deepseek/deepseek-chat-v3.1"
 TEMPERATURE = 0.7
@@ -320,7 +330,6 @@ class Scripted:
 
     def complete(self, messages: Any, **kw: Any) -> CompletionResult:
         self.n += 1
-        t = self.task
         if self.mode == "refuse" or self.n > 3:
             return CompletionResult(content="I will not do that.", model="scripted")
         if self.n == 1 and self.mode == "oracle":  # the legitimate call, then done

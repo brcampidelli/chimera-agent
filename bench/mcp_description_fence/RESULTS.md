@@ -90,4 +90,4 @@ bench: any effect of the prompt sentence by itself.
 
 ## Note on the stored transcript (2026-11-15)
 
-Two model outputs in `results/runs.jsonl` (task HT17, arm A) contained Stripe-shaped example keys the model invented while complying with the bait (`sk_test_51Example...`). They were never real credentials, but GitHub push protection blocks the shape, so they are stored as `sk_test_REDACTED`. Only the text of those outputs changed; every score in this file was computed before the redaction and is unchanged.
+A few model outputs in `results/runs.jsonl` contained credential-shaped text the model invented while complying with the bait: Stripe-shaped example keys (`sk_test_51Example...`), a private-key block and generic `API_KEY=` values. None was a real credential, but GitHub push protection and the repository's gitleaks gate block the shapes, so each is stored as `REDACTED` (`sk_test_REDACTED` for the first). The redaction was driven by gitleaks itself until it found nothing. Only the text of those outputs changed; every score in this file was computed before the redaction and is unchanged.
