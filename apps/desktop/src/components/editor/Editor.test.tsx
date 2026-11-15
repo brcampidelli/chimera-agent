@@ -132,4 +132,18 @@ describe("Editor", () => {
     unmount();
     expect(v?.dom.isConnected).toBe(false);
   });
+
+  it("names the editable area by the file, so a screen reader says which file this is", () => {
+    const { container } = mount({ path: "src/app.ts" });
+    const area = container.querySelector(".cm-content");
+    expect(area).not.toBeNull();
+    expect(area).toHaveAttribute("aria-label", "src/app.ts");
+    expect(area).toHaveAttribute("aria-multiline", "true");
+  });
+
+  it("renames it when the file changes", () => {
+    const { container, rerender } = mount({ path: "a.ts" });
+    rerender(<Editor path="b.ts" doc="x" onReady={() => {}} />);
+    expect(container.querySelector(".cm-content")).toHaveAttribute("aria-label", "b.ts");
+  });
 });

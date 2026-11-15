@@ -60,6 +60,7 @@ function config() {
     host_exec: "ask",
     denied_tools: [],
     governance: "off",
+    governance_notice: false,
     approval_webhook_set: false,
     pull_requests: false,
     close_loop: false,

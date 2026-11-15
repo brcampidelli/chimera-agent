@@ -484,6 +484,46 @@ describe("accessibility", () => {
   });
 });
 
+/**
+ * `outline-none` / `outline-hidden` switch the browser's own focus ring OFF. That is fine when the
+ * element draws another one (`focusRing`, a `.field` wrapper, `data-highlighted` in a menu) or is only
+ * ever focused by script (`tabIndex={-1}`). Alone, it leaves a keyboard user with nothing: the
+ * Settings tab panel, the Endpoints and Servers inputs, the viewer's editor and the palette field
+ * all did, and the focus-ring contrast test could not see it because it measures tokens, not use.
+ *
+ * Textual, so it errs toward the element's neighbours: an occurrence counts as covered when any of
+ * those escapes appears within four lines above or three below it. What it cannot see is a `.field`
+ * wrapper further up (an input inside a labelled `field`), which is why the ceiling is not zero.
+ */
+function outlineOffWithoutRing(): { total: number; where: string[] } {
+  const off = /\boutline-(?:none|hidden)\b/;
+  const covered =
+    /focusRing|focus-visible:(?:outline-(?!hidden|none)|ring)|data-\[?highlighted|tabIndex=\{-1\}|\bfield\b|focus-within/;
+  const where: string[] = [];
+  for (const [file, text] of appSources()) {
+    if (file.endsWith("ui/focus.ts")) continue;
+    // Prose about the class is not the class.
+    const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const lines = code.split("\n");
+    lines.forEach((line, i) => {
+      if (!off.test(line)) return;
+      const around = lines.slice(Math.max(0, i - 4), i + 4).join("\n");
+      if (!covered.test(around)) where.push(`${file}:${i + 1}`);
+    });
+  }
+  return { total: where.length, where };
+}
+
+describe("focus indicators", () => {
+  it("does not let an element switch its outline off without drawing a ring", () => {
+    const { total, where } = outlineOffWithoutRing();
+    expect(
+      total,
+      `outline off with no focus ring on the element (use focusRing / focusRingInset, or a .field wrapper): ${where.join(", ")}`,
+    ).toBeLessThanOrEqual(ratchet.outlineOffWithoutRing);
+  });
+});
+
 describe("the ratchet", () => {
   it("does not let arbitrary utilities grow", () => {
     // The catch-all: any `utility-[value]` that escaped the specific rules above. It may fall; it

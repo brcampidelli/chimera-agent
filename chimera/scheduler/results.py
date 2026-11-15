@@ -15,6 +15,7 @@ whoever left the app running longest.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,20 @@ def _tail_lines(path: Path, limit_bytes: int) -> list[str]:
     return linhas[1:] if inicio > 0 and linhas else linhas
 
 
+def _epoch(value: Any) -> float:
+    """``value`` as a timestamp, or 0.0 when it is not a finite number.
+
+    One damaged line must not take the reader down with it: ``float("abc")`` raised out of the loop
+    below, and an absurd ``1e100`` was a perfectly good float that only blew up later, at the date
+    conversion. Both read as "no time recorded".
+    """
+    try:
+        number = float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    return number if math.isfinite(number) and 0.0 <= number < 32_503_680_000.0 else 0.0
+
+
 def load_results(path: Path, *, job_id: str | None = None, limit: int = 50) -> list[CronResult]:
     """The most recent answers first. Malformed lines are skipped rather than fatal.
 
@@ -84,7 +99,7 @@ def load_results(path: Path, *, job_id: str | None = None, limit: int = 50) -> l
             continue
         fora.append(
             CronResult(
-                at=float(d.get("at") or 0.0),
+                at=_epoch(d.get("at")),
                 job_id=str(d.get("id") or ""),
                 name=str(d.get("name") or ""),
                 action=str(d.get("action") or ""),

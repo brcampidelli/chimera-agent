@@ -91,6 +91,24 @@ class ProfileWorth(BaseModel):
     a ``null`` is indistinguishable from "no data" and a number is indistinguishable from "all of
     it"."""
 
+    resolved_n: int = 0
+    """How many runs passed: the denominator of ``usd_per_resolved``, named so a reader does not
+    have to know that it is ``passed``. Equal to it; carried because the cost per solved task is read
+    next to the number of tasks it is spread over, and one resolved task is an anecdote."""
+    price_coverage: float = 0.0
+    """``usd_known_runs / runs``: the share of the group whose cost is fully known. Beside
+    ``usd_per_resolved`` for the same reason ``usd_known_runs`` is beside ``usd_total``: a ``null``
+    cost per resolved must say whether it is missing one price or all of them."""
+    usd_per_resolved: float | None = None
+    """What the group spent, FAILURES INCLUDED, per run that passed. The failures are the point: a
+    configuration that is cheap per attempt and fails often is expensive per solved task, and dividing
+    only the passing runs' cost by the passes would hide exactly that. ``null`` when nothing passed
+    (the quotient does not exist) or when any run is unpriced (the numerator is not known — the same
+    refusal to add up what is not fully known that ``usd_total`` makes)."""
+    usd_per_verified: float | None = None
+    """The same, per run an EXECUTABLE verifier approved (``passed_by_verifier``): the cost of a
+    pass nothing but a command's exit code vouched for. ``null`` under the same two conditions."""
+
     @property
     def readable(self) -> bool:
         return self.runs >= READABLE_N
@@ -105,6 +123,13 @@ class WorthReport(BaseModel):
     #: True when at least one group has enough runs to be worth reading. The UI uses this to decide
     #: whether to show the numbers as a record or as "not enough yet" — never to hide them.
     any_readable: bool = False
+
+
+def _per(usd_total: float | None, n: int) -> float | None:
+    """The group's whole cost over ``n`` approved runs; None when either side is not there."""
+    if usd_total is None or n <= 0:
+        return None
+    return round(usd_total / n, 6)
 
 
 def summarize_worth(receipts: list[RunReceipt]) -> WorthReport:
@@ -124,20 +149,22 @@ def summarize_worth(receipts: list[RunReceipt]) -> WorthReport:
     out: list[ProfileWorth] = []
     for (profile, profile_source), runs in groups.items():
         priced = [r for r in runs if r.usd is not None]
+        passed = sum(1 for r in runs if r.success)
+        # The winning attempt's evidence, not any attempt's: a run that failed twice with a verifier
+        # and then passed on a manager-only retry was not verified.
+        passed_by_verifier = sum(
+            1 for r in runs if r.success and any(a.success and a.evidence == "verifier" for a in r.attempts)
+        )
+        usd_total = (
+            round(sum(r.usd or 0.0 for r in priced), 6) if len(priced) == len(runs) and runs else None
+        )
         out.append(
             ProfileWorth(
                 profile=profile,
                 profile_source=profile_source,
                 runs=len(runs),
-                passed=sum(1 for r in runs if r.success),
-                # The WINNING attempt's evidence, not any attempt's: a run that failed twice with a
-                # verifier and then passed on a manager-only retry was not verified.
-                passed_by_verifier=sum(
-                    1
-                    for r in runs
-                    if r.success
-                    and any(a.success and a.evidence == "verifier" for a in r.attempts)
-                ),
+                passed=passed,
+                passed_by_verifier=passed_by_verifier,
                 reverted=sum(1 for r in runs if any(a.reverted for a in r.attempts)),
                 # Only successes: an unproductive FAILURE is just a failure, and counting it here
                 # would double-punish the same run in two columns.
@@ -147,11 +174,12 @@ def summarize_worth(receipts: list[RunReceipt]) -> WorthReport:
                     if r.success and any(a.success and a.diff_productive is False for a in r.attempts)
                 ),
                 attempts_total=sum(len(r.attempts) for r in runs),
-                usd_total=(
-                    round(sum(r.usd or 0.0 for r in priced), 6) if len(priced) == len(runs) and runs
-                    else None
-                ),
+                usd_total=usd_total,
                 usd_known_runs=len(priced),
+                resolved_n=passed,
+                price_coverage=round(len(priced) / len(runs), 4),
+                usd_per_resolved=_per(usd_total, passed),
+                usd_per_verified=_per(usd_total, passed_by_verifier),
             )
         )
 

@@ -149,9 +149,13 @@ def home_is_empty(settings: Settings) -> bool:
     install already has a non-empty home by the time the adapter is made. Asking then classified
     every first run as an upgrade and started the bot open, which is the posture this replaces.
     """
+    from chimera.governance.first_boot import STATE_FILE
+
     home = Path(settings.home).expanduser()
     try:
-        return not any(home.iterdir())
+        # Not the governance verdict (or its temporary): `get_settings()` writes that on the very
+        # first boot, before this is asked, and counting it made every first run look like an upgrade.
+        return not any(not entry.name.startswith(STATE_FILE) for entry in home.iterdir())
     except FileNotFoundError:
         return True
     except OSError:

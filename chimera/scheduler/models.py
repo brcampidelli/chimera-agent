@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
+
+_log = logging.getLogger(__name__)
 
 
 def kill_flag_path(home: Path, job_id: str) -> Path:
@@ -39,6 +42,55 @@ CatchUp = Literal["once", "skip"]
 #: two equal. ``bypass`` is not a mode a job can name, ever: nobody is watching a scheduled run, so
 #: "ignore permissions" there would be the one switch that has no one to catch its mistake.
 JOB_PERMISSION_MODES: tuple[str, ...] = ("manual", "accept_edits", "plan", "auto", "dont_ask")
+
+#: The most steps one scheduled dispatch may be given. A ceiling and not a default: the serve loop's
+#: own ``--max-steps`` (6) is what a job inherits, and a job that names more is the owner saying
+#: "this one needs room". Unattended, an unbounded number is a loop nobody is watching.
+MAX_JOB_STEPS = 40
+
+_MODEL_SLUG_MAX = 200
+
+
+def validate_run_config(model: str, effort: str, max_steps: int | None) -> None:
+    """Refuse a per-job ``model`` / ``effort`` / ``max_steps`` the dispatch could not honour.
+
+    Raises ``ValueError`` with a sentence the caller can show as it stands. Empty ``model`` / empty
+    ``effort`` / ``None`` ``max_steps`` mean "inherit from the serve loop" and are always valid.
+
+    ``model`` follows the rule the rest of the install already uses for model slugs: anything the
+    gateway can route (``provider/model``, a LiteLLM or OpenRouter slug) or a catalog slug, with no
+    whitespace. It is NOT checked against the catalog alone — the catalog is a list of suggestions,
+    and ``weak_model`` / ``default_model`` accept any slug — but a name that is plainly not a slug
+    (spaces, no provider) is refused here, at the keyboard, instead of failing at 07:00 with nobody
+    to read the error. The reasoning variant belongs in ``effort``, so a ``#high`` suffix on the
+    model is refused: two places to say it is how the two disagree.
+    """
+    # Imported here: the data model stays importable without the provider package.
+    from chimera.providers.catalog import CATALOG, REASONING_EFFORTS, split_effort
+
+    slug = model.strip()
+    if slug:
+        if split_effort(slug)[1] is not None:
+            raise ValueError("model must not carry a #effort suffix; set effort separately")
+        known = {entry.slug for entry in CATALOG}
+        shaped = (
+            len(slug) <= _MODEL_SLUG_MAX
+            and slug.isprintable()
+            and not any(ch.isspace() for ch in slug)
+            and "/" in slug.strip("/")
+        )
+        if slug not in known and not shaped:
+            raise ValueError(
+                f"model {model!r} is not a model slug (expected provider/model, "
+                "e.g. openrouter/vendor/model)"
+            )
+    if effort and effort not in REASONING_EFFORTS:
+        raise ValueError(f"effort must be one of {', '.join(REASONING_EFFORTS)} (or empty)")
+    if max_steps is not None and (
+        isinstance(max_steps, bool) or not 1 <= max_steps <= MAX_JOB_STEPS
+    ):
+        raise ValueError(f"max_steps must be an integer from 1 to {MAX_JOB_STEPS}")
+
 
 DispatchStatus = Literal["ok", "error", "timeout", "budget", "rejected", "cancelled"]
 """How a dispatch ended.
@@ -237,6 +289,11 @@ class CronJob(BaseModel):
     """Set by the result sink when THIS run's answer reached :attr:`deliver_to`. Not persisted: it
     describes one dispatch, read by the failure notifier in the same tick and cleared there. It is
     how the notice knows the channel already saw the job run again and need not be told twice."""
+    _delivery_failed: bool = PrivateAttr(default=False)
+    """Set by the result sink when THIS run's answer was posted and the destination did not accept it.
+    Not persisted: it describes one dispatch. The dispatch reads it to end the run as a failure
+    rather than as ``ok``, so a destination that is down rides ``consecutive_failures`` into the
+    brake instead of being retried, and re-asked of the model, every tick for ever."""
     catch_up: CatchUp = "once"
     """What happens when the job's time passed while the app or the service was off.
 
@@ -259,9 +316,79 @@ class CronJob(BaseModel):
     would ask a person (``manual``, ``accept_edits``) refuses the action instead — nobody can
     answer, and the run never approves for itself. Only the owner's screen sets it
     (``bridge_routes.OWNER_DECISION_ROUTES``)."""
+    model: str = ""
+    """The model this job runs on, or ``""`` (inherit the serve loop's, as every job did before).
+
+    A scheduled report that reads a feed and posts a summary does not need the model the owner chats
+    with, and every job paying the top rung's price is the default only because nothing could say
+    otherwise. Validated by :func:`validate_run_config`. Never carries a ``#effort`` suffix: that is
+    :attr:`effort`."""
+    effort: str = ""
+    """Reasoning effort for this job (``low``, ``medium``, ``high``), or ``""`` (the model as it is).
+    Sent as the slug's ``#effort`` variant, the same way every other surface asks for it."""
+    max_steps: int | None = None
+    """Tool-calling steps this job may take per attempt, or ``None`` (inherit the serve loop's).
+    Between 1 and :data:`MAX_JOB_STEPS`."""
     worktree: bool = False
     """Run in a new git worktree of the job's folder instead of in the folder itself.
 
     Removed when the run ended with nothing changed and nothing committed; kept, with its path in
     the history, when it left work behind. ``False`` is what every job did before this field."""
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("model", "effort", mode="before")
+    @classmethod
+    def _text_or_inherit(cls, value: Any, info: Any) -> Any:
+        """A hand-edited ``jobs.json`` with a non-text ``model`` / ``effort`` keeps the job.
+
+        The store drops an entry the model refuses, and a dropped job is a job that stops running
+        and is then erased by the next write. A value of the wrong TYPE is read as "inherit" and
+        said so; a text value that is not a valid model or effort is kept as written and is refused
+        (with a warning, inheriting) when the job runs, where the reason can be shown.
+        """
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        _log.warning("cron job: %s=%r is not text; the job inherits instead", info.field_name, value)
+        return ""
+
+    @field_validator("max_steps", mode="before")
+    @classmethod
+    def _steps_or_inherit(cls, value: Any) -> Any:
+        """Same rule for ``max_steps``: not a whole number -> ``None`` (inherit), with a warning."""
+        if value is None:
+            return None
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, str) and value.strip().isdigit():
+            return int(value.strip())
+        _log.warning("cron job: max_steps=%r is not a whole number; the job inherits instead", value)
+        return None
+
+
+def webhook_unsupported(job: CronJob) -> list[str]:
+    """The run-configuration fields a webhook job carries but the webhook path does not read.
+
+    A webhook runs through the chat gateway with the gateway's own model and step budget, so a job
+    that names its own would run on something else than it says. ``schedule_webhook`` refuses to
+    write them; this is for the job that got them by a hand edit of ``jobs.json``.
+    """
+    named = {"model": bool(job.model), "effort": bool(job.effort), "max_steps": job.max_steps is not None}
+    return [name for name, present in named.items() if present]
+
+
+def refuse_webhook_overrides(job: CronJob) -> None:
+    """Raise when a webhook job names a model, effort or step budget the webhook path would ignore.
+
+    Fail closed, as for ``tools``/``notify``: running it on the gateway's own values would run it on
+    something else than it says.
+    """
+    unread = webhook_unsupported(job)
+    if unread:
+        raise ValueError(
+            f"webhook job {job.name!r} sets {', '.join(unread)}, which the webhook path does not "
+            "apply; refusing to run it with other values than declared"
+        )

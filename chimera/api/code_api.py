@@ -181,6 +181,7 @@ from chimera.core.agent_batch_note import (
     is_batch_note,
 )
 from chimera.core.cache_miss import (
+    CacheTurn,
     classify_cache_miss,
     external_turn_record,
     facts_for_turn,
@@ -6328,6 +6329,7 @@ def register_code_api(
                 miss_cause: str | None = None
                 cache_gap_seconds: float | None = None
                 cache_write_tokens: int | None = None
+                cache_warning: dict[str, Any] | None = None
                 idle_compaction: dict[str, Any] | None = None
                 turn_model = str(getattr(getattr(agent, "config", None), "model", "") or "")
                 with lock_for(session_id):
@@ -6402,6 +6404,23 @@ def register_code_api(
                             had_history=had_history,
                         )
                         miss_cause = classify_cache_miss(turn_facts)
+                        # The conversation's rate, not this turn's: warned once, when it crosses
+                        # under the threshold (`session_cache_warning`).
+                        crossed = session.record_cache_turn(
+                            CacheTurn(
+                                # The prompt of the steps that reported a cache, like the
+                                # numerator: a silent step has no cache share to be counted in.
+                                prompt_tokens=sum(
+                                    s.prompt_tokens
+                                    for s in result.steplog.steps
+                                    if s.cached_tokens is not None
+                                ),
+                                cache_read_tokens=cache_read,
+                                cause=miss_cause,
+                                first_turn=turn_facts.first_turn,
+                            )
+                        )
+                        cache_warning = crossed.to_record() if crossed else None
                     # Reported by the provider, or None when it said nothing about the cache at all.
                     if cache_read is not None or result.cache_write_tokens:
                         cache_write_tokens = result.cache_write_tokens
@@ -6495,6 +6514,9 @@ def register_code_api(
                         "cache_write_tokens": cache_write_tokens,
                         "cache_gap_seconds": cache_gap_seconds,
                         "cache_miss_cause": miss_cause,
+                        # Set only on the turn that took the conversation's cache rate under 80%,
+                        # with the cause that cost the most tokens; None every other turn.
+                        "cache_warning": cache_warning,
                         # Set only when this turn's history was shortened for a long pause; the sizes
                         # are estimates, as the provider has not yet counted the shorter history.
                         "idle_compaction": idle_compaction,

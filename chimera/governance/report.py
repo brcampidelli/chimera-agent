@@ -25,7 +25,7 @@ model — a figure that reaches a person goes through code, never through a mode
 refusals are NOT in the report. A table with no host-exec row reads as "host-exec refused nothing", so
 the text says it.
 
-**``observe``** refuses nothing: the kernel's ``review`` verdicts under it reach an approver that
+**``observe``** asks nothing and refuses no ``review``: those verdicts reach an approver that
 says yes. Those are counted apart as ``would_refuse`` — the price of turning ``enforce`` on — and
 are never added to ``refused``. A ``block`` is refused in every mode and is counted as refused.
 """

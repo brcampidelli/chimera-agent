@@ -171,7 +171,7 @@ export function Servers() {
             {(a) => (
               <input
                 {...a}
-                className="w-full bg-transparent text-sm outline-hidden"
+                className="field w-full px-2.5 py-1.5 text-sm"
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               />
@@ -181,7 +181,7 @@ export function Servers() {
             {(a) => (
               <input
                 {...a}
-                className="w-full bg-transparent font-mono text-sm outline-hidden"
+                className="field w-full px-2.5 py-1.5 font-mono text-sm"
                 placeholder="https://chimera.exemplo.com"
                 value={draft.url}
                 onChange={(e) => setDraft({ ...draft, url: e.target.value })}
@@ -193,7 +193,7 @@ export function Servers() {
               <input
                 {...a}
                 type="password"
-                className="w-full bg-transparent font-mono text-sm outline-hidden"
+                className="field w-full px-2.5 py-1.5 font-mono text-sm"
                 value={draft.token}
                 onChange={(e) => setDraft({ ...draft, token: e.target.value })}
               />

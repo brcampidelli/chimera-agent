@@ -204,3 +204,46 @@ def test_old_receipts_count_as_deliberate_because_they_were() -> None:
     from chimera.api.runs import RunReceipt
 
     assert RunReceipt(task="t").profile_source == "user"
+
+
+# --- cost per resolved task ------------------------------------------------------------------
+
+
+def test_cost_per_resolved_counts_the_failures_in_the_numerator() -> None:
+    """Two runs cost 0.01 each and one passed: the task cost 0.02, not 0.01. Dividing only the
+    passing run's cost would make a configuration that fails half the time look as cheap as one
+    that never does."""
+    group = summarize_worth([_run(), _run(success=False)]).profiles[0]
+    assert group.passed == 1 and group.resolved_n == 1
+    assert group.usd_per_resolved == 0.02
+    assert group.price_coverage == 1.0
+
+
+def test_cost_per_verified_is_over_the_passes_a_command_vouched_for() -> None:
+    verified = _run(attempts=[_attempt(evidence="verifier")])
+    manager_only = _run(attempts=[_attempt(evidence="manager")])
+    group = summarize_worth([verified, manager_only]).profiles[0]
+    assert group.passed == 2 and group.passed_by_verifier == 1
+    assert group.usd_per_resolved == 0.01
+    assert group.usd_per_verified == 0.02
+
+
+def test_a_group_with_an_unpriced_run_has_no_cost_per_resolved_and_says_the_coverage() -> None:
+    group = summarize_worth([_run(), _run(), _run(attempts=[_attempt(usd=None)])]).profiles[0]
+    assert group.usd_per_resolved is None and group.usd_per_verified is None
+    assert group.resolved_n == 3
+    assert group.price_coverage == round(2 / 3, 4)
+
+
+def test_a_group_where_nothing_passed_has_no_cost_per_resolved() -> None:
+    group = summarize_worth([_run(success=False), _run(success=False)]).profiles[0]
+    assert group.resolved_n == 0
+    assert group.usd_per_resolved is None and group.usd_per_verified is None
+    assert group.usd_total == 0.02
+
+
+def test_cost_per_resolved_does_not_reorder_the_groups() -> None:
+    cheap_and_good = [_run("zeta")]
+    dear_and_bad = [_run("alpha", success=False, attempts=[_attempt(usd=5.0, success=False)])]
+    names = [p.profile for p in summarize_worth(cheap_and_good + dear_and_bad).profiles]
+    assert names == ["alpha", "zeta"]
