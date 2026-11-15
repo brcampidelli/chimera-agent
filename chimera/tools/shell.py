@@ -242,6 +242,12 @@ class RunShellTool(Tool):
         # The process-wide register of suites in progress; a test passes its own.
         self._slots = SUITE_SLOTS if slots is None else slots
         self.turn_job_ids: set[str] = set()
+        #: The conversation this shell works for, stamped on every job it starts so a job tool can be
+        #: confined to one conversation (a share link's guest). "" = not stamped.
+        self.job_session: str = ""
+        #: When set, the refusal for the job limit lists only this conversation's jobs (a guest must
+        #: not read another conversation's commands) and counts the rest.
+        self.only_session: str | None = None
         #: What a declined host execution answers, when the caller knows WHY it is declined (the
         #: folder has no command grant). None: the generic CHIMERA_HOST_EXEC sentence.
         self.declined_message: str | None = None
@@ -293,9 +299,18 @@ class RunShellTool(Tool):
         # third job running is fine, and the tenth is worth a sentence, but neither is a refusal.
         over = self._jobs.over_advisory_limit()
         try:
-            job = self._jobs.start(command, cwd=cwd, env=_child_env(), argv=argv, shell=use_shell)
+            job = self._jobs.start(
+                command, cwd=cwd, env=_child_env(), argv=argv, shell=use_shell,
+                extra={"session_id": self.job_session} if self.job_session else None,
+            )
         except JobLimitError as exc:
-            running = "; ".join(f"{j.id}: {j.command[:80]}" for j in exc.running)
+            mine = [
+                j for j in exc.running
+                if self.only_session is None or j.extra.get("session_id") == self.only_session
+            ]
+            running = "; ".join(f"{j.id}: {j.command[:80]}" for j in mine)
+            if len(mine) < len(exc.running):
+                running += f" (and {len(exc.running) - len(mine)} from other conversations)"
             return (
                 f"error: {len(exc.running)} background jobs are already running, the most this app "
                 f"runs at once ({exc.limit}; CHIMERA_JOBS_MAX_RUNNING). Not started. Wait for one to "

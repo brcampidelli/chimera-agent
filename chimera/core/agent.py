@@ -751,6 +751,15 @@ class AgentConfig:
     #: whoever talks to that run could read it back. Only the owner's own surfaces (the CLI chat and
     #: code, and the desktop Code turn) set it, and they say so where they build their AgentConfig.
     user_claude_md: bool = False
+    #: The turn was sent through a conversation's share link: somebody other than the owner. It
+    #: withholds every prompt source that belongs to the owner and not to the conversation: the
+    #: owner's global AGENTS.md (``CHIMERA_HOME/AGENTS.md``) and the list of the owner's own skill
+    #: bundles. The project's instructions (the repository's AGENTS.md / CLAUDE.md) stay: the guest
+    #: works in that project. Set only by the Code turn's builder, where the share-link route decides it.
+    guest: bool = False
+    #: The folders a guest's turn treats as absent (`chimera.api.guest_audience.denied_roots`): an
+    #: instruction file under one is not read and an `@import` of one is not followed.
+    denied_roots: tuple[Path, ...] = ()
     #: The owner's own instructions, already rendered (see chimera.core.instructions).
     #:
     #: Passed in rather than read from disk here, unlike ``project_root``: an AGENTS.md is workspace
@@ -1198,7 +1207,7 @@ class Agent:
         # Owner-level file instructions share authority with the owner's identity and therefore
         # precede repository instructions. They remain guidance only; neither this block nor the
         # file can alter the registry or posture enforced outside prompt composition.
-        owner_block = self._owner_agent_context()
+        owner_block = "" if self.config.guest else self._owner_agent_context()
         if owner_block:
             system_prompt = f"{system_prompt}\n\n{owner_block}"
         user_claude_block = self._user_claude_context()
@@ -1246,7 +1255,8 @@ class Agent:
             self._skill_context(task),
             self._card_context(task),
             self.config.turn_notes if notes is None else notes,
-            moment_facts(self.config.project_root),
+            # No `git status` on a guest's turn: it runs the repository's configured fsmonitor.
+            moment_facts(self.config.project_root, git=not self.config.guest),
         )
 
     def _skill_context(self, task: str) -> str:
@@ -1261,11 +1271,11 @@ class Agent:
         except Exception as exc:  # skill retrieval must never break the loop
             _log.debug("skill-context retrieval skipped: %s", exc)
             block = ""
-        return block + self._bundle_context()
+        return block + ("" if self.config.guest else self._bundle_context())
 
     def _card_context(self, task: str) -> str:
         """Learned skill cards relevant to this task ("" when there are none or on any error)."""
-        if self.cards is None:
+        if self.cards is None or self.config.guest:
             return ""
         try:
             return str(self.cards.card_context(task) or "")
@@ -1406,6 +1416,8 @@ class Agent:
                 closest_first=True,
                 seen=already_shown,
                 claude_compat=self._claude_compat(),
+                contain=self.config.guest,
+                denied=self.config.denied_roots,
             )
             if not found:
                 return ""
@@ -1463,6 +1475,8 @@ class Agent:
                 focus=focus,
                 untrusted=not trusted,
                 claude_compat=self._claude_compat(),
+                contain=self.config.guest,
+                denied=self.config.denied_roots,
             )
             if found and not trusted:
                 # The operator said this workspace holds code they do not control, so its AGENTS.md

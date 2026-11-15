@@ -33,6 +33,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from chimera.core.contained import contained_path, read_contained_text
+
 if TYPE_CHECKING:
     from chimera.core.verify import CommandVerifier
 
@@ -67,12 +69,12 @@ def _package_manager(workspace: Path) -> str:
 
 
 def _from_package_json(workspace: Path) -> InferredVerify | None:
-    path = workspace / "package.json"
-    if not path.is_file():
+    text = read_contained_text(workspace, workspace / "package.json", errors="replace")
+    if text is None:
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        data = json.loads(text)
+    except ValueError:
         return None
     scripts = data.get("scripts") if isinstance(data, dict) else None
     scripts = scripts if isinstance(scripts, dict) else {}
@@ -87,12 +89,8 @@ def _from_package_json(workspace: Path) -> InferredVerify | None:
 
 def _from_makefile(workspace: Path) -> InferredVerify | None:
     for name in ("Makefile", "makefile", "GNUmakefile"):
-        path = workspace / name
-        if not path.is_file():
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        text = read_contained_text(workspace, workspace / name, errors="replace")
+        if text is None:
             continue
         # A target at the start of a line, which is what make itself requires. A `test` appearing in
         # a recipe body or a variable is not a target and would produce a command that does nothing.
@@ -103,24 +101,16 @@ def _from_makefile(workspace: Path) -> InferredVerify | None:
 
 
 def _from_python(workspace: Path) -> InferredVerify | None:
-    if (workspace / "pytest.ini").is_file():
+    if contained_path(workspace, workspace / "pytest.ini") and (workspace / "pytest.ini").is_file():
         return InferredVerify("python -m pytest -q", "pytest.ini")
-    pyproject = workspace / "pyproject.toml"
-    if pyproject.is_file():
-        try:
-            if "[tool.pytest.ini_options]" in pyproject.read_text(encoding="utf-8", errors="replace"):
-                return InferredVerify("python -m pytest -q", "pyproject.toml")
-        except OSError:
-            pass
-    setup_cfg = workspace / "setup.cfg"
-    if setup_cfg.is_file():
-        try:
-            if "[tool:pytest]" in setup_cfg.read_text(encoding="utf-8", errors="replace"):
-                return InferredVerify("python -m pytest -q", "setup.cfg")
-        except OSError:
-            pass
+    pyproject = read_contained_text(workspace, workspace / "pyproject.toml", errors="replace")
+    if pyproject is not None and "[tool.pytest.ini_options]" in pyproject:
+        return InferredVerify("python -m pytest -q", "pyproject.toml")
+    setup_cfg = read_contained_text(workspace, workspace / "setup.cfg", errors="replace")
+    if setup_cfg is not None and "[tool:pytest]" in setup_cfg:
+        return InferredVerify("python -m pytest -q", "setup.cfg")
     tests = workspace / "tests"
-    if tests.is_dir():
+    if contained_path(workspace, tests) is not None and tests.is_dir():
         try:
             if any(tests.glob("test_*.py")) or any(tests.glob("*_test.py")):
                 return InferredVerify("python -m pytest -q", "tests/")
@@ -130,9 +120,9 @@ def _from_python(workspace: Path) -> InferredVerify | None:
 
 
 def _from_rust_or_go(workspace: Path) -> InferredVerify | None:
-    if (workspace / "Cargo.toml").is_file():
+    if (workspace / "Cargo.toml").is_file() and contained_path(workspace, workspace / "Cargo.toml"):
         return InferredVerify("cargo test", "Cargo.toml")
-    if (workspace / "go.mod").is_file():
+    if (workspace / "go.mod").is_file() and contained_path(workspace, workspace / "go.mod"):
         return InferredVerify("go test ./...", "go.mod")
     return None
 
@@ -151,7 +141,7 @@ def project_verify(workspace: Path) -> InferredVerify | None:
     try:
         if directory.is_symlink() or path.is_symlink():
             return None
-        if not path.is_file() or not path.resolve().is_relative_to(workspace):
+        if not path.is_file() or contained_path(workspace, path) is None:
             return None
     except (OSError, RuntimeError, ValueError):
         return None
@@ -182,7 +172,7 @@ def project_setup(workspace: Path) -> InferredVerify | None:
     try:
         if directory.is_symlink() or path.is_symlink():
             return None
-        if not path.is_file() or not path.resolve().is_relative_to(workspace):
+        if not path.is_file() or contained_path(workspace, path) is None:
             return None
         with path.open("rb") as stream:
             data = tomllib.load(stream)

@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A share link's guest turn runs with the least privilege.** It no longer reaches the owner's other conversations, mailbox, calendar, skill bundles, MCP servers, global instructions, hooks, browser sign-ins, lessons or other conversations' jobs; it has no shell, runs nothing it could have edited (verifier, formatter, hooks, git), and cannot read or write outside the conversation's folder or inside Chimera's own data, even through symlinks, junctions or instruction imports. Rendered PNG/SVG charts now refuse remote data URLs, and snapshots no longer follow links out of the workspace, for everyone. (#1281)
+
 - **The Design check measures HTML artboards.** Colours, fonts, spacing and text contrast are checked against the tokens, and anything the check could not measure is listed as "not checked" instead of reading as "no findings". (#1277)
 
 - **The app's agent now knows who you are.** The profile you fill in (stored profile and remembered facts about you) is added to the agent's instructions in the same place in the desktop Code turn, the terminal and the bots, and stays identical between turns so prompt caching keeps working. (#1275)

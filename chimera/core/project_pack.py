@@ -118,6 +118,10 @@ def read_pack(folder: Path | str) -> PackRead:
     try:
         if not path.is_file():
             return PackRead(present=False)
+        from chimera.core.contained import contained_path
+
+        if contained_path(folder, path) is None:
+            return PackRead(present=True, error=f"{PACK_PATH.as_posix()} resolves outside the folder")
         # Bounded BEFORE the bytes are loaded. `parse_pack` refuses anything over the limit, but
         # it was handed the whole file first: a clone shipping a multi-GB `pack.json` (or a symlink
         # to one) went into the sidecar's memory every time the Code screen opened the folder.
