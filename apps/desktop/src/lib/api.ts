@@ -1158,6 +1158,11 @@ export const createCron = (
     permission_mode?: CronPermissionMode | "";
     /** Run in a new git worktree of the task's folder. */
     worktree?: boolean;
+    /** This task's own model (`provider/model`), reasoning effort and step budget. Omitted, the
+     *  task inherits the app's, as every task did before these existed. */
+    model?: string;
+    effort?: "low" | "medium" | "high";
+    max_steps?: number;
   },
 ) =>
   json<CronJob>("/api/cron", { method: "POST", body: JSON.stringify(body) });

@@ -1496,7 +1496,7 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
     import time
 
     from chimera.governance.ledger_tool import fence
-    from chimera.scheduler import Scheduler
+    from chimera.scheduler import Scheduler, refuse_webhook_overrides
     from chimera.scheduler.weekly_review import builtin_of
     from chimera.server import InboundMessage
 
@@ -1506,6 +1506,7 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
         results: list[str] = []
 
         def dispatch(job: Any) -> None:
+            refuse_webhook_overrides(job)  # P1-03 fields; same fail-closed rule as below
             if job.tools is not None or job.notify != "always":
                 # Fail closed. `cron add --webhook` refuses these fields, so a webhook job carrying
                 # them was edited into jobs.json by hand — and the gateway below would run it with

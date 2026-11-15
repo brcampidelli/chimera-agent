@@ -130,6 +130,9 @@ function AddSchedule() {
   const [catchUp, setCatchUp] = useState<"once" | "skip">("once");
   const [mode, setMode] = useState<CronPermissionMode | "">("");
   const [worktree, setWorktree] = useState(false);
+  const [model, setModel] = useState("");
+  const [effort, setEffort] = useState<"" | "low" | "medium" | "high">("");
+  const [steps, setSteps] = useState("");
   const create = useMutation({
     mutationFn: createCron,
     onSuccess: () => {
@@ -140,6 +143,9 @@ function AddSchedule() {
       setDeliverTo("");
       setMode("");
       setWorktree(false);
+      setModel("");
+      setEffort("");
+      setSteps("");
     },
   });
   const canSubmit = name.trim() && schedule.trim() && action.trim() && !create.isPending;
@@ -246,6 +252,44 @@ function AddSchedule() {
             <span>{t("cron.add.worktree")}</span>
           </label>
         </div>
+        {/* The task's own model, reasoning effort and step budget. All optional, and empty means the
+            app's own, which is what every task did before they existed: a report that reads a feed
+            does not need the model the owner chats with, but whether a cheaper one is good enough is
+            measured on the task, so nothing here picks one for them. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          <input
+            className="field min-w-0 flex-1 px-3 py-1.5 font-mono text-xs"
+            placeholder={t("cron.add.model")}
+            aria-label={t("cron.add.model")}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
+          <label className="flex items-center gap-1.5">
+            <span>{t("cron.add.effort")}</span>
+            <select
+              className="field px-1.5 py-0.5 text-xs"
+              value={effort}
+              onChange={(e) => setEffort(e.target.value as "" | "low" | "medium" | "high")}
+            >
+              <option value="">{t("cron.add.effort.none")}</option>
+              <option value="low">{t("cron.add.effort.low")}</option>
+              <option value="medium">{t("cron.add.effort.medium")}</option>
+              <option value="high">{t("cron.add.effort.high")}</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5">
+            <span>{t("cron.add.steps")}</span>
+            <input
+              className="field w-16 px-1.5 py-0.5 text-xs"
+              type="number"
+              min={1}
+              max={40}
+              value={steps}
+              onChange={(e) => setSteps(e.target.value)}
+            />
+          </label>
+          <span className="basis-full">{t("cron.add.runHint")}</span>
+        </div>
         <div className="flex items-center justify-between gap-3 pt-0.5">
           <span className="text-xs text-muted-foreground">{t("cron.add.hint")}</span>
           <Button
@@ -270,6 +314,9 @@ function AddSchedule() {
                 ...(catchUp === "skip" ? { catch_up: catchUp } : {}),
                 ...(mode ? { permission_mode: mode } : {}),
                 ...(worktree ? { worktree: true } : {}),
+                ...(model.trim() ? { model: model.trim() } : {}),
+                ...(effort ? { effort } : {}),
+                ...(steps.trim() && Number.isInteger(Number(steps)) ? { max_steps: Number(steps) } : {}),
               })
             }
             disabled={!canSubmit}
@@ -389,6 +436,9 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                   ) : null}
                   {j.catch_up === "skip" && <Badge tone="muted">{t("cron.badge.skip")}</Badge>}
                   {j.worktree && <Badge tone="muted">{t("cron.badge.worktree")}</Badge>}
+                  {(j.model || j.effort) && (
+                    <Badge tone="muted">{`${j.model || "·"}${j.effort ? `#${j.effort}` : ""}`}</Badge>
+                  )}
                 </div>
                 <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                   {j.schedule} → {j.action}
@@ -468,6 +518,11 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                     ask "is this job checked?" had no way to tell, and the field is set on a form
                     they may not have filled in themselves. Shown as the command, because "verified"
                     alone would not say what was run. */}
+                {j.suggested_tools && j.suggested_tools.length > 0 && (
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {t("cron.suggestedTools", { tools: j.suggested_tools.join(", ") })}
+                  </div>
+                )}
                 {j.verify && (
                   <div className="mt-0.5 truncate text-xs text-muted-foreground" title={j.verify}>
                     {t("cron.gatedBy", { command: j.verify })}

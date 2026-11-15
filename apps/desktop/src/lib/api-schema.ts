@@ -10134,10 +10134,23 @@ export interface components {
             /** Deliver To */
             deliver_to?: string | null;
             /**
+             * Effort
+             * @default
+             * @enum {string}
+             */
+            effort: "" | "low" | "medium" | "high";
+            /**
              * Max Attempts
              * @default 1
              */
             max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
             /** Name */
             name: string;
             /**
@@ -10263,6 +10276,11 @@ export interface components {
              * @default
              */
             disabled_by: string;
+            /**
+             * Effort
+             * @default
+             */
+            effort: string;
             /** Enabled */
             enabled: boolean;
             /** Id */
@@ -10278,6 +10296,13 @@ export interface components {
              * @default 1
              */
             max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
             /** Name */
             name: string;
             /** Next Firings */
@@ -10299,6 +10324,8 @@ export interface components {
             schedule: string;
             /** Schedule Description */
             schedule_description: string;
+            /** Suggested Tools */
+            suggested_tools?: string[];
             /** Tools */
             tools?: string[] | null;
             /** Trigger */

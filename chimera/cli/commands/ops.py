@@ -304,6 +304,12 @@ def cron_list() -> None:
             extras.append(f"notify={job.notify}")
         if job.tools is not None:
             extras.append(f"tools={','.join(job.tools) or '(none)'}")
+        if job.model:
+            extras.append(f"model={job.model}")
+        if job.effort:
+            extras.append(f"effort={job.effort}")
+        if job.max_steps is not None:
+            extras.append(f"max_steps={job.max_steps}")
         if job.deliver_to:
             # The host only: the rest of a webhook URL is the credential to post into the channel.
             extras.append(f"deliver_to={webhook_host_only(job.deliver_to)}")
@@ -473,6 +479,19 @@ def cron_add(
              "Omit for every tool (the previous behaviour). Refused with --webhook: a webhook "
              "job runs through the chat gateway, which does not apply the list.",
     ),
+    model: str = typer.Option(
+        "", "--model",
+        help="Model this job runs on (provider/model). Omit to inherit the serve loop's. A cheaper "
+             "rung is worth trying for a report job, measured on that job before it is trusted.",
+    ),
+    effort: str = typer.Option(
+        "", "--effort",
+        help="Reasoning effort for this job: low, medium or high. Omit to leave the model as it is.",
+    ),
+    max_steps: int | None = typer.Option(
+        None, "--max-steps",
+        help="Tool-calling steps per attempt for this job (1-40). Omit to inherit the serve loop's.",
+    ),
     deliver_to: str | None = typer.Option(
         None, "--deliver-to",
         help="Chat webhook URL (Discord or Slack) the job's answers are posted to, per --notify; "
@@ -491,7 +510,7 @@ def cron_add(
     import urllib.parse
 
     from chimera.scheduler import Scheduler
-    from chimera.scheduler.models import Notify
+    from chimera.scheduler.models import Notify, validate_run_config
 
     modos: dict[str, Notify] = {
         "always": "always", "on_change": "on_change", "failures_only": "failures_only"
@@ -516,6 +535,12 @@ def cron_add(
             )
             raise typer.Exit(code=1)
 
+    try:
+        validate_run_config(model, effort, max_steps)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
     sched = Scheduler(_cron_store())
     # Passed by name rather than unpacked from a dict: a `**kwargs` here type-erases both fields,
     # and these are exactly the two that decide whether the run is governed.
@@ -523,7 +548,7 @@ def cron_add(
         try:
             job = sched.schedule_webhook(
                 name, schedule, action, verify=verify, max_attempts=max_attempts,
-                notify=modo, tools=lista,
+                notify=modo, tools=lista, model=model, effort=effort, max_steps=max_steps,
             )
         except ValueError as exc:
             console.print(f"[red]{exc}[/red]")
@@ -531,18 +556,77 @@ def cron_add(
     elif event:
         job = sched.schedule_event(
             name, schedule, action, deliver_to=destino, verify=verify,
-            max_attempts=max_attempts, notify=modo, tools=lista,
+            max_attempts=max_attempts, notify=modo, tools=lista, model=model, effort=effort,
+            max_steps=max_steps,
         )
     else:
         try:
             job = sched.schedule_cron(
                 name, schedule, action, now=time.time(), deliver_to=destino,
                 verify=verify, max_attempts=max_attempts, notify=modo, tools=lista,
+                model=model, effort=effort, max_steps=max_steps,
             )
         except ValueError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(code=1) from exc
     console.print(f"[green]added[/green] job {job.id} ({job.name})")
+    if lista is None and not webhook:
+        # A suggestion, printed and never applied: the owner knows the job, and a tool left out
+        # fails a run quietly. Without --tools the job holds every tool.
+        from chimera.scheduler.tool_suggestion import suggest_tools
+
+        console.print(
+            f"[dim]holds every tool; a smaller set would do: --tools {','.join(suggest_tools(action))}[/dim]"
+        )
+
+
+@cron_app.command("edit")
+def cron_edit(
+    job_id: str = typer.Argument(..., help="The job id to change."),
+    model: str | None = typer.Option(
+        None, "--model", help="Model for this job (provider/model). Pass an empty string to inherit again.",
+    ),
+    effort: str | None = typer.Option(
+        None, "--effort", help="low, medium or high. Pass an empty string to clear it.",
+    ),
+    max_steps: int | None = typer.Option(
+        None, "--max-steps", help="Steps per attempt (1-40).",
+    ),
+    inherit_steps: bool = typer.Option(
+        False, "--inherit-steps", help="Clear the job's own step budget; it inherits the serve loop's again.",
+    ),
+) -> None:
+    """Change the model, effort or step budget of an existing job.
+
+    Only what is passed changes. The schedule, the prompt and every other field stay as written.
+    """
+    from chimera.scheduler.models import validate_run_config
+
+    store = _cron_store()
+    if job_id not in store:
+        console.print(f"[red]no job {job_id}[/red]")
+        raise typer.Exit(code=1)
+    job = store.get(job_id)
+    if job.trigger == "webhook":
+        console.print("[red]a webhook job runs through the chat gateway and does not read these[/red]")
+        raise typer.Exit(code=1)
+    if inherit_steps and max_steps is not None:
+        console.print("[red]--max-steps and --inherit-steps contradict each other[/red]")
+        raise typer.Exit(code=1)
+    new_model = job.model if model is None else model.strip()
+    new_effort = job.effort if effort is None else effort.strip()
+    new_steps = None if inherit_steps else (job.max_steps if max_steps is None else max_steps)
+    try:
+        validate_run_config(new_model, new_effort, new_steps)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    job.model, job.effort, job.max_steps = new_model, new_effort, new_steps
+    store.add(job)
+    console.print(
+        f"[green]updated[/green] job {job.id}: model={job.model or '(inherit)'} "
+        f"effort={job.effort or '(inherit)'} max_steps={job.max_steps if job.max_steps is not None else '(inherit)'}"
+    )
 
 
 @cron_app.command("remove")
