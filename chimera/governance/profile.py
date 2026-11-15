@@ -369,7 +369,9 @@ def govern_step(
     band = build_band(settings) if band_enabled(settings) else None
     registry = govern_registry(
         registry,
-        TrustKernel(audit=audit, audit_allows=audit_allows, band=band),
+        TrustKernel(
+            audit=audit, audit_allows=audit_allows, band=band, surface=surface, mode=resolved
+        ),
         approve=approve,
         bypass_permissions=bypass_permissions,
         bypass_workspace=workspace,
@@ -693,7 +695,8 @@ def governed_profile(
     if on_ledger is not None:
         on_ledger(ledger)
     registry = ledger_registry(
-        step.registry, ledger, audit=audit, narrow_on_taint=True, approve=step.approve
+        step.registry, ledger, audit=audit, narrow_on_taint=True, approve=step.approve,
+        surface=surface, mode=step.mode,
     )
     from chimera.governance.mcp_readonly import alert_exec_tools
 

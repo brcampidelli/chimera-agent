@@ -14,7 +14,6 @@ from rich.markup import escape
 
 from chimera.cli.commands._shared import (
     _IMAGE_OPTION,
-    _apply_tool_allowlist,
     _emit_headless,
     _exit_for,
     _headless,
@@ -198,7 +197,6 @@ def agent(
     from chimera.core import Agent, AgentConfig
     from chimera.core.agent import attended
     from chimera.providers import LLMGateway, MissingCredentialsError
-    from chimera.tools import default_registry
 
     out = _machine_stdout(json_output or jsonl)
     task = _task_from_stdin(task)
@@ -210,22 +208,20 @@ def agent(
             from chimera.fusion.factory import fusion_engine
 
             backend = RoutedBackend(gateway, fusion_engine(gateway))
-        registry = default_registry(Path(workspace))
-        registry = _apply_tool_allowlist(
-            registry, allow=allow_tools, deny=deny_tools, settings=get_settings()
-        )
-        if guard:
-            from chimera.governance import AuditLog, TrustKernel, govern_registry
-            from chimera.governance.profile import owner_hooks
+        # The same governed assembly `chat`, `assist` and `tui` run on, from the same function: the
+        # deployment's allowlist and reach floor, the trust kernel in the deployment's mode, the
+        # taint ledger and the owner's hooks. This command used to build `default_registry` by hand
+        # and wrap a kernel only under `--guard`, so the one surface the owner scripts from a shell
+        # (and a cron line can reach) ran with none of it. `--guard` keeps its meaning — the kernel
+        # on, enforcing — by naming the mode; the per-session tool lists keep winning over the env.
+        from chimera.cli.right_hand import build_right_hand
 
-            run_audit = AuditLog(get_settings().home / "audit.jsonl")
-            kernel = TrustKernel(audit=run_audit)
-            registry = govern_registry(registry, kernel)
-            # The owner's hooks, which `govern_step` installs and this direct kernel used to skip:
-            # a guarded run carries them like every other guarded surface.
-            registry = owner_hooks(
-                registry, settings=get_settings(), audit=run_audit, workspace=Path(workspace)
-            )
+        hand = build_right_hand(
+            Path(workspace), settings=get_settings(), surface="agent",
+            allow=allow_tools, deny=deny_tools, mode="enforce" if guard else "",
+        )
+        registry = hand.registry
+        hand.begin_turn(task)
         runner = Agent(
             backend, registry,
             attended(AgentConfig(

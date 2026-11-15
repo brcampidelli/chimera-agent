@@ -353,7 +353,18 @@ class GovernedTool(Tool):
             if floor is not None:
                 verdict = replace(verdict, decision=Decision.REVIEW, reason=floor, rule="owner_floor")
                 if self.audit is not None:
-                    self.audit.record("owner_floor", {"tool": name, "reason": floor, "run_id": self.run_id})
+                    self.audit.record(
+                        "owner_floor",
+                        {
+                            "tool": name, "reason": floor, "run_id": self.run_id,
+                            # So the weekly report can tell a raise-to-review under `observe` (what
+                            # enforce WOULD stop) from one a person was asked about.
+                            **{k: v for k, v in (
+                                ("surface", getattr(self.kernel, "surface", "")),
+                                ("mode", getattr(self.kernel, "mode", "")),
+                            ) if v},
+                        },
+                    )
         if verdict.decision == Decision.REVIEW:
             # No approver, no card: the refusal below is read by the model alone, and the lookup
             # would still send the package's name to PyPI and wait up to its timeout. `chimera agent

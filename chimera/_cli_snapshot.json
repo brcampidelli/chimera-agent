@@ -5752,6 +5752,36 @@
       "commands": [
         {
           "deprecated": false,
+          "help": "What the governance layers granted and refused, per surface \u2014 and under `observe`, what\n`enforce` WOULD have refused. Reads only.\n\nCounted by code from `audit.jsonl` (kernel, taint ledger, owner floor, hooks, allowlist) and\n`approvals/history.jsonl` (how each durable question ended). No model writes or restates a\nfigure; the text says what these logs cannot see (the host-exec confirm).",
+          "hidden": false,
+          "name": "governance",
+          "params": [
+            {
+              "default": "7",
+              "help": "How many days back to count.",
+              "kind": "option",
+              "name": "days",
+              "opts": [
+                "--days"
+              ],
+              "required": false,
+              "type": "int range"
+            },
+            {
+              "help": "pt or en. Default: the owner's identity language (Portuguese unless it names another).",
+              "kind": "option",
+              "name": "lang",
+              "opts": [
+                "--lang"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "report governance"
+        },
+        {
+          "deprecated": false,
           "help": "Pull request watch: failing checks and new comments on your open pull requests, and failed runs\non the default branch \u2014 read with the GitHub CLI, never acted on.\n\nWithout `--print`/`--json` this registers the watch for WORKSPACE as an hourly job, DISABLED,\nonce per repository: it runs only after `chimera cron enable <id>`, posts only where\n`--deliver-to` says, and posts again only when the summary changes. Nothing is pushed, commented,\nmerged or re-run, and other people's comments are quoted inside the data fence, as data.",
           "hidden": false,
           "name": "pr-watch",

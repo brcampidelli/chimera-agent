@@ -51,7 +51,8 @@ def _audit(tmp_path: Path) -> AuditLog:
 
 
 def _lines(audit: AuditLog) -> list[tuple[str, dict[str, Any]]]:
-    keep = ("seq", "type", "prev", "hash")
+    # `ts` is the audit log's own clock (added for the weekly governance report), not the payload.
+    keep = ("seq", "type", "ts", "prev", "hash")
     return [(e["type"], {k: v for k, v in e.items() if k not in keep}) for e in audit.entries()]
 
 

@@ -151,6 +151,7 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`project step`](#project-step) | Run exactly one iteration (cron-able). |
 | [`redteam`](#redteam) | Red-team the injection defenses: attack success rate with vs without them. |
 | [`report`](#report) | Reports counted by code — from this home's own logs, or read with the GitHub CLI — no model call. |
+| [`report governance`](#report-governance) | What the governance layers granted and refused, per surface — and under `observe`, what |
 | [`report pr-watch`](#report-pr-watch) | Pull request watch: failing checks and new comments on your open pull requests, and failed runs |
 | [`report weekly`](#report-weekly) | Weekly review: spend, runs, approvals and failing jobs over the last 7 days. |
 | [`review`](#review) | [experimental] Review a change: findings first, P0 to P3, from a model of another family. |
@@ -2395,6 +2396,24 @@ Reports counted by code — from this home's own logs, or read with the GitHub C
 ```bash
 chimera report
 ```
+
+## report governance
+
+What the governance layers granted and refused, per surface — and under `observe`, what
+`enforce` WOULD have refused. Reads only.
+
+Counted by code from `audit.jsonl` (kernel, taint ledger, owner floor, hooks, allowlist) and
+`approvals/history.jsonl` (how each durable question ended). No model writes or restates a
+figure; the text says what these logs cannot see (the host-exec confirm).
+
+```bash
+chimera report governance
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--days` | How many days back to count. | `7` |
+| `--lang` | pt or en. Default: the owner's identity language (Portuguese unless it names another). |  |
 
 ## report pr-watch
 

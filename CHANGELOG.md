@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **`chimera report governance` and a governed `chimera agent`.** The report counts, per surface over the last N days, what governance granted, refused, raised to review and withheld, and under `observe` what `enforce` would have refused or put before an approver. `chimera agent` now runs on the same governed assembly as chat, assist and tui, so its hooks come from the project it works in and `--deny-tools` reaches deferred MCP tools. (#1283)
+
 - **Claude 5 models in the catalogue, priced and asked only what they accept.** Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5 carry verified prices (Haiku 5.5's long-context tier included); the gateway stops sending parameters a model refuses; an exact provider cost is never rebuilt below what was spent, and an unknown one stays unpriced so the spend cap still holds. Fable 5.2's data-retention requirement is shown in the privacy card and the security docs. (#1279)
 
 - **The Storage card now sees the conversations' worktrees, says why each is kept, and offers to archive idle ones.** It used to list only the worktrees in the system temp folder, missing the project's durable folder (89 checkouts, 72.9 GiB measured on one machine); it now lists them with size, age and the reason each still exists, warns above a limit (`CHIMERA_WORKTREE_LIMIT_GB`, default 50) and offers to archive conversations idle for `CHIMERA_WORKTREE_IDLE_DAYS` (default 14) through the existing archive route, never deleting anything. A new worktree card also says "fetching the remote base" while it waits and highlights the warning when it did not start from the remote tip. (P1-18) (#1253)

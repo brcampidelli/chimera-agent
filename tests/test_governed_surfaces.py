@@ -141,7 +141,9 @@ def test_enforce_actually_wraps(tmp_path: pathlib.Path) -> None:
 #: making it is a candidate for consolidation rather than a settled answer.
 EXEMPT: dict[str, str] = {
     # --- a person is at the terminal, watching the tool calls go by ---
-    "chimera/cli/commands/run.py:agent": "attended: one-shot at the terminal",
+    # `chimera agent` was exempt here as "attended: one-shot at the terminal" until 2026-11-14 (audit
+    # P0-15). It is a one-shot a shell script or a cron line can drive, so "a person is watching" was
+    # never a property of the command, and it now goes through `build_right_hand` like its siblings.
     # `chat` and `assist` were exempt here on the same "attended" grounds until 2026-09-08, when
     # the reason was measured instead of asserted: `bench/right_hand_governance/RESULTS.md` found
     # the terminal registry executing 7 of 7 attacks the governed one blocked, and 0 of 12 external
@@ -240,7 +242,8 @@ EXEMPT: dict[str, str] = {
     "chimera/orchestration/lifecycle.py:lifecycle_crew": "library constructor; the HTTP caller governs",
     "chimera/workflow/executors.py:build_executors.solve_step": "delegates to solve, governed there",
     # Renders the schemas `chimera run` declares so a snapshot can pin them; it never executes a
-    # tool, and it mirrors `run.py:agent` (exempt above) so the snapshot shows what that surface sends.
+    # tool, and it mirrors `run.py:agent` (which `build_right_hand` now assembles; wrapping does not change a
+    # schema) so the snapshot shows what that surface sends.
     "chimera/prompts/tool_schemas.py:_assemble_cli": "reads schemas only; mirrors run.py:agent",
 }
 

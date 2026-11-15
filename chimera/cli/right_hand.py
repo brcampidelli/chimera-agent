@@ -172,7 +172,9 @@ class RightHand:
         return granted, refused
 
 
-def _mount_mcp(registry: Any, settings: Settings) -> None:
+def _mount_mcp(
+    registry: Any, settings: Settings, *, allow: str | None = None, deny: str | None = None
+) -> None:
     """Pour the connected MCP servers into the terminal's registry, as the other callers do.
 
     ``mcp_pool.connectors(settings)`` is called at ``code_api.py:498`` and ``main.py:2206`` and
@@ -207,7 +209,28 @@ def _mount_mcp(registry: Any, settings: Settings) -> None:
 
     # `mount` and not `register_deferred_mcp` directly: deferred, the server's names leave the
     # registry before the fence below runs, so the proxy has to be handed the lists itself.
-    mount(pool, registry, settings)
+    if allow is None and deny is None:
+        mount(pool, registry, settings)
+        return
+    # A per-session list (`chimera agent --deny-tools`) has to reach the catalogue too: deferred, the
+    # server's names are behind `mcp_call`, where the filter that runs after this cannot see them, so
+    # a name denied for this session only would stay callable. The session's denials add to the
+    # deployment's; its allowlist, as everywhere, replaces the deployment's.
+    if not settings.mcp_defer:
+        pool.into_tool_registry(registry)
+        return
+    from chimera.api.posture import deployment_fence
+    from chimera.integrations.mcp_defer import register_deferred_mcp
+
+    def names(value: str | None) -> frozenset[str]:
+        return frozenset(n.strip() for n in (value or "").split(",") if n.strip())
+
+    denied, allowed = deployment_fence(settings)
+    register_deferred_mcp(
+        pool, registry,
+        denied=frozenset({*denied, *names(deny)}),
+        allowed=names(allow) if allow is not None else allowed,
+    )
 
 
 def build_right_hand(
@@ -218,6 +241,9 @@ def build_right_hand(
     write_region: str | None = None,
     base: Any = None,
     ask: TerminalAsk | None = None,
+    allow: str | None = None,
+    deny: str | None = None,
+    mode: str = "",
 ) -> RightHand:
     """Assemble the terminal's governed registry, in the order ``assemble_registry`` uses.
 
@@ -237,6 +263,12 @@ def build_right_hand(
     costs US$ 0 and executes nothing, and without this seam it would have to *re-implement* steps
     1-5 to do it. A bench whose arm is a copy of the code it measures stops measuring the code the
     day the copy drifts. Everything below this line is identical either way, which is the point.
+
+    ``allow`` / ``deny`` are a per-session tool list (``chimera agent --allow-tools`` /
+    ``--deny-tools``), which wins over the ``CHIMERA_TOOL_*`` environment lists exactly as it does
+    on the other commands; ``None`` leaves the environment's lists in force. ``mode`` names the
+    trust kernel's mode for this assembly (``chimera agent --guard`` asks for ``enforce``); empty
+    means the deployment's own ``CHIMERA_GOVERNANCE_MODE``, which is what every other caller gets.
 
     ``ask`` is how a surface that cannot answer through stdin supplies its own question — see
     :class:`TerminalAsk`. **Both** gates take it: the host-execution confirm the shell tools consult
@@ -286,10 +318,10 @@ def build_right_hand(
         # allowlist. Before the wrappers, so the kernel and the ledger wrap the bound tools.
         if surface in REFERENCE_SURFACES:
             bind_references(registry, settings.home)
-        _mount_mcp(registry, settings)
+        _mount_mcp(registry, settings, allow=allow, deny=deny)
     # The fence these surfaces already applied, unchanged and in the same place: an explicit
     # allowlist is an instruction, and it must run before the wrappers so they wrap what survives.
-    registry = _apply_tool_allowlist(registry, allow=None, deny=None, settings=settings)
+    registry = _apply_tool_allowlist(registry, allow=allow, deny=deny, settings=settings)
     # The owner's floor, on top. Empty by default — `deployment_posture` returns no denials when
     # `CHIMERA_REACH` is unset, deliberately, because a floor is not a default. So a stock `chimera
     # chat` keeps every tool it had, including the shell, and an owner who set `read_only` finally
@@ -355,6 +387,8 @@ def build_right_hand(
         settings=settings,
         audit=audit,
         surface=surface,
+        mode=mode,
+        workspace=ws,
         attended=True,
         audit_allows=False,
         lineage=ledger.lineage,
@@ -366,6 +400,7 @@ def build_right_hand(
     narrow = bool(settings.taint_narrow or deployment_posture(settings).narrow_on_taint)
     governed = ledger_registry(
         step.registry, ledger, narrow_on_taint=narrow, audit=audit, approve=approve,
+        surface=surface,
         # A send to an address nobody mentioned becomes a question only when a person is here to
         # answer it (study 24, M2); under a pipe it goes ahead and the audit records it.
         ask_unseen_recipients=attended,

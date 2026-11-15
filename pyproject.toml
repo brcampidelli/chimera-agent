@@ -376,6 +376,8 @@ only_mutate = [
 pytest_add_cli_args_test_selection = [
   "tests/test_bypass_one_rule_and_one_credential_list.py",  # names governance/audit, ledger, ledger_tool, policy (P0-01)
   "tests/test_code_environments.py",
+  "tests/test_chimera_agent_governance_review_fixes.py",  # names governance/ledger.py (taint mode on the audit lines, P0-15)
+  "tests/test_governance_report.py",  # reads the audit lines the kernel and AuditLog write (the new ts)
   "tests/test_the_registry_bounds_every_tool_output.py",  # names governance/ledger.py and ledger_tool.py
   "tests/test_solve_judges_like_the_api.py",  # names core/verify.py and api/runs.py (the solve receipt)
   "tests/test_escalation_ladder.py",  # names core/verify.py and api/runs.py (attempt receipts)
