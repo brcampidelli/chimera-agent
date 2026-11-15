@@ -42,6 +42,7 @@ tracked as follow-up work, not claimed as closed here.
 
 from __future__ import annotations
 
+import functools
 import re
 import shlex
 from collections.abc import Callable
@@ -459,12 +460,16 @@ def _upload_value(token: str) -> str:
     return re.split(r"[=@<]", token)[-1] if re.search(r"[=@<]", token) else token
 
 
+@functools.lru_cache(maxsize=4096)
 def _is_secret_token(token: str) -> bool:
     """A token that names a secret file, bare or as an upload value: ``.env``, ``@.env``, ``f=@.env``.
 
     Also the value glued to a short option, in a cluster too: ``-T.env``, ``-d@.env``, ``-sT.env``
     (every suffix after the dash is read, because the option letters and the value run together),
     and ``<`` as the separator curl's ``-F 'file=<.env'`` and a redirect ``<.env`` use.
+
+    Cached: it is a pure function of the token, and a long command repeats the same token
+    thousands of times (``a;`` x 5000 spent ~1 s re-matching ~37 credential patterns per copy).
     """
     from chimera.api.bridge_routes import is_secret_file
 
