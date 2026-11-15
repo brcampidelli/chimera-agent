@@ -3,5 +3,12 @@
   "_howToUse": "Adding a UI string and not fluent in nine languages? Put its key in `keys` and open the PR. Translating? Delete the key from `keys` once every language has it — the test fails if you leave a finished entry behind.",
   "_budget": "`maxPending` is a ceiling under review, not a number that can never move. A ratchet fixed at zero would just be the old rule with extra steps. It lives in .github/CODEOWNERS, so raising it is a decision someone sees; lowering it is always welcome and is the direction it should travel.",
   "maxPending": 25,
-  "keys": []
+  "keys": [
+    "status.cacheWarning",
+    "code.worth.perResolved",
+    "code.worth.perVerified",
+    "code.worth.perResolvedNote",
+    "code.worth.resolvedN",
+    "code.worth.coverage"
+  ]
 }

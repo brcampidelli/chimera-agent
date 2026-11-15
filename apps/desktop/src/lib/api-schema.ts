@@ -14312,6 +14312,11 @@ export interface components {
             passed: number;
             /** Passed By Verifier */
             passed_by_verifier: number;
+            /**
+             * Price Coverage
+             * @default 0
+             */
+            price_coverage: number;
             /** Profile */
             profile: string | null;
             /**
@@ -14319,6 +14324,11 @@ export interface components {
              * @default user
              */
             profile_source: string;
+            /**
+             * Resolved N
+             * @default 0
+             */
+            resolved_n: number;
             /** Reverted */
             reverted: number;
             /** Runs */
@@ -14327,6 +14337,10 @@ export interface components {
             unproductive: number;
             /** Usd Known Runs */
             usd_known_runs: number;
+            /** Usd Per Resolved */
+            usd_per_resolved?: number | null;
+            /** Usd Per Verified */
+            usd_per_verified?: number | null;
             /** Usd Total */
             usd_total: number | null;
         };
