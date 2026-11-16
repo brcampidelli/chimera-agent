@@ -60,6 +60,9 @@ CONSERVATIVE_PRICES = {MODELS["ds"]: (0.10, 0.40), MODELS["glm"]: (0.10, 1.30)}
 LIVE_PRICES = {MODELS["ds"]: (0.06, 0.18), MODELS["glm"]: (0.0399, 0.0784)}
 SPEND_STOP = 4.00
 REPS = 3
+#: Amendment 2: without a cap on reasoning both routes spend most of the 8,000-token reply budget thinking
+#: and cut off before the JSON ends. Same setting in both arms of a model.
+REASONING = {MODELS["ds"]: {"reasoning": {"enabled": False}}, MODELS["glm"]: {"reasoning": {"effort": "low"}}}
 RESULTS = HERE / "results"
 _LEDGER_LOCK = threading.Lock()
 
@@ -128,6 +131,7 @@ class Meter:
 
     def complete(self, messages: Any, **kwargs: Any) -> Any:
         kwargs["model"] = self.model
+        kwargs["extra_body"] = REASONING[self.model]
         try:
             result = self.gateway().complete(messages, **kwargs)
         except Exception:
