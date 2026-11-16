@@ -99,3 +99,7 @@ Nothing here is loosened after the data. A retraction is published with the prom
 ## Cost
 
 Calls: R1 360 generations; corpus about 30 designs × 4 screens × 2 models plus retries; R2 360 refinements plus read rounds. At the conservative price (US$ 0.10 / 0.40 per M for DeepSeek, 0.10 / 1.30 for Zhipu) the projection is US$ 2–3 and at the live index under US$ 0.50. **Stop:** the ledger at US$ 4.00, below the owner's US$ 5.00.
+
+## Amendment 1 (2026-11-16, after the 4-call pilot, before any scored call)
+
+The pilot (briefs b01 and b02, one repetition, both arms, DeepSeek) returned **no valid proposal in 4 of 4 generations**: every call ended at the 8,000-token ceiling twice (the first answer and the re-ask) with an empty body. A direct probe reproduced it: the same prompt with `response_format={"type": "json_object"}`, which the product sends for this slug (`propose._json_object_mode`), returns empty content and `finish_reason=length`; without it the reply is complete JSON in about 3,600 tokens. So on this route JSON mode makes the shipped path fail, which is a finding for the product and is reported in RESULTS.md, but it would make the ruler read 0% in both arms (a floor, §2q). **Both arms run with JSON mode off**, on both models, by one line in `run.py`; nothing else changes. The pilot's four records are discarded (their spend, US$ 0.028 conservative, stays in the ledger). Gates, margins and predictions are unchanged.

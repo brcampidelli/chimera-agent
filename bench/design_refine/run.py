@@ -42,6 +42,10 @@ from chimera.design.model import DesignDocument, Page, is_index_page, wire  # no
 from chimera.design.ops import apply_operations  # noqa: E402
 from chimera.design.tokens import default_tokens  # noqa: E402
 
+# Amendment 1 (PREREGISTRATION.md): with ``response_format=json_object`` the DeepSeek route returned an empty
+# body cut at the token ceiling in 4 of 4 pilot generations, in both arms. Both arms run without it.
+propose._json_object_mode = lambda model: {}  # type: ignore[assignment]
+
 BASE_SHA = "b53dd4fe"
 #: sha256 of ``chimera/design/prompts.py`` at BASE_SHA, written before any paid call.
 BASE_PROMPTS_SHA256 = "8b858d4e7fc3b5cbe05b19d4fab3f6cbf9ef96e26fbaf064a0cc124f71d04629"
