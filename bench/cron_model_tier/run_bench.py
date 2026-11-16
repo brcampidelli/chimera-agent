@@ -41,9 +41,12 @@ def _surface_constants() -> tuple[str, str]:
     tree = ast.parse((REPO / "chimera" / "scheduler" / "surface.py").read_text(encoding="utf-8"))
     found: dict[str, str] = {}
     for node in tree.body:
-        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
-            if node.targets[0].id in ("SCHEDULED_RUN_NOTE", "NOTHING_NEW"):
-                found[node.targets[0].id] = ast.literal_eval(node.value)
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id in ("SCHEDULED_RUN_NOTE", "NOTHING_NEW")
+        ):
+            found[node.targets[0].id] = ast.literal_eval(node.value)
     return found["SCHEDULED_RUN_NOTE"], found["NOTHING_NEW"]
 
 
@@ -145,7 +148,7 @@ def selftest() -> int:
             bad += 1
     j = J.all_jobs()[0]
     rate = str(j.expected["Activation rate %"]).replace(".", ",")
-    md = "- **Total signups**: %d\n* Activation rate %%: %s%%" % (j.expected["Total signups"], rate)
+    md = "- **Total signups**: {:d}\n* Activation rate %: {}%".format(j.expected["Total signups"], rate)
     f = score(j, md)["fields"]
     if not (f["Total signups"] and f["Activation rate %"]):
         print("PARSER: markdown / decimal-comma not handled", f)
@@ -190,7 +193,7 @@ def call(model: str, system: str, user: str, seed: int, key: str) -> dict:
             ch = r["choices"][0]
             return {"answer": ch["message"].get("content") or "", "finish": ch.get("finish_reason"),
                     "usage": r.get("usage", {}), "seconds": round(time.time() - t0, 2)}
-        except Exception as exc:  # noqa: BLE001 - retried, then surfaced as a failed cell
+        except Exception as exc:
             last = exc
             time.sleep(2 * (attempt + 1))
     return {"answer": "", "finish": "error", "error": str(last)[:200], "usage": {}, "seconds": 0}
