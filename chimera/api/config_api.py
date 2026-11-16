@@ -20,7 +20,7 @@ import os
 import threading
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chimera.api.key_vault import (
     SCREEN_STORABLE,
@@ -36,6 +36,9 @@ from chimera.governance import first_boot
 from chimera.memory.backend import resolve_memory_backend
 from chimera.providers.catalog import PROVIDERS
 from chimera.providers.privacy import privacy_snapshot
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.providers.routing import Route
 
 # Credential env-vars (secret) and the non-secret settings the UI may edit. Anything outside this set
 # is rejected by patch_config, so the endpoint can't be used to write arbitrary .env lines.
@@ -786,6 +789,24 @@ def remove_endpoint(name: str) -> dict[str, Any]:
         return patch_config({"CHIMERA_ENDPOINTS": json.dumps(kept)})
 
 
+def _typed_slug(route: Route) -> str:
+    """The slug of a tier rung the owner typed, ``""`` when a preset chose it."""
+    return route.slug if route.origin != "default" else ""
+
+
+def _own_slug(route: Route) -> str:
+    """The slug of a role that has a model of its own, ``""`` when it follows another role."""
+    return "" if route.inherits else route.slug
+
+
+def routing_rows(settings: Settings) -> dict[str, Any]:
+    """``GET /api/routing``: :func:`chimera.providers.routing.public_routing`, which sanitises every
+    string it returns (the denial message included) and answers a denying policy as data."""
+    from chimera.providers.routing import public_routing
+
+    return public_routing(settings)
+
+
 def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str, Any]:
     """The settings snapshot for the UI. Secrets are masked to ``{set, hint}`` — never cleartext."""
     creds = settings.credentials()
@@ -832,7 +853,8 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
                 "keys_url": "",
             }
         )
-    ladder = settings.tier_ladder()
+    table = settings.routing_table()
+    ladder = table.tiers()
     pools = read_pools(settings)
     from chimera.sandbox import sandbox_network
 
@@ -842,10 +864,12 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
 
     return {
         "models": {
-            "default": settings.default_model,
-            "weak": settings.weak_model,
-            "mid": settings.mid_model,
-            "orchestrator": settings.orchestrator_model,
+            "default": table.route("default").slug,
+            # What the owner TYPED, which is what the rows that edit them show; the rung that runs is
+            # `tiers` below, and the two differ whenever a preset or the policy chose it.
+            "weak": _typed_slug(table.route("tier.weak")),
+            "mid": _typed_slug(table.route("tier.mid")),
+            "orchestrator": _typed_slug(table.route("tier.top")),
             "cost_mode": settings.cost_mode,
             "cascade": settings.cascade,
             "api_base": settings.api_base,
@@ -853,9 +877,9 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "tiers": {"weak": ladder.weak, "mid": ladder.mid, "top": ladder.top},
             "ollama_base_url": settings.ollama_base_url,
             "lm_studio_base_url": settings.lm_studio_base_url,
-            "complete_model": settings.complete_model,
-            "voice_model": settings.voice_model,
-            "voice_work_model": settings.voice_work_model,
+            "complete_model": table.route("complete").slug,
+            "voice_model": _own_slug(table.route("voice")),
+            "voice_work_model": _own_slug(table.route("voice_work")),
         },
         # Panel -> judge -> synthesizer, and how independent the judge actually is from the panel it
         # grades. `role_kinship` is reported rather than enforced: a user with one provider key has
@@ -869,7 +893,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "auto_consolidate": settings.auto_consolidate,
             "remember_from_chat": settings.remember_from_chat,
             "skill_cards": settings.skill_cards,
-            "embed_model": settings.embed_model,
+            "embed_model": table.route("embed").slug,
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache is not False},
         "sandbox": {

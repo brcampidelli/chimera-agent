@@ -98,6 +98,7 @@ import type {
   ShellPrefsChange,
   WeeklyReview,
   DeferSaving,
+  Routing,
   StorageReport,
   WorktreePrune,
   LogRotate,
@@ -577,6 +578,8 @@ export const labelDecision = (decisionId: string, event: boolean) =>
 export const getTools = () => json<Tools>("/api/tools");
 // What CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save here. Read-only; never connects a server.
 export const getDeferSaving = () => json<DeferSaving>("/api/tools/defer-saving");
+// Every role of the routing table: its model, effort, origin and how it was reached. Read-only.
+export const getRouting = () => json<Routing>("/api/routing");
 
 // --- Filesystem (read-only tree + file viewer for the Code screen) ---
 // Both are path-scoped server-side to the workspace; a `..` escape is a 400, a binary/dir is an

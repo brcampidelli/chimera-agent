@@ -54,6 +54,7 @@ import { Usage } from "@/components/Usage";
 import { SystemOneCard } from "@/components/SystemOneCard";
 import { KeepAwakeCard } from "@/components/KeepAwakeCard";
 import { DeferSavingNote } from "@/components/DeferSavingNote";
+import { RoutingTable } from "@/components/RoutingTable";
 import { EnvironmentsCard } from "@/components/EnvironmentsCard";
 import { FoldersCard } from "@/components/FoldersCard";
 import { VoiceCard } from "@/components/VoiceCard";
@@ -1828,6 +1829,8 @@ export function Settings({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["config"] });
       qc.invalidateQueries({ queryKey: ["doctor"] });
+      // A saved model changes which model each role runs on; the table under the model rows reads it.
+      qc.invalidateQueries({ queryKey: ["routing"] });
       // The Storage card says where the next worktree goes, which a saved folder changes.
       qc.invalidateQueries({ queryKey: ["storage"] });
       // A changed sandbox changes what a command can reach; the network rows read it from there.
@@ -2249,6 +2252,9 @@ export function Settings({
                       onSave={(v) => save({ CHIMERA_FALLBACK_MODELS: v })}
                     />
                   </Row>
+                  <div className="px-4 py-3">
+                    <RoutingTable />
+                  </div>
                   <Row
                     label={t("settings.row.cascade")}
                     hint={t("settings.hint.cascade")}

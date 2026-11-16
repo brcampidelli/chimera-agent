@@ -660,6 +660,21 @@ _NO_ENDPOINT_KEY = "no-key-configured"
 
 
 
+def route_takes_effort(resolved: str, settings: Settings) -> bool:
+    """Whether a route is sent a reasoning effort at all: OpenRouter and OpenAI, and only while no
+    custom base URL redirects them.
+
+    A function rather than only a method so that a screen can ask the question without building a
+    gateway (whose constructor exports the configured keys into the process environment).
+    """
+    custom_base = bool(settings.api_base)
+    if resolved.startswith("openrouter/") and not custom_base:
+        return True
+    return resolved.startswith("openai/") and not (
+        custom_base or os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL")
+    )
+
+
 def thinking_overrides_effort(resolved: str, thinking: bool | None) -> bool:
     """Whether ``thinking=False`` replaces a reasoning effort on this route.
 
@@ -864,12 +879,7 @@ class LLMGateway:
 
     def _route_takes_effort(self, resolved: str) -> bool:
         """Whether this route is sent a reasoning effort at all (the rule :meth:`_effort_for_route` applies)."""
-        custom_base = bool(self.settings.api_base)
-        if resolved.startswith("openrouter/") and not custom_base:
-            return True
-        return resolved.startswith("openai/") and not (
-            custom_base or os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL")
-        )
+        return route_takes_effort(resolved, self.settings)
 
     def takes_effort(self, model: str | None, *, thinking: bool | None = None) -> bool:
         """Whether a ``#low|#medium|#high`` variant of ``model`` would actually be sent, quietly.

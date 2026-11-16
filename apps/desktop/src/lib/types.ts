@@ -144,6 +144,9 @@ export type WeeklyReview = Schemas["WeeklyReviewOut"];
  *  MCP half is absent when it is. `saving_pct` is negative when deferral would cost more. */
 export type DeferSaving = Schemas["DeferSavingOut"];
 export type DeferSavingHalf = Schemas["DeferSavingHalfOut"];
+/** Which model each role runs on, where that choice came from, and whether its effort is sent. */
+export type Routing = Schemas["RoutingOut"];
+export type RoutingRow = Schemas["RoutingRowOut"];
 // What this install keeps on disk, by kind; `bytes: null` is "not measured", never zero (P5.3).
 export type StorageReport = Schemas["StorageOut"];
 export type StorageCategory = Schemas["StorageCategoryOut"];

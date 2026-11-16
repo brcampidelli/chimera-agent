@@ -2271,6 +2271,50 @@ class CodePythonOut(BaseModel):
     looked_for: list[str] = Field(default_factory=list)
 
 
+class RoutingMemberOut(BaseModel):
+    """One slug of a list role (the panel, the fallbacks, the escalation rungs)."""
+
+    model: str
+    effort: Literal["low", "medium", "high"] | None = None
+    effort_sent: bool | None = None
+    #: The model is a file on this machine and ``model`` is its name only; the folders are not sent.
+    local_file: bool = False
+
+
+class RoutingRowOut(BaseModel):
+    """One role of the routing table: the model it runs on, and where that choice came from."""
+
+    role: str
+    #: Empty for a role whose model is picked when it is used (the reviewer). For a list role, the
+    #: slugs joined by commas; ``members`` has them one by one.
+    model: str
+    effort: Literal["low", "medium", "high"] | None = None
+    #: ``default`` ``env`` ``config`` ``agent`` ``job`` ``request``. ``env`` means the variable was in
+    #: the environment Chimera started with, so the Settings screen cannot change it durably.
+    origin: str
+    effort_origin: str
+    #: One line saying how the model was reached: the setting, the preset or the derivation.
+    via: str
+    #: The role this one follows while it has no model of its own; empty when it has one.
+    inherits: str = ""
+    kind: Literal["chat", "embedding", "media", "local", "list"] = "chat"
+    #: Whether the gateway would put ``effort`` on the wire for this route; null when there is none.
+    effort_sent: bool | None = None
+    #: As in ``RoutingMemberOut``: ``model`` is the file name of a local file, never its path.
+    local_file: bool = False
+    members: list[RoutingMemberOut] = []
+
+
+class RoutingOut(BaseModel):
+    """``GET /api/routing`` — which model each role runs on, and why."""
+
+    rows: list[RoutingRowOut]
+    ladder_source: str
+    cost_mode: str
+    #: Set (with ``rows`` empty) when the deployment policy leaves no model for the tier ladder.
+    denied: str = ""
+
+
 class DoctorOut(BaseModel):
     has_any_key: bool
     #: The default model runs on this machine and needs no key (``ollama_chat/…``, ``lm_studio/…``).

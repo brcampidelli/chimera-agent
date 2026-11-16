@@ -469,37 +469,67 @@ models_app = typer.Typer(
 )
 
 
+#: The names the ladder and fusion rows have always had in this table; every other role shows its id.
+_ROLE_LABELS = {
+    "default": "default (Tier 1)",
+    "tier.weak": "tier: weak",
+    "tier.mid": "tier: mid",
+    "tier.top": "tier: top (orchestrator)",
+    "fusion.panel": "fusion panel",
+    "fusion.judge": "fusion judge",
+    "fusion.synthesizer": "fusion synthesizer",
+}
+
+
+def _shown_model(entry: dict[str, Any]) -> str:
+    """A model as the table prints it: already the public form, with the effort and the file marker."""
+    shown = f"{entry['model']}#{entry['effort']}" if entry["effort"] else entry["model"]
+    return f"{escape(shown)} [dim](local file)[/dim]" if entry["local_file"] else escape(shown)
+
+
+def _effort_cell(row: dict[str, Any]) -> str:
+    """The effort of a route, and the one thing nobody guesses: whether the gateway would send it."""
+    if row["effort"] is None:
+        return "[dim]-[/dim]"
+    note = "" if row["effort_sent"] else " [yellow](effort not sent on this route)[/yellow]"
+    return f"{row['effort']}  [dim]({escape(row['effort_origin'])})[/dim]{note}"
+
+
 def _render_models() -> None:
-    """The active model assignment: tier ladder + cost mode + fusion roles."""
+    """Every role's model, effort, where each came from, and how it was reached.
+
+    One row per role of the routing table (``chimera.providers.routing``), so the roles the product
+    runs but never named a model for (chat, the code roles, the cron) are listed with the role they
+    follow instead of being absent. It prints :func:`public_routing`'s answer and nothing else, the
+    one the API sends, so a path or a URL credential cannot reach the terminal by another way.
+    """
+    from chimera.providers.routing import public_routing
+
     settings = get_settings()
-    ladder = settings.tier_ladder()
+    routing = public_routing(settings)
+    if routing["denied"]:
+        console.print(f"[red]No model is permitted for the tier ladder:[/red] {escape(routing['denied'])}")
+        raise typer.Exit(code=1)
+    entry = settings.tier_ladder().entry
     table = Table(title="Models", show_header=True, header_style="bold")
-    table.add_column("Role")
-    table.add_column("Model(s)")
-    pinned = {
-        "weak": bool(settings.weak_model),
-        "mid": bool(settings.mid_model),
-        "top": bool(settings.orchestrator_model),
-    }
-
-    def _mark(tier: str, slug: str) -> str:
-        origin = "pinned" if pinned[tier] else f"cost_mode={settings.cost_mode}"
-        entry = "  ← entry" if ladder.entry == tier else ""
-        return f"{slug}  [dim]({origin}){entry}[/dim]"
-
-    table.add_row("default (Tier 1)", settings.default_model)
-    table.add_row("tier: weak", _mark("weak", ladder.weak))
-    table.add_row("tier: mid", _mark("mid", ladder.mid))
-    table.add_row("tier: top (orchestrator)", _mark("top", ladder.top))
-    # The cast `--fuse` convenes, which is the ladder unless a panel was named — not the raw
-    # `CHIMERA_FUSION_PANEL`, whose frontier default no product surface convenes any more.
-    from chimera.fusion.factory import fusion_config
-
-    fused = fusion_config(settings)
-    table.add_row("fusion panel", "\n".join(fused.panel))
-    table.add_row("fusion judge", fused.judge)
-    table.add_row("fusion synthesizer", fused.synthesizer)
+    table.add_column("Role", no_wrap=True)
+    for column in ("Model(s)", "Effort", "Origin", "Via"):
+        table.add_column(column)
+    for row in routing["rows"]:
+        if row["kind"] == "list":
+            model = chr(10).join(_shown_model(m) for m in row["members"]) or "[dim](none)[/dim]"
+        else:
+            model = _shown_model(row) if row["model"] else "[dim](chosen when used)[/dim]"
+        if row["role"] == f"tier.{entry}":
+            model += "  [dim]← entry[/dim]"
+        via = escape(row["via"])
+        if row["inherits"]:
+            via += f" [dim](follows {escape(row['inherits'])})[/dim]"
+        table.add_row(
+            _ROLE_LABELS.get(row["role"], row["role"]), model, _effort_cell(row), row["origin"], via
+        )
     console.print(table)
+    console.print(f"[dim]cost_mode={routing['cost_mode']}; ladder source: {routing['ladder_source']}.[/dim]")
     console.print(
         "[dim]Any LiteLLM/OpenRouter slug fits any role — pin with "
         "`chimera models set <weak|mid|top> <slug>`, browse with `chimera models catalog`, "

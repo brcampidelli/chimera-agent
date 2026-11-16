@@ -54,6 +54,7 @@ imported inside :func:`build_routing_table`.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
@@ -220,6 +221,106 @@ ROLES: tuple[RoleSpec, ...] = (
 ROLE_IDS: tuple[str, ...] = tuple(spec.id for spec in ROLES)
 
 
+_LOCAL_PATH = re.compile(r"^(?:[/~]|\.{1,2}[/\\]|[A-Za-z]:[/\\]|\\\\|file://)")
+
+
+# Up to whitespace, a quote or an angle bracket, and no further: stopping at `)` or `]` as well left
+# the rest of a query OUTSIDE the match (`?token=abc)def456` published `)def456`). The query is dropped
+# whole, so a closing bracket swallowed with it costs a cosmetic character at most.
+_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://[^\s'\"<>]+")
+# A path between quotes runs to the closing quote, spaces included: `repr()` of a setting
+# (`unknown decision backend '/home/x/Client Name/backend'`) is how a value lands in a message, and
+# cutting at the first space published the folder names after it.
+_QUOTED_PATH = re.compile(r"""(['"])((?:[A-Za-z]:[/\\]|\\\\|~[/\\]|\.{1,2}[/\\]|/)[^'"]*)\1""")
+_PATH_IN_TEXT = re.compile(
+    r"(?<![\w:/.\\])(?:[A-Za-z]:[/\\]|\\\\|~[/\\]|\.{1,2}[/\\]|/(?=[^\s'\"<>/]))[^\s'\"<>]*"
+)
+
+
+def _bare_url(match: re.Match[str]) -> str:
+    from urllib.parse import urlsplit, urlunsplit
+
+    try:
+        parts = urlsplit(match.group(0))
+        host = parts.hostname or ""
+        netloc = f"{host}:{parts.port}" if parts.port else host
+        return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
+    except ValueError:
+        return "[redacted]"
+
+
+def _file_name(path: str) -> str:
+    return re.split(r"[/\\]+", path.rstrip("/\\"))[-1] or "?"
+
+
+def public_text(text: str) -> str:
+    """Any string that leaves through the public view: a path is its file name, a URL has no
+    ``user:pass@`` and no query, and the rest goes through the repo's redactor.
+
+    Free text is what leaks: ``ProviderDeniedError`` names the whole model slug, and ``via`` repeats
+    the value of a setting. So this works INSIDE a sentence, not only on a value that is one.
+    """
+    if not text:
+        return text
+    from chimera.core.redact import redact
+
+    text = _URL.sub(_bare_url, text)
+    text = _QUOTED_PATH.sub(lambda m: m.group(1) + _file_name(m.group(2)) + m.group(1), text)
+    text = _PATH_IN_TEXT.sub(lambda m: _file_name(m.group(0)), text)
+    return redact(text)
+
+
+def public_model(model: str) -> tuple[str, bool]:
+    """``(what a screen may show, is it a local file)`` for a role's model.
+
+    A role's "model" can be a path on this machine (a Piper voice, a diffusers checkpoint): the
+    execution needs the whole path, but the API, the Settings panel and ``chimera models`` must not
+    publish the folder names in it, which can name a client. Only the file name is shown, flagged as a
+    local file. Anything else is :func:`public_text`.
+    """
+    if not model:
+        return model, False
+    if _LOCAL_PATH.match(model) and "://" not in model.split("/", 1)[0]:
+        return _file_name(model), True
+    return public_text(model), False
+
+
+def _publish(value: Any, key: str = "") -> Any:
+    """Every string of a public answer, wherever it sits. A field added later is covered by default."""
+    if isinstance(value, str):
+        return public_model(value)[0] if key == "model" else public_text(value)
+    if isinstance(value, dict):
+        return {k: _publish(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_publish(v, key) for v in value]
+    return value
+
+
+def public_routing(settings: Settings) -> dict[str, Any]:
+    """The ONE public answer: ``GET /api/routing``, the Settings panel and ``chimera models`` all
+    render this and nothing else, so no field reaches a screen except through :func:`_publish`.
+
+    ``ProviderDeniedError`` is the table's one deliberate raise (the deployment policy leaves no model
+    for the ladder). It is answered as data (``denied``), not as a server error: the screen has to say
+    what the policy did, and a 500 would read as a fault in the product. Its message names the whole
+    model, URL credentials included, which is why it goes through the same sanitiser.
+    """
+    from chimera.providers.gateway import ProviderDeniedError
+
+    try:
+        table = settings.routing_table()
+    except ProviderDeniedError as exc:
+        denied: dict[str, Any] = _publish(
+            {"rows": [], "ladder_source": "", "cost_mode": settings.cost_mode, "denied": str(exc)}
+        )
+        return denied
+    answer: dict[str, Any] = _publish({
+        "rows": table.describe(), "ladder_source": table.ladder_source,
+        "cost_mode": settings.cost_mode, "denied": "",
+    })
+    return answer
+
+
 @dataclass(frozen=True)
 class RoutingTable:
     """The resolved routes of one :class:`~chimera.config.Settings`, at the moment it was built.
@@ -288,6 +389,50 @@ class RoutingTable:
     def rows(self) -> list[Route]:
         """Every role's route in registry order, list roles as their summary row."""
         return list(self.routes.values())
+
+    def members(self, role: str) -> tuple[Route, ...]:
+        """The slugs of a list role (panel, escalation, fallback), one route each; empty for any other."""
+        return self.lists.get(role, ())
+
+    def effort_sent(self, route: Route) -> bool | None:
+        """Whether the gateway would put ``route``'s effort on the wire: ``None`` when it has none.
+
+        The same rule the escalation ladder asks (``gateway.route_takes_effort``), without a gateway:
+        building one exports the configured keys into the process environment, which a read of the
+        table must not do. ``thinking`` is a property of a run, so it is not part of this answer.
+        """
+        if route.effort is None or not route.model:
+            return None
+        from chimera.providers.gateway import route_takes_effort
+
+        return route_takes_effort(route.model, self._settings)
+
+    def describe(self) -> list[dict[str, Any]]:
+        """Every row as plain data, for the screen and ``GET /api/routing``: the route, whether its
+        effort would be sent, and each member of a list role.
+
+        The PUBLIC form: a model that is a local path is its file name with ``local_file`` set, and a
+        URL has no credentials (:func:`public_model`). The table itself keeps the real value.
+        """
+        out: list[dict[str, Any]] = []
+        for route in self.rows():
+            model, local = public_model(route.model) if route.kind != "list" else (route.model, False)
+            members: list[dict[str, Any]] = []
+            for m in self.members(route.role):
+                name, member_local = public_model(m.model)
+                members.append({
+                    "model": name, "effort": m.effort, "effort_sent": self.effort_sent(m),
+                    "local_file": member_local,
+                })
+            if route.kind == "list":
+                model = ",".join(f"{x['model']}#{x['effort']}" if x["effort"] else x["model"] for x in members)
+            out.append({
+                "role": route.role, "model": model, "effort": route.effort,
+                "origin": route.origin, "effort_origin": route.effort_origin, "via": route.via,
+                "inherits": route.inherits, "kind": route.kind,
+                "effort_sent": self.effort_sent(route), "local_file": local, "members": members,
+            })
+        return _publish(out)  # type: ignore[no-any-return]
 
     def profile_routes(self, profile: Any) -> dict[str, Route]:
         """The four code roles a profile (``economy`` | ``balanced`` | ``max``) would run on.
