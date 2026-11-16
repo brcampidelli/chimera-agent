@@ -27,6 +27,9 @@ REPO = HERE.parent.parent
 sys.path.insert(0, str(HERE))
 import jobs as J  # noqa: E402
 
+sys.path.insert(0, str(REPO))
+from chimera.eval import proportions  # noqa: E402
+
 JOURNAL = HERE / "results" / "journal.jsonl"
 ARMS = {"current": "deepseek/deepseek-chat-v3.1", "cheap": "deepseek/deepseek-v4-flash-0731"}
 SEEDS = (42, 43, 44)
@@ -236,12 +239,12 @@ def run(only_pilot: bool) -> None:
         print(f"{job.name:22} {arm:8} s{seed} ok={sc['ok']!s:5} ${usd:.5f}  (total ${spent:.4f})")
 
 
-def wilson_lower(k: int, n: int, z: float = 1.96) -> float:
-    p = k / n
-    d = 1 + z * z / n
-    c = p + z * z / (2 * n)
-    m = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5)
-    return (c - m) / d
+def lower_bound_95(k: int, n: int) -> float:
+    return proportions.wilson(k, n)[0]
+
+
+def upper_bound_95(k: int, n: int) -> float:
+    return proportions.wilson(k, n)[1]
 
 
 def report() -> None:
@@ -263,11 +266,14 @@ def report() -> None:
         usd = sum(r["usd"] for r in rs)
         k = sum(r["ok"] for r in rs)
         n = len(rs)
-        print(f"{a}: {k}/{n} cells fully correct, ${usd:.4f}, Wilson lower {wilson_lower(k, n):.3f}" if n else a)
+        print(f"{a}: {k}/{n} cells fully correct, ${usd:.4f}, Wilson lower {lower_bound_95(k, n):.3f}" if n else a)
     print(f"total spend ${sum(r['usd'] for r in rows):.4f}")
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, str(HERE.parent))
+    from _legacy_defaults import pin_legacy_defaults
+    pin_legacy_defaults()  # the five 2026-11-10 defaults, back to the value these numbers used
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--pilot", action="store_true")

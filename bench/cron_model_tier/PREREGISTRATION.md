@@ -107,3 +107,31 @@ US$ 2.50. A 2-cell pilot prices the run first.
 5. **No "last delivery" note** and no `effort` axis; the plan's second acceptance clause (7 days,
    repeated alerts) needs production traffic and is out of scope here.
 6. Two models of one family: the cheap tier is a smaller sibling, so errors are likely correlated.
+
+---
+
+## Adicionado depois da rodada, em 16/11, para cumprir o PROTOCOL; não altera hipótese, métricas nem regra de adoção
+
+Tudo acima foi commitado (`920d2210`) antes da primeira chamada paga e não foi reescrito. Esta parte
+só responde, por escrito, às quatro seções de `bench/PROTOCOL.md` que o teste de convenção exige.
+
+**§11 — intervalo.** Proporções simples (células totalmente corretas por braço): Wilson, a função
+`wilson` de `chimera/eval/proportions.py` (o script chama essa função, não reimplementa a conta). Não
+há bootstrap. Por job há 3 células, então o intervalo por job não é informativo; o que decide é a
+regra de 3/3 da §5, que é um portão operacional, e o RESULTS diz isso.
+
+**§12 — margem.** Não se alega equivalência nem não-inferioridade. A regra de adoção (3/3) é uma
+decisão operacional por job, sem margem declarada; por isso o resultado nunca é lido como "o degrau
+barato é equivalente", só como "passou no portão nestas 3 sementes".
+
+**§13 — controles.** Braço de agente trivial: não se aplica de forma útil, porque o gabarito exige
+números específicos de cada fonte (um agente que não faz nada ou devolve uma resposta fixa reprova
+por construção, e o `--selftest` confirma que uma resposta corrompida reprova). Braço aleatório a
+custo pareado: não se aplica, não há mecanismo de seleção. O controle que existe é o invariante do
+corretor: o gabarito passa em si mesmo e uma resposta errada falha, verificado antes de qualquer
+gasto. O braço `current` é referência, não controle.
+
+**§14 — escopo de modelo.** Duas famílias não foram medidas: os dois braços são da mesma família
+(DeepSeek), declarado no limite 6. O veredito recomenda *adotar* um degrau mais barato (não remover
+componente), mas fica medido só em `deepseek-v4-flash-0731` contra `deepseek-chat-v3.1`; nada é
+default, os campos seguem opt-in por job.
