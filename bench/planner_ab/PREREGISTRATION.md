@@ -148,3 +148,40 @@ bench's oracle stands in for it; RESULTS states that assumption next to the verd
 config, runs the shuffled queue, stops on §6) and `bench/planner_ab/read_ab.py` (reads E1 from the
 committed JSONL and E2/E3 from the driver log; prints §3–§5 and nothing else). Both are committed with
 the RESULTS.
+
+---
+
+## Amendment 1 — apparatus defects found by the first pilot; pilot discarded and re-run (2026-11-16, after 11 paid solves, before any retained solve)
+
+The first 11 pilot solves of E2 ran (driver stopped by hand; 8 rows of the driver log, with their
+`outcome`, were on screen before this amendment was written — which is why the amendment is dated
+and lists what was seen). Two defects were found, **both in the apparatus, neither about the effect**,
+and the pilot is **discarded in full** (kept in `~/p101-discarded-pilot/`, never read for an effect)
+and re-run from scratch with the fixes. §3–§5 (outcome, interval, margin, decision rule) are
+**unchanged**.
+
+1. **`PATH`.** Launched from a non-login shell, the harness could not find `pytest` / `node`: 2 of the
+   first 10 oracles raised `FileNotFoundError` (rc = 1, no outcome), and the agent's own shell had no
+   `pytest` either. The factorial ran from a login shell. Fix: launch under `wsl bash -l`, with
+   `~/.local/bin` first in `PATH` (`p101_launch.sh`).
+2. **The chimera meter does not price these models.** For `z-ai/glm-5.3-flash` it fell back to ≈ US$ 1.5
+   per million input tokens (measured on the discarded pilot: 845k input + 89k output tokens metered
+   at **US$ 1.575**, which at the OpenRouter list price is **US$ 0.041**, a factor of ≈ 39). That made
+   the registered `--max-usd 0.15` per-solve cap bind on most solves (`ending = spend`), truncating
+   them — a defect that would have hit both arms but would have measured the meter, not the planner.
+   Fix, applied to **both arms identically**: `--max-usd 2.0` per solve (the factorial's value), and
+   the item's **US$ 5.00 ceiling is accounted in real money** = Σ (prompt tokens × list in-price +
+   completion tokens × list out-price), no cache discount taken, **× 1.25 safety**, read from the
+   receipts' token counts. List prices on 2026-11-16 (US$ per million tokens, in / out): `glm-5.3-flash`
+   0.0399 / 0.0784; `qwen3-coder-next` 0.12 / 0.80. The meter's own `usd` is still recorded as the
+   factorial's cost column, never used for the ceiling. Spend of the discarded pilot: **≈ US$ 0.05
+   real** (US$ 1.575 metered), counted against the ceiling.
+
+Consequences, stated now. (a) The E2 projection becomes ≈ 138 × US$ 0.004–0.01 ≈ **US$ 0.6–1.4**, so
+the §6 cut will not bind and E3 (≈ 138 × US$ 0.02 ≈ US$ 3) is expected to fit; the other §6 rules
+(pilot = the first 12 triples of the shuffled queue and kept, E3 all-or-nothing, hard stop **US$
+4.00** now on the real-money number) are unchanged. (b) `rc ≠ 0` with a receipt but no oracle score
+counts as "bad" in the §6 apparatus rule, exactly as in the factorial. (c) `chimera solve` returns a
+non-zero exit when the loop ends without an accepted verdict; with `--no-manager` and no `--verify`
+that is the ordinary ending (`exhausted`), so the driver's `rc` is the **harness's** exit code
+(oracle ran or not), which is what the factorial recorded as well.
