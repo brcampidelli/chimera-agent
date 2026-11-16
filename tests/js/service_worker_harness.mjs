@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { assertValidFetchFilter } from './fetch_filter.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -77,11 +78,11 @@ async function scenario(name, options = {}) {
     children: [options.previewForm ? previewForm : target],
   };
   const chrome = {
-    storage: { session: {
+    storage: { local: { async get() { return {}; }, async set() {} }, session: {
       async get() { return storage; },
       async set(value) { storage = { ...storage, ...value }; },
     } },
-    tabs: {
+    tabs: { onCreated: { addListener() {} }, onUpdated: { addListener() {} },
       async get() { return { id: 1, groupId: 7, url: 'https://shop.example/' }; },
       async create() { return { id: 1 }; }, async group() { return 7; },
       async remove() {},
@@ -95,6 +96,9 @@ async function scenario(name, options = {}) {
       onDetach: { addListener() {} },
       async sendCommand(_target, method, params = {}) {
         calls.push({ method, params });
+        // The owner presses Stop while the click is part-way through its mouse events.
+        if (options.stopOn && method === options.stopOn && !options.stopped) { options.stopped = true; messageHandler({ op: 'stop' }, {}, () => {}); }
+        if (options.stopAt && method === 'Input.dispatchMouseEvent' && params.type === options.stopAt) messageHandler({ op: 'stop' }, {}, () => {});
         if (method === 'DOM.describeNode') {
           describes += 1;
           const labels = options.describeLabels || [];
@@ -202,6 +206,8 @@ async function scenario(name, options = {}) {
         if (method === 'Runtime.releaseObject') return {};
         if (method === 'Input.dispatchMouseEvent' && params.type === 'mouseMoved') hovered = true;
         if (method === 'DOM.focus' || method.startsWith('Input.')) return {};
+        if (method === 'Fetch.enable') assertValidFetchFilter(params);
+        if (['Fetch.enable', 'Fetch.disable', 'Network.enable', 'Target.setAutoAttach', 'Network.setBypassServiceWorker', 'Page.setPrerenderingAllowed'].includes(method)) return {};
         throw new Error(`Unexpected CDP method ${method}`);
       },
     },
@@ -231,8 +237,8 @@ async function typeFocusChanges() {
   const port = { onMessage: { addListener(fn) { nativeHandler = fn; } }, onDisconnect: { addListener() {} }, postMessage() {}, disconnect() {} };
   const node = { nodeName: 'INPUT', backendNodeId: 12, frameId: 'frame', attributes: ['type', 'search', 'aria-label', 'Search'] };
   const chrome = {
-    storage: { session: { async get() { return store; }, async set(v) { store = { ...store, ...v }; } } },
-    tabs: { async get() { return { groupId: 7, url: 'https://shop.example/' }; }, async remove() {} },
+    storage: { local: { async get() { return {}; }, async set() {} }, session: { async get() { return store; }, async set(v) { store = { ...store, ...v }; } } },
+    tabs: { onCreated: { addListener() {} }, onUpdated: { addListener() {} }, async get() { return { groupId: 7, url: 'https://shop.example/' }; }, async remove() {} },
     tabGroups: { async get() { return {}; } }, permissions: { async contains() { return true; } }, downloads: { onCreated: { addListener() {} } },
     debugger: { async attach() {}, async detach() {}, onEvent: { addListener() {}, removeListener() {} }, onDetach: { addListener() {} },
       async sendCommand(_t, method, params = {}) {
@@ -262,6 +268,8 @@ async function typeFocusChanges() {
         if (method === 'DOMDebugger.getEventListeners') return { listeners: [] };
         if (method === 'Runtime.releaseObject') return {};
         if (method === 'Accessibility.getFullAXTree') return { nodes: [] };
+        if (method === 'Fetch.enable') assertValidFetchFilter(params);
+        if (['Fetch.enable', 'Fetch.disable', 'Network.enable', 'Target.setAutoAttach', 'Network.setBypassServiceWorker', 'Page.setPrerenderingAllowed'].includes(method)) return {};
         throw new Error(`Unexpected CDP method ${method}`);
       } },
     runtime: { connectNative() { return port; }, onMessage: { addListener() {} }, onStartup: { addListener() {} }, onInstalled: { addListener() {} } },
@@ -401,6 +409,21 @@ for (const [name, options] of [
 const listenerError = await scenario('positive click when listener inspection fails', { href: 'https://shop.example/catalog',
   listenerError: true, expected: expectedSummaries.click });
 assert.equal(listenerError.reply.ok, true, `a failed listener inspection does not change a decided click: ${JSON.stringify(listenerError.reply)}`);
+// Stop lands while the click is still deciding (before its first mouse event): nothing at all is dispatched.
+{
+  const early = await scenario('stop before any mouse event', { href: 'https://shop.example/catalog', expected: expectedSummaries.click, stopOn: 'DOM.getNodeForLocation' });
+  assert.equal(early.reply.ok, false);
+  assert.deepEqual(early.calls.filter(call => call.method === 'Input.dispatchMouseEvent'), [], 'no mouse event after an early Stop');
+}
+// Stop between the events of one click: every Input.dispatch* revalidates, so nothing is dispatched after it.
+for (const [stopAt, allowed] of [['mouseMoved', ['mouseMoved']], ['mousePressed', ['mouseMoved', 'mouseMoved', 'mousePressed']]]) {
+  const interrupted = await scenario(`stop at ${stopAt}`, { href: 'https://shop.example/catalog', expected: expectedSummaries.click, stopAt });
+  assert.equal(interrupted.reply.ok, false, `the click is dropped after a Stop at ${stopAt}`);
+  const sent = interrupted.calls.filter(call => call.method === 'Input.dispatchMouseEvent').map(call => call.params.type);
+  const firstStop = sent.indexOf(stopAt);
+  assert.deepEqual(sent.slice(firstStop + 1), [], `no mouse event is dispatched after the Stop at ${stopAt}: ${JSON.stringify(sent)}`);
+  assert.ok(!sent.includes('mouseReleased'), 'the button is never released after Stop');
+}
 console.log('service worker harness positive: decided click, trusted-site button, click and button with a window listener, click with failed listener inspection, search type through the native setter');
 console.log('service worker harness negative: mismatched expected button (twice), no expected summary, overlap, changed href, hover hijack, password, cc-number, sensitive ariaLabel');
 console.log('service worker harness: 6 positive + 9 negative behavioral cases passed');

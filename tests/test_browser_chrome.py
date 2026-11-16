@@ -139,7 +139,8 @@ def test_default_registry_ignores_chrome_engine_environment(monkeypatch: pytest.
 def test_manifest_permissions_are_scoped_and_minimum_versioned() -> None:
     manifest = json.loads((Path(__file__).parents[1] / "extensions/chrome/manifest.json").read_text(encoding="utf-8"))
     assert "storage" in manifest["permissions"]
-    # 105, not 102: from 105 an open native port keeps the MV3 service worker alive (E4 review).
-    assert manifest["minimum_chrome_version"] == "105"
+    # 105 was the floor for the open native port keeping the MV3 worker alive (E4 review). It is 125 now:
+    # child debugger sessions (`sessionId`), which the popup/prerender guard needs, arrived in Chrome 125.
+    assert manifest["minimum_chrome_version"] == "125"
     assert "<all_urls>" not in manifest["permissions"] + manifest.get("optional_host_permissions", [])
     assert "externally_connectable" not in manifest

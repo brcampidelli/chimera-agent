@@ -24,7 +24,8 @@ def _package_module() -> dict[str, Any]:
 def test_manifest_has_least_privilege_permissions_and_local_popup() -> None:
     manifest = json.loads((EXTENSION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["action"]["default_popup"] == "popup.html"
-    assert manifest["minimum_chrome_version"] == "105"
+    # 125: child debugger sessions (`sessionId`) arrived in Chrome 125, and the popup/prerender guard needs them.
+    assert manifest["minimum_chrome_version"] == "125"
     assert (EXTENSION / manifest["action"]["default_popup"]).is_file()
     assert manifest["permissions"] == EXPECTED_PERMISSIONS
     assert manifest["optional_host_permissions"] == ["http://*/*", "https://*/*"]
@@ -73,3 +74,12 @@ def test_extension_icons_have_required_png_dimensions() -> None:
         data = (EXTENSION / "icons" / f"icon{size}.png").read_bytes()
         assert data[:8] == b"\x89PNG\r\n\x1a\n"
         assert struct.unpack(">II", data[16:24]) == (size, size)
+
+
+def test_popup_css_lets_the_hidden_attribute_win() -> None:
+    """The popup hides Allow and Resume with `hidden`; a `button { display: block }` rule used to override it,
+    so both buttons always showed, with nothing to allow or resume (seen by the owner on 0.90.0)."""
+    css = (EXTENSION / "popup.css").read_text(encoding="utf-8")
+    html = (EXTENSION / "popup.html").read_text(encoding="utf-8")
+    assert 'id="allow" type="button" hidden' in html and 'id="resume" type="button" hidden' in html
+    assert "[hidden] { display: none !important; }" in css

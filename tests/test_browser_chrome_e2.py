@@ -318,7 +318,7 @@ def test_preview_sanitization_checks_metadata_and_payment_numbers() -> None:
     assert _safe_preview([{"label": "Character count", "value": "10"}]) == []
 
 
-def test_textbox_without_label_requires_card_but_named_searchbox_does_not() -> None:
+def test_textbox_without_label_requires_card() -> None:
     driver, _transport = driver_for({"tag": "div", "role": "textbox", "accessibleName": ""})
     questions: list[Any] = []
     driver.ask_action = lambda question: questions.append(question) or True
@@ -328,15 +328,43 @@ def test_textbox_without_label_requires_card_but_named_searchbox_does_not() -> N
     assert '"query"' not in questions[0].action
     assert questions[0].typed_text == "query"
 
-    driver, _transport = driver_for({"tag": "input", "role": "searchbox", "type": "search", "accessibleName": "Search"})
-    driver.type_text("e1", "query")
-    assert driver.ask_action is None
 
-def test_searchbox_typing_is_allowed_without_owner_card() -> None:
+# ext-03: the old tests here asserted that a field the PAGE calls a search box (`role="searchbox"`,
+# `type=search`) is typed into with no card. Those attributes are written by the page, so the exemption
+# let any granted site receive turn data. The premise was false; the tests now pin the opposite.
+@pytest.mark.parametrize(
+    "description",
+    [
+        {"tag": "input", "role": "searchbox", "type": "search", "accessibleName": "Search"},
+        {"tag": "div", "role": "searchbox", "accessibleName": "Buscar"},
+        {"tag": "input", "type": "search", "ariaLabel": "Search", "accessibleName": "Search"},
+    ],
+)
+def test_a_page_declared_searchbox_does_not_skip_the_card(description: dict[str, object]) -> None:
+    driver, transport = driver_for(description)
+    questions: list[Any] = []
+    driver.ask_action = lambda question: questions.append(question) or False
+    with pytest.raises(RuntimeError, match="refused"):
+        driver.type_text("e1", "contents-of-the-env-file")
+    assert len(questions) == 1
+    assert questions[0].typed_text == "contents-of-the-env-file"
+    assert "type" not in [item["op"] for item in transport.messages]
+
+
+def test_a_page_declared_searchbox_without_a_card_channel_is_refused() -> None:
     driver, transport = driver_for({"tag": "input", "role": "searchbox", "type": "search", "accessibleName": "Search"})
+    assert driver.ask_action is None
+    with pytest.raises(RuntimeError, match="owner approval required"):
+        driver.type_text("e1", "query")
+    assert "type" not in [item["op"] for item in transport.messages]
+
+
+def test_a_searchbox_on_a_trusted_host_still_types_without_a_card() -> None:
+    # The owner's own trust list is unchanged: only the page's say-so stopped counting.
+    driver, transport = driver_for({"tag": "input", "role": "searchbox", "type": "search", "accessibleName": "Search"})
+    driver.trusted_sites = "shop.example"
     driver.type_text("e1", "query")
     assert "type" in [item["op"] for item in transport.messages]
-    assert driver.ask_action is None
 
 
 def test_trusted_sites_setting_is_validated_as_hosts_only() -> None:
@@ -685,6 +713,7 @@ def test_existing_text_is_reported_as_replaced_and_requires_card() -> None:
 
 def test_allowed_typing_audits_only_length() -> None:
     driver, _transport = driver_for({"tag": "input", "role": "searchbox", "accessibleName": "Search"})
+    driver.trusted_sites = "shop.example"  # the page's own "searchbox" no longer skips the card (ext-03)
     records: list[tuple[str, dict[str, object]]] = []
 
     class Audit:
@@ -773,4 +802,4 @@ def test_service_worker_recovers_from_refused_download_denial_and_cancel() -> No
         [node, str(harness)], capture_output=True, text=True, check=False, timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "service worker recovery cases: 6" in result.stdout
+    assert "service worker recovery cases: 27" in result.stdout

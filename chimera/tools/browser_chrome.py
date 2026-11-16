@@ -274,12 +274,10 @@ class ChromeExtensionDriver:
                 host, action, role, name, text,
                 "link URL exceeds 2,000 characters; use navigate with the URL instead",
             )
-        allowed_search = False
-        if action == "type":
-            role_name = role.casefold()
-            allowed_search = bool(name.strip()) and (
-                role_name == "searchbox" or (tag == "input" and input_type == "search")
-            )
+        # No card-free typing for a field the page calls a search box. `role="searchbox"` and
+        # `type=search` are attributes the page writes, so honouring them let any granted site, trusted
+        # or not, receive turn data typed into an input it controls (a script reads the `input` event at
+        # once). Typing needs a card unless the owner trusted the host (ext-03).
         irreversible = action == "click" and self._irreversible(target, identity_values)
         self._pending_irreversible = irreversible
         frame_host = ""
@@ -298,9 +296,7 @@ class ChromeExtensionDriver:
         replaced_content = action == "type" and _field(target, "tag").casefold() in {
             "input", "textarea",
         } and bool(target.get("valueLength", 0))
-        needs_approval = irreversible or foreign_frame or replaced_content or (
-            not allowed_search and not self._site_trusted(host)
-        )
+        needs_approval = irreversible or foreign_frame or replaced_content or not self._site_trusted(host)
         approved_by: str | bool | None = None
         if needs_approval:
             if not self._request_approval(

@@ -1,6 +1,8 @@
 const status = document.getElementById('status');
 const allow = document.getElementById('allow');
 const stop = document.getElementById('stop');
+const start = document.getElementById('start');
+const stoppedNote = document.getElementById('stoppedNote');
 const pair = document.getElementById('pair');
 const pairCode = document.getElementById('pairCode');
 const pairStatus = document.getElementById('pairStatus');
@@ -17,6 +19,11 @@ async function refresh() {
   // Cancel is an owner kill-switch: the note and the Resume button show only while it is set.
   canceled.hidden = !value.actionsDisabled;
   resume.hidden = !value.actionsDisabled;
+  // Stop holds across worker restarts and Chrome restarts; this reflects what is stored, not what was clicked.
+  stop.hidden = value.stopped === true;
+  start.hidden = value.stopped !== true;
+  stoppedNote.hidden = value.stopped !== true;
+  if (value.issues && value.issues.length) showNote(`Protection problem: ${value.issues.join('; ')}`);
 }
 
 function showNote(text) {
@@ -55,9 +62,23 @@ pair.addEventListener('click', async () => {
   } catch {
     pairStatus.textContent = 'Could not pair. Check the code and try again.';
   } finally { pair.disabled = false; }
+  await refresh(); // a code entered here also ends a Stop
 });
 stop.addEventListener('click', async () => {
   status.textContent = 'Stopping…';
   const result = await chrome.runtime.sendMessage({ op: 'stop' });
-  status.textContent = result.error || 'Stopped';
+  if (result.error) { status.textContent = result.error; return; }
+  await refresh();
+  // Anything the teardown could not do cleanly is said, not hidden.
+  if (result.issues && result.issues.length) showNote(`Stopped, with problems: ${result.issues.join('; ')}`);
+});
+start.addEventListener('click', async () => {
+  start.disabled = true;
+  try {
+    const result = await chrome.runtime.sendMessage({ op: 'start' });
+    showNote(result?.ok ? 'Chimera can use the browser again' : 'Could not start Chimera Browser');
+  } catch {
+    showNote('Could not start Chimera Browser');
+  } finally { start.disabled = false; }
+  await refresh();
 });
