@@ -8,6 +8,8 @@
 0,
 11,
 19,
+18,
+1,
 61
 ],
 "auto|none|none|derived|deny_anthropic|plain": [
@@ -18,6 +20,8 @@
 0,
 10,
 19,
+18,
+0,
 60
 ],
 "auto|none|none|derived|none|effort": [
@@ -28,6 +32,8 @@
 0,
 11,
 19,
+18,
+1,
 61
 ],
 "auto|none|none|derived|none|plain": [
@@ -38,6 +44,8 @@
 0,
 10,
 19,
+18,
+0,
 60
 ],
 "auto|none|none|empty|deny_anthropic|effort": [
@@ -48,6 +56,8 @@
 0,
 11,
 21,
+18,
+1,
 65
 ],
 "auto|none|none|empty|deny_anthropic|plain": [
@@ -58,6 +68,8 @@
 0,
 10,
 21,
+18,
+0,
 64
 ],
 "auto|none|none|empty|none|effort": [
@@ -68,6 +80,8 @@
 0,
 11,
 21,
+18,
+1,
 65
 ],
 "auto|none|none|empty|none|plain": [
@@ -78,6 +92,8 @@
 0,
 10,
 21,
+18,
+0,
 64
 ],
 "auto|none|none|explicit|deny_anthropic|effort": [
@@ -88,6 +104,8 @@
 0,
 11,
 20,
+18,
+1,
 63
 ],
 "auto|none|none|explicit|deny_anthropic|plain": [
@@ -98,6 +116,8 @@
 0,
 10,
 20,
+18,
+0,
 62
 ],
 "auto|none|none|explicit|none|effort": [
@@ -108,6 +128,8 @@
 0,
 11,
 20,
+18,
+1,
 63
 ],
 "auto|none|none|explicit|none|plain": [
@@ -118,6 +140,8 @@
 0,
 10,
 20,
+18,
+0,
 62
 ],
 "auto|none|openrouter|derived|deny_anthropic|effort": [
@@ -128,6 +152,8 @@
 0,
 11,
 19,
+18,
+1,
 67
 ],
 "auto|none|openrouter|derived|deny_anthropic|plain": [
@@ -138,6 +164,8 @@
 0,
 10,
 19,
+18,
+0,
 66
 ],
 "auto|none|openrouter|derived|none|effort": [
@@ -148,6 +176,8 @@
 0,
 11,
 19,
+18,
+1,
 67
 ],
 "auto|none|openrouter|derived|none|plain": [
@@ -158,6 +188,8 @@
 0,
 10,
 19,
+18,
+0,
 66
 ],
 "auto|none|openrouter|empty|deny_anthropic|effort": [
@@ -168,6 +200,8 @@
 0,
 11,
 21,
+18,
+1,
 71
 ],
 "auto|none|openrouter|empty|deny_anthropic|plain": [
@@ -178,6 +212,8 @@
 0,
 10,
 21,
+18,
+0,
 70
 ],
 "auto|none|openrouter|empty|none|effort": [
@@ -188,6 +224,8 @@
 0,
 11,
 21,
+18,
+1,
 71
 ],
 "auto|none|openrouter|empty|none|plain": [
@@ -198,6 +236,8 @@
 0,
 10,
 21,
+18,
+0,
 70
 ],
 "auto|none|openrouter|explicit|deny_anthropic|effort": [
@@ -208,6 +248,8 @@
 0,
 11,
 20,
+18,
+1,
 69
 ],
 "auto|none|openrouter|explicit|deny_anthropic|plain": [
@@ -218,6 +260,8 @@
 0,
 10,
 20,
+18,
+0,
 68
 ],
 "auto|none|openrouter|explicit|none|effort": [
@@ -228,6 +272,8 @@
 0,
 11,
 20,
+18,
+1,
 69
 ],
 "auto|none|openrouter|explicit|none|plain": [
@@ -238,6 +284,8 @@
 0,
 10,
 20,
+18,
+0,
 68
 ],
 "auto|none|other|derived|deny_anthropic|effort": [
@@ -248,6 +296,8 @@
 0,
 11,
 19,
+18,
+1,
 61
 ],
 "auto|none|other|derived|deny_anthropic|plain": [
@@ -258,6 +308,8 @@
 0,
 10,
 19,
+18,
+0,
 60
 ],
 "auto|none|other|derived|none|effort": [
@@ -268,6 +320,8 @@
 0,
 11,
 19,
+18,
+1,
 61
 ],
 "auto|none|other|derived|none|plain": [
@@ -278,6 +332,8 @@
 0,
 10,
 19,
+18,
+0,
 60
 ],
 "auto|none|other|empty|deny_anthropic|effort": [
@@ -288,6 +344,8 @@
 0,
 11,
 21,
+18,
+1,
 65
 ],
 "auto|none|other|empty|deny_anthropic|plain": [
@@ -298,6 +356,8 @@
 0,
 10,
 21,
+18,
+0,
 64
 ],
 "auto|none|other|empty|none|effort": [
@@ -308,6 +368,8 @@
 0,
 11,
 21,
+18,
+1,
 65
 ],
 "auto|none|other|empty|none|plain": [
@@ -318,6 +380,8 @@
 0,
 10,
 21,
+18,
+0,
 64
 ],
 "auto|none|other|explicit|deny_anthropic|effort": [
@@ -328,6 +392,8 @@
 0,
 11,
 20,
+18,
+1,
 63
 ],
 "auto|none|other|explicit|deny_anthropic|plain": [
@@ -338,6 +404,8 @@
 0,
 10,
 20,
+18,
+0,
 62
 ],
 "auto|none|other|explicit|none|effort": [
@@ -348,6 +416,8 @@
 0,
 11,
 20,
+18,
+1,
 63
 ],
 "auto|none|other|explicit|none|plain": [
@@ -358,6 +428,8 @@
 0,
 10,
 20,
+18,
+0,
 62
 ],
 "auto|partial|none|derived|deny_anthropic|effort": [
@@ -368,6 +440,8 @@
 0,
 15,
 25,
+22,
+1,
 75
 ],
 "auto|partial|none|derived|deny_anthropic|plain": [
@@ -378,6 +452,8 @@
 0,
 14,
 24,
+21,
+0,
 74
 ],
 "auto|partial|none|derived|none|effort": [
@@ -388,6 +464,8 @@
 0,
 13,
 23,
+20,
+1,
 73
 ],
 "auto|partial|none|derived|none|plain": [
@@ -398,6 +476,8 @@
 0,
 12,
 22,
+19,
+0,
 72
 ],
 "auto|partial|none|empty|deny_anthropic|effort": [
@@ -408,6 +488,8 @@
 0,
 15,
 29,
+22,
+1,
 83
 ],
 "auto|partial|none|empty|deny_anthropic|plain": [
@@ -418,6 +500,8 @@
 0,
 14,
 29,
+21,
+0,
 82
 ],
 "auto|partial|none|empty|none|effort": [
@@ -428,6 +512,8 @@
 0,
 13,
 28,
+20,
+1,
 81
 ],
 "auto|partial|none|empty|none|plain": [
@@ -438,6 +524,8 @@
 0,
 12,
 28,
+19,
+0,
 80
 ],
 "auto|partial|none|explicit|deny_anthropic|effort": [
@@ -448,6 +536,8 @@
 0,
 15,
 27,
+22,
+1,
 79
 ],
 "auto|partial|none|explicit|deny_anthropic|plain": [
@@ -458,6 +548,8 @@
 0,
 14,
 27,
+21,
+0,
 78
 ],
 "auto|partial|none|explicit|none|effort": [
@@ -468,6 +560,8 @@
 0,
 13,
 26,
+20,
+1,
 77
 ],
 "auto|partial|none|explicit|none|plain": [
@@ -478,6 +572,8 @@
 0,
 12,
 26,
+19,
+0,
 76
 ],
 "auto|partial|openrouter|derived|deny_anthropic|effort": [
@@ -488,6 +584,8 @@
 0,
 15,
 25,
+22,
+1,
 87
 ],
 "auto|partial|openrouter|derived|deny_anthropic|plain": [
@@ -498,6 +596,8 @@
 0,
 14,
 24,
+21,
+0,
 86
 ],
 "auto|partial|openrouter|derived|none|effort": [
@@ -508,6 +608,8 @@
 0,
 13,
 23,
+20,
+1,
 85
 ],
 "auto|partial|openrouter|derived|none|plain": [
@@ -518,6 +620,8 @@
 0,
 12,
 22,
+19,
+0,
 84
 ],
 "auto|partial|openrouter|empty|deny_anthropic|effort": [
@@ -528,6 +632,8 @@
 0,
 15,
 29,
+22,
+1,
 95
 ],
 "auto|partial|openrouter|empty|deny_anthropic|plain": [
@@ -538,6 +644,8 @@
 0,
 14,
 29,
+21,
+0,
 94
 ],
 "auto|partial|openrouter|empty|none|effort": [
@@ -548,6 +656,8 @@
 0,
 13,
 28,
+20,
+1,
 93
 ],
 "auto|partial|openrouter|empty|none|plain": [
@@ -558,6 +668,8 @@
 0,
 12,
 28,
+19,
+0,
 92
 ],
 "auto|partial|openrouter|explicit|deny_anthropic|effort": [
@@ -568,6 +680,8 @@
 0,
 15,
 27,
+22,
+1,
 91
 ],
 "auto|partial|openrouter|explicit|deny_anthropic|plain": [
@@ -578,6 +692,8 @@
 0,
 14,
 27,
+21,
+0,
 90
 ],
 "auto|partial|openrouter|explicit|none|effort": [
@@ -588,6 +704,8 @@
 0,
 13,
 26,
+20,
+1,
 89
 ],
 "auto|partial|openrouter|explicit|none|plain": [
@@ -598,6 +716,8 @@
 0,
 12,
 26,
+19,
+0,
 88
 ],
 "auto|partial|other|derived|deny_anthropic|effort": [
@@ -608,6 +728,8 @@
 0,
 15,
 25,
+22,
+1,
 75
 ],
 "auto|partial|other|derived|deny_anthropic|plain": [
@@ -618,6 +740,8 @@
 0,
 14,
 24,
+21,
+0,
 74
 ],
 "auto|partial|other|derived|none|effort": [
@@ -628,6 +752,8 @@
 0,
 13,
 23,
+20,
+1,
 73
 ],
 "auto|partial|other|derived|none|plain": [
@@ -638,6 +764,8 @@
 0,
 12,
 22,
+19,
+0,
 72
 ],
 "auto|partial|other|empty|deny_anthropic|effort": [
@@ -648,6 +776,8 @@
 0,
 15,
 29,
+22,
+1,
 83
 ],
 "auto|partial|other|empty|deny_anthropic|plain": [
@@ -658,6 +788,8 @@
 0,
 14,
 29,
+21,
+0,
 82
 ],
 "auto|partial|other|empty|none|effort": [
@@ -668,6 +800,8 @@
 0,
 13,
 28,
+20,
+1,
 81
 ],
 "auto|partial|other|empty|none|plain": [
@@ -678,6 +812,8 @@
 0,
 12,
 28,
+19,
+0,
 80
 ],
 "auto|partial|other|explicit|deny_anthropic|effort": [
@@ -688,6 +824,8 @@
 0,
 15,
 27,
+22,
+1,
 79
 ],
 "auto|partial|other|explicit|deny_anthropic|plain": [
@@ -698,6 +836,8 @@
 0,
 14,
 27,
+21,
+0,
 78
 ],
 "auto|partial|other|explicit|none|effort": [
@@ -708,6 +848,8 @@
 0,
 13,
 26,
+20,
+1,
 77
 ],
 "auto|partial|other|explicit|none|plain": [
@@ -718,6 +860,8 @@
 0,
 12,
 26,
+19,
+0,
 76
 ],
 "auto|total|none|derived|deny_anthropic|effort": [
@@ -728,6 +872,8 @@
 0,
 9,
 14,
+17,
+1,
 39
 ],
 "auto|total|none|derived|deny_anthropic|plain": [
@@ -738,6 +884,8 @@
 0,
 8,
 13,
+16,
+0,
 38
 ],
 "auto|total|none|derived|none|effort": [
@@ -748,6 +896,8 @@
 0,
 7,
 12,
+15,
+1,
 37
 ],
 "auto|total|none|derived|none|plain": [
@@ -758,6 +908,8 @@
 0,
 6,
 11,
+14,
+0,
 36
 ],
 "auto|total|none|empty|deny_anthropic|effort": [
@@ -768,6 +920,8 @@
 0,
 9,
 18,
+17,
+1,
 47
 ],
 "auto|total|none|empty|deny_anthropic|plain": [
@@ -778,6 +932,8 @@
 0,
 8,
 18,
+16,
+0,
 46
 ],
 "auto|total|none|empty|none|effort": [
@@ -788,6 +944,8 @@
 0,
 7,
 17,
+15,
+1,
 45
 ],
 "auto|total|none|empty|none|plain": [
@@ -798,6 +956,8 @@
 0,
 6,
 17,
+14,
+0,
 44
 ],
 "auto|total|none|explicit|deny_anthropic|effort": [
@@ -808,6 +968,8 @@
 0,
 9,
 16,
+17,
+1,
 43
 ],
 "auto|total|none|explicit|deny_anthropic|plain": [
@@ -818,6 +980,8 @@
 0,
 8,
 16,
+16,
+0,
 42
 ],
 "auto|total|none|explicit|none|effort": [
@@ -828,6 +992,8 @@
 0,
 7,
 15,
+15,
+1,
 41
 ],
 "auto|total|none|explicit|none|plain": [
@@ -838,6 +1004,8 @@
 0,
 6,
 15,
+14,
+0,
 40
 ],
 "auto|total|openrouter|derived|deny_anthropic|effort": [
@@ -848,6 +1016,8 @@
 0,
 9,
 14,
+17,
+1,
 51
 ],
 "auto|total|openrouter|derived|deny_anthropic|plain": [
@@ -858,6 +1028,8 @@
 0,
 8,
 13,
+16,
+0,
 50
 ],
 "auto|total|openrouter|derived|none|effort": [
@@ -868,6 +1040,8 @@
 0,
 7,
 12,
+15,
+1,
 49
 ],
 "auto|total|openrouter|derived|none|plain": [
@@ -878,6 +1052,8 @@
 0,
 6,
 11,
+14,
+0,
 48
 ],
 "auto|total|openrouter|empty|deny_anthropic|effort": [
@@ -888,6 +1064,8 @@
 0,
 9,
 18,
+17,
+1,
 59
 ],
 "auto|total|openrouter|empty|deny_anthropic|plain": [
@@ -898,6 +1076,8 @@
 0,
 8,
 18,
+16,
+0,
 58
 ],
 "auto|total|openrouter|empty|none|effort": [
@@ -908,6 +1088,8 @@
 0,
 7,
 17,
+15,
+1,
 57
 ],
 "auto|total|openrouter|empty|none|plain": [
@@ -918,6 +1100,8 @@
 0,
 6,
 17,
+14,
+0,
 56
 ],
 "auto|total|openrouter|explicit|deny_anthropic|effort": [
@@ -928,6 +1112,8 @@
 0,
 9,
 16,
+17,
+1,
 55
 ],
 "auto|total|openrouter|explicit|deny_anthropic|plain": [
@@ -938,6 +1124,8 @@
 0,
 8,
 16,
+16,
+0,
 54
 ],
 "auto|total|openrouter|explicit|none|effort": [
@@ -948,6 +1136,8 @@
 0,
 7,
 15,
+15,
+1,
 53
 ],
 "auto|total|openrouter|explicit|none|plain": [
@@ -958,6 +1148,8 @@
 0,
 6,
 15,
+14,
+0,
 52
 ],
 "auto|total|other|derived|deny_anthropic|effort": [
@@ -968,6 +1160,8 @@
 0,
 9,
 14,
+17,
+1,
 39
 ],
 "auto|total|other|derived|deny_anthropic|plain": [
@@ -978,6 +1172,8 @@
 0,
 8,
 13,
+16,
+0,
 38
 ],
 "auto|total|other|derived|none|effort": [
@@ -988,6 +1184,8 @@
 0,
 7,
 12,
+15,
+1,
 37
 ],
 "auto|total|other|derived|none|plain": [
@@ -998,6 +1196,8 @@
 0,
 6,
 11,
+14,
+0,
 36
 ],
 "auto|total|other|empty|deny_anthropic|effort": [
@@ -1008,6 +1208,8 @@
 0,
 9,
 18,
+17,
+1,
 47
 ],
 "auto|total|other|empty|deny_anthropic|plain": [
@@ -1018,6 +1220,8 @@
 0,
 8,
 18,
+16,
+0,
 46
 ],
 "auto|total|other|empty|none|effort": [
@@ -1028,6 +1232,8 @@
 0,
 7,
 17,
+15,
+1,
 45
 ],
 "auto|total|other|empty|none|plain": [
@@ -1038,6 +1244,8 @@
 0,
 6,
 17,
+14,
+0,
 44
 ],
 "auto|total|other|explicit|deny_anthropic|effort": [
@@ -1048,6 +1256,8 @@
 0,
 9,
 16,
+17,
+1,
 43
 ],
 "auto|total|other|explicit|deny_anthropic|plain": [
@@ -1058,6 +1268,8 @@
 0,
 8,
 16,
+16,
+0,
 42
 ],
 "auto|total|other|explicit|none|effort": [
@@ -1068,6 +1280,8 @@
 0,
 7,
 15,
+15,
+1,
 41
 ],
 "auto|total|other|explicit|none|plain": [
@@ -1078,6 +1292,8 @@
 0,
 6,
 15,
+14,
+0,
 40
 ],
 "balanced|none|none|derived|deny_anthropic|effort": [
@@ -1088,6 +1304,8 @@
 0,
 11,
 19,
+0,
+1,
 61
 ],
 "balanced|none|none|derived|deny_anthropic|plain": [
@@ -1098,6 +1316,8 @@
 0,
 10,
 19,
+0,
+0,
 60
 ],
 "balanced|none|none|derived|none|effort": [
@@ -1108,6 +1328,8 @@
 0,
 11,
 19,
+0,
+1,
 61
 ],
 "balanced|none|none|derived|none|plain": [
@@ -1118,6 +1340,8 @@
 0,
 10,
 19,
+0,
+0,
 60
 ],
 "balanced|none|none|empty|deny_anthropic|effort": [
@@ -1128,6 +1352,8 @@
 0,
 11,
 21,
+0,
+1,
 65
 ],
 "balanced|none|none|empty|deny_anthropic|plain": [
@@ -1138,6 +1364,8 @@
 0,
 10,
 21,
+0,
+0,
 64
 ],
 "balanced|none|none|empty|none|effort": [
@@ -1148,6 +1376,8 @@
 0,
 11,
 21,
+0,
+1,
 65
 ],
 "balanced|none|none|empty|none|plain": [
@@ -1158,6 +1388,8 @@
 0,
 10,
 21,
+0,
+0,
 64
 ],
 "balanced|none|none|explicit|deny_anthropic|effort": [
@@ -1168,6 +1400,8 @@
 0,
 11,
 20,
+0,
+1,
 63
 ],
 "balanced|none|none|explicit|deny_anthropic|plain": [
@@ -1178,6 +1412,8 @@
 0,
 10,
 20,
+0,
+0,
 62
 ],
 "balanced|none|none|explicit|none|effort": [
@@ -1188,6 +1424,8 @@
 0,
 11,
 20,
+0,
+1,
 63
 ],
 "balanced|none|none|explicit|none|plain": [
@@ -1198,6 +1436,8 @@
 0,
 10,
 20,
+0,
+0,
 62
 ],
 "balanced|none|openrouter|derived|deny_anthropic|effort": [
@@ -1208,6 +1448,8 @@
 0,
 11,
 19,
+0,
+1,
 67
 ],
 "balanced|none|openrouter|derived|deny_anthropic|plain": [
@@ -1218,6 +1460,8 @@
 0,
 10,
 19,
+0,
+0,
 66
 ],
 "balanced|none|openrouter|derived|none|effort": [
@@ -1228,6 +1472,8 @@
 0,
 11,
 19,
+0,
+1,
 67
 ],
 "balanced|none|openrouter|derived|none|plain": [
@@ -1238,6 +1484,8 @@
 0,
 10,
 19,
+0,
+0,
 66
 ],
 "balanced|none|openrouter|empty|deny_anthropic|effort": [
@@ -1248,6 +1496,8 @@
 0,
 11,
 21,
+0,
+1,
 71
 ],
 "balanced|none|openrouter|empty|deny_anthropic|plain": [
@@ -1258,6 +1508,8 @@
 0,
 10,
 21,
+0,
+0,
 70
 ],
 "balanced|none|openrouter|empty|none|effort": [
@@ -1268,6 +1520,8 @@
 0,
 11,
 21,
+0,
+1,
 71
 ],
 "balanced|none|openrouter|empty|none|plain": [
@@ -1278,6 +1532,8 @@
 0,
 10,
 21,
+0,
+0,
 70
 ],
 "balanced|none|openrouter|explicit|deny_anthropic|effort": [
@@ -1288,6 +1544,8 @@
 0,
 11,
 20,
+0,
+1,
 69
 ],
 "balanced|none|openrouter|explicit|deny_anthropic|plain": [
@@ -1298,6 +1556,8 @@
 0,
 10,
 20,
+0,
+0,
 68
 ],
 "balanced|none|openrouter|explicit|none|effort": [
@@ -1308,6 +1568,8 @@
 0,
 11,
 20,
+0,
+1,
 69
 ],
 "balanced|none|openrouter|explicit|none|plain": [
@@ -1318,6 +1580,8 @@
 0,
 10,
 20,
+0,
+0,
 68
 ],
 "balanced|none|other|derived|deny_anthropic|effort": [
@@ -1328,6 +1592,8 @@
 0,
 11,
 19,
+0,
+1,
 61
 ],
 "balanced|none|other|derived|deny_anthropic|plain": [
@@ -1338,6 +1604,8 @@
 0,
 10,
 19,
+0,
+0,
 60
 ],
 "balanced|none|other|derived|none|effort": [
@@ -1348,6 +1616,8 @@
 0,
 11,
 19,
+0,
+1,
 61
 ],
 "balanced|none|other|derived|none|plain": [
@@ -1358,6 +1628,8 @@
 0,
 10,
 19,
+0,
+0,
 60
 ],
 "balanced|none|other|empty|deny_anthropic|effort": [
@@ -1368,6 +1640,8 @@
 0,
 11,
 21,
+0,
+1,
 65
 ],
 "balanced|none|other|empty|deny_anthropic|plain": [
@@ -1378,6 +1652,8 @@
 0,
 10,
 21,
+0,
+0,
 64
 ],
 "balanced|none|other|empty|none|effort": [
@@ -1388,6 +1664,8 @@
 0,
 11,
 21,
+0,
+1,
 65
 ],
 "balanced|none|other|empty|none|plain": [
@@ -1398,6 +1676,8 @@
 0,
 10,
 21,
+0,
+0,
 64
 ],
 "balanced|none|other|explicit|deny_anthropic|effort": [
@@ -1408,6 +1688,8 @@
 0,
 11,
 20,
+0,
+1,
 63
 ],
 "balanced|none|other|explicit|deny_anthropic|plain": [
@@ -1418,6 +1700,8 @@
 0,
 10,
 20,
+0,
+0,
 62
 ],
 "balanced|none|other|explicit|none|effort": [
@@ -1428,6 +1712,8 @@
 0,
 11,
 20,
+0,
+1,
 63
 ],
 "balanced|none|other|explicit|none|plain": [
@@ -1438,6 +1724,8 @@
 0,
 10,
 20,
+0,
+0,
 62
 ],
 "balanced|partial|none|derived|deny_anthropic|effort": [
@@ -1448,6 +1736,8 @@
 0,
 15,
 25,
+4,
+1,
 75
 ],
 "balanced|partial|none|derived|deny_anthropic|plain": [
@@ -1458,6 +1748,8 @@
 0,
 14,
 24,
+3,
+0,
 74
 ],
 "balanced|partial|none|derived|none|effort": [
@@ -1468,6 +1760,8 @@
 0,
 13,
 23,
+2,
+1,
 73
 ],
 "balanced|partial|none|derived|none|plain": [
@@ -1478,6 +1772,8 @@
 0,
 12,
 22,
+1,
+0,
 72
 ],
 "balanced|partial|none|empty|deny_anthropic|effort": [
@@ -1488,6 +1784,8 @@
 0,
 15,
 29,
+4,
+1,
 83
 ],
 "balanced|partial|none|empty|deny_anthropic|plain": [
@@ -1498,6 +1796,8 @@
 0,
 14,
 29,
+3,
+0,
 82
 ],
 "balanced|partial|none|empty|none|effort": [
@@ -1508,6 +1808,8 @@
 0,
 13,
 28,
+2,
+1,
 81
 ],
 "balanced|partial|none|empty|none|plain": [
@@ -1518,6 +1820,8 @@
 0,
 12,
 28,
+1,
+0,
 80
 ],
 "balanced|partial|none|explicit|deny_anthropic|effort": [
@@ -1528,6 +1832,8 @@
 0,
 15,
 27,
+4,
+1,
 79
 ],
 "balanced|partial|none|explicit|deny_anthropic|plain": [
@@ -1538,6 +1844,8 @@
 0,
 14,
 27,
+3,
+0,
 78
 ],
 "balanced|partial|none|explicit|none|effort": [
@@ -1548,6 +1856,8 @@
 0,
 13,
 26,
+2,
+1,
 77
 ],
 "balanced|partial|none|explicit|none|plain": [
@@ -1558,6 +1868,8 @@
 0,
 12,
 26,
+1,
+0,
 76
 ],
 "balanced|partial|openrouter|derived|deny_anthropic|effort": [
@@ -1568,6 +1880,8 @@
 0,
 15,
 25,
+4,
+1,
 87
 ],
 "balanced|partial|openrouter|derived|deny_anthropic|plain": [
@@ -1578,6 +1892,8 @@
 0,
 14,
 24,
+3,
+0,
 86
 ],
 "balanced|partial|openrouter|derived|none|effort": [
@@ -1588,6 +1904,8 @@
 0,
 13,
 23,
+2,
+1,
 85
 ],
 "balanced|partial|openrouter|derived|none|plain": [
@@ -1598,6 +1916,8 @@
 0,
 12,
 22,
+1,
+0,
 84
 ],
 "balanced|partial|openrouter|empty|deny_anthropic|effort": [
@@ -1608,6 +1928,8 @@
 0,
 15,
 29,
+4,
+1,
 95
 ],
 "balanced|partial|openrouter|empty|deny_anthropic|plain": [
@@ -1618,6 +1940,8 @@
 0,
 14,
 29,
+3,
+0,
 94
 ],
 "balanced|partial|openrouter|empty|none|effort": [
@@ -1628,6 +1952,8 @@
 0,
 13,
 28,
+2,
+1,
 93
 ],
 "balanced|partial|openrouter|empty|none|plain": [
@@ -1638,6 +1964,8 @@
 0,
 12,
 28,
+1,
+0,
 92
 ],
 "balanced|partial|openrouter|explicit|deny_anthropic|effort": [
@@ -1648,6 +1976,8 @@
 0,
 15,
 27,
+4,
+1,
 91
 ],
 "balanced|partial|openrouter|explicit|deny_anthropic|plain": [
@@ -1658,6 +1988,8 @@
 0,
 14,
 27,
+3,
+0,
 90
 ],
 "balanced|partial|openrouter|explicit|none|effort": [
@@ -1668,6 +2000,8 @@
 0,
 13,
 26,
+2,
+1,
 89
 ],
 "balanced|partial|openrouter|explicit|none|plain": [
@@ -1678,6 +2012,8 @@
 0,
 12,
 26,
+1,
+0,
 88
 ],
 "balanced|partial|other|derived|deny_anthropic|effort": [
@@ -1688,6 +2024,8 @@
 0,
 15,
 25,
+4,
+1,
 75
 ],
 "balanced|partial|other|derived|deny_anthropic|plain": [
@@ -1698,6 +2036,8 @@
 0,
 14,
 24,
+3,
+0,
 74
 ],
 "balanced|partial|other|derived|none|effort": [
@@ -1708,6 +2048,8 @@
 0,
 13,
 23,
+2,
+1,
 73
 ],
 "balanced|partial|other|derived|none|plain": [
@@ -1718,6 +2060,8 @@
 0,
 12,
 22,
+1,
+0,
 72
 ],
 "balanced|partial|other|empty|deny_anthropic|effort": [
@@ -1728,6 +2072,8 @@
 0,
 15,
 29,
+4,
+1,
 83
 ],
 "balanced|partial|other|empty|deny_anthropic|plain": [
@@ -1738,6 +2084,8 @@
 0,
 14,
 29,
+3,
+0,
 82
 ],
 "balanced|partial|other|empty|none|effort": [
@@ -1748,6 +2096,8 @@
 0,
 13,
 28,
+2,
+1,
 81
 ],
 "balanced|partial|other|empty|none|plain": [
@@ -1758,6 +2108,8 @@
 0,
 12,
 28,
+1,
+0,
 80
 ],
 "balanced|partial|other|explicit|deny_anthropic|effort": [
@@ -1768,6 +2120,8 @@
 0,
 15,
 27,
+4,
+1,
 79
 ],
 "balanced|partial|other|explicit|deny_anthropic|plain": [
@@ -1778,6 +2132,8 @@
 0,
 14,
 27,
+3,
+0,
 78
 ],
 "balanced|partial|other|explicit|none|effort": [
@@ -1788,6 +2144,8 @@
 0,
 13,
 26,
+2,
+1,
 77
 ],
 "balanced|partial|other|explicit|none|plain": [
@@ -1798,6 +2156,8 @@
 0,
 12,
 26,
+1,
+0,
 76
 ],
 "balanced|total|none|derived|deny_anthropic|effort": [
@@ -1808,6 +2168,8 @@
 0,
 9,
 14,
+8,
+1,
 39
 ],
 "balanced|total|none|derived|deny_anthropic|plain": [
@@ -1818,6 +2180,8 @@
 0,
 8,
 13,
+7,
+0,
 38
 ],
 "balanced|total|none|derived|none|effort": [
@@ -1828,6 +2192,8 @@
 0,
 7,
 12,
+6,
+1,
 37
 ],
 "balanced|total|none|derived|none|plain": [
@@ -1838,6 +2204,8 @@
 0,
 6,
 11,
+5,
+0,
 36
 ],
 "balanced|total|none|empty|deny_anthropic|effort": [
@@ -1848,6 +2216,8 @@
 0,
 9,
 18,
+8,
+1,
 47
 ],
 "balanced|total|none|empty|deny_anthropic|plain": [
@@ -1858,6 +2228,8 @@
 0,
 8,
 18,
+7,
+0,
 46
 ],
 "balanced|total|none|empty|none|effort": [
@@ -1868,6 +2240,8 @@
 0,
 7,
 17,
+6,
+1,
 45
 ],
 "balanced|total|none|empty|none|plain": [
@@ -1878,6 +2252,8 @@
 0,
 6,
 17,
+5,
+0,
 44
 ],
 "balanced|total|none|explicit|deny_anthropic|effort": [
@@ -1888,6 +2264,8 @@
 0,
 9,
 16,
+8,
+1,
 43
 ],
 "balanced|total|none|explicit|deny_anthropic|plain": [
@@ -1898,6 +2276,8 @@
 0,
 8,
 16,
+7,
+0,
 42
 ],
 "balanced|total|none|explicit|none|effort": [
@@ -1908,6 +2288,8 @@
 0,
 7,
 15,
+6,
+1,
 41
 ],
 "balanced|total|none|explicit|none|plain": [
@@ -1918,6 +2300,8 @@
 0,
 6,
 15,
+5,
+0,
 40
 ],
 "balanced|total|openrouter|derived|deny_anthropic|effort": [
@@ -1928,6 +2312,8 @@
 0,
 9,
 14,
+8,
+1,
 51
 ],
 "balanced|total|openrouter|derived|deny_anthropic|plain": [
@@ -1938,6 +2324,8 @@
 0,
 8,
 13,
+7,
+0,
 50
 ],
 "balanced|total|openrouter|derived|none|effort": [
@@ -1948,6 +2336,8 @@
 0,
 7,
 12,
+6,
+1,
 49
 ],
 "balanced|total|openrouter|derived|none|plain": [
@@ -1958,6 +2348,8 @@
 0,
 6,
 11,
+5,
+0,
 48
 ],
 "balanced|total|openrouter|empty|deny_anthropic|effort": [
@@ -1968,6 +2360,8 @@
 0,
 9,
 18,
+8,
+1,
 59
 ],
 "balanced|total|openrouter|empty|deny_anthropic|plain": [
@@ -1978,6 +2372,8 @@
 0,
 8,
 18,
+7,
+0,
 58
 ],
 "balanced|total|openrouter|empty|none|effort": [
@@ -1988,6 +2384,8 @@
 0,
 7,
 17,
+6,
+1,
 57
 ],
 "balanced|total|openrouter|empty|none|plain": [
@@ -1998,6 +2396,8 @@
 0,
 6,
 17,
+5,
+0,
 56
 ],
 "balanced|total|openrouter|explicit|deny_anthropic|effort": [
@@ -2008,6 +2408,8 @@
 0,
 9,
 16,
+8,
+1,
 55
 ],
 "balanced|total|openrouter|explicit|deny_anthropic|plain": [
@@ -2018,6 +2420,8 @@
 0,
 8,
 16,
+7,
+0,
 54
 ],
 "balanced|total|openrouter|explicit|none|effort": [
@@ -2028,6 +2432,8 @@
 0,
 7,
 15,
+6,
+1,
 53
 ],
 "balanced|total|openrouter|explicit|none|plain": [
@@ -2038,6 +2444,8 @@
 0,
 6,
 15,
+5,
+0,
 52
 ],
 "balanced|total|other|derived|deny_anthropic|effort": [
@@ -2048,6 +2456,8 @@
 0,
 9,
 14,
+8,
+1,
 39
 ],
 "balanced|total|other|derived|deny_anthropic|plain": [
@@ -2058,6 +2468,8 @@
 0,
 8,
 13,
+7,
+0,
 38
 ],
 "balanced|total|other|derived|none|effort": [
@@ -2068,6 +2480,8 @@
 0,
 7,
 12,
+6,
+1,
 37
 ],
 "balanced|total|other|derived|none|plain": [
@@ -2078,6 +2492,8 @@
 0,
 6,
 11,
+5,
+0,
 36
 ],
 "balanced|total|other|empty|deny_anthropic|effort": [
@@ -2088,6 +2504,8 @@
 0,
 9,
 18,
+8,
+1,
 47
 ],
 "balanced|total|other|empty|deny_anthropic|plain": [
@@ -2098,6 +2516,8 @@
 0,
 8,
 18,
+7,
+0,
 46
 ],
 "balanced|total|other|empty|none|effort": [
@@ -2108,6 +2528,8 @@
 0,
 7,
 17,
+6,
+1,
 45
 ],
 "balanced|total|other|empty|none|plain": [
@@ -2118,6 +2540,8 @@
 0,
 6,
 17,
+5,
+0,
 44
 ],
 "balanced|total|other|explicit|deny_anthropic|effort": [
@@ -2128,6 +2552,8 @@
 0,
 9,
 16,
+8,
+1,
 43
 ],
 "balanced|total|other|explicit|deny_anthropic|plain": [
@@ -2138,6 +2564,8 @@
 0,
 8,
 16,
+7,
+0,
 42
 ],
 "balanced|total|other|explicit|none|effort": [
@@ -2148,6 +2576,8 @@
 0,
 7,
 15,
+6,
+1,
 41
 ],
 "balanced|total|other|explicit|none|plain": [
@@ -2158,6 +2588,8 @@
 0,
 6,
 15,
+5,
+0,
 40
 ],
 "cheap|none|none|derived|deny_anthropic|effort": [
@@ -2168,9 +2600,13 @@
 0,
 1,
 0,
+0,
+1,
 1
 ],
 "cheap|none|none|derived|deny_anthropic|plain": [
+0,
+0,
 0,
 0,
 0,
@@ -2188,9 +2624,13 @@
 0,
 1,
 0,
+0,
+1,
 1
 ],
 "cheap|none|none|derived|none|plain": [
+0,
+0,
 0,
 0,
 0,
@@ -2208,6 +2648,8 @@
 0,
 1,
 2,
+0,
+1,
 5
 ],
 "cheap|none|none|empty|deny_anthropic|plain": [
@@ -2218,6 +2660,8 @@
 0,
 0,
 2,
+0,
+0,
 4
 ],
 "cheap|none|none|empty|none|effort": [
@@ -2228,6 +2672,8 @@
 0,
 1,
 2,
+0,
+1,
 5
 ],
 "cheap|none|none|empty|none|plain": [
@@ -2238,6 +2684,8 @@
 0,
 0,
 2,
+0,
+0,
 4
 ],
 "cheap|none|none|explicit|deny_anthropic|effort": [
@@ -2247,6 +2695,8 @@
 0,
 0,
 1,
+1,
+0,
 1,
 3
 ],
@@ -2258,6 +2708,8 @@
 0,
 0,
 1,
+0,
+0,
 2
 ],
 "cheap|none|none|explicit|none|effort": [
@@ -2267,6 +2719,8 @@
 0,
 0,
 1,
+1,
+0,
 1,
 3
 ],
@@ -2278,6 +2732,8 @@
 0,
 0,
 1,
+0,
+0,
 2
 ],
 "cheap|none|openrouter|derived|deny_anthropic|effort": [
@@ -2288,6 +2744,8 @@
 0,
 1,
 0,
+0,
+1,
 7
 ],
 "cheap|none|openrouter|derived|deny_anthropic|plain": [
@@ -2295,6 +2753,8 @@
 0,
 0,
 1,
+0,
+0,
 0,
 0,
 0,
@@ -2308,6 +2768,8 @@
 0,
 1,
 0,
+0,
+1,
 7
 ],
 "cheap|none|openrouter|derived|none|plain": [
@@ -2315,6 +2777,8 @@
 0,
 0,
 1,
+0,
+0,
 0,
 0,
 0,
@@ -2328,6 +2792,8 @@
 0,
 1,
 2,
+0,
+1,
 11
 ],
 "cheap|none|openrouter|empty|deny_anthropic|plain": [
@@ -2338,6 +2804,8 @@
 0,
 0,
 2,
+0,
+0,
 10
 ],
 "cheap|none|openrouter|empty|none|effort": [
@@ -2348,6 +2816,8 @@
 0,
 1,
 2,
+0,
+1,
 11
 ],
 "cheap|none|openrouter|empty|none|plain": [
@@ -2358,6 +2828,8 @@
 0,
 0,
 2,
+0,
+0,
 10
 ],
 "cheap|none|openrouter|explicit|deny_anthropic|effort": [
@@ -2367,6 +2839,8 @@
 1,
 0,
 1,
+1,
+0,
 1,
 9
 ],
@@ -2378,6 +2852,8 @@
 0,
 0,
 1,
+0,
+0,
 8
 ],
 "cheap|none|openrouter|explicit|none|effort": [
@@ -2387,6 +2863,8 @@
 1,
 0,
 1,
+1,
+0,
 1,
 9
 ],
@@ -2398,6 +2876,8 @@
 0,
 0,
 1,
+0,
+0,
 8
 ],
 "cheap|none|other|derived|deny_anthropic|effort": [
@@ -2408,9 +2888,13 @@
 0,
 1,
 0,
+0,
+1,
 1
 ],
 "cheap|none|other|derived|deny_anthropic|plain": [
+0,
+0,
 0,
 0,
 0,
@@ -2428,9 +2912,13 @@
 0,
 1,
 0,
+0,
+1,
 1
 ],
 "cheap|none|other|derived|none|plain": [
+0,
+0,
 0,
 0,
 0,
@@ -2448,6 +2936,8 @@
 0,
 1,
 2,
+0,
+1,
 5
 ],
 "cheap|none|other|empty|deny_anthropic|plain": [
@@ -2458,6 +2948,8 @@
 0,
 0,
 2,
+0,
+0,
 4
 ],
 "cheap|none|other|empty|none|effort": [
@@ -2468,6 +2960,8 @@
 0,
 1,
 2,
+0,
+1,
 5
 ],
 "cheap|none|other|empty|none|plain": [
@@ -2478,6 +2972,8 @@
 0,
 0,
 2,
+0,
+0,
 4
 ],
 "cheap|none|other|explicit|deny_anthropic|effort": [
@@ -2487,6 +2983,8 @@
 0,
 0,
 1,
+1,
+0,
 1,
 3
 ],
@@ -2498,6 +2996,8 @@
 0,
 0,
 1,
+0,
+0,
 2
 ],
 "cheap|none|other|explicit|none|effort": [
@@ -2507,6 +3007,8 @@
 0,
 0,
 1,
+1,
+0,
 1,
 3
 ],
@@ -2518,6 +3020,8 @@
 0,
 0,
 1,
+0,
+0,
 2
 ],
 "cheap|partial|none|derived|deny_anthropic|effort": [
@@ -2528,6 +3032,8 @@
 0,
 5,
 6,
+4,
+1,
 15
 ],
 "cheap|partial|none|derived|deny_anthropic|plain": [
@@ -2538,6 +3044,8 @@
 0,
 4,
 5,
+3,
+0,
 14
 ],
 "cheap|partial|none|derived|none|effort": [
@@ -2548,6 +3056,8 @@
 0,
 3,
 4,
+2,
+1,
 13
 ],
 "cheap|partial|none|derived|none|plain": [
@@ -2558,6 +3068,8 @@
 0,
 2,
 3,
+1,
+0,
 12
 ],
 "cheap|partial|none|empty|deny_anthropic|effort": [
@@ -2568,6 +3080,8 @@
 0,
 5,
 10,
+4,
+1,
 23
 ],
 "cheap|partial|none|empty|deny_anthropic|plain": [
@@ -2578,6 +3092,8 @@
 0,
 4,
 10,
+3,
+0,
 22
 ],
 "cheap|partial|none|empty|none|effort": [
@@ -2588,6 +3104,8 @@
 0,
 3,
 9,
+2,
+1,
 21
 ],
 "cheap|partial|none|empty|none|plain": [
@@ -2598,6 +3116,8 @@
 0,
 2,
 9,
+1,
+0,
 20
 ],
 "cheap|partial|none|explicit|deny_anthropic|effort": [
@@ -2608,6 +3128,8 @@
 0,
 5,
 8,
+4,
+1,
 19
 ],
 "cheap|partial|none|explicit|deny_anthropic|plain": [
@@ -2618,6 +3140,8 @@
 0,
 4,
 8,
+3,
+0,
 18
 ],
 "cheap|partial|none|explicit|none|effort": [
@@ -2628,6 +3152,8 @@
 0,
 3,
 7,
+2,
+1,
 17
 ],
 "cheap|partial|none|explicit|none|plain": [
@@ -2638,6 +3164,8 @@
 0,
 2,
 7,
+1,
+0,
 16
 ],
 "cheap|partial|openrouter|derived|deny_anthropic|effort": [
@@ -2648,6 +3176,8 @@
 0,
 5,
 6,
+4,
+1,
 27
 ],
 "cheap|partial|openrouter|derived|deny_anthropic|plain": [
@@ -2658,6 +3188,8 @@
 0,
 4,
 5,
+3,
+0,
 26
 ],
 "cheap|partial|openrouter|derived|none|effort": [
@@ -2668,6 +3200,8 @@
 0,
 3,
 4,
+2,
+1,
 25
 ],
 "cheap|partial|openrouter|derived|none|plain": [
@@ -2678,6 +3212,8 @@
 0,
 2,
 3,
+1,
+0,
 24
 ],
 "cheap|partial|openrouter|empty|deny_anthropic|effort": [
@@ -2688,6 +3224,8 @@
 0,
 5,
 10,
+4,
+1,
 35
 ],
 "cheap|partial|openrouter|empty|deny_anthropic|plain": [
@@ -2698,6 +3236,8 @@
 0,
 4,
 10,
+3,
+0,
 34
 ],
 "cheap|partial|openrouter|empty|none|effort": [
@@ -2708,6 +3248,8 @@
 0,
 3,
 9,
+2,
+1,
 33
 ],
 "cheap|partial|openrouter|empty|none|plain": [
@@ -2718,6 +3260,8 @@
 0,
 2,
 9,
+1,
+0,
 32
 ],
 "cheap|partial|openrouter|explicit|deny_anthropic|effort": [
@@ -2728,6 +3272,8 @@
 0,
 5,
 8,
+4,
+1,
 31
 ],
 "cheap|partial|openrouter|explicit|deny_anthropic|plain": [
@@ -2738,6 +3284,8 @@
 0,
 4,
 8,
+3,
+0,
 30
 ],
 "cheap|partial|openrouter|explicit|none|effort": [
@@ -2748,6 +3296,8 @@
 0,
 3,
 7,
+2,
+1,
 29
 ],
 "cheap|partial|openrouter|explicit|none|plain": [
@@ -2758,6 +3308,8 @@
 0,
 2,
 7,
+1,
+0,
 28
 ],
 "cheap|partial|other|derived|deny_anthropic|effort": [
@@ -2768,6 +3320,8 @@
 0,
 5,
 6,
+4,
+1,
 15
 ],
 "cheap|partial|other|derived|deny_anthropic|plain": [
@@ -2778,6 +3332,8 @@
 0,
 4,
 5,
+3,
+0,
 14
 ],
 "cheap|partial|other|derived|none|effort": [
@@ -2788,6 +3344,8 @@
 0,
 3,
 4,
+2,
+1,
 13
 ],
 "cheap|partial|other|derived|none|plain": [
@@ -2798,6 +3356,8 @@
 0,
 2,
 3,
+1,
+0,
 12
 ],
 "cheap|partial|other|empty|deny_anthropic|effort": [
@@ -2808,6 +3368,8 @@
 0,
 5,
 10,
+4,
+1,
 23
 ],
 "cheap|partial|other|empty|deny_anthropic|plain": [
@@ -2818,6 +3380,8 @@
 0,
 4,
 10,
+3,
+0,
 22
 ],
 "cheap|partial|other|empty|none|effort": [
@@ -2828,6 +3392,8 @@
 0,
 3,
 9,
+2,
+1,
 21
 ],
 "cheap|partial|other|empty|none|plain": [
@@ -2838,6 +3404,8 @@
 0,
 2,
 9,
+1,
+0,
 20
 ],
 "cheap|partial|other|explicit|deny_anthropic|effort": [
@@ -2848,6 +3416,8 @@
 0,
 5,
 8,
+4,
+1,
 19
 ],
 "cheap|partial|other|explicit|deny_anthropic|plain": [
@@ -2858,6 +3428,8 @@
 0,
 4,
 8,
+3,
+0,
 18
 ],
 "cheap|partial|other|explicit|none|effort": [
@@ -2868,6 +3440,8 @@
 0,
 3,
 7,
+2,
+1,
 17
 ],
 "cheap|partial|other|explicit|none|plain": [
@@ -2878,6 +3452,8 @@
 0,
 2,
 7,
+1,
+0,
 16
 ],
 "cheap|total|none|derived|deny_anthropic|effort": [
@@ -2888,6 +3464,8 @@
 0,
 9,
 14,
+8,
+1,
 39
 ],
 "cheap|total|none|derived|deny_anthropic|plain": [
@@ -2898,6 +3476,8 @@
 0,
 8,
 13,
+7,
+0,
 38
 ],
 "cheap|total|none|derived|none|effort": [
@@ -2908,6 +3488,8 @@
 0,
 7,
 12,
+6,
+1,
 37
 ],
 "cheap|total|none|derived|none|plain": [
@@ -2918,6 +3500,8 @@
 0,
 6,
 11,
+5,
+0,
 36
 ],
 "cheap|total|none|empty|deny_anthropic|effort": [
@@ -2928,6 +3512,8 @@
 0,
 9,
 18,
+8,
+1,
 47
 ],
 "cheap|total|none|empty|deny_anthropic|plain": [
@@ -2938,6 +3524,8 @@
 0,
 8,
 18,
+7,
+0,
 46
 ],
 "cheap|total|none|empty|none|effort": [
@@ -2948,6 +3536,8 @@
 0,
 7,
 17,
+6,
+1,
 45
 ],
 "cheap|total|none|empty|none|plain": [
@@ -2958,6 +3548,8 @@
 0,
 6,
 17,
+5,
+0,
 44
 ],
 "cheap|total|none|explicit|deny_anthropic|effort": [
@@ -2968,6 +3560,8 @@
 0,
 9,
 16,
+8,
+1,
 43
 ],
 "cheap|total|none|explicit|deny_anthropic|plain": [
@@ -2978,6 +3572,8 @@
 0,
 8,
 16,
+7,
+0,
 42
 ],
 "cheap|total|none|explicit|none|effort": [
@@ -2988,6 +3584,8 @@
 0,
 7,
 15,
+6,
+1,
 41
 ],
 "cheap|total|none|explicit|none|plain": [
@@ -2998,6 +3596,8 @@
 0,
 6,
 15,
+5,
+0,
 40
 ],
 "cheap|total|openrouter|derived|deny_anthropic|effort": [
@@ -3008,6 +3608,8 @@
 0,
 9,
 14,
+8,
+1,
 51
 ],
 "cheap|total|openrouter|derived|deny_anthropic|plain": [
@@ -3018,6 +3620,8 @@
 0,
 8,
 13,
+7,
+0,
 50
 ],
 "cheap|total|openrouter|derived|none|effort": [
@@ -3028,6 +3632,8 @@
 0,
 7,
 12,
+6,
+1,
 49
 ],
 "cheap|total|openrouter|derived|none|plain": [
@@ -3038,6 +3644,8 @@
 0,
 6,
 11,
+5,
+0,
 48
 ],
 "cheap|total|openrouter|empty|deny_anthropic|effort": [
@@ -3048,6 +3656,8 @@
 0,
 9,
 18,
+8,
+1,
 59
 ],
 "cheap|total|openrouter|empty|deny_anthropic|plain": [
@@ -3058,6 +3668,8 @@
 0,
 8,
 18,
+7,
+0,
 58
 ],
 "cheap|total|openrouter|empty|none|effort": [
@@ -3068,6 +3680,8 @@
 0,
 7,
 17,
+6,
+1,
 57
 ],
 "cheap|total|openrouter|empty|none|plain": [
@@ -3078,6 +3692,8 @@
 0,
 6,
 17,
+5,
+0,
 56
 ],
 "cheap|total|openrouter|explicit|deny_anthropic|effort": [
@@ -3088,6 +3704,8 @@
 0,
 9,
 16,
+8,
+1,
 55
 ],
 "cheap|total|openrouter|explicit|deny_anthropic|plain": [
@@ -3098,6 +3716,8 @@
 0,
 8,
 16,
+7,
+0,
 54
 ],
 "cheap|total|openrouter|explicit|none|effort": [
@@ -3108,6 +3728,8 @@
 0,
 7,
 15,
+6,
+1,
 53
 ],
 "cheap|total|openrouter|explicit|none|plain": [
@@ -3118,6 +3740,8 @@
 0,
 6,
 15,
+5,
+0,
 52
 ],
 "cheap|total|other|derived|deny_anthropic|effort": [
@@ -3128,6 +3752,8 @@
 0,
 9,
 14,
+8,
+1,
 39
 ],
 "cheap|total|other|derived|deny_anthropic|plain": [
@@ -3138,6 +3764,8 @@
 0,
 8,
 13,
+7,
+0,
 38
 ],
 "cheap|total|other|derived|none|effort": [
@@ -3148,6 +3776,8 @@
 0,
 7,
 12,
+6,
+1,
 37
 ],
 "cheap|total|other|derived|none|plain": [
@@ -3158,6 +3788,8 @@
 0,
 6,
 11,
+5,
+0,
 36
 ],
 "cheap|total|other|empty|deny_anthropic|effort": [
@@ -3168,6 +3800,8 @@
 0,
 9,
 18,
+8,
+1,
 47
 ],
 "cheap|total|other|empty|deny_anthropic|plain": [
@@ -3178,6 +3812,8 @@
 0,
 8,
 18,
+7,
+0,
 46
 ],
 "cheap|total|other|empty|none|effort": [
@@ -3188,6 +3824,8 @@
 0,
 7,
 17,
+6,
+1,
 45
 ],
 "cheap|total|other|empty|none|plain": [
@@ -3198,6 +3836,8 @@
 0,
 6,
 17,
+5,
+0,
 44
 ],
 "cheap|total|other|explicit|deny_anthropic|effort": [
@@ -3208,6 +3848,8 @@
 0,
 9,
 16,
+8,
+1,
 43
 ],
 "cheap|total|other|explicit|deny_anthropic|plain": [
@@ -3218,6 +3860,8 @@
 0,
 8,
 16,
+7,
+0,
 42
 ],
 "cheap|total|other|explicit|none|effort": [
@@ -3228,6 +3872,8 @@
 0,
 7,
 15,
+6,
+1,
 41
 ],
 "cheap|total|other|explicit|none|plain": [
@@ -3238,6 +3884,8 @@
 0,
 6,
 15,
+5,
+0,
 40
 ],
 "premium|none|none|derived|deny_anthropic|effort": [
@@ -3248,6 +3896,8 @@
 0,
 17,
 30,
+9,
+1,
 97
 ],
 "premium|none|none|derived|deny_anthropic|plain": [
@@ -3258,6 +3908,8 @@
 0,
 16,
 30,
+9,
+0,
 96
 ],
 "premium|none|none|derived|none|effort": [
@@ -3268,6 +3920,8 @@
 0,
 17,
 30,
+9,
+1,
 97
 ],
 "premium|none|none|derived|none|plain": [
@@ -3278,6 +3932,8 @@
 0,
 16,
 30,
+9,
+0,
 96
 ],
 "premium|none|none|empty|deny_anthropic|effort": [
@@ -3288,6 +3944,8 @@
 0,
 17,
 32,
+9,
+1,
 101
 ],
 "premium|none|none|empty|deny_anthropic|plain": [
@@ -3298,6 +3956,8 @@
 0,
 16,
 32,
+9,
+0,
 100
 ],
 "premium|none|none|empty|none|effort": [
@@ -3308,6 +3968,8 @@
 0,
 17,
 32,
+9,
+1,
 101
 ],
 "premium|none|none|empty|none|plain": [
@@ -3318,6 +3980,8 @@
 0,
 16,
 32,
+9,
+0,
 100
 ],
 "premium|none|none|explicit|deny_anthropic|effort": [
@@ -3328,6 +3992,8 @@
 0,
 17,
 31,
+9,
+1,
 99
 ],
 "premium|none|none|explicit|deny_anthropic|plain": [
@@ -3338,6 +4004,8 @@
 0,
 16,
 31,
+9,
+0,
 98
 ],
 "premium|none|none|explicit|none|effort": [
@@ -3348,6 +4016,8 @@
 0,
 17,
 31,
+9,
+1,
 99
 ],
 "premium|none|none|explicit|none|plain": [
@@ -3358,6 +4028,8 @@
 0,
 16,
 31,
+9,
+0,
 98
 ],
 "premium|none|openrouter|derived|deny_anthropic|effort": [
@@ -3368,6 +4040,8 @@
 0,
 17,
 30,
+9,
+1,
 103
 ],
 "premium|none|openrouter|derived|deny_anthropic|plain": [
@@ -3378,6 +4052,8 @@
 0,
 16,
 30,
+9,
+0,
 102
 ],
 "premium|none|openrouter|derived|none|effort": [
@@ -3388,6 +4064,8 @@
 0,
 17,
 30,
+9,
+1,
 103
 ],
 "premium|none|openrouter|derived|none|plain": [
@@ -3398,6 +4076,8 @@
 0,
 16,
 30,
+9,
+0,
 102
 ],
 "premium|none|openrouter|empty|deny_anthropic|effort": [
@@ -3408,6 +4088,8 @@
 0,
 17,
 32,
+9,
+1,
 107
 ],
 "premium|none|openrouter|empty|deny_anthropic|plain": [
@@ -3418,6 +4100,8 @@
 0,
 16,
 32,
+9,
+0,
 106
 ],
 "premium|none|openrouter|empty|none|effort": [
@@ -3428,6 +4112,8 @@
 0,
 17,
 32,
+9,
+1,
 107
 ],
 "premium|none|openrouter|empty|none|plain": [
@@ -3438,6 +4124,8 @@
 0,
 16,
 32,
+9,
+0,
 106
 ],
 "premium|none|openrouter|explicit|deny_anthropic|effort": [
@@ -3448,6 +4136,8 @@
 0,
 17,
 31,
+9,
+1,
 105
 ],
 "premium|none|openrouter|explicit|deny_anthropic|plain": [
@@ -3458,6 +4148,8 @@
 0,
 16,
 31,
+9,
+0,
 104
 ],
 "premium|none|openrouter|explicit|none|effort": [
@@ -3468,6 +4160,8 @@
 0,
 17,
 31,
+9,
+1,
 105
 ],
 "premium|none|openrouter|explicit|none|plain": [
@@ -3478,6 +4172,8 @@
 0,
 16,
 31,
+9,
+0,
 104
 ],
 "premium|none|other|derived|deny_anthropic|effort": [
@@ -3488,6 +4184,8 @@
 0,
 17,
 30,
+9,
+1,
 97
 ],
 "premium|none|other|derived|deny_anthropic|plain": [
@@ -3498,6 +4196,8 @@
 0,
 16,
 30,
+9,
+0,
 96
 ],
 "premium|none|other|derived|none|effort": [
@@ -3508,6 +4208,8 @@
 0,
 17,
 30,
+9,
+1,
 97
 ],
 "premium|none|other|derived|none|plain": [
@@ -3518,6 +4220,8 @@
 0,
 16,
 30,
+9,
+0,
 96
 ],
 "premium|none|other|empty|deny_anthropic|effort": [
@@ -3528,6 +4232,8 @@
 0,
 17,
 32,
+9,
+1,
 101
 ],
 "premium|none|other|empty|deny_anthropic|plain": [
@@ -3538,6 +4244,8 @@
 0,
 16,
 32,
+9,
+0,
 100
 ],
 "premium|none|other|empty|none|effort": [
@@ -3548,6 +4256,8 @@
 0,
 17,
 32,
+9,
+1,
 101
 ],
 "premium|none|other|empty|none|plain": [
@@ -3558,6 +4268,8 @@
 0,
 16,
 32,
+9,
+0,
 100
 ],
 "premium|none|other|explicit|deny_anthropic|effort": [
@@ -3568,6 +4280,8 @@
 0,
 17,
 31,
+9,
+1,
 99
 ],
 "premium|none|other|explicit|deny_anthropic|plain": [
@@ -3578,6 +4292,8 @@
 0,
 16,
 31,
+9,
+0,
 98
 ],
 "premium|none|other|explicit|none|effort": [
@@ -3588,6 +4304,8 @@
 0,
 17,
 31,
+9,
+1,
 99
 ],
 "premium|none|other|explicit|none|plain": [
@@ -3598,6 +4316,8 @@
 0,
 16,
 31,
+9,
+0,
 98
 ],
 "premium|partial|none|derived|deny_anthropic|effort": [
@@ -3608,6 +4328,8 @@
 0,
 21,
 36,
+13,
+1,
 111
 ],
 "premium|partial|none|derived|deny_anthropic|plain": [
@@ -3618,6 +4340,8 @@
 0,
 20,
 35,
+12,
+0,
 110
 ],
 "premium|partial|none|derived|none|effort": [
@@ -3628,6 +4352,8 @@
 0,
 19,
 34,
+11,
+1,
 109
 ],
 "premium|partial|none|derived|none|plain": [
@@ -3638,6 +4364,8 @@
 0,
 18,
 33,
+10,
+0,
 108
 ],
 "premium|partial|none|empty|deny_anthropic|effort": [
@@ -3648,6 +4376,8 @@
 0,
 21,
 40,
+13,
+1,
 119
 ],
 "premium|partial|none|empty|deny_anthropic|plain": [
@@ -3658,6 +4388,8 @@
 0,
 20,
 40,
+12,
+0,
 118
 ],
 "premium|partial|none|empty|none|effort": [
@@ -3668,6 +4400,8 @@
 0,
 19,
 39,
+11,
+1,
 117
 ],
 "premium|partial|none|empty|none|plain": [
@@ -3678,6 +4412,8 @@
 0,
 18,
 39,
+10,
+0,
 116
 ],
 "premium|partial|none|explicit|deny_anthropic|effort": [
@@ -3688,6 +4424,8 @@
 0,
 21,
 38,
+13,
+1,
 115
 ],
 "premium|partial|none|explicit|deny_anthropic|plain": [
@@ -3698,6 +4436,8 @@
 0,
 20,
 38,
+12,
+0,
 114
 ],
 "premium|partial|none|explicit|none|effort": [
@@ -3708,6 +4448,8 @@
 0,
 19,
 37,
+11,
+1,
 113
 ],
 "premium|partial|none|explicit|none|plain": [
@@ -3718,6 +4460,8 @@
 0,
 18,
 37,
+10,
+0,
 112
 ],
 "premium|partial|openrouter|derived|deny_anthropic|effort": [
@@ -3728,6 +4472,8 @@
 0,
 21,
 36,
+13,
+1,
 123
 ],
 "premium|partial|openrouter|derived|deny_anthropic|plain": [
@@ -3738,6 +4484,8 @@
 0,
 20,
 35,
+12,
+0,
 122
 ],
 "premium|partial|openrouter|derived|none|effort": [
@@ -3748,6 +4496,8 @@
 0,
 19,
 34,
+11,
+1,
 121
 ],
 "premium|partial|openrouter|derived|none|plain": [
@@ -3758,6 +4508,8 @@
 0,
 18,
 33,
+10,
+0,
 120
 ],
 "premium|partial|openrouter|empty|deny_anthropic|effort": [
@@ -3768,6 +4520,8 @@
 0,
 21,
 40,
+13,
+1,
 131
 ],
 "premium|partial|openrouter|empty|deny_anthropic|plain": [
@@ -3778,6 +4532,8 @@
 0,
 20,
 40,
+12,
+0,
 130
 ],
 "premium|partial|openrouter|empty|none|effort": [
@@ -3788,6 +4544,8 @@
 0,
 19,
 39,
+11,
+1,
 129
 ],
 "premium|partial|openrouter|empty|none|plain": [
@@ -3798,6 +4556,8 @@
 0,
 18,
 39,
+10,
+0,
 128
 ],
 "premium|partial|openrouter|explicit|deny_anthropic|effort": [
@@ -3808,6 +4568,8 @@
 0,
 21,
 38,
+13,
+1,
 127
 ],
 "premium|partial|openrouter|explicit|deny_anthropic|plain": [
@@ -3818,6 +4580,8 @@
 0,
 20,
 38,
+12,
+0,
 126
 ],
 "premium|partial|openrouter|explicit|none|effort": [
@@ -3828,6 +4592,8 @@
 0,
 19,
 37,
+11,
+1,
 125
 ],
 "premium|partial|openrouter|explicit|none|plain": [
@@ -3838,6 +4604,8 @@
 0,
 18,
 37,
+10,
+0,
 124
 ],
 "premium|partial|other|derived|deny_anthropic|effort": [
@@ -3848,6 +4616,8 @@
 0,
 21,
 36,
+13,
+1,
 111
 ],
 "premium|partial|other|derived|deny_anthropic|plain": [
@@ -3858,6 +4628,8 @@
 0,
 20,
 35,
+12,
+0,
 110
 ],
 "premium|partial|other|derived|none|effort": [
@@ -3868,6 +4640,8 @@
 0,
 19,
 34,
+11,
+1,
 109
 ],
 "premium|partial|other|derived|none|plain": [
@@ -3878,6 +4652,8 @@
 0,
 18,
 33,
+10,
+0,
 108
 ],
 "premium|partial|other|empty|deny_anthropic|effort": [
@@ -3888,6 +4664,8 @@
 0,
 21,
 40,
+13,
+1,
 119
 ],
 "premium|partial|other|empty|deny_anthropic|plain": [
@@ -3898,6 +4676,8 @@
 0,
 20,
 40,
+12,
+0,
 118
 ],
 "premium|partial|other|empty|none|effort": [
@@ -3908,6 +4688,8 @@
 0,
 19,
 39,
+11,
+1,
 117
 ],
 "premium|partial|other|empty|none|plain": [
@@ -3918,6 +4700,8 @@
 0,
 18,
 39,
+10,
+0,
 116
 ],
 "premium|partial|other|explicit|deny_anthropic|effort": [
@@ -3928,6 +4712,8 @@
 0,
 21,
 38,
+13,
+1,
 115
 ],
 "premium|partial|other|explicit|deny_anthropic|plain": [
@@ -3938,6 +4724,8 @@
 0,
 20,
 38,
+12,
+0,
 114
 ],
 "premium|partial|other|explicit|none|effort": [
@@ -3948,6 +4736,8 @@
 0,
 19,
 37,
+11,
+1,
 113
 ],
 "premium|partial|other|explicit|none|plain": [
@@ -3958,6 +4748,8 @@
 0,
 18,
 37,
+10,
+0,
 112
 ],
 "premium|total|none|derived|deny_anthropic|effort": [
@@ -3968,6 +4760,8 @@
 0,
 9,
 14,
+17,
+1,
 39
 ],
 "premium|total|none|derived|deny_anthropic|plain": [
@@ -3978,6 +4772,8 @@
 0,
 8,
 13,
+16,
+0,
 38
 ],
 "premium|total|none|derived|none|effort": [
@@ -3988,6 +4784,8 @@
 0,
 7,
 12,
+15,
+1,
 37
 ],
 "premium|total|none|derived|none|plain": [
@@ -3998,6 +4796,8 @@
 0,
 6,
 11,
+14,
+0,
 36
 ],
 "premium|total|none|empty|deny_anthropic|effort": [
@@ -4008,6 +4808,8 @@
 0,
 9,
 18,
+17,
+1,
 47
 ],
 "premium|total|none|empty|deny_anthropic|plain": [
@@ -4018,6 +4820,8 @@
 0,
 8,
 18,
+16,
+0,
 46
 ],
 "premium|total|none|empty|none|effort": [
@@ -4028,6 +4832,8 @@
 0,
 7,
 17,
+15,
+1,
 45
 ],
 "premium|total|none|empty|none|plain": [
@@ -4038,6 +4844,8 @@
 0,
 6,
 17,
+14,
+0,
 44
 ],
 "premium|total|none|explicit|deny_anthropic|effort": [
@@ -4048,6 +4856,8 @@
 0,
 9,
 16,
+17,
+1,
 43
 ],
 "premium|total|none|explicit|deny_anthropic|plain": [
@@ -4058,6 +4868,8 @@
 0,
 8,
 16,
+16,
+0,
 42
 ],
 "premium|total|none|explicit|none|effort": [
@@ -4068,6 +4880,8 @@
 0,
 7,
 15,
+15,
+1,
 41
 ],
 "premium|total|none|explicit|none|plain": [
@@ -4078,6 +4892,8 @@
 0,
 6,
 15,
+14,
+0,
 40
 ],
 "premium|total|openrouter|derived|deny_anthropic|effort": [
@@ -4088,6 +4904,8 @@
 0,
 9,
 14,
+17,
+1,
 51
 ],
 "premium|total|openrouter|derived|deny_anthropic|plain": [
@@ -4098,6 +4916,8 @@
 0,
 8,
 13,
+16,
+0,
 50
 ],
 "premium|total|openrouter|derived|none|effort": [
@@ -4108,6 +4928,8 @@
 0,
 7,
 12,
+15,
+1,
 49
 ],
 "premium|total|openrouter|derived|none|plain": [
@@ -4118,6 +4940,8 @@
 0,
 6,
 11,
+14,
+0,
 48
 ],
 "premium|total|openrouter|empty|deny_anthropic|effort": [
@@ -4128,6 +4952,8 @@
 0,
 9,
 18,
+17,
+1,
 59
 ],
 "premium|total|openrouter|empty|deny_anthropic|plain": [
@@ -4138,6 +4964,8 @@
 0,
 8,
 18,
+16,
+0,
 58
 ],
 "premium|total|openrouter|empty|none|effort": [
@@ -4148,6 +4976,8 @@
 0,
 7,
 17,
+15,
+1,
 57
 ],
 "premium|total|openrouter|empty|none|plain": [
@@ -4158,6 +4988,8 @@
 0,
 6,
 17,
+14,
+0,
 56
 ],
 "premium|total|openrouter|explicit|deny_anthropic|effort": [
@@ -4168,6 +5000,8 @@
 0,
 9,
 16,
+17,
+1,
 55
 ],
 "premium|total|openrouter|explicit|deny_anthropic|plain": [
@@ -4178,6 +5012,8 @@
 0,
 8,
 16,
+16,
+0,
 54
 ],
 "premium|total|openrouter|explicit|none|effort": [
@@ -4188,6 +5024,8 @@
 0,
 7,
 15,
+15,
+1,
 53
 ],
 "premium|total|openrouter|explicit|none|plain": [
@@ -4198,6 +5036,8 @@
 0,
 6,
 15,
+14,
+0,
 52
 ],
 "premium|total|other|derived|deny_anthropic|effort": [
@@ -4208,6 +5048,8 @@
 0,
 9,
 14,
+17,
+1,
 39
 ],
 "premium|total|other|derived|deny_anthropic|plain": [
@@ -4218,6 +5060,8 @@
 0,
 8,
 13,
+16,
+0,
 38
 ],
 "premium|total|other|derived|none|effort": [
@@ -4228,6 +5072,8 @@
 0,
 7,
 12,
+15,
+1,
 37
 ],
 "premium|total|other|derived|none|plain": [
@@ -4238,6 +5084,8 @@
 0,
 6,
 11,
+14,
+0,
 36
 ],
 "premium|total|other|empty|deny_anthropic|effort": [
@@ -4248,6 +5096,8 @@
 0,
 9,
 18,
+17,
+1,
 47
 ],
 "premium|total|other|empty|deny_anthropic|plain": [
@@ -4258,6 +5108,8 @@
 0,
 8,
 18,
+16,
+0,
 46
 ],
 "premium|total|other|empty|none|effort": [
@@ -4268,6 +5120,8 @@
 0,
 7,
 17,
+15,
+1,
 45
 ],
 "premium|total|other|empty|none|plain": [
@@ -4278,6 +5132,8 @@
 0,
 6,
 17,
+14,
+0,
 44
 ],
 "premium|total|other|explicit|deny_anthropic|effort": [
@@ -4288,6 +5144,8 @@
 0,
 9,
 16,
+17,
+1,
 43
 ],
 "premium|total|other|explicit|deny_anthropic|plain": [
@@ -4298,6 +5156,8 @@
 0,
 8,
 16,
+16,
+0,
 42
 ],
 "premium|total|other|explicit|none|effort": [
@@ -4308,6 +5168,8 @@
 0,
 7,
 15,
+15,
+1,
 41
 ],
 "premium|total|other|explicit|none|plain": [
@@ -4318,6 +5180,8 @@
 0,
 6,
 15,
+14,
+0,
 40
 ]
 },
@@ -4329,9 +5193,105 @@
 "decisions",
 "profiles",
 "lists",
+"cascade",
+"subagent",
 "routes"
 ],
 "pools": {
+"cascade": [
+[
+"openrouter/mistralai/mistral-small-3.2-24b-instruct|openrouter/deepseek/deepseek-v4-flash-0731|weak",
+"openrouter/mistralai/mistral-small-3.2-24b-instruct|openrouter/deepseek/deepseek-v4-flash-0731|weak"
+],
+[
+"anthropic/pin-weak|openrouter/deepseek/deepseek-v4-flash-0731|weak",
+"anthropic/pin-weak|openrouter/deepseek/deepseek-v4-flash-0731|weak"
+],
+[
+"anthropic/pin-weak#high|openrouter/deepseek/deepseek-v4-flash-0731|weak",
+"anthropic/pin-weak#high|openrouter/deepseek/deepseek-v4-flash-0731|weak"
+],
+[
+"openrouter/test/dflt|openrouter/deepseek/deepseek-v4-flash-0731|weak",
+"openrouter/test/dflt|openrouter/deepseek/deepseek-v4-flash-0731|weak"
+],
+[
+"openrouter/test/dflt#high|openrouter/deepseek/deepseek-v4-flash-0731|weak",
+"openrouter/test/dflt#high|openrouter/deepseek/deepseek-v4-flash-0731|weak"
+],
+[
+"anthropic/pin-weak|openrouter/pin/mid|weak",
+"anthropic/pin-weak|openrouter/pin/mid|weak"
+],
+[
+"anthropic/pin-weak#high|openrouter/pin/mid#high|weak",
+"anthropic/pin-weak#high|openrouter/pin/mid#high|weak"
+],
+[
+"openrouter/test/dflt|openrouter/pin/mid|weak",
+"openrouter/test/dflt|openrouter/pin/mid|weak"
+],
+[
+"openrouter/test/dflt#high|openrouter/pin/mid#high|weak",
+"openrouter/test/dflt#high|openrouter/pin/mid#high|weak"
+],
+[
+"openrouter/deepseek/deepseek-v4-flash-0731|openrouter/openai/gpt-5.5|mid",
+"openrouter/deepseek/deepseek-v4-flash-0731|openrouter/openai/gpt-5.5|mid"
+],
+[
+"anthropic/pin-weak|openrouter/openai/gpt-5.5|mid",
+"anthropic/pin-weak|openrouter/openai/gpt-5.5|mid"
+],
+[
+"anthropic/pin-weak#high|openrouter/openai/gpt-5.5|mid",
+"anthropic/pin-weak#high|openrouter/openai/gpt-5.5|mid"
+],
+[
+"openrouter/test/dflt|openrouter/openai/gpt-5.5|mid",
+"openrouter/test/dflt|openrouter/openai/gpt-5.5|mid"
+],
+[
+"openrouter/test/dflt#high|openrouter/openai/gpt-5.5|mid",
+"openrouter/test/dflt#high|openrouter/openai/gpt-5.5|mid"
+],
+[
+"anthropic/pin-weak|openrouter/pin/mid|mid",
+"anthropic/pin-weak|openrouter/pin/mid|mid"
+],
+[
+"anthropic/pin-weak#high|openrouter/pin/mid#high|mid",
+"anthropic/pin-weak#high|openrouter/pin/mid#high|mid"
+],
+[
+"openrouter/test/dflt|openrouter/pin/mid|mid",
+"openrouter/test/dflt|openrouter/pin/mid|mid"
+],
+[
+"openrouter/test/dflt#high|openrouter/pin/mid#high|mid",
+"openrouter/test/dflt#high|openrouter/pin/mid#high|mid"
+],
+[
+"openrouter/mistralai/mistral-small-3.2-24b-instruct|openrouter/deepseek/deepseek-v4-flash-0731|mid",
+"openrouter/mistralai/mistral-small-3.2-24b-instruct|openrouter/deepseek/deepseek-v4-flash-0731|mid"
+],
+[
+"anthropic/pin-weak|openrouter/deepseek/deepseek-v4-flash-0731|mid",
+"anthropic/pin-weak|openrouter/deepseek/deepseek-v4-flash-0731|mid"
+],
+[
+"anthropic/pin-weak#high|openrouter/deepseek/deepseek-v4-flash-0731|mid",
+"anthropic/pin-weak#high|openrouter/deepseek/deepseek-v4-flash-0731|mid"
+],
+[
+"openrouter/test/dflt|openrouter/deepseek/deepseek-v4-flash-0731|mid",
+"openrouter/test/dflt|openrouter/deepseek/deepseek-v4-flash-0731|mid"
+],
+[
+"openrouter/test/dflt#high|openrouter/deepseek/deepseek-v4-flash-0731|mid",
+"openrouter/test/dflt#high|openrouter/deepseek/deepseek-v4-flash-0731|mid"
+]
+],
 "decisions": [
 "qwen3:4b"
 ],
@@ -10975,6 +11935,18 @@
 [
 "openrouter/test/dflt",
 "openrouter/anthropic/claude-opus-5"
+]
+],
+"subagent": [
+[
+"openrouter/test/dflt#high",
+"openrouter/test/dflt#high",
+"openrouter/test/dflt"
+],
+[
+"openrouter/test/dflt#high",
+"openrouter/test/dflt#high",
+"openrouter/test/dflt#high"
 ]
 ],
 "tiers": [

@@ -309,6 +309,11 @@ class Settings(BaseSettings):
         default_factory=list, validation_alias="CHIMERA_FALLBACK_MODELS"
     )
 
+    # --- Reasoning effort per role: `code.plan=high,code.explore=low` (see providers/routing.py) ---
+    # A STRING on purpose: a malformed entry must become a note on the routing table, never an
+    # exception out of get_settings() that would stop the app from starting over a typo.
+    role_efforts: str = Field(default="", validation_alias="CHIMERA_ROLE_EFFORTS")
+
     # --- Fusion engine (panel -> judge -> synthesizer) ---
     fusion_panel: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: list(_DEFAULT_PANEL), validation_alias="CHIMERA_FUSION_PANEL"

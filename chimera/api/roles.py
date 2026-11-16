@@ -90,12 +90,17 @@ class RolePlan:
 def resolve(profile: Profile | None, settings: Settings, override: RoleModels | None = None) -> RolePlan:
     """Turn a profile into concrete models, then let any explicit override win field by field.
 
-    The tiers come from ``resolve_tiers``, which already honours the user's cost mode and explicit
-    per-tier model settings — so a profile chosen here never contradicts what they configured
-    globally, it just says which tier each ROLE draws from.
-    """
-    from chimera.providers.catalog import resolve_tiers
+    The tiers come from the routing table (``resolve_tiers`` underneath), which already honours the
+    user's cost mode and explicit per-tier model settings — so a profile chosen here never
+    contradicts what they configured globally, it just says which tier each ROLE draws from.
 
+    **Effort is fixed here, once.** ``CHIMERA_ROLE_EFFORTS`` entries for ``code.explore|plan|edit|
+    review`` are added to the role's slug as ``#effort`` when this function builds the plan, and the
+    plan is frozen: a run reads ``plan.models.<role>`` for each call that has its own context
+    (explore is a sub-agent, plan and review are single completions, edit is the run's loop from its
+    first turn), so nothing re-reads the setting in the middle of a conversation. An explicit
+    ``override`` is applied AFTER and names its slug in full, ``#effort`` included.
+    """
     if profile is None and override is None:
         return RolePlan(RoleModels(), None)
 
@@ -106,14 +111,29 @@ def resolve(profile: Profile | None, settings: Settings, override: RoleModels | 
         # as well", which is not what anyone typing one field meant.
         return RolePlan(_merge(RoleModels(), override), None)
 
+    base, single = _profile_base(profile, settings)
+    if single is not None:
+        # One model on every rung: routing has nothing to route. This is the ordinary state for a
+        # user with a single provider key, and pretending otherwise would produce a `max` profile that
+        # costs exactly what `economy` costs and reports itself as something else. An explicit
+        # per-role override still wins — someone naming a second model is exactly the person who has
+        # one. No role effort either: every role runs the run's one model, in one conversation.
+        return RolePlan(_merge(RoleModels(), override), profile, single_model=single)
+    return RolePlan(_merge(with_role_efforts(base, settings), override), profile)
+
+
+def _profile_base(profile: Profile, settings: Settings) -> tuple[RoleModels, str | None]:
+    """``(models, single_model)`` for a profile, before role efforts and before any override.
+
+    ``single_model`` is the one model when the ladder collapsed to it (and then ``models`` is empty).
+    """
+    from chimera.providers.catalog import resolve_tiers
+
+    # The light path: only the ladder is needed, so the rest of the routing table is not built.
     ladder = resolve_tiers(settings)
 
-    # One model on every rung: routing has nothing to route. This is the ordinary state for a user
-    # with a single provider key, and pretending otherwise would produce a `max` profile that costs
-    # exactly what `economy` costs and reports itself as something else. An explicit per-role
-    # override still wins — someone naming a second model is exactly the person who has one.
     if ladder.weak == ladder.mid == ladder.top:
-        return RolePlan(_merge(RoleModels(), override), profile, single_model=ladder.weak)
+        return RoleModels(), ladder.weak
 
     chosen = profile
     if chosen == "economy":
@@ -140,8 +160,26 @@ def resolve(profile: Profile | None, settings: Settings, override: RoleModels | 
         base = RoleModels(
             explore=ladder.weak, plan=ladder.top, edit=ladder.mid, review=ladder.top, fuse_plan=True
         )
+    return base, None
 
-    return RolePlan(_merge(base, override), profile)
+
+def with_role_efforts(base: RoleModels, settings: Settings) -> RoleModels:
+    """``base`` with each code role's ``CHIMERA_ROLE_EFFORTS`` entry added to its slug.
+
+    A slug that already carries ``#effort`` keeps it. When the reviewer and the editor are the SAME
+    slug the reviewer keeps following the editor's final slug: ``review_model_for`` withholds a
+    reviewer that is the editor, and a ``code.review`` effort that made the two differ would turn
+    "the author grades its own work" into a distinct-looking pair on the same model.
+    """
+    from chimera.providers.routing import with_role_effort
+
+    explore = with_role_effort(settings, "code.explore", base.explore)
+    plan = with_role_effort(settings, "code.plan", base.plan)
+    edit = with_role_effort(settings, "code.edit", base.edit)
+    review = edit if base.review and base.review == base.edit else with_role_effort(
+        settings, "code.review", base.review
+    )
+    return base.model_copy(update={"explore": explore, "plan": plan, "edit": edit, "review": review})
 
 
 def _merge(base: RoleModels, override: RoleModels | None) -> RoleModels:
