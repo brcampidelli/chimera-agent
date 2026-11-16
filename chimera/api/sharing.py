@@ -349,8 +349,10 @@ class SessionBus:
         turn_id: str = "",
         author: str = "",
         keep: bool = True,
+        guest: str = "",
     ) -> dict[str, Any]:
-        """Number and deliver one frame. ``keep=False`` delivers without remembering — a browser
+        """Number and deliver one frame. ``guest`` is the share link's identity when the turn is a
+        guest's own, so a viewer can tell its own turn's frames from everybody else's. ``keep=False`` delivers without remembering — a browser
         picture is tens of kilobytes and replay is for words, not for a page that has moved on."""
         with self._lock:
             channel = self._channel(session_id)
@@ -362,6 +364,8 @@ class SessionBus:
                 "author": author,
                 "payload": payload,
             }
+            if guest:
+                frame["guest"] = guest
             if keep:
                 if channel.ring.maxlen is not None and len(channel.ring) == channel.ring.maxlen:
                     channel.dropped_through = int(channel.ring[0]["session_seq"])
@@ -409,13 +413,17 @@ class SessionBus:
                 continue  # the ring holds this turn from its opening, or it has none (a background work)
             if int(opening["session_seq"]) > since:
                 restored.append(opening)
-            restored.extend(self._from_run_log(turn_id, str(first["author"]), since, start))
+            restored.extend(
+                self._from_run_log(turn_id, str(first["author"]), str(first.get("guest") or ""), since, start)
+            )
         if not restored:
             return kept
         restored.sort(key=lambda f: int(f["session_seq"]))
         return restored + kept
 
-    def _from_run_log(self, turn_id: str, author: str, after: int, before: int) -> list[dict[str, Any]]:
+    def _from_run_log(
+        self, turn_id: str, author: str, guest: str, after: int, before: int
+    ) -> list[dict[str, Any]]:
         if self._backfill is None:
             return []
         try:
@@ -429,10 +437,15 @@ class SessionBus:
             if not isinstance(number, int) or not after < number < before:
                 continue
             payload = {k: v for k, v in record.items() if k not in ("event", "session_seq")}
-            out.append({
+            frame = {
                 "session_seq": number, "event": str(record.get("event") or ""),
                 "turn_id": turn_id, "author": author, "payload": payload,
-            })
+            }
+            if guest:
+                # The authorship the live frame carried, so a guest who reconnects past the ring
+                # still gets its own turn's text (`guest_projection.project_frame`).
+                frame["guest"] = guest
+            out.append(frame)
         return out
 
     def trim_idle(self, *, max_age: float, keep: set[str]) -> int:

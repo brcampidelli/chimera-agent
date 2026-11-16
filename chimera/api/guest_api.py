@@ -33,6 +33,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, params
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.guest_projection import project_exchange, project_frame
 from chimera.api.sharing import SessionBus, Share, ShareStore, lan_addresses
 from chimera.api.sse import SSE_RESPONSE
 from chimera.telemetry import get_logger
@@ -46,6 +47,18 @@ SHARING_OFF = "sharing is off (Settings › Sharing)"
 #: what an unnamed window honestly is.
 ANONYMOUS = "someone"
 MAX_NAME = 40
+
+
+def _shown_exchanges(view: dict[str, Any], running: bool) -> list[dict[str, Any]]:
+    """The conversation's exchanges as a guest reads them; the last one is "in progress" while a
+    turn of the conversation is still running."""
+    exchanges = list(view.get("exchanges", []))
+    shown: list[dict[str, Any]] = []
+    for index, exchange in enumerate(exchanges):
+        one = project_exchange(exchange, running=running and index == len(exchanges) - 1)
+        if one is not None:
+            shown.append(one)
+    return shown
 
 
 def _clean_name(name: str | None) -> str:
@@ -265,6 +278,7 @@ def build_guest_app(
     start_turn: Callable[..., Any],
     static_dir: Path | None = None,
     sharing_on: SharingOn = _always_on,
+    turn_running: Callable[[str], bool] = lambda _session_id: False,
 ) -> FastAPI:
     """The four routes a share token opens, and the page that uses them.
 
@@ -312,7 +326,7 @@ def build_guest_app(
         return {
             "session_id": share.session_id,
             "workspace_name": folder,
-            "exchanges": [_exchange_for_a_guest(e) for e in view.get("exchanges", [])],
+            "exchanges": _shown_exchanges(view, turn_running(share.session_id)),
             "presence": bus.presence(share.session_id),
             "seq": bus.seq(share.session_id),
         }
@@ -347,7 +361,7 @@ def build_guest_app(
             still_open=still_open,
             share_id=share.id,
             door=LAN_DOOR if door is not None else "",
-            frame_filter=_for_a_guest,
+            frame_filter=lambda frame: project_frame(frame, viewer=share.id),
         )
 
     @guest.post("/api/turn", responses=SSE_RESPONSE)
@@ -361,6 +375,9 @@ def build_guest_app(
             session_id=share.session_id,
             workspace=session_workspace(share.session_id) or None,
         )
+        # The link's identity is stamped on the request here and never read from a body: it is what
+        # makes the turn THIS guest's own when its history is later shown to this guest's model.
+        req.stamp_guest(share.id)
         return await start_turn(req, author=_clean_name(body.name))
 
     return guest
@@ -405,28 +422,6 @@ def _open_always() -> bool:
     return True
 
 
-#: Payload fields that hold the owner's private memory. The bus carries every frame of the
-#: conversation, the owner's turns included, so what a guest may see is decided where the frame
-#: leaves for the guest and not where it is made.
-PRIVATE_PAYLOAD_KEYS = ("memory_facts",)
-
-
-def _for_a_guest(frame: dict[str, Any]) -> dict[str, Any]:
-    """The frame as a guest may see it: the receipt's recalled memory records are removed."""
-    payload = frame.get("payload")
-    if not isinstance(payload, dict) or not any(k in payload for k in PRIVATE_PAYLOAD_KEYS):
-        return frame
-    return {**frame, "payload": {k: v for k, v in payload.items() if k not in PRIVATE_PAYLOAD_KEYS}}
-
-
-def _exchange_for_a_guest(exchange: Any) -> Any:
-    """A stored exchange as a guest may read it: its receipt without the recalled memory records."""
-    done = exchange.get("done") if isinstance(exchange, dict) else None
-    if not isinstance(done, dict) or not any(k in done for k in PRIVATE_PAYLOAD_KEYS):
-        return exchange
-    return {**exchange, "done": {k: v for k, v in done.items() if k not in PRIVATE_PAYLOAD_KEYS}}
-
-
 async def live_frames(
     bus: SessionBus,
     session_id: str,
@@ -438,7 +433,7 @@ async def live_frames(
     still_open: Callable[[], bool] = _open_always,
     share_id: str = "",
     door: str = "",
-    frame_filter: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    frame_filter: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
 ) -> AsyncIterator[dict[str, str]]:
     """Replay what the viewer missed, then everything as it happens, until they leave.
 
@@ -455,14 +450,16 @@ async def live_frames(
     loop = asyncio.get_running_loop()
     sub = bus.subscribe(session_id, name=name, loop=loop, share_id=share_id, door=door)
 
-    def shown(frame: dict[str, Any]) -> dict[str, Any]:
+    def shown(frame: dict[str, Any]) -> dict[str, Any] | None:
         return frame if frame_filter is None else frame_filter(frame)
 
     try:
         for frame in bus.replay(session_id, since):
             if not still_open():
                 return
-            yield {"event": frame["event"], "data": json.dumps(shown(frame))}
+            out = shown(frame)
+            if out is not None:  # a frame that is not for this viewer is simply not sent
+                yield {"event": frame["event"], "data": json.dumps(out)}
         while True:
             if await disconnected() or not still_open():
                 break
@@ -478,7 +475,9 @@ async def live_frames(
                 continue
             if item is None or not still_open():
                 break
-            yield {"event": item["event"], "data": json.dumps(shown(item))}
+            out = shown(item)
+            if out is not None:
+                yield {"event": item["event"], "data": json.dumps(out)}
     finally:
         bus.unsubscribe(session_id, sub.id)
 
@@ -493,7 +492,7 @@ def live_stream(
     still_open: Callable[[], bool] = _open_always,
     share_id: str = "",
     door: str = "",
-    frame_filter: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    frame_filter: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
 ) -> EventSourceResponse:
     return EventSourceResponse(
         live_frames(

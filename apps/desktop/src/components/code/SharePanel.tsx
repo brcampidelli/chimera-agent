@@ -122,6 +122,9 @@ export function SharePanel({
       <p className="text-xs text-warn-foreground" data-testid="share-warning">
         {t("code.share.warning")}
       </p>
+      <p className="text-xs text-muted-foreground" data-testid="share-guest-sees">
+        {t("code.share.guestSees")}
+      </p>
 
       <section className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-2 text-xs">

@@ -56,6 +56,18 @@ async def _ends(stream: AsyncIterator[dict[str, str]], within: float = 2.0) -> N
         await asyncio.wait_for(stream.__anext__(), timeout=within)
 
 
+def answer_frame(bus: Any, session_id: str, text: str) -> None:
+    """A frame a guest DOES receive: a finished turn's sealed final answer.
+
+    These tests publish a frame after a link closed and assert the guest never sees it. They used a
+    ``token`` frame, but a guest is no longer sent the tokens of a turn that is not its own
+    (`guest_projection.project_frame`), so with a token the assertion would hold even for a link
+    that never closed. The ``done`` frame passes the projection, so "the guest did not see it" is
+    again evidence about the link and not about the filter."""
+    bus.publish(session_id, "done", {"answer": text, "final_answer": text, "final_sealed": True},
+                turn_id="t-after")
+
+
 def _publish_from_a_thread(bus: SessionBus, session_id: str, text: str) -> None:
     # A turn publishes from its worker thread; so does this.
     worker = threading.Thread(target=lambda: bus.publish(session_id, "token", {"text": text}))
@@ -324,7 +336,7 @@ def test_on_a_real_server_revoking_ends_an_open_guest_stream_on_both_doors(
     assert client.delete("/api/security/access/links").json() == {"revoked": 1}
     # Ended by the revoke itself — well inside the fifteen-second heartbeat.
     assert mounted.ended.wait(3) and lan.ended.wait(3)
-    app.state.session_bus.publish(sid, "token", {"text": SECRET})
+    answer_frame(app.state.session_bus, sid, SECRET)
     real_time.sleep(0.3)
     assert not mounted.saw(SECRET) and not lan.saw(SECRET)
 
@@ -343,7 +355,7 @@ def test_on_a_real_server_sharing_off_ends_an_open_guest_stream_on_both_doors(
 
     assert client.patch("/api/config", json={"CHIMERA_SHARING": "false"}).status_code == 200
     assert mounted.ended.wait(3) and lan.ended.wait(3)
-    app.state.session_bus.publish(sid, "token", {"text": SECRET})
+    answer_frame(app.state.session_bus, sid, SECRET)
     real_time.sleep(0.3)
     assert not mounted.saw(SECRET) and not lan.saw(SECRET)
     # The link is kept, inert — the same fact the card states.

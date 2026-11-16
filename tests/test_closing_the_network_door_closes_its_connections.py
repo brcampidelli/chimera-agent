@@ -37,6 +37,7 @@ from tests.test_an_open_guest_stream_closes_when_its_link_does import (
     SECRET,
     _Reader,
     _session,
+    answer_frame,
     served,  # noqa: F401 -- a fixture, used by name
 )
 
@@ -97,7 +98,7 @@ def test_closing_the_door_ends_the_streams_through_it_at_once(
     assert time.monotonic() - started < 2.5
     assert closed == {"open": False, "port": None, "urls": []}
     assert lan.ended.wait(3)
-    app.state.session_bus.publish(sid, "token", {"text": SECRET})
+    answer_frame(app.state.session_bus, sid, SECRET)
     time.sleep(0.3)
     assert not lan.saw(SECRET)
     # The door is the LAN's: the owner's own /guest mount, with a link that still opens, goes on.
@@ -123,7 +124,7 @@ def test_a_closing_door_is_reported_open_and_sends_nothing_more_through_it(
     with pytest.raises(OSError):
         door.start(0, host="127.0.0.1")  # no second listener beside one still closing
 
-    bus.publish("s1", "token", {"text": SECRET})
+    answer_frame(bus, "s1", SECRET)
     assert lan.ended.wait(3)  # the frame met the door's check, and the stream ended there
     assert not lan.saw(SECRET)
     assert _wait(lambda: not door.open, 5)
