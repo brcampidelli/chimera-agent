@@ -21,6 +21,7 @@ import os
 import re
 import tempfile
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -443,10 +444,17 @@ def autoload_into_registry(
         if cfg.disabled:
             continue
         try:
+            artifact = None
+            if mcp_path is not None:
+                from chimera.integrations.mcp_pool import _artifact_of, artifact_held
+
+                artifact = _artifact_of(cfg, mcp_path)
+                if artifact_held(mcp_path, cfg.name, artifact):
+                    continue
             session = _session_for(cfg, connect_timeout).start()
             mounted: Any = session
             if mcp_path is not None:
-                mounted = pinned_session(mcp_path, cfg.name, session)
+                mounted = pinned_session(mcp_path, cfg.name, session, artifact)
                 if mounted is None:
                     continue
             connectors.register(
@@ -458,6 +466,38 @@ def autoload_into_registry(
         except Exception as exc:  # a broken server must never break agent boot
             _log.warning("MCP autoload: skipping server %r (%s)", cfg.name, type(exc).__name__)
     return connectors.into_tool_registry(registry)
+
+
+@dataclass(frozen=True)
+class EffectiveLaunch:
+    """What a stdio server is really started with: references expanded, ``cwd`` resolved."""
+
+    command: str
+    args: list[str]
+    env: dict[str, str]
+    cwd: Path | None
+
+
+def effective_launch(cfg: McpServerConfig) -> EffectiveLaunch:
+    """The launch line as the process will receive it (P1-12). One definition, used to start the
+    session AND to compute the artifact identity, so the pin cannot describe a line that was not run.
+
+    Raises ``ValueError`` for a missing environment reference or a ``cwd`` that is not a directory.
+    """
+    cwd = None
+    if cfg.cwd:
+        candidate = Path(cfg.cwd).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        cwd = candidate.resolve()
+        if not cwd.exists() or not cwd.is_dir():
+            raise ValueError(f"MCP server {cfg.name!r} cwd does not exist or is not a directory")
+    return EffectiveLaunch(
+        command=cfg.command,
+        args=[_resolve_env_value(arg) for arg in cfg.args],
+        env=_resolve_env(cfg.env),
+        cwd=cwd,
+    )
 
 
 def _session_for(cfg: McpServerConfig, connect_timeout: float) -> Any:
@@ -489,20 +529,12 @@ def _session_for(cfg: McpServerConfig, connect_timeout: float) -> Any:
         )
     from chimera.integrations import StdioMCPSession
 
-    cwd = None
-    if cfg.cwd:
-        candidate = Path(cfg.cwd).expanduser()
-        if not candidate.is_absolute():
-            candidate = Path.cwd() / candidate
-        cwd = candidate.resolve()
-        if not cwd.exists() or not cwd.is_dir():
-            raise ValueError(f"MCP server {cfg.name!r} cwd does not exist or is not a directory")
-    env = _resolve_env(cfg.env)
-    args = [_resolve_env_value(arg) for arg in cfg.args]
+    launch = effective_launch(cfg)
+    cwd = launch.cwd
     return StdioMCPSession(
         cfg.command,
-        args or None,
-        env or None,
+        launch.args or None,
+        launch.env or None,
         connect_timeout=configured_connect_timeout,
         call_timeout=configured_call_timeout,
         catalog_timeout=configured_catalog_timeout,

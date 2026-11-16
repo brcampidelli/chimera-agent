@@ -90,7 +90,7 @@ def test_the_reviewer_is_told_which_file_the_attempt_wrote(tmp_path: Path) -> No
     assert manager.contexts, "the reviewer was never called, so this proved nothing"
     context = manager.contexts[-1]
     assert "README.md" in context, "the reviewer still cannot see what the attempt wrote"
-    assert "what-this-attempt-changed-on-disk" in context
+    assert "What this attempt changed on disk" in context
 
 
 def test_the_reviewer_is_told_when_nothing_changed(tmp_path: Path) -> None:
@@ -102,7 +102,7 @@ def test_the_reviewer_is_told_when_nothing_changed(tmp_path: Path) -> None:
 
     assert manager.contexts
     context = manager.contexts[-1]
-    assert "what-this-attempt-changed-on-disk" in context
+    assert "What this attempt changed on disk" in context
     assert "no productive change" in context, (
         "the reviewer is left to guess whether the silence means nothing happened or nothing "
         "was looked at"

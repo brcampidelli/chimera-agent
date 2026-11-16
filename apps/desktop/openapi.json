@@ -13260,6 +13260,13 @@
             "title": "Args",
             "type": "array"
           },
+          "artifact_unverifiable": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Artifact Unverifiable",
+            "type": "array"
+          },
           "command": {
             "title": "Command",
             "type": "string"

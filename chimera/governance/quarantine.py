@@ -26,6 +26,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError, create_model
 
+from chimera.governance.sanitize import fence
 from chimera.providers.gateway import Message, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -76,9 +77,8 @@ class QuarantinedReader:
         return (
             "Extract these fields as a JSON object:\n"
             + "\n".join(lines)
-            + "\n\n<<untrusted-content>>\n"
-            + content
-            + "\n<<end-untrusted-content>>"
+            + "\n\n"
+            + fence(content)
         )
 
     def extract(self, content: str, schema: type[BaseModel]) -> QuarantineResult:

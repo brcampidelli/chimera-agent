@@ -320,6 +320,11 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> dict[str, str | None
             continue
         session = None
         try:
+            # The identity of what is about to run, and its verdict, BEFORE anything of it executes.
+            artifact = _artifact_of(cfg, mcp_path)
+            if artifact_held(mcp_path, cfg.name, artifact):
+                outcomes[cfg.name] = "server tools are awaiting approval"
+                continue
             session = _session_for(cfg, _CONNECT_TIMEOUT)
             with _lock:
                 _sessions.append(session)
@@ -329,7 +334,7 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> dict[str, str | None
                 # registering it now would hand a dead session to the pool.
                 outcomes[cfg.name] = "connection stopped because the application is shutting down"
                 continue
-            pinned = pinned_session(mcp_path, cfg.name, session)
+            pinned = pinned_session(mcp_path, cfg.name, session, artifact)
             if pinned is None:
                 _untrack(session)
                 outcomes[cfg.name] = "server tools are awaiting approval"
@@ -377,12 +382,58 @@ def _untrack(session: Any) -> None:
             _sessions.remove(session)
 
 
-def pinned_session(mcp_path: Path, name: str, session: Any) -> Any:
+def _artifact_of(cfg: Any, mcp_path: Path | None = None) -> dict[str, Any] | None:
+    """What ``cfg`` runs, for the pin (:mod:`chimera.integrations.mcp_artifact`); None for a URL server.
+
+    Computed from the EFFECTIVE launch (references expanded, ``cwd`` resolved, ``env`` block), the
+    same one the session is started with. A launch that cannot be built (an unset ``{env:...}``, a
+    missing ``cwd``) has no identity: the session refuses it a moment later with the real reason.
+    """
+    from chimera.integrations.mcp_artifact import artifact_identity
+    from chimera.integrations.mcp_config import effective_launch
+
+    if cfg.url:
+        return None
+    try:
+        launch = effective_launch(cfg)
+    except ValueError:
+        return None
+    # What is stored and shown is the line as CONFIGURED (`{env:NAME}`, never the value); the expanded
+    # one only decides what is hashed. The Chimera home (where the pin file lives) is never hashed.
+    return artifact_identity(
+        launch.command,
+        launch.args,
+        raw_args=list(cfg.args),
+        cwd=launch.cwd,
+        env=launch.env,
+        exclude=[mcp_path.parent] if mcp_path is not None else [],
+    )
+
+
+def artifact_held(mcp_path: Path, name: str, artifact: dict[str, Any] | None) -> bool:
+    """True when the artifact alone already holds the mount — decided BEFORE the server starts."""
+    from chimera.integrations.mcp_pins import check_artifact
+
+    verdict = check_artifact(mcp_path, name, artifact)
+    if verdict is None or not verdict.held:
+        return False
+    _log.warning(
+        "MCP: holding server %r before starting it — what it runs changed (%s); review with "
+        "`chimera mcp approve %s` or on the MCP screen",
+        name,
+        ", ".join(c["change"] for c in verdict.changes)[:300],
+        name,
+    )
+    return True
+
+
+def pinned_session(mcp_path: Path, name: str, session: Any, artifact: dict[str, Any] | None = None) -> Any:
     """``session`` behind its checked tool listing, or ``None`` — and the session closed — if held.
 
     The one gate every mount goes through (study 30, S30-24): a server whose tools no longer read as
     they did when the owner accepted them is not handed to any surface until the owner approves the
-    change, which `chimera mcp approve` and the MCP screen show as a diff. See
+    change, which `chimera mcp approve` and the MCP screen show as a diff. ``artifact`` is what the
+    server RUNS (P1-12): the same listing under a different package version or script is held too. See
     :mod:`chimera.integrations.mcp_pins` for why first sight pins rather than asks.
     """
     from chimera.integrations.mcp_pins import PinnedSession, check_manifest
@@ -396,7 +447,7 @@ def pinned_session(mcp_path: Path, name: str, session: Any) -> Any:
         if callable(close):
             close()
         raise
-    verdict = check_manifest(mcp_path, name, specs)
+    verdict = check_manifest(mcp_path, name, specs, artifact)
     if verdict.held:
         if callable(close):
             close()
