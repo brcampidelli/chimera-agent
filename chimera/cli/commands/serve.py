@@ -31,7 +31,7 @@ from chimera.cli.commands.memory import _memory_manager, _recall_graph
 from chimera.cli.commands.ops import _cron_store
 from chimera.cli.service_cmd import AppMode, AppServerOptions, record_install
 from chimera.config import get_settings
-from chimera.governance import governed_profile
+from chimera.governance import announce_existing_install, governed_profile
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -94,6 +94,7 @@ def serve(
     # Before anything below writes to home (the memory store creates memory.db): a first run read
     # after that point looks like an upgrade, and the bot would start open instead of pairing.
     home_was_empty = home_is_empty(settings)
+    announce_existing_install(settings)  # the log half of the existing-install notice
 
     # The same warnings-and-errors file as `chimera app` (plan M5), and only after the first-run
     # check above, because creating `logs/` makes home look used. Only the app attached it before,
@@ -375,7 +376,7 @@ def _kernel_observes_unless_told_otherwise() -> None:
     PATCH to ``off`` writes ``.env`` and is honoured at the next launch, and ``chimera serve``, the
     CLI and the VPS are untouched: this is the desktop's default, not the package's.
     """
-    from chimera.config import get_settings
+    announce_existing_install(get_settings(), desktop=True)  # before the desktop's own default
 
     if "governance_mode" in get_settings().model_fields_set:
         return
@@ -1496,7 +1497,7 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
     import time
 
     from chimera.governance.ledger_tool import fence
-    from chimera.scheduler import Scheduler
+    from chimera.scheduler import Scheduler, refuse_webhook_overrides
     from chimera.scheduler.weekly_review import builtin_of
     from chimera.server import InboundMessage
 
@@ -1506,6 +1507,7 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
         results: list[str] = []
 
         def dispatch(job: Any) -> None:
+            refuse_webhook_overrides(job)  # P1-03 fields; same fail-closed rule as below
             if job.tools is not None or job.notify != "always":
                 # Fail closed. `cron add --webhook` refuses these fields, so a webhook job carrying
                 # them was edited into jobs.json by hand — and the gateway below would run it with

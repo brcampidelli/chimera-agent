@@ -1,3 +1,4 @@
+import type { CacheWarning } from "@/lib/cache-miss";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { Status } from "@/components/Activity";
@@ -37,6 +38,8 @@ export interface AgentReport {
   cache_read_tokens?: number | null;
   /** The cause of the last miss, shown on the status bar's tooltip (`lib/cache-miss.ts`). */
   cache_miss_cause?: string | null;
+  /** Set only on the turn that took the conversation's cache rate under its threshold. */
+  cache_warning?: CacheWarning | null;
   /** Scoped to the screen that produced the receipt so shell navigation does not attribute it to another. */
   viewKey?: string;
   memory_facts_used?: number;
@@ -53,6 +56,10 @@ export interface AgentState {
   /** The coding turn this state describes, when there is one. Lets the status bar tell the turn on
    *  screen from the others running in other conversations, which it lists beside it. */
   turnId?: string | null;
+  /** True while a screen that announces its own turn (the conversation's header chip) is actually
+   *  on screen. The status bar keeps quiet about the chat turn only then, so the same transition is
+   *  not read twice; absent or false, the bar is the announcer. */
+  chatAnnounces?: boolean;
   /** Publish what this screen's agent is doing, so the shell can show it from anywhere.
    *
    *  The provider owns the state now rather than receiving it from App. It used to be fed by the

@@ -95,8 +95,13 @@ function palette(theme: Theme, tint: Tint, contrast: Contrast, accent: Accent): 
   };
 }
 
-/** The surfaces a focused control sits on: the page, a card, a `muted` well, a raised row. */
-const GROUNDS = ["--background", "--card", "--muted", "--surface-2"];
+/** The surfaces a focused control sits on: the page, a card, a `muted` well, a raised row, and a
+ *  recessed `.field` (`--input`), which passed without being checked.
+ *
+ *  `--surface-hover` is NOT here yet, and that is a finding rather than an oversight: measured, the
+ *  ring on it is 4.19–4.24:1 in the dark high-contrast palettes, under the 4.5:1 that mode promises.
+ *  Adding it red-lines six palettes until a token is retuned, which is a design decision. */
+const GROUNDS = ["--background", "--card", "--muted", "--surface-2", "--input"];
 
 const SOLID = /focus-visible:outline-ring\b/.test(FOCUS) && !/focus-visible:outline-hidden/.test(FOCUS);
 

@@ -7370,6 +7370,11 @@ export interface components {
              */
             governance: string;
             /**
+             * Governance Notice
+             * @default false
+             */
+            governance_notice: boolean;
+            /**
              * Hooks
              * @default false
              */
@@ -10134,10 +10139,23 @@ export interface components {
             /** Deliver To */
             deliver_to?: string | null;
             /**
+             * Effort
+             * @default
+             * @enum {string}
+             */
+            effort: "" | "low" | "medium" | "high";
+            /**
              * Max Attempts
              * @default 1
              */
             max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
             /** Name */
             name: string;
             /**
@@ -10263,6 +10281,11 @@ export interface components {
              * @default
              */
             disabled_by: string;
+            /**
+             * Effort
+             * @default
+             */
+            effort: string;
             /** Enabled */
             enabled: boolean;
             /** Id */
@@ -10278,6 +10301,13 @@ export interface components {
              * @default 1
              */
             max_attempts: number;
+            /** Max Steps */
+            max_steps?: number | null;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
             /** Name */
             name: string;
             /** Next Firings */
@@ -10299,6 +10329,8 @@ export interface components {
             schedule: string;
             /** Schedule Description */
             schedule_description: string;
+            /** Suggested Tools */
+            suggested_tools?: string[];
             /** Tools */
             tools?: string[] | null;
             /** Trigger */
@@ -14312,6 +14344,11 @@ export interface components {
             passed: number;
             /** Passed By Verifier */
             passed_by_verifier: number;
+            /**
+             * Price Coverage
+             * @default 0
+             */
+            price_coverage: number;
             /** Profile */
             profile: string | null;
             /**
@@ -14319,6 +14356,11 @@ export interface components {
              * @default user
              */
             profile_source: string;
+            /**
+             * Resolved N
+             * @default 0
+             */
+            resolved_n: number;
             /** Reverted */
             reverted: number;
             /** Runs */
@@ -14327,6 +14369,10 @@ export interface components {
             unproductive: number;
             /** Usd Known Runs */
             usd_known_runs: number;
+            /** Usd Per Resolved */
+            usd_per_resolved?: number | null;
+            /** Usd Per Verified */
+            usd_per_verified?: number | null;
             /** Usd Total */
             usd_total: number | null;
         };

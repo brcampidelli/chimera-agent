@@ -20,7 +20,12 @@ posture, pick a provider the owner did not configure, or start a process:
   anything here. ``acceptEdits``, ``auto`` and ``dontAsk`` would not narrow what the session
   already enforces, and ``bypassPermissions`` is refused with a warning. A file can lower the
   posture of its own subagent; it can never raise it.
-- ``hooks``, ``mcpServers``, ``skills``, ``isolation``, ``background``, ``effort``, ``omitClaudeMd``:
+- ``effort``: ``low`` / ``medium`` / ``high``, the reasoning effort of THIS subagent's own calls (it
+  has its own context, so changing it never touches the parent's conversation). Honoured only from
+  the owner's files; a repository's is ignored with a note. Anything else is
+  ignored with a note, NOT turned into ``high``: Claude Code also accepts ``xhigh`` and ``max``,
+  which this scale cannot express, and rounding them to ``high`` would pick a cost nobody wrote.
+- ``hooks``, ``mcpServers``, ``skills``, ``isolation``, ``background``, ``omitClaudeMd``:
   recognised and reported as not applied. A repository file must not mount a server or run a hook.
 - ``memory``: a directory the agent may read and write, and nothing else (see :func:`memory_block`).
 
@@ -38,6 +43,7 @@ from typing import TYPE_CHECKING, Any
 
 from chimera.core.registry import ID_PATTERN
 from chimera.governance.sanitize import fence, sanitize_untrusted
+from chimera.providers.catalog import REASONING_EFFORTS
 from chimera.skills.aliases import CLAUDE_CODE_TOOLS
 from chimera.tools.base import Tool
 
@@ -65,7 +71,7 @@ _PERMISSION_NOTES = {
     "dontAsk": "permissionMode dontAsk ignored: the session's own approvals apply",
     "bypassPermissions": "permissionMode bypassPermissions ignored: no file can bypass permissions",
 }
-_NOT_APPLIED = ("skills", "isolation", "background", "effort", "omitClaudeMd", "autoCompactWindow")
+_NOT_APPLIED = ("skills", "isolation", "background", "omitClaudeMd", "autoCompactWindow")
 
 
 @dataclass
@@ -80,6 +86,8 @@ class ClaudeSpec:
     model: str = ""
     model_role: str = ""
     model_ignored: bool = False
+    #: ``low`` | ``medium`` | ``high`` when the file declared a valid one, else ``""`` (inherit).
+    effort: str = ""
     plan: bool = False
     max_turns: int | None = None
     memory: str = ""
@@ -211,6 +219,26 @@ def resolve_model(
     return "", "", True, [f"model {value!r} is not in the model catalogue; using the conversation's"]
 
 
+def resolve_effort(raw: Any, *, owner: bool) -> tuple[str, list[str]]:
+    """``(effort, notes)`` for an ``effort:`` value; ``""`` means the agent declares none that counts."""
+    if raw is None:
+        return "", []
+    value = str(raw).strip().lower()
+    if not value:
+        return "", []
+    if not owner:
+        # A repository file is not trusted: raising the effort is a cost nobody chose, and lowering it
+        # would need the owner's effort, which is not known when the file is parsed. Ignored, as the
+        # native format ignores a project file's model and effort.
+        return "", ["effort is chosen by the owner; ignored for project agents"]
+    if value not in REASONING_EFFORTS:
+        return "", [
+            f"effort {str(raw).strip()!r} is not low, medium or high; ignored "
+            "(the agent runs at the model's own effort)"
+        ]
+    return value, []
+
+
 def parse_claude(
     raw: dict[str, Any],
     *,
@@ -247,6 +275,9 @@ def parse_claude(
         raw.get("model"), owner=owner, catalogue=catalogue, settings=settings
     )
     notes.extend(model_notes)
+
+    effort, effort_notes = resolve_effort(raw.get("effort"), owner=owner)
+    notes.extend(effort_notes)
 
     mode = str(raw.get("permissionMode") or "default").strip()
     plan = mode == "plan"
@@ -289,6 +320,7 @@ def parse_claude(
         model=slug_model,
         model_role=role,
         model_ignored=ignored,
+        effort=effort,
         plan=plan,
         max_turns=max_turns,
         memory=memory,

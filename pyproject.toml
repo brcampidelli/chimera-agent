@@ -382,6 +382,7 @@ pytest_add_cli_args_test_selection = [
   "tests/test_code_environments.py",
   "tests/test_chimera_agent_governance_review_fixes.py",  # names governance/ledger.py (taint mode on the audit lines, P0-15)
   "tests/test_governance_report.py",  # reads the audit lines the kernel and AuditLog write (the new ts)
+  "tests/test_a_new_home_starts_in_observe_and_an_old_one_is_told.py",  # names governance/ledger.py (P0-15 default)
   "tests/test_the_registry_bounds_every_tool_output.py",  # names governance/ledger.py and ledger_tool.py
   "tests/test_solve_judges_like_the_api.py",  # names core/verify.py and api/runs.py (the solve receipt)
   "tests/test_escalation_ladder.py",  # names core/verify.py and api/runs.py (attempt receipts)

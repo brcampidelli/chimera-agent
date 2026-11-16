@@ -3,7 +3,7 @@ import { Square, Trash2 } from "lucide-react";
 
 import { cancelExec, streamExec } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { focusRing } from "@/components/ui/focus";
+import { focusRing, focusRingInset } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
 
 /**
@@ -217,7 +217,8 @@ export function Runner({ workspace }: { workspace: string | null }) {
           aria-label={t("runner.input")}
           placeholder={t("runner.placeholder")}
           className={cn(
-            "min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-hidden",
+            "min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground",
+            focusRingInset,
             "placeholder:text-muted-foreground disabled:opacity-50",
           )}
         />

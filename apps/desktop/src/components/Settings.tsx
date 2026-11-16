@@ -217,6 +217,16 @@ function AutonomyCard({
 }) {
   const t = useT();
   const [confirmingHostExec, setConfirmingHostExec] = useState(false);
+  // The notice about an existing install left on governance "off" is shown until dismissed. The
+  // dismissal is per browser profile: it is a courtesy, not a setting, and the server keeps saying
+  // so in its log either way.
+  const [noticeDismissed, setNoticeDismissed] = useState(() => {
+    try {
+      return localStorage.getItem("chimera.governanceNoticeDismissed") === "1";
+    } catch {
+      return false;
+    }
+  });
 
   return (
     <Card id="settings-card-autonomy" title={t("settings.card.autonomy")}>
@@ -518,6 +528,28 @@ function AutonomyCard({
         <p className="px-4 pb-3 text-xs text-muted-foreground">
           {t("settings.governance.cost")}
         </p>
+      )}
+      {c.autonomy.governance_notice && !noticeDismissed && (
+        <div
+          role="note"
+          className="mx-4 mb-3 flex items-start justify-between gap-3 rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground"
+        >
+          <p>{t("settings.governance.notice")}</p>
+          <button
+            type="button"
+            className="shrink-0 underline"
+            onClick={() => {
+              setNoticeDismissed(true);
+              try {
+                localStorage.setItem("chimera.governanceNoticeDismissed", "1");
+              } catch {
+                /* a private window: the notice simply returns next time */
+              }
+            }}
+          >
+            {t("settings.governance.notice.dismiss")}
+          </button>
+        </div>
       )}
       <Row
         label={t("settings.row.approvalWebhook")}

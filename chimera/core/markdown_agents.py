@@ -23,7 +23,7 @@ import stat
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -41,6 +41,7 @@ _log = get_logger("core.markdown_agents")
 MAX_AGENT_STEPS = 32
 MAX_AGENT_FILE_CHARS = 24_000
 PROJECT_MODEL_IGNORED = "model is chosen by the owner; ignored for project agents"
+PROJECT_EFFORT_IGNORED = "effort is chosen by the owner; ignored for project agents"
 _CATALOG_MODELS = frozenset(entry.slug for entry in CATALOG)
 _FRONTMATTER = re.compile(r"\A---\s*\r?\n(.*?)\r?\n---\s*(?:\r?\n|\Z)(.*)\Z", re.DOTALL)
 _COLLISION = "agent filename collides with another file after case normalization"
@@ -51,6 +52,9 @@ class _Frontmatter(BaseModel):
 
     description: str = Field(min_length=1, max_length=500)
     model: str | None = Field(default=None, min_length=1, max_length=160)
+    #: The reasoning effort of this agent's own calls. Strict here, like ``model``: a value outside
+    #: the three skips the file with a message instead of guessing what was meant.
+    effort: Literal["low", "medium", "high"] | None = None
     tools: list[str] = Field(max_length=128)
     steps: int = Field(ge=1, le=MAX_AGENT_STEPS)
 
@@ -110,6 +114,9 @@ class MarkdownAgent:
     model_role: str = ""
     #: None: the legacy rule (a project file's model is ignored). True/False: decided per file.
     model_ignored: bool | None = None
+    #: ``low`` | ``medium`` | ``high`` when the file declares one that applies, else ``""``. Kept off
+    #: ``AgentDef`` (the registry's saved-agent schema) so no stored agent changes shape.
+    effort: str = ""
 
     @property
     def id(self) -> str:
@@ -420,6 +427,12 @@ def _read_agent(
     metadata = _Frontmatter.model_validate(raw)
     notes: list[str] = []
     model = ""
+    effort = ""
+    if metadata.effort is not None:
+        if from_project:
+            notes.append(PROJECT_EFFORT_IGNORED)
+        else:
+            effort = metadata.effort
     if from_project:
         if metadata.model is not None:
             notes.append(PROJECT_MODEL_IGNORED)
@@ -442,6 +455,7 @@ def _read_agent(
         from_project=from_project,
         origin="chimera",
         layer=source.layer,
+        effort=effort,
     )
     return agent, notes
 
@@ -497,6 +511,7 @@ def _claude_agent(
         layer=source.layer,
         model_role=spec.model_role,
         model_ignored=spec.model_ignored,
+        effort=spec.effort,
     )
     return agent, spec.notes
 
@@ -515,6 +530,7 @@ def _project_instruction(source: str, body: str) -> str:
 __all__ = [
     "MAX_AGENT_FILE_CHARS",
     "MAX_AGENT_STEPS",
+    "PROJECT_EFFORT_IGNORED",
     "PROJECT_MODEL_IGNORED",
     "AgentCatalog",
     "AgentIssue",

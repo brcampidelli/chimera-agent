@@ -334,10 +334,20 @@ def _no_dotenv(
     # real home, and since the app claims its folder (`chimera/core/instance.py`, R12 of 2026-09-30)
     # it would have taken the developer's own app's lock, or failed because that app held it. A test
     # that needs a particular home still sets its own; this is only the default under it.
-    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path_factory.mktemp("home")))
+    test_home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("CHIMERA_HOME", str(test_home))
+    # A fresh home now starts in `observe` (`chimera/governance/first_boot.py`, audit P0-15). Most tests
+    # assert the package's stock behaviour, which is what an EXISTING home keeps, so every test home is
+    # recorded as one. The tests of the new-home default build their own home and do not inherit this.
+    (test_home / "governance_default.json").write_text(
+        '{"version": 1, "default": "off", "reason": "existing-install"}', encoding="utf-8"
+    )
     # Claude Code's own folder (`~/.claude`) is the developer's real one too: the instruction files in it
     # reach every composed prompt when `CHIMERA_CLAUDE_COMPAT` is on. Private here, so no test reads them.
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("claude-config")))
+    from chimera.governance import first_boot as _first_boot
+
+    _first_boot.forget()
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
