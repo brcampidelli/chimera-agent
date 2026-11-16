@@ -8,6 +8,14 @@ let activeTabId;
 let nextId = 1;
 let requestedOrigin;
 let actionsDisabled = false;
+// The owner pressed Stop in the popup. Kept in chrome.storage.local (it survives the service worker being
+// recycled and Chrome restarting) and cleared only by the owner's Start or a pairing from the popup, never
+// by an app request or by any event that wakes the worker (ext-04).
+let stopped = false;
+// Bumped by every Stop, Cancel and app `close`. An operation reads it when it is admitted and checks it before
+// each effect (opening a tab, navigating, clicking, typing), so a Stop that lands while an operation waits on
+// Chrome (a permission check, say) drops that operation instead of letting it finish (ext, Codex review).
+let stopEpoch = 0;
 // Browser actions currently inside handle(); the download guard below refuses any download started meanwhile.
 let actionsInFlight = 0;
 const tabIds = new Set();
@@ -54,26 +62,53 @@ function safePreview(fields) {
   return preview;
 }
 
+// Tab bookkeeping is per browser session. The two owner switches (Stop and the debugging bar's Cancel) are
+// not: they live in storage.local so a Chrome restart cannot turn the agent back on (ext-04, ext-08).
 async function persistState() {
   await chrome.storage.session.set({
     chimeraGroupId: groupId,
     chimeraTabIds: [...tabIds],
     chimeraActiveTabId: activeTabId,
     chimeraRequestedOrigin: requestedOrigin,
-    chimeraActionsDisabled: actionsDisabled,
   });
+  await chrome.storage.local.set({ chimeraActionsDisabled: actionsDisabled, chimeraStopped: stopped });
 }
 
 async function restoreState() {
   const saved = await chrome.storage.session.get([
-    'chimeraGroupId', 'chimeraTabIds', 'chimeraActiveTabId', 'chimeraRequestedOrigin', 'chimeraActionsDisabled',
+    'chimeraGroupId', 'chimeraTabIds', 'chimeraActiveTabId', 'chimeraRequestedOrigin',
   ]);
+  const owner = await chrome.storage.local.get(['chimeraActionsDisabled', 'chimeraStopped']);
   groupId = saved.chimeraGroupId;
   tabIds.clear();
   for (const tabId of saved.chimeraTabIds || []) tabIds.add(tabId);
   activeTabId = saved.chimeraActiveTabId;
   requestedOrigin = saved.chimeraRequestedOrigin;
-  actionsDisabled = saved.chimeraActionsDisabled === true;
+  actionsDisabled = owner.chimeraActionsDisabled === true;
+  stopped = owner.chimeraStopped === true;
+}
+
+// Pure decisions, kept apart from the chrome.* calls so they can be tested on their own.
+// May the worker open (or keep) its link to the app? Never while the owner's Stop holds.
+function mayConnect(ownerStopped) { return ownerStopped !== true; }
+
+// Is this paused non-navigation request a speculative prefetch? Chrome marks them with a purpose header
+// (`Sec-Purpose: prefetch` for speculation rules, `Purpose: prefetch` for <link rel=prefetch>); the event may
+// also report the type as 'Prefetch'. Which of these the event really carries is checked by hand (REVISAO.md).
+function isPrefetchRequest(params) {
+  if (params && params.resourceType === 'Prefetch') return true;
+  const headers = (params && params.request && params.request.headers) || {};
+  return Object.keys(headers).some(name => /^(sec-)?purpose$/i.test(name) && /prefetch/i.test(String(headers[name])));
+}
+
+// The origin a navigation lands on, or null when it is not a plain http(s) page. Anything else (a
+// chrome:// page, a data: or blob: document, a javascript: URL) is refused rather than guessed at.
+function navigationOrigin(url) {
+  try {
+    const parsed = new URL(url || '');
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return parsed.origin;
+  } catch { return null; }
 }
 
 function setStatus(text) {
@@ -94,29 +129,45 @@ async function groupIsOpen() {
   catch { return false; }
 }
 
-// A new tab inside our group, opened on the requested URL so it never sits on a Chrome page.
-async function openTabInGroup(url) {
-  const tab = await chrome.tabs.create({ active: true, url });
+const STOPPED_MESSAGE = 'Chimera Browser was stopped; the operation was dropped before it changed anything';
+
+// Every Chimera tab starts on about:blank. The debugger is attached and the request filter is on BEFORE any
+// URL loads, so even the first navigation, and every redirect after it, is checked before it leaves. Opening
+// the tab on the URL itself let that first request go out unprotected.
+async function createBlankTab(live) {
+  live();
+  const tab = await chrome.tabs.create({ active: true, url: 'about:blank' });
+  try { live(); } catch (error) {
+    await chrome.tabs.remove(tab.id).catch(() => {});
+    throw error;
+  }
+  return tab;
+}
+
+async function openTabInGroup(live) {
+  const tab = await createBlankTab(live);
   tabIds.add(tab.id);
   activeTabId = tab.id;
   await chrome.tabs.group({ tabIds: [tab.id], groupId });
   await persistState();
 }
 
-// `openUrl` is set only for navigate. Reuse the group's own tab when it is a web page; otherwise open
-// a new tab in the group. Never touches a tab outside the group (the owner's focused tab, for one).
-async function ensureGroup(openUrl) {
+// `openUrl` is set only for navigate (the URL itself is loaded later, by Page.navigate, once the tab is
+// protected). Reuse the group's own tab when it is a web page; otherwise open a new tab in the group. Never
+// touches a tab outside the group (the owner's focused tab, for one).
+async function ensureGroup(openUrl, live) {
+  live();
   if (groupId !== undefined && await groupIsOpen()) {
     const tab = activeTabId === undefined ? null : await chrome.tabs.get(activeTabId).catch(() => null);
     if (tab && tab.groupId === groupId) {
       if (isWebUrl(tab.url) || openUrl === undefined) return;
-      return openTabInGroup(openUrl);
+      return openTabInGroup(live);
     }
   }
   if (openUrl === undefined) throw new Error('No Chimera tab is active; navigate to a site first');
   groupId = undefined;
   activeTabId = undefined;
-  const tab = await chrome.tabs.create({ active: true, url: openUrl });
+  const tab = await createBlankTab(live);
   tabIds.add(tab.id);
   activeTabId = tab.id;
   groupId = await chrome.tabs.group({ tabIds: [tab.id] });
@@ -134,12 +185,187 @@ async function denyDownloads(tabId) {
   }
 }
 
+// Request types held at the Request stage. The names are the ones Chromium's Fetch.enable ACCEPTS (its filter
+// parser, content/browser/devtools/protocol/fetch_handler.cc), which is narrower than the protocol's
+// Network.ResourceType: 'Prefetch' is rejected there with "Unknown resource type in fetch filter".
+//  - Document: every navigation (typed, redirected, history, script, link).
+//  - Fetch: the interceptor maps it to both fetch()/XHR and speculative prefetch (kXhr + kPrefetch). Ordinary
+//    fetch/XHR is let straight through by onFetchPaused; only a request that looks like a prefetch is held to
+//    the grant (see isPrefetchRequest). This costs one round trip per page fetch/XHR.
+// `Other` is not listed: favicons, beacons and the like, which the page may send anywhere; holding them to the
+// grant would break ordinary pages without protecting anything model-supplied.
+const FETCH_PATTERNS = [
+  { urlPattern: '*', resourceType: 'Document', requestStage: 'Request' },
+  { urlPattern: '*', resourceType: 'Fetch', requestStage: 'Request' },
+];
+// Every child target (a popup, a prerendered page, an out-of-process iframe, a worker) starts paused and is
+// handed to onTargetAttached, which protects it before it is allowed to run.
+const AUTO_ATTACH = { autoAttach: true, waitForDebuggerOnStart: true, flatten: true };
+// Requests held at Fetch.requestPaused, by id, so Stop can fail each one before anything is detached.
+const paused = new Map();
+// Protection failures the owner should see in the popup. They are reported, never swallowed.
+const containmentIssues = [];
+
+function sessionTarget(source) {
+  return source.sessionId ? { tabId: source.tabId, sessionId: source.sessionId } : { tabId: source.tabId };
+}
+
+function sendTo(target, method, params = {}) { return chrome.debugger.sendCommand(target, method, params); }
+
+// Turn the protection on for one debugger session. `type` is 'page' for the tab itself and for popups and
+// prerendered pages (held to the grant), anything else only watches for its own children.
+async function protectTarget(target, type) {
+  if (type === 'page') {
+    // Every top-level document request pauses until onFetchPaused has checked where it goes: the one place
+    // that sees redirects, history navigation, link clicks and script navigation before the request leaves.
+    await sendTo(target, 'Fetch.enable', { patterns: FETCH_PATTERNS });
+    // A service worker registered by the page could answer a navigation outside the filter above. Chromium
+    // ignores the bypass override on a session whose Network domain is off, so Network is enabled first.
+    await sendTo(target, 'Network.enable');
+    await sendTo(target, 'Network.setBypassServiceWorker', { bypass: true });
+    try { await sendTo(target, 'Page.setPrerenderingAllowed', { isAllowed: false }); }
+    catch (error) {
+      // Older Chrome has no such command; the prerendered page is then held by the auto-attach below.
+      if (!/wasn't found|not found|not supported/i.test(String(error))) throw error;
+    }
+  }
+  await sendTo(target, 'Target.setAutoAttach', AUTO_ATTACH);
+}
+
 async function attach(tabId) {
   try { await chrome.debugger.attach({ tabId }, CDP); }
   catch (error) {
     if (!String(error).includes('Another debugger is already attached')) throw error;
   }
   await denyDownloads(tabId);
+  await protectTarget({ tabId }, 'page');
+}
+
+const NOT_GRANTED = 'This site has not been granted to the Chimera extension';
+// Callers waiting on a load learn at once that the navigation was refused instead of timing out.
+const navigationRefusals = new Set();
+let lastRefusal = '';
+
+async function isGranted(origin) {
+  return chrome.permissions.contains({ origins: [`${origin}/*`] });
+}
+
+async function isGrantedUrl(url) {
+  const origin = navigationOrigin(url);
+  return origin !== null && await isGranted(origin);
+}
+
+// Throws NOT_GRANTED, and records the origin so the popup offers "Allow", when `url` is not on a granted origin.
+async function requireGrantedUrl(url) {
+  const origin = navigationOrigin(url);
+  if (origin === null) throw new Error('Only http(s) navigation is supported');
+  if (!await isGranted(origin)) {
+    requestedOrigin = origin;
+    await chrome.storage.session.set({ chimeraRequestedOrigin: origin });
+    throw new Error(NOT_GRANTED);
+  }
+}
+
+// A request that could not be failed would leave this tab free to send it. Close the tab, say so.
+async function containFailure(target, requestId, failure) {
+  containmentIssues.push(`Request ${requestId} could not be blocked (${failure}); its tab was closed`);
+  await chrome.tabs.remove(target.tabId).catch(error => containmentIssues.push(`Tab ${target.tabId} could not be closed: ${error}`));
+}
+
+async function onFetchPaused(source, params) {
+  const target = sessionTarget(source);
+  const requestId = params.requestId;
+  const epoch = stopEpoch;
+  const url = params.request && params.request.url;
+  paused.set(requestId, target);
+  let refusal = null;
+  let stillMine = true;
+  try {
+    if (stopped) throw new Error(STOPPED_MESSAGE);
+    if (params.resourceType !== 'Document') {
+      // fetch/XHR/prefetch. Only a prefetch is held to the grant, and never as a reason to prompt the owner.
+      if (isPrefetchRequest(params) && !await isGrantedUrl(url)) throw new Error(NOT_GRANTED);
+    } else {
+      const mainFrame = (await sendTo(target, 'Page.getFrameTree')).frameTree.frame.id;
+      // Embedded frames (captcha, payment, video) are not navigations of the page; the app already treats a
+      // frame from another host as a reason to ask. Only the top-level document is held to the grant.
+      if (params.frameId === mainFrame) await requireGrantedUrl(url);
+    }
+    if (epoch !== stopEpoch || stopped) throw new Error(STOPPED_MESSAGE);
+    await sendTo(target, 'Fetch.continueRequest', { requestId });
+  } catch (error) {
+    // Fail closed: a refused origin, and any error while deciding, stop the request before it is sent.
+    refusal = String(error.message || error);
+  } finally {
+    // False when Stop (or a tab leaving the group) already took this request over and dealt with it.
+    stillMine = paused.delete(requestId);
+  }
+  if (refusal === null) return;
+  lastRefusal = refusal;
+  if (!stillMine) return;
+  try { await sendTo(target, 'Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }); }
+  catch (failure) { await containFailure(target, requestId, failure); }
+  if (params.resourceType === 'Document') for (const refuse of [...navigationRefusals]) refuse(refusal);
+}
+
+// A child target the PAGE session delivers: a prerendered page, an out-of-process iframe, a worker. It arrives
+// paused; it is protected first and only then allowed to run. A page that cannot be protected is closed and
+// never resumed. This does NOT cover a popup (window.open, target=_blank): Chromium pauses those only for
+// browser-level sessions, which chrome.debugger cannot open. See the tabs.onCreated note below.
+async function onTargetAttached(source, params) {
+  const parent = sessionTarget(source);
+  const child = { tabId: source.tabId, sessionId: params.sessionId };
+  const info = params.targetInfo || {};
+  try {
+    if (info.type === 'page' || info.type === 'iframe') await protectTarget(child, info.type);
+  } catch (error) {
+    if (info.type === 'page') {
+      containmentIssues.push(`A page opened from a Chimera tab could not be protected and was closed: ${error}`);
+      await sendTo(parent, 'Target.closeTarget', { targetId: info.targetId })
+        .catch(closeError => containmentIssues.push(`It could not be closed either: ${closeError}`));
+      return;
+    }
+  }
+  if (params.waitingForDebugger) {
+    await sendTo(child, 'Runtime.runIfWaitingForDebugger')
+      .catch(error => containmentIssues.push(`A child target could not be resumed: ${error}`));
+  }
+}
+
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (!source || typeof source.tabId !== 'number') return;
+  if (method === 'Fetch.requestPaused') void onFetchPaused(source, params || {});
+  else if (method === 'Target.attachedToTarget') void onTargetAttached(source, params || {});
+});
+
+// A tab the page opens is useless to the driver (it only ever follows its own tab), so it is closed as soon as
+// Chrome reports it. THIS IS NOT A GUARD AGAINST THE FIRST REQUEST: the popup's navigation (and its redirects)
+// starts in the browser process in parallel with this event, so a request can leave before the tab is closed.
+// No extension API available here closes that window (documented in docs/chrome-extension.md).
+chrome.tabs.onCreated.addListener(async tab => {
+  if (tab.openerTabId === undefined) return;
+  const saved = await chrome.storage.session.get('chimeraTabIds');
+  if (!(saved.chimeraTabIds || []).includes(tab.openerTabId)) return;
+  await chrome.tabs.remove(tab.id)
+    .catch(error => containmentIssues.push(`Tab ${tab.id} opened by a Chimera tab could not be closed: ${error}`));
+});
+
+// A tab the owner drags out of the Chimera group is the owner's again: stop filtering it and let go of it, so
+// the filter never holds up their own navigation.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.groupId === undefined) return;
+  void releaseIfLeftGroup(tabId, changeInfo.groupId);
+});
+
+async function releaseIfLeftGroup(tabId, newGroupId) {
+  await restoreState();
+  if (!tabIds.has(tabId) || newGroupId === groupId) return;
+  for (const [requestId, target] of [...paused]) if (target.tabId === tabId) paused.delete(requestId);
+  try { await chrome.debugger.sendCommand({ tabId }, 'Fetch.disable'); } catch { /* not attached */ }
+  try { await chrome.debugger.detach({ tabId }); } catch { /* not attached */ }
+  tabIds.delete(tabId);
+  if (activeTabId === tabId) activeTabId = undefined;
+  await persistState();
 }
 
 function originOf(url) {
@@ -442,7 +668,7 @@ function expectedMatches(target, expected) {
   catch { return false; }
 }
 
-async function actOnTarget(operation, refNode, text = '', expected = null, expectedPreview = null) {
+async function actOnTarget(operation, refNode, text = '', expected = null, expectedPreview = null, live = () => {}) {
   await checkCurrentOrigin();
   const target = await describeTarget(refNode);
   // Every click/type carries the summary the engine decided on; an action without one is refused, not trusted.
@@ -540,18 +766,22 @@ async function actOnTarget(operation, refNode, text = '', expected = null, expec
     });
     if (freshHit.backendNodeId !== hitBackendId)
       throw new Error('The element under the click changed; refusing to click');
+    live();
     await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
     const hoverHit = await cdp('DOM.getNodeForLocation', {
       x: Math.round(x), y: Math.round(y), includeUserAgentShadowDOM: true,
     });
     if (hoverHit.backendNodeId !== hitBackendId)
       throw new Error('The element under the pointer changed on hover; refusing to click');
+    live();
     await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+    live();
     await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
   } else {
     if (target.tag === 'input' || target.tag === 'textarea') replacedLength = Number(target.valueLength) || 0;
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
     if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
+    live();
     typed = await cdp('Runtime.callFunctionOn', {
       objectId: resolved.object.objectId,
       functionDeclaration: `function(text){
@@ -602,7 +832,7 @@ async function checkCurrentOrigin() {
   if (!await chrome.permissions.contains({ origins: [`${origin}/*`] })) {
     requestedOrigin = origin;
     await persistState();
-    throw new Error('This site has not been granted to the Chimera extension');
+    throw new Error(NOT_GRANTED);
   }
   requestedOrigin = undefined;
   await persistState();
@@ -611,16 +841,19 @@ async function checkCurrentOrigin() {
 async function waitForLoad() {
   await cdp('Page.enable');
   await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      chrome.debugger.onEvent.removeListener(listener);
-      reject(new Error('Page load timed out'));
-    }, 15000);
-    const listener = (source, method) => {
-      if (source.tabId !== activeTabId || method !== 'Page.loadEventFired') return;
+    const done = () => {
       clearTimeout(timeout);
       chrome.debugger.onEvent.removeListener(listener);
+      navigationRefusals.delete(refused);
+    };
+    const timeout = setTimeout(() => { done(); reject(new Error('Page load timed out')); }, 15000);
+    const listener = (source, method) => {
+      if (source.tabId !== activeTabId || method !== 'Page.loadEventFired') return;
+      done();
       resolve();
     };
+    const refused = message => { done(); reject(new Error(message)); };
+    navigationRefusals.add(refused);
     chrome.debugger.onEvent.addListener(listener);
   });
 }
@@ -634,32 +867,37 @@ async function handle(message) {
 async function runOperation(message) {
   if (!message || typeof message.id !== 'number' || typeof message.op !== 'string')
     throw new Error('Invalid request');
+  const epoch = stopEpoch;
+  const live = () => { if (epoch !== stopEpoch || stopped) throw new Error(STOPPED_MESSAGE); };
   await restoreState();
   if (message.op === 'close') { await stop({ disconnectPort: false }); return true; }
+  // Stop holds until the owner's Start: a request that still reaches a live port is refused, not served.
+  if (stopped) throw new Error('Chimera Browser was stopped from its popup; click Start in the Chimera extension popup to let Chimera use the browser again');
   // Cancel is the owner's kill-switch, so only the owner's Resume (popup) clears it, never an app request.
   if (actionsDisabled) throw new Error('Chrome debugging was canceled from its bar; click "Resume Chimera actions" in the Chimera extension popup, then request the action again');
   let requested;
   if (message.op === 'navigate') {
     if (typeof message.url !== 'string' || !/^https?:\/\//i.test(message.url)) throw new Error('Only http(s) navigation is supported');
     try { requested = new URL(message.url); } catch { throw new Error('Invalid navigation URL'); }
-    if (!await chrome.permissions.contains({ origins: [`${requested.origin}/*`] })) {
-      requestedOrigin = requested.origin;
-      await persistState();
-      throw new Error('This site has not been granted to the Chimera extension');
-    }
+    await requireGrantedUrl(requested.href);
   }
-  await ensureGroup(requested?.href);
+  live();
+  await ensureGroup(requested?.href, live);
   if (!requested) {
     const current = await chrome.tabs.get(activeTabId);
     if (!isWebUrl(current.url)) throw new Error(NOT_A_WEB_TAB);
   }
+  live();
   await attach(activeTabId);
   switch (message.op) {
     case 'navigate': {
       await cdp('Page.enable');
+      lastRefusal = '';
+      live();
       const loading = waitForLoad();
+      loading.catch(() => {}); // its outcome is read below; a refusal must not also surface as an unhandled rejection
       const result = await cdp('Page.navigate', { url: message.url });
-      if (result.errorText) throw new Error('Navigation failed');
+      if (result.errorText) throw new Error(lastRefusal || 'Navigation failed');
       await loading;
       await checkCurrentOrigin();
       return await elements();
@@ -671,10 +909,10 @@ async function runOperation(message) {
       await checkCurrentOrigin();
       return await describeTarget(message.ref_node);
     case 'click':
-      return await actOnTarget('click', message.ref_node, '', message.expected, message.expected_preview);
+      return await actOnTarget('click', message.ref_node, '', message.expected, message.expected_preview, live);
     case 'type':
       if (typeof message.text !== 'string') throw new Error('Invalid text');
-      return await actOnTarget('type', message.ref_node, message.text, message.expected);
+      return await actOnTarget('type', message.ref_node, message.text, message.expected, null, live);
     case 'current_url': {
       await checkCurrentOrigin();
       const tab = await chrome.tabs.get(activeTabId);
@@ -713,8 +951,12 @@ async function runOperation(message) {
       await checkCurrentOrigin();
       const history = await cdp('Page.getNavigationHistory');
       if (history.currentIndex > 0) {
+        const entry = history.entries[history.currentIndex - 1];
+        // The entry may sit on another origin than the one granted for this page: ask before the request goes out.
+        await requireGrantedUrl(entry.url);
+        live();
         const loading = waitForLoad();
-        await cdp('Page.navigateToHistoryEntry', { entryId: history.entries[history.currentIndex - 1].id });
+        await cdp('Page.navigateToHistoryEntry', { entryId: entry.id });
         await loading;
       }
       await checkCurrentOrigin();
@@ -744,7 +986,7 @@ function pairUsingCode(code) {
 }
 
 function connectNative() {
-  if (nativePort) return;
+  if (nativePort || !mayConnect(stopped)) return;
   nativePort = chrome.runtime.connectNative(HOST);
   nativePort.onMessage.addListener(async message => {
     if (!message) return;
@@ -781,49 +1023,94 @@ async function statusForPopup() {
     await persistState();
   }
   const value = await chrome.storage.session.get(['chimeraStatus']);
-  return { status: value.chimeraStatus || 'Stopped', requestedOrigin: requestedOrigin || '', actionsDisabled };
+  // The real state comes from storage: a worker that was recycled has no memory of a Stop, and a stale
+  // "Connected" must not be shown while the owner's Stop holds.
+  return {
+    status: stopped ? 'Stopped' : (value.chimeraStatus || 'Stopped'),
+    requestedOrigin: requestedOrigin || '', actionsDisabled, stopped, issues: [...containmentIssues],
+  };
 }
 
 // Owner action from the popup only (onMessage never receives web pages or the app). Clears the kill-switch.
 async function resumeActions() {
-  await chrome.storage.session.set({ chimeraActionsDisabled: false });
+  await chrome.storage.local.set({ chimeraActionsDisabled: false });
   actionsDisabled = false;
+}
+
+// Owner action from the popup only. The one way out of Stop besides pairing.
+async function startFromPopup() {
+  await chrome.storage.local.set({ chimeraStopped: false });
+  stopped = false;
+  connectNative();
 }
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.op === 'status') {
-    statusForPopup().then(sendResponse, () => sendResponse({ status: 'Stopped', requestedOrigin: '', actionsDisabled: false }));
+    statusForPopup().then(sendResponse, () => sendResponse({ status: 'Stopped', requestedOrigin: '', actionsDisabled: false, stopped: true }));
     return true;
   }
   if (request.op === 'resume') {
     resumeActions().then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }));
     return true;
   }
+  if (request.op === 'start') {
+    startFromPopup().then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }));
+    return true;
+  }
   if (request.op === 'pair') {
     // Only the popup asks to pair; a pairing request coming from the host side is never honoured.
     if (typeof request.code !== 'string' || !/^\d{6}$/.test(request.code)) { sendResponse({ ok: false }); return false; }
-    connectNative();
-    pairUsingCode(request.code)
+    // Entering a code from Chimera Desktop is the owner's explicit gesture, so it also ends a Stop.
+    startFromPopup().then(() => pairUsingCode(request.code))
       .then(result => sendResponse({ ok: result?.ok === true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
   }
   if (request.op === 'stop') {
-    stop().then(() => sendResponse({ ok: true })).catch(() => sendResponse({ error: 'Could not stop Chimera browser' }));
+    stop({ hold: true }).then(issues => sendResponse({ ok: true, issues })).catch(() => sendResponse({ error: 'Could not stop Chimera browser' }));
     return true;
   }
   return false;
 });
 
-async function stop({ disconnectPort = true } = {}) {
+// Closes one Chimera tab: removed, or at worst sent to about:blank. Resolves to true when the page can no
+// longer send anything, so the debugger may be let go of.
+async function closeTab(tabId) {
+  try { await chrome.tabs.remove(tabId); } catch { /* may already be gone; checked below */ }
+  if (!await chrome.tabs.get(tabId).then(() => true, () => false)) return true;
+  try {
+    // A refused navigation is reported in the RESULT (errorText), not as an exception: it is a failure too.
+    const result = await chrome.debugger.sendCommand({ tabId }, 'Page.navigate', { url: 'about:blank' });
+    return !(result && result.errorText);
+  } catch { return false; }
+}
+
+// Order matters (ext, Codex review): letting go of the debugger releases every request still paused, so first
+// each paused request is FAILED, then the tabs are closed, and only then is the debugger detached. A failure
+// at any step is returned, not hidden; a tab that could not be closed stays attached (its requests stay held).
+async function stop({ disconnectPort = true, hold = false } = {}) {
+  stopEpoch += 1;
+  if (hold) {
+    // Written first and to storage.local: even if this worker dies half way, nothing reconnects it.
+    await chrome.storage.local.set({ chimeraStopped: true });
+    stopped = true;
+  }
   await restoreState();
+  const issues = [];
   const ownedTabs = groupId === undefined ? [...tabIds] :
     (await chrome.tabs.query({ groupId }).catch(() => [])).map(tab => tab.id);
-  for (const tabId of ownedTabs) {
-    try { await chrome.debugger.detach({ tabId }); } catch { /* tab already closed or detached */ }
+  for (const [requestId, target] of [...paused]) {
+    paused.delete(requestId);
+    try { await sendTo(target, 'Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }); }
+    catch (error) { issues.push(`A paused request could not be failed (${error}); its tab is closed instead`); }
   }
-  if (ownedTabs.length) {
-    try { await chrome.tabs.remove(ownedTabs); } catch { /* tabs were already closed */ }
+  const detachable = [];
+  for (const tabId of ownedTabs) {
+    if (await closeTab(tabId)) detachable.push(tabId);
+    else issues.push(`Tab ${tabId} could not be closed; it stays attached and held`);
+  }
+  for (const tabId of detachable) {
+    try { await chrome.debugger.detach({ tabId }); } catch { /* the tab is closed, so there is nothing attached */ }
   }
   tabIds.clear();
   groupId = undefined;
@@ -832,25 +1119,29 @@ async function stop({ disconnectPort = true } = {}) {
   await persistState();
   if (disconnectPort && nativePort) { nativePort.disconnect(); nativePort = undefined; }
   setStatus('Stopped');
+  containmentIssues.push(...issues);
+  return issues;
 }
 
 chrome.debugger.onDetach.addListener((source, reason) => {
   if (source.tabId !== activeTabId) return;
   if (reason === 'canceled_by_user') {
     // Owner pressed Cancel on Chrome's debugging bar: stop everything and stay off until the owner resumes.
-    chrome.storage.session.set({ chimeraActionsDisabled: true }).then(() => {
+    chrome.storage.local.set({ chimeraActionsDisabled: true }).then(() => {
       actionsDisabled = true;
       return stop({ disconnectPort: false });
     }).then(async () => {
       actionsDisabled = true;
-      await chrome.storage.session.set({ chimeraActionsDisabled: true });
+      await chrome.storage.local.set({ chimeraActionsDisabled: true });
     });
     return;
   }
   setStatus('Debugger detached');
 });
 
-chrome.runtime.onStartup.addListener(connectNative);
-chrome.runtime.onInstalled.addListener(connectNative);
-restoreState().then(connectNative);
-connectNative();
+// Every start of this worker, whatever woke it, reads the owner's Stop first; connectNative itself refuses
+// while it holds. There is no unconditional connect.
+function connectUnlessStopped() { return restoreState().then(connectNative); }
+chrome.runtime.onStartup.addListener(connectUnlessStopped);
+chrome.runtime.onInstalled.addListener(connectUnlessStopped);
+connectUnlessStopped();
