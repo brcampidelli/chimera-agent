@@ -403,6 +403,12 @@ class RunRequest(CodeSeams):
     this is a field the caller sets rather than a rule the loop infers.
     """
 
+    use_planner: bool | None = None
+    """Plan before working. ``None`` = the default policy (``chimera.core.planner_policy``): on today.
+
+    ``False`` skips the planning call; ``True`` forces it. Ignored when ``plan`` is set — an approved
+    plan is followed verbatim and makes no planning call either way."""
+
     replan: bool = False
     """On a stall, rebuild the plan from the accumulated failure causes instead of nudging.
 
@@ -4035,6 +4041,7 @@ def _build_solve_agent(
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.core.planner import Plan
+    from chimera.core.planner_policy import resolve_use_planner
     from chimera.core.runstate import RunCheckpointer
     from chimera.core.spec_test import SpecTestGenerator
     from chimera.core.verify import CommandVerifier
@@ -4252,7 +4259,10 @@ def _build_solve_agent(
         # Half the scaffold lift this project measured, unreachable from any screen until now
         # because it lived only as a CLI flag.
         require_diff=req.require_diff,
-        config=AutonomousConfig(max_attempts=req.max_attempts),
+        config=AutonomousConfig(
+            max_attempts=req.max_attempts,
+            use_planner=resolve_use_planner(req.use_planner, has_verifier=bool(verify_command)),
+        ),
     )
 
 

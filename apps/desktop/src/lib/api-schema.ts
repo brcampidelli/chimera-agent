@@ -15225,6 +15225,8 @@ export interface components {
             task: string;
             /** Thread Id */
             thread_id?: string | null;
+            /** Use Planner */
+            use_planner?: boolean | null;
             /** Verify */
             verify?: string | null;
             /** Warn Usd */

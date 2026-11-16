@@ -27,7 +27,7 @@ from itertools import product
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from _legacy_defaults import pin_legacy_defaults  # noqa: E402
+from _legacy_defaults import pin_legacy_defaults
 
 HB = Path(os.path.expanduser("~/harness-bench"))
 HOMES = Path(os.path.expanduser("~/p101-homes"))
@@ -245,4 +245,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    pin_legacy_defaults()  # the five 2026-11-10 defaults, back to the value the factorial used
     main()

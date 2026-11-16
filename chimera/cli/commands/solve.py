@@ -459,6 +459,7 @@ def solve(
         WorkspaceGuard,
     )
     from chimera.core.failure_class import RECOVERY_MODES
+    from chimera.core.planner_policy import resolve_use_planner
     from chimera.core.tool_router import ToolRouter as _ToolRouter
     from chimera.core.verify_infer import cli_verifier
     from chimera.evolution import build_evolution_context
@@ -828,6 +829,8 @@ def solve(
         )
 
         run_verifier, verify_origin = cli_verifier(verify, ws, gen_tests=gen_tests)
+        # `--no-plan` is the caller's explicit word; without it the shared policy decides.
+        use_planner = resolve_use_planner(False if no_plan else None, has_verifier=run_verifier is not None)
         auto = AutonomousAgent(
             worker,
             escalation=escalation,
@@ -867,9 +870,11 @@ def solve(
             ),
             # Provenance gate: artifacts born from a tainted run are marked/held pending.
             taint=ledger,
-            planner=None if no_plan else Planner(
+            planner=Planner(
                 _fused_if(planner_backend, roles.models.fuse_plan, meter, settings), roles.models.plan or model
-            ),
+            )
+            if use_planner
+            else None,
             # review_model_for refuses to let the reviewer be the model that wrote the patch —
             # generate-and-verify collapses when it grades its own work and agrees with itself.
             manager=None if no_manager else Manager(
@@ -915,7 +920,7 @@ def solve(
             meter=meter,
             config=AutonomousConfig(
                 max_attempts=max_attempts,
-                use_planner=not no_plan,
+                use_planner=use_planner,
                 use_manager=not no_manager,
                 normalize_task=normalize_task,
             ),

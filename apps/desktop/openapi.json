@@ -18172,6 +18172,17 @@
             ],
             "title": "Thread Id"
           },
+          "use_planner": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Use Planner"
+          },
           "verify": {
             "anyOf": [
               {
