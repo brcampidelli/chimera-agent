@@ -29,6 +29,10 @@ from typing import Any
 #: * ``recall_history`` searches the owner's OTHER conversations (and, with ``everywhere``, other
 #:   projects'): the guest's own conversation is already in front of the model.
 #: * ``read_email`` / ``calendar_events`` read the owner's mailbox and calendar with the owner's keys.
+#: * ``job_status`` / ``job_cancel`` list and read background jobs by the folder, and a job's command,
+#:   directory and output are whatever the owner's turn ran: the filter by conversation cannot tell
+#:   the guest's job from the owner's job in the SAME shared conversation. A guest has no shell and so
+#:   starts no job of its own; there is nothing of its own to look up.
 #: * ``skill_view`` reads the owner's skill bundles, plugins' included.
 #: * ``run_shell`` / ``execute_code`` run on the owner's machine, where ``cat``/``type`` reads any
 #:   path (the owner's ``agent.json``, ``.env``, other projects): no approval mode and no read-only
@@ -37,7 +41,7 @@ from typing import Any
 #:   sandbox that mounts the workspace alone.
 WITHHELD_TOOLS: frozenset[str] = frozenset(
     {
-        "recall_history", "read_email", "calendar_events", "skill_view",
+        "recall_history", "read_email", "calendar_events", "skill_view", "job_status", "job_cancel",
         "run_shell", "execute_code",
         # Each of these runs something the guest's own edits can change: a dev server starts the
         # project's recipe, and a pull request runs git (hooks) and gh with the owner's credentials.

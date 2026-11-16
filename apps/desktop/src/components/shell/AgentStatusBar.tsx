@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Square } from "lucide-react";
 
 import { BrandMark } from "@/components/BrandMark";
@@ -11,7 +12,7 @@ import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
 import { useAgent } from "@/lib/agent-context";
 import { useRunSession } from "@/lib/run-session";
-import { missLabelKey, shownMissCause } from "@/lib/cache-miss";
+import { cacheWarningText, missLabelKey, shownMissCause } from "@/lib/cache-miss";
 import { useI18n, useNum, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -31,12 +32,22 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
   const t = useT();
   const num = useNum();
   const { lang } = useI18n();
-  const { status, tools, report, busy, stop, turnId } = useAgent();
+  const { status, tools, report, busy, stop, turnId, chatAnnounces } = useAgent();
   const run = useRunSession();
   // A live run outranks the chat turn as the subject of this bar. Both can be going at once, but
   // only one of them is the thing you might have walked away from — a chat turn finishes in
   // seconds and you are looking at it; a run takes minutes and is the reason this bar exists.
   const idle = status === "idle" && !run.running;
+  // A run is announced by THIS bar, never by the conversation's chip, and its END has to be heard
+  // too: the region must not turn itself off in the very render that says "finished". So once a run
+  // has been seen, the bar stays the announcer until a chat turn takes over (status leaves idle).
+  const runSeen = useRef(false);
+  if (run.running) runSeen.current = true;
+  else if (status !== "idle") runSeen.current = false;
+  // Quiet only when the chip that says the same thing is actually on screen, on the chat screen, with
+  // no run involved.
+  const localAnnouncer = viewKey === "code" && chatAnnounces === true && !run.running && !runSeen.current;
+  const cacheWarning = cacheWarningText(report?.cache_warning, t, (n) => `${num(n)}%`);
   // Not `.at(-1)`: the project targets ES2020, and widening lib for one call is a
   // disproportionate change.
   const lastTool = tools.length > 0 ? tools[tools.length - 1] : undefined;
@@ -52,9 +63,16 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
           outside the launch sequence, and it is the one that says "still going". */}
       <BrandMark className={cn("h-4 w-4", !idle && "pulse-glow")} aria-hidden alt="" />
 
-      {/* The single announcement channel for agent state. Transitions only — announcing the
-          streaming text itself would re-read the whole growing answer on every token. */}
-      <span role="status" aria-live="polite" className="font-medium">
+      {/* The announcement channel for agent state outside the chat screen, and for a run anywhere.
+          Transitions only — announcing the streaming text itself would re-read the whole growing
+          answer on every token. On the chat screen, the CHAT turn is announced by the header chip in
+          `Conversation` (it also knows a turn FAILED, which `status` here cannot say), so this one
+          stays visual there: two live regions saying "working" and "done" is the same sentence twice. */}
+      <span
+        role="status"
+        aria-live={localAnnouncer ? "off" : "polite"}
+        className="font-medium"
+      >
         {run.running ? t("runs.running") : t(`activity.${status}`)}
       </span>
 
@@ -106,6 +124,13 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
                   : t("status.cacheUnknown"),
             })}
           </span>
+          {/* Set only on the turn that took the conversation's cache rate under 80%: the cost of
+              this conversation is higher than it needs to be, and the cause is named beside it. */}
+          {cacheWarning ? (
+            <span className="text-warn" data-testid="cache-warning">
+              {cacheWarning}
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={onOpenUsage}

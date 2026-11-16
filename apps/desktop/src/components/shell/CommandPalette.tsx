@@ -3,6 +3,7 @@ import * as RadixDialog from "@radix-ui/react-dialog";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { focusRingInset } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
 
 export interface Command {
@@ -126,7 +127,10 @@ export function CommandPalette({
               aria-activedescendant={matches[active] ? `cmd-${matches[active].id}` : undefined}
               aria-autocomplete="list"
               aria-label={t("palette.placeholder")}
-              className="w-full bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
+              className={cn(
+                "w-full bg-transparent text-sm placeholder:text-muted-foreground",
+                focusRingInset,
+              )}
             />
           </div>
 

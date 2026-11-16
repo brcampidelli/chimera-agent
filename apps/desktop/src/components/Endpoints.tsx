@@ -12,7 +12,9 @@ import {
 } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 
-const inputCls = "w-full bg-transparent text-sm outline-hidden";
+// `field` is the recessed, bordered input with the shared focus ring; a bare transparent input had
+// neither a visible edge nor a focus indicator.
+const inputCls = "field w-full px-2.5 py-1.5 text-sm";
 
 /**
  * Named OpenAI-compatible endpoints (#1133): a vLLM, LM Studio or llama.cpp server, or a hosted one

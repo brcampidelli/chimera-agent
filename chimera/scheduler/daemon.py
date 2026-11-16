@@ -211,7 +211,14 @@ def make_agent_dispatch(
         )
         if on_result is None:
             return status
+        job._delivery_failed = False
         _send(job, answer, status or "ok")
+        # A run whose answer reached nobody did not finish its job: the answer IS the product. As
+        # `ok` it zeroed the failure count and was never braked, so a destination returning 503
+        # cost a model run, and a send, on every tick for as long as it stayed down. As `error` it
+        # rides the brake that already exists. A `rejected` run keeps its own, stronger, status.
+        if status is None and job._delivery_failed:
+            return "error"
         return status
 
     return dispatch

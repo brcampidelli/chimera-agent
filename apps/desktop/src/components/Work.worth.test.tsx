@@ -49,10 +49,64 @@ describe("Work — was it worth it?", () => {
 
   it("reports the real cost when every run in the group was priced", async () => {
     vi.mocked(getWorth).mockResolvedValue(
-      worthReport([{ profile: "balanced", runs: 12, passed: 9, usd_total: 1.2345, usd_known_runs: 12 }]),
+      worthReport([{ profile: "balanced", runs: 12, passed: 9, passed_by_verifier: 3, usd_total: 1.2345, usd_known_runs: 12 }]),
     );
     await openTab(/Valeu a pena|Was it worth/);
     expect(await screen.findByText("$1.2345")).toBeInTheDocument();
+  });
+
+  it("shows the cost per resolved task with its count and price coverage", async () => {
+    vi.mocked(getWorth).mockResolvedValue(
+      worthReport([
+        {
+          runs: 4,
+          passed: 2,
+          resolved_n: 2,
+          passed_by_verifier: 1,
+          usd_total: 0.4,
+          usd_known_runs: 4,
+          price_coverage: 1,
+          usd_per_resolved: 0.2,
+          usd_per_verified: 0.4,
+        },
+      ]),
+    );
+    await openTab(/Valeu a pena|Was it worth/);
+    expect(await screen.findByTestId("usd-per-resolved")).toHaveTextContent("$0.2000");
+    expect(screen.getByTestId("usd-per-verified")).toHaveTextContent("$0.4000");
+    expect(screen.getByText(/2 resolved.*100% of runs priced/)).toBeInTheDocument();
+  });
+
+  it("leaves cost per resolved blank, with the coverage, when a run was unpriced", async () => {
+    vi.mocked(getWorth).mockResolvedValue(
+      worthReport([
+        {
+          runs: 3,
+          passed: 3,
+          resolved_n: 3,
+          usd_total: null,
+          usd_known_runs: 2,
+          price_coverage: 0.6667,
+          usd_per_resolved: null,
+          usd_per_verified: null,
+        },
+      ]),
+    );
+    await openTab(/Valeu a pena|Was it worth/);
+    expect(await screen.findByTestId("usd-per-resolved")).toHaveTextContent("—");
+    expect(screen.getByTestId("usd-per-verified")).toHaveTextContent("—");
+    expect(screen.getByText(/3 resolved.*67% of runs priced/)).toBeInTheDocument();
+  });
+
+  it("leaves cost per resolved blank when nothing passed, and says it is not a ranking", async () => {
+    vi.mocked(getWorth).mockResolvedValue(
+      worthReport([
+        { runs: 2, passed: 0, resolved_n: 0, passed_by_verifier: 0, usd_total: 0.02, usd_per_resolved: null, usd_per_verified: null },
+      ]),
+    );
+    await openTab(/Valeu a pena|Was it worth/);
+    expect(await screen.findByTestId("usd-per-resolved")).toHaveTextContent("—");
+    expect(screen.getByText(/Not an experiment: it is not ranked/)).toBeInTheDocument();
   });
 
   it("refuses to invent a cost when part of the group was unpriced", async () => {
@@ -137,5 +191,26 @@ describe("Work — which kind of pass", () => {
     const row = (await screen.findAllByRole("row"))[1];
     expect(row).toHaveTextContent("3");
     expect(row).toHaveTextContent(/1.*with tests|1.*com testes/);
+  });
+});
+
+describe("Work - was it worth it? against a server older than the per-resolved fields", () => {
+  it("shows a dash, not an error, when the response lacks the new fields", async () => {
+    vi.mocked(getFsTree).mockResolvedValue(emptyTree());
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
+    vi.mocked(getRuns).mockResolvedValue([]);
+    vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
+    vi.mocked(getRoleModels).mockResolvedValue(roleModels());
+    // The shape an older server sends: no resolved_n, price_coverage, usd_per_resolved or usd_per_verified.
+    const old = worthReport([{ runs: 4, passed: 2, usd_total: 0.4, usd_known_runs: 4 }]);
+    old.profiles = old.profiles.map((g) => {
+      const { resolved_n: _a, price_coverage: _b, usd_per_resolved: _c, usd_per_verified: _d, ...rest } = g;
+      return rest;
+    });
+    vi.mocked(getWorth).mockResolvedValue(old);
+    await openTab(/Valeu a pena|Was it worth/);
+    expect(await screen.findByTestId("usd-per-resolved")).toHaveTextContent("—");
+    expect(screen.getByTestId("usd-per-verified")).toHaveTextContent("—");
+    expect(screen.getByText(/2 resolved.*100% of runs priced/)).toBeInTheDocument();
   });
 });

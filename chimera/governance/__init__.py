@@ -72,6 +72,7 @@ if TYPE_CHECKING:
 _LAZY: dict[str, tuple[str, str]] = {
     "ApprovalLedger": ("approval", "ApprovalLedger"),
     "governed_profile": ("profile", "governed_profile"),
+    "announce_existing_install": ("first_boot", "announce_existing_install"),
     "govern_step": ("profile", "govern_step"),
     "GovernanceStep": ("profile", "GovernanceStep"),
     "Approver": ("approval", "Approver"),
@@ -168,6 +169,7 @@ __all__ = [
     "fields_schema",
     "ApprovalLedger",
     "governed_profile",
+    "announce_existing_install",
     "govern_step",
     "GovernanceStep",
     "Approver",

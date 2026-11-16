@@ -36,6 +36,43 @@ function mount(onAnswered: () => void = () => {}, q: ApprovalQuestionLike = ques
   );
 }
 
+describe("ApprovalCard — spoken aloud", () => {
+  it("says nothing by itself: a dialog or a list the person navigated to already announces", () => {
+    mount();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("with `announce`, raises one alert naming the decision and the ledger's reason", () => {
+    render(
+      <I18nProvider>
+        <ApprovalCard question={question} onAnswered={() => {}} announce />
+      </I18nProvider>,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveClass("sr-only");
+    expect(alert.textContent).toContain("Chimera needs a decision");
+    expect(alert.textContent).toContain(question.reason);
+  });
+
+  it("announces the NEXT question too, when the same card is reused for it", () => {
+    const { rerender } = render(
+      <I18nProvider>
+        <ApprovalCard question={question} onAnswered={() => {}} announce />
+      </I18nProvider>,
+    );
+    const first = screen.getByRole("alert");
+    rerender(
+      <I18nProvider>
+        <ApprovalCard question={{ ...question, id: "next", reason: "run_shell needs a look" }} onAnswered={() => {}} announce />
+      </I18nProvider>,
+    );
+    const second = screen.getByRole("alert");
+    // A new node (keyed by question id), so a screen reader treats it as a fresh insertion.
+    expect(second).not.toBe(first);
+    expect(second.textContent).toContain("run_shell needs a look");
+  });
+});
+
 describe("ApprovalCard — the other half of a pause", () => {
   it("shows the ledger's own reason and how long silence has before it refuses", () => {
     mount();

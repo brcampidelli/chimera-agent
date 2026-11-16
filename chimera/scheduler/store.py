@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from chimera.core.state_format import report
-from chimera.scheduler.models import CronJob
+from chimera.scheduler.models import CronJob, webhook_unsupported
 from chimera.telemetry import get_logger
 
 _log = get_logger("scheduler.store")
@@ -52,6 +52,11 @@ class CronStore:
                 _log.debug("malformed cron entry: %s", exc)
                 pulados += 1
                 continue
+            if job.trigger == "webhook" and webhook_unsupported(job):
+                _log.warning(
+                    "webhook job %s names %s, which the webhook path does not apply; "
+                    "it will be refused when it fires", job.id, ", ".join(webhook_unsupported(job)),
+                )
             jobs[job.id] = job
         # Every entry rejected is a file written by another version, not a corrupt one — and `None`
         # is already this method's word for "could not read it", which `load` handles by keeping

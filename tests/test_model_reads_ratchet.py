@@ -83,7 +83,7 @@ KEPT: dict[tuple[str, str], tuple[int, str]] = {
     ("chimera/cli/decisions_cmd.py", "decision_model"): (1, _CONSUMER),
     ("chimera/cli/review_cmd.py", "default_model"): (1, _CONSUMER),
     ("chimera/core/agent.py", "default_model"): (1, _CONSUMER),
-    ("chimera/core/escalation.py", "default_model"): (2, _RESOLVER),
+    ("chimera/core/escalation.py", "default_model"): (1, _RESOLVER),
     ("chimera/decisions/factory.py", "decision_model"): (1, _RESOLVER),
     ("chimera/design/propose.py", "default_model"): (1, _CONSUMER),
     ("chimera/evolution/wiring.py", "embed_model"): (1, _CONSUMER),

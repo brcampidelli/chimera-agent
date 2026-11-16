@@ -31,7 +31,8 @@ from chimera.api.key_vault import (
     write_credentials,
     write_env_value,
 )
-from chimera.config import Settings, get_settings, pinned_by_environment
+from chimera.config import Settings, config_env_files, get_settings, pinned_by_environment
+from chimera.governance import first_boot
 from chimera.memory.backend import resolve_memory_backend
 from chimera.providers.catalog import PROVIDERS
 from chimera.providers.privacy import privacy_snapshot
@@ -975,6 +976,9 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             # It decides whether anything judges what a run DOES, and it was the only one of the
             # four with no way to change it but a text editor.
             "governance": settings.governance_mode,
+            "governance_notice": first_boot.notice_active(
+                Path(settings.home), env_files=config_env_files()
+            ),
             # Reported as a fact about configuration, never as the value: the URL is a credential,
             # and whoever holds it can post into that channel. Same shape as `server.token_set`.
             "approval_webhook_set": bool(settings.approval_webhook.strip()),

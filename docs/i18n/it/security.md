@@ -1,5 +1,5 @@
 ---
-source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
+source_sha256: 98e04cea6d46d08e173e43f42725aa38d3079dd3bb10dea93d09502423e0e091
 ---
 
 # Sicurezza & salvaguardie
@@ -191,6 +191,25 @@ raggiunge quelle quattro rotte e nulla di ciò che il token del server protegge.
 di consegnare un link: un ospite può chiedere all'agente qualsiasi cosa chiederebbe il proprietario, nel
 progetto del proprietario, con i suoi strumenti e la sua spesa — sotto le cuciture predefinite della
 richiesta, e senza approvare schede.
+
+**Cosa legge un ospite dei turni del proprietario.** Ciò che il proprietario ha detto e la risposta finale del
+modello, e niente di ciò che la macchina ha visto o prodotto nel frattempo. La porta dell'ospite
+(`chimera/api/guest_projection.py` e `chimera/core/guest_history.py`) è una lista di elementi consentiti
+applicata allo stream in diretta, alla sua riproduzione, alla conversazione salvata e alla cronologia inviata al
+modello del turno dell'ospite stesso. All'ospite viene mostrata la richiesta così come la persona l'ha scritta
+(una richiesta automatica, il testo di un documento allegato, un comando espanso o una scheda proposta dal
+modello compaiono come segnaposto), la risposta finale del modello quando il turno si è concluso normalmente
+(un errore, un limite o una prima passata poi riparata non vengono mostrati: l'ospite legge che il turno non
+si è concluso) e, per uno strumento, solo il tipo e lo stato. Il testo tra una chiamata e l'altra agli
+strumenti non viene trasmesso a un ospite, e il turno dell'ospite stesso non riceve i risultati degli
+strumenti, le note dei job o dei lavori del proprietario, né gli strumenti per i job. Argomenti e risultati
+degli strumenti, diff di modifica, anteprime di approvazione, immagini del browser, l'output del verificatore,
+le fonti delle istruzioni, il costo della ricevuta e i percorsi dell'host non vengono inviati, e un tipo di
+frame che nessuno ha elencato viene scartato. Una conversazione salvata prima che esistessero questi contrassegni
+mostra segnaposto a un ospite. La finestra del proprietario continua a ricevere ogni frame. L'unica cosa che
+questo non può filtrare è la risposta finale stessa: se il modello cita un file privato con parole sue,
+l'ospite lo legge — condividere una conversazione ne condivide le risposte, e il pannello di condivisione lo
+dice.
 
 ### Il tuo telefono o browser: associare un dispositivo
 

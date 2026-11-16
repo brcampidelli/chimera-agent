@@ -29,26 +29,18 @@ from typing import Any
 from chimera.fusion.engine import FusionConfig, FusionEngine
 
 
-def fusion_config(settings: Any) -> FusionConfig:
-    """The fusion config a user's settings mean: their ladder unless they named the models."""
-    from chimera.providers.catalog import resolve_tiers
+def fusion_config(settings: Any, *, with_efforts: bool = True) -> FusionConfig:
+    """The fusion config a user's settings mean: their ladder unless they named the models.
 
-    config = FusionConfig.from_settings(settings)
-    explicit: set[str] = set(getattr(settings, "model_fields_set", set()))
-    if "fusion_panel" in explicit:
-        return config
-    ladder = resolve_tiers(settings)
-    # dict.fromkeys: dedupe while keeping order. A cost mode can point two tiers at the same model
-    # (``cheap`` sets mid == top), and a panel that asks one model the same question twice is paying
-    # twice for one opinion and calling the agreement a signal.
-    config.panel = list(dict.fromkeys([ladder.top, ladder.mid, ladder.weak]))
-    # The judge and the synthesiser follow the ladder only when the user did not name them: an
-    # explicit `CHIMERA_FUSION_JUDGE` is a choice, the same as an explicit panel.
-    if "fusion_judge" not in explicit:
-        config.judge = ladder.top
-    if "fusion_synthesizer" not in explicit:
-        config.synthesizer = ladder.top
-    return config
+    The rule is written once, in :func:`chimera.providers.routing.fusion_cast`, which is also what
+    the routing table reports for ``fusion.panel`` / ``fusion.judge`` / ``fusion.synthesizer`` — and
+    where a ``CHIMERA_ROLE_EFFORTS`` entry for those roles is applied. Each fusion stage is a fresh
+    model call with its own context, so an effort set here never changes mid-conversation.
+    """
+    from chimera.providers.routing import fusion_cast
+
+    cast: FusionConfig = fusion_cast(settings, with_efforts=with_efforts)
+    return cast
 
 
 def fusion_engine(gateway: Any, settings: Any = None) -> FusionEngine:

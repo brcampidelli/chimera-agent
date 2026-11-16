@@ -84,9 +84,10 @@ _WHERE = " The error is not posted here; `chimera cron doctor` on the host shows
 class Delivered:
     """What happened when we tried. ``ok=False`` is a report, never an exception upwards.
 
-    The job already ran and its answer is already on disk; failing the job because a chat service
-    was down would throw away work that succeeded, and would count against
-    ``consecutive_failures`` as though the schedule itself were broken.
+    The job already ran and its answer is already on disk, so nothing is thrown away and no
+    exception goes up. It is NOT free, though: the dispatch ends such a run as ``error`` so a
+    destination that stays down rides ``consecutive_failures`` into the brake (P1-03) instead of
+    costing a model run and a send on every tick for ever.
     """
 
     ok: bool
@@ -155,6 +156,7 @@ def make_deliver(
         # Assigned on every call, true or false, so it never carries over from an earlier run: the
         # failure notice reads it to know whether the channel already saw this run's answer.
         job._answer_posted = entrega is not None and entrega.ok
+        job._delivery_failed = entrega is not None and not entrega.ok
         # The fingerprint moves only when the answer actually reached its destination (or there is
         # no destination, and the record IS the delivery). A post that failed was not seen, so the
         # same answer next time is still news to the person it was for. And only for a successful

@@ -421,7 +421,10 @@ def _without_refused(resolved: str, kwargs: dict[str, Any]) -> dict[str, Any]:
 #: content parts below) and the guidance marker. Spelled out rather than imported from the agent,
 #: which imports this module.
 # `agent_batch` marks a finished batch's record in a conversation (`chimera.core.agent_batch_note`).
-_LOCAL_KEYS = frozenset({"images", "guidance", "agent_batch"})
+# `origin`, `author` and `model_answer` are the marks `chimera.core.guest_history` puts on stored
+# messages (who wrote a user message; the model's own text where the server replaced it).
+_LOCAL_KEYS = frozenset({"images", "guidance", "agent_batch", "origin", "author", "model_answer",
+     "guest_id", "human_text", "final_seal"})
 
 
 def _request_chars(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None) -> int:

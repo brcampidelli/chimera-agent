@@ -51,7 +51,8 @@ import { Badge, Spinner } from "@/components/ui/panel";
 import { Tabs } from "@/components/ui/tabs";
 import type { AgentEdit, DesignTarget } from "@/components/design/DesignPane";
 import type { CodeDesignFrame } from "@/lib/design/frames";
-import { focusRing } from "@/components/ui/focus";
+import { focusRing, focusRingInset } from "@/components/ui/focus";
+import { useAgent } from "@/lib/agent-context";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Conversation } from "@/components/code/Conversation";
 import { ClaudeHooksNotice } from "@/components/code/ClaudeHooksNotice";
@@ -457,7 +458,13 @@ function Viewer({
       {minimized ? null : editing ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <textarea
-            className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground outline-hidden"
+            // Named by the file, so a screen reader says what is being edited rather than "edit,
+            // multi-line"; the ring is drawn inside because the box fills the pane.
+            aria-label={name}
+            className={cn(
+              "min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground",
+              focusRingInset,
+            )}
             value={draft}
             spellCheck={false}
             onChange={(e) => setDraft(e.target.value)}
@@ -581,6 +588,16 @@ export function Code() {
   const viewerShown = viewerOn && viewerMode !== "closed" && !viewerMin;
   // With a design, the stacked switch can hand the column back to the conversation.
   const viewerFull = viewerShown && !(design !== null && stacked === "conversation");
+  // Whether the conversation's own status chip can be heard: it is `display:none` while the viewer
+  // is maximised (and, below `lg`, while a file replaces it), and a hidden live region says nothing.
+  // Told to the status bar, which is then the announcer. Counted as hidden for any full viewer, even
+  // where CSS keeps the conversation beside it: a repeated sentence is better than a silent one.
+  const { publish: publishAgent } = useAgent();
+  const chatAnnounces = !viewerMax && !viewerFull;
+  useEffect(() => {
+    publishAgent({ chatAnnounces });
+    return () => publishAgent({ chatAnnounces: false });
+  }, [chatAnnounces, publishAgent]);
   useEffect(() => {
     if (!viewerOn && viewerMode !== "open") layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
   }, [viewerOn, viewerMode, layoutDispatch]);
