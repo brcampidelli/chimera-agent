@@ -107,3 +107,36 @@ counts, how many ON runs changed no file on an edit task.
 
 Predicted US$ 2.5, ceiling **US$ 5.00** for the whole item, admission stop at US$ 4.50. The key is
 read from the working directory's `.env` by the product's settings and is never printed.
+
+## 9 · Added later: answers to `bench/PROTOCOL.md` §11–§14
+
+*Added 2026-11-16, after the pre-registration commit and while the runs were being collected; the
+only analysis seen when it was written was a 5-pair look at the first rows. It does not change the
+hypothesis, the corpus, the metrics, the 10% effect floor, the gates or the adoption rule. It changes
+one thing, and says so: the interval estimator in §5.*
+
+- **§11 (the interval).** §5 said "cluster bootstrap over items". §11 forbids a percentile bootstrap
+  under N = 100 (it covers ~88%), and here the clusters are 12 and 11. Replaced by the closed form:
+  each item contributes one number (the mean of its replicas' deltas) and the interval is
+  `mean_t_interval` of `chimera/eval/proportions.py` over those. "Interval lies entirely below 0" in
+  the adoption rule now reads that t interval. If the deltas show no spread at all the interval is
+  undefined (`±inf`) and the condition is not met.
+- **§12 (a "no worse" claim needs a margin).** G2 and G1 are non-inferiority claims with a declared
+  margin of **−5 pp**, one-sided. The adoption rule keeps the point-estimate reading written in §5
+  (that is what the plan asked for). `report.py` also prints the TOST (`tost_mean` on per-item
+  differences) beside it. It will probably not show non-inferiority at 11 items, and a pass on the
+  point estimate is then reported as "no drop beyond 5 pp measured, not shown non-inferior".
+- **§13 (controls).** Trivial-agent arm: not applicable, the read checker is a regex on a fact in a
+  file and a do-nothing agent cannot produce it, and the edit verdict is a pytest that fails on the
+  untouched fixture (verified: every edit fixture's test fails before the edit). Random/selection arm,
+  grader-hijack probe, attack success, counterfactual-judge probe, placebo arms: not applicable (no
+  selection mechanism, no LLM judge, no attacker). The edit verdict restores the test file from
+  pristine before running it, which is the wall for the grader. A same-length placebo arm (an
+  irrelevant sentence of the block's length) is **not run**: this bench measures the sentence's
+  content, and the missing placebo is a stated limit: an effect could be the length, not the words.
+- **§14 (removal needs two model families).** The bench measures adding a block, not removing one.
+  NOT ADOPTED leaves the flag off, which is today's behaviour, so nothing is removed; the verdict is
+  worded "measured on deepseek-chat-v3.1" and no second family is claimed.
+- **Entry point.** `run.py` does not pin the five 2026-11-10 switches back to their legacy values:
+  it measures the block on the product as it ships. Their effective values are written to
+  `switches.json` next to the results.

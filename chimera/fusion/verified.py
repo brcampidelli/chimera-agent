@@ -52,6 +52,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 from chimera.decisions.contract import Answer, Choice, Decider
+from chimera.prompts.blocks import language_rule
 from chimera.telemetry import get_logger
 
 _log = get_logger("fusion.verified")
@@ -529,8 +530,10 @@ DRAFT_SYSTEM = (
     "You answer questions using only the excerpts in the user's message. Use no other knowledge. "
     "If the excerpts answer the question, answer it concisely; every fact, number, name, flag or "
     "setting you state must appear in the excerpts. If the excerpts do not contain the answer, say "
-    "that the provided excerpts do not cover it, and add no facts or guesses. Answer in the language "
-    "of the question."
+    "that the provided excerpts do not cover it, and add no facts or guesses. "
+    # Same bytes as the sentence the bench measured ("Answer in the language of the question."):
+    # language_rule() with no owner language returns exactly that.
+    + language_rule()
 )
 
 

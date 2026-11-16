@@ -166,8 +166,9 @@ def test_the_drafted_text_is_written_for_the_person_approving_it() -> None:
     """`text` is the whole product here: it is the sentence somebody reads to decide whether the
     spec is right, and the checks run whether or not it describes them."""
     from chimera.orchestration.draft import _SYSTEM
+    from chimera.prompts.blocks import language_rule
 
-    assert "same language as the request" in _SYSTEM
+    assert language_rule(of="request", subject="it") in _SYSTEM
     assert "describe what `target` actually checks" in _SYSTEM
 
 

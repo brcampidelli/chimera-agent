@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-141 directories: 126 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
+142 directories: 127 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
@@ -106,6 +106,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`premise_capitulation`](premise_capitulation/) | with result | 1 | 1 |
 | [`project_pack`](project_pack/) | preregistered, no result | 1 | 0 |
 | [`prompt_overlays`](prompt_overlays/) | preregistered, no result | 1 | 0 |
+| [`proportionality`](proportionality/) | with result | 1 | 1 |
 | [`rag`](rag/) | with result | 1 | 1 |
 | [`rag_rerank`](rag_rerank/) | with result | 2 | 2 |
 | [`recipient_provenance`](recipient_provenance/) | with result | 1 | 1 |
