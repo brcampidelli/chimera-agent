@@ -326,9 +326,16 @@ def _guest_turn(client: TestClient, sid: str, message: str = "what is going on")
     return _Agent.built[-1]
 
 
-def test_a_guest_sees_only_the_jobs_of_its_own_conversation(
+def test_a_guest_is_given_no_job_tools_and_a_conversation_confinement_is_kept_beneath(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Premise changed (audit P1b, 3rd review): this used to pin that a guest sees the jobs of its own
+    conversation. In a shared conversation the owner's jobs ARE that conversation's jobs (the filter is
+    the session id, and the owner started them there), and a job's command, directory and output are
+    whatever the owner's turn ran. So a guest turn has no job tools at all (`WITHHELD_TOOLS`); it has no
+    shell either, so it starts no job of its own to look up. The leak assertions below are the same ones
+    as before and are now made at two layers: the guest's registry lacks the tools, and the
+    conversation confinement that stays underneath them still refuses another conversation's jobs."""
     client = _client(tmp_path, monkeypatch)
     sid = _owner_turn(client, tmp_path)
     home, ws = tmp_path / "home", tmp_path / "ws"
@@ -337,7 +344,15 @@ def test_a_guest_sees_only_the_jobs_of_its_own_conversation(
     unstamped = _finished_job(home, ws, None, "from before stamps", "cccc00000003")
 
     built = _guest_turn(client, sid)
-    status = built["registry"].get("job_status")
+    assert "job_status" not in built["registry"] and "job_cancel" not in built["registry"]
+    assert "ORION_741" not in json.dumps(sorted(t.name for t in built["registry"].tools()))
+
+    # Beneath the withholding: the confinement of the tool itself, as it was pinned before.
+    from chimera.tools.defer import _unwrapped
+
+    # `confine_to_conversation` sets exactly this on the raw tool (`only_session`).
+    status = _unwrapped(_registry(tmp_path, guest=False).get("job_status"))
+    status.only_session = sid
     listing = status.run()
     assert mine in listing
     assert owners not in listing and unstamped not in listing and "ORION_741" not in listing
@@ -348,9 +363,13 @@ def test_a_guest_sees_only_the_jobs_of_its_own_conversation(
     assert all(i in everything for i in (mine, owners, unstamped))
 
 
-def test_the_finished_jobs_note_a_guest_turn_is_handed_names_no_other_conversations_command(
+def test_the_finished_jobs_note_is_not_handed_to_a_guest_turn_at_all(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Premise changed (audit P1b, 3rd review): this used to require the guest to be told of its own
+    conversation's job. That job note quotes the command, and in a shared conversation the jobs of the
+    conversation are the owner's. The note is omitted for a guest on purpose; the assertion that no
+    OTHER conversation's command reaches the guest is kept, and now also covers this conversation's."""
     client = _client(tmp_path, monkeypatch)
     sid = _owner_turn(client, tmp_path)
     home, ws = tmp_path / "home", tmp_path / "ws"
@@ -359,8 +378,8 @@ def test_the_finished_jobs_note_a_guest_turn_is_handed_names_no_other_conversati
 
     built = _guest_turn(client, sid)
     notes = str(built["config"].turn_notes)
-    assert "aaaa00000001" in notes, "the guest is told of its own conversation's job"
     assert "ORION_741" not in notes and "bbbb00000002" not in notes
+    assert "aaaa00000001" not in notes, "the owner's job of this conversation is not the guest's to hear"
     # What the guest was not told is still the owner's to hear.
     from chimera.core.jobs import finished_note
 

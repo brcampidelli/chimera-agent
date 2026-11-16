@@ -1,5 +1,5 @@
 ---
-source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
+source_sha256: 98e04cea6d46d08e173e43f42725aa38d3079dd3bb10dea93d09502423e0e091
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -193,6 +193,25 @@ erreicht diese vier Routen und nichts von dem, was das Server-Token schützt. Kl
 weitergegeben wird: ein Gast kann den Agenten um alles bitten, worum der Besitzer ihn bitten würde, im
 Projekt des Besitzers, mit dessen Werkzeugen und Ausgaben — unter den Standard-Nähten der Anfrage, und
 ohne Karten freizugeben.
+
+**Was ein Gast von den Durchläufen des Eigentümers liest.** Was der Eigentümer gesagt hat und die
+endgültige Antwort des Modells — und nichts von dem, was die Maschine dazwischen gesehen oder erzeugt hat. Die
+Tür des Gastes (`chimera/api/guest_projection.py` und `chimera/core/guest_history.py`) ist eine Positivliste,
+die auf den Live-Stream, seine Wiedergabe, die gespeicherte Unterhaltung und den Verlauf angewendet wird, der
+an das Modell des eigenen Durchlaufs des Gastes geht. Der Gast sieht die Anfrage so, wie die Person sie getippt
+hat (eine automatische Anfrage, der Text eines angehängten Dokuments, ein expandierter Befehl oder eine vom
+Modell vorgeschlagene Karte erscheinen als Platzhalter), die endgültige Antwort des Modells, wenn der
+Durchlauf normal abgeschlossen wurde (ein Fehler, ein Limit oder ein erster Durchgang, der danach repariert
+wurde, werden nicht gezeigt: der Gast liest, dass der Durchlauf nicht abgeschlossen wurde) und von einem
+Werkzeug nur Art und Status. Der Text zwischen Werkzeugaufrufen wird nicht an einen Gast gestreamt, und der
+eigene Durchlauf eines Gastes erhält weder die Werkzeugergebnisse noch die Job- oder Work-Notizen des
+Eigentümers noch die Job-Werkzeuge. Werkzeugargumente und -ergebnisse, Bearbeitungs-Diffs,
+Freigabe-Vorschauen, Browserbilder, die Ausgabe des Prüfers, Anweisungsquellen, die Kosten des Belegs und die
+Pfade des Hosts werden nicht gesendet, und ein Frame-Typ, den niemand aufgelistet hat, wird verworfen. Eine vor
+diesen Markierungen gespeicherte Unterhaltung zeigt einem Gast Platzhalter. Das Fenster des Eigentümers
+erhält weiterhin jeden Frame. Das Einzige, was sich nicht filtern lässt, ist die endgültige Antwort selbst:
+Zitiert das Modell eine private Datei mit eigenen Worten, liest der Gast sie — wer eine Unterhaltung teilt,
+teilt ihre Antworten, und das Freigabe-Panel sagt das.
 
 ### Das eigene Handy oder der eigene Browser: ein Gerät koppeln
 

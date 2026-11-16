@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A guest of a shared conversation sees the answers, not the owner's workings.** Live, on replay and in the model's own context, a guest no longer receives the tool arguments and results, edit diffs, approval previews, browser pictures, verifier output, instruction sources, cost receipts or host paths of the owner's turns: only the answers and the tool names and status, through an allowlist that drops any frame type it does not know. (#1293)
+
 - **Screen readers hear a failed turn as failed, and keyboard focus shows where it is.** A turn that ends in an error is announced as "Failed: <reason>", never as complete; the conversation announces working, waiting and complete instead of reading the answer token by token; an approval that pauses the agent is announced once, not again after minimising and reopening it; and focus is visible on the settings tab panels, the Connections fields, the file editor and the command palette. (P1-20) (#1290)
 
 ## [0.90.0] - 2026-11-15
