@@ -296,6 +296,51 @@ def _publish(value: Any, key: str = "") -> Any:
     return value
 
 
+#: What ``via`` can say, as a closed set a screen can translate. ``via`` stays the one-line technical
+#: text (the CLI prints it, the title of a cell carries it); this is the category it falls in.
+VIA_KINDS: tuple[str, ...] = (
+    "setting", "preset", "override", "replaced", "empty", "follows", "backend_default",
+    "backend_unknown", "escalation_measured", "ladder_top", "ladder", "fusion_ladder", "profile",
+    "review_time", "product_default", "unavailable", "other",
+)
+
+_EFFORT_TAIL = re.compile(r"; effort from CHIMERA_ROLE_EFFORTS.*$")
+_SETTING_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+
+
+def via_kind_of(via: str) -> str:
+    """The category of a route's ``via`` text, one of :data:`VIA_KINDS`.
+
+    ``via`` is free text written at a dozen places; this reads it back, and a test builds the table
+    under many settings and fails when a ``via`` lands in ``other``, so a new sentence cannot reach the
+    screen untranslated and uncategorised. A trailing "effort from CHIMERA_ROLE_EFFORTS" does not
+    change what the MODEL came from, so it is not part of the category.
+    """
+    text = _EFFORT_TAIL.sub("", via.strip())
+    rules: tuple[tuple[Callable[[str], bool], str], ...] = (
+        (lambda v: v.startswith("unavailable"), "unavailable"),
+        (lambda v: v.startswith("cost_mode "), "preset"),
+        (lambda v: v.startswith("replaced after resolution"), "replaced"),
+        (lambda v: v.endswith(" override"), "override"),
+        (lambda v: v.endswith(" is empty"), "empty"),
+        (lambda v: v.startswith("no model of its own") or v == "not differentiated today", "follows"),
+        (lambda v: v.startswith("backend "), "backend_default"),
+        (lambda v: v.startswith("unknown decision backend"), "backend_unknown"),
+        (lambda v: v.startswith("the measured escalation model"), "escalation_measured"),
+        (lambda v: v == "the ladder's top", "ladder_top"),
+        (lambda v: v.startswith("ladder_of:"), "ladder"),
+        (lambda v: "fusion_config" in v, "fusion_ladder"),
+        (lambda v: v.startswith("profile "), "profile"),
+        (lambda v: v.startswith("chosen at review time"), "review_time"),
+        (lambda v: v == "the product's default", "product_default"),
+        (lambda v: bool(_SETTING_NAME.match(v)), "setting"),
+    )
+    for matches, kind in rules:
+        if matches(text):
+            return kind
+    return "other"
+
+
 def public_routing(settings: Settings) -> dict[str, Any]:
     """The ONE public answer: ``GET /api/routing``, the Settings panel and ``chimera models`` all
     render this and nothing else, so no field reaches a screen except through :func:`_publish`.
@@ -429,6 +474,7 @@ class RoutingTable:
             out.append({
                 "role": route.role, "model": model, "effort": route.effort,
                 "origin": route.origin, "effort_origin": route.effort_origin, "via": route.via,
+                "via_kind": via_kind_of(route.via),
                 "inherits": route.inherits, "kind": route.kind,
                 "effort_sent": self.effort_sent(route), "local_file": local, "members": members,
             })
