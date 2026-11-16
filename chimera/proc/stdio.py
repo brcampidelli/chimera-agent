@@ -79,7 +79,28 @@ def launch_program(command: str, cwd: str | os.PathLike[str] | None = None, path
         if not os.path.isabs(candidate):
             candidate = os.path.join(os.fspath(cwd) if cwd else os.getcwd(), candidate)
         return candidate if os.path.exists(candidate) else None
-    return shutil.which(command, path=path)
+    return _which_on_path(command, path)
+
+
+def _which_on_path(command: str, path: str | None) -> str | None:
+    """``command`` looked up on ``path`` alone, as an absolute path.
+
+    Not ``shutil.which``: on Windows it searches the process's current directory BEFORE the PATH and
+    returns a relative ``.\tool.CMD`` - a file the server's PATH never named, planted wherever the
+    process happens to stand. A bare name here means the PATH, on every platform.
+    """
+    dirs = (path if path is not None else os.environ.get("PATH", os.defpath)).split(os.pathsep)
+    names = [command]
+    if os.name == "nt":
+        pathext = [e for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(os.pathsep) if e]
+        tried_as_is = os.path.splitext(command)[1].lower() in {e.lower() for e in pathext}
+        names = ([command] if tried_as_is else []) + [command + e for e in pathext]
+    for folder in filter(None, dirs):
+        for name in names:
+            candidate = os.path.join(folder, name)
+            if os.path.isfile(candidate) and (os.name == "nt" or os.access(candidate, os.X_OK)):
+                return os.path.abspath(candidate)
+    return None
 
 
 def is_batch_launcher(program: str) -> bool:
