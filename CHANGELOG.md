@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Cron model tiers, measured.** A paired bench on 8 synthetic jobs found the cheap tier fully correct on 7 of them in 3 of 3 seeds, at only ~17% lower cost per job; it changes no default and does not cover the 21 production jobs. (P1-03) (#1299)
 
+### Fixed
+
+- **Settings search finds the model table; routing and receipts read right in Portuguese.** The "which model runs each role" table is searchable, its Via column is translated, a new conversation no longer says "Complete", an answer-only turn no longer reports a failed close loop, and "1 step" is singular. (P1-20) (#1300)
+
 ## [0.91.0] - 2026-11-16
 ### Added
 

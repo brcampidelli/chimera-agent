@@ -2295,6 +2295,10 @@ class RoutingRowOut(BaseModel):
     effort_origin: str
     #: One line saying how the model was reached: the setting, the preset or the derivation.
     via: str
+    #: The category ``via`` falls in (``setting`` ``preset`` ``override`` ``replaced`` ``empty``
+    #: ``follows`` ``backend_default`` ``ladder`` ``profile`` ...), so a screen can say it in its own
+    #: language. ``other`` is a sentence the table does not know yet; ``via`` is the text then.
+    via_kind: str = "other"
     #: The role this one follows while it has no model of its own; empty when it has one.
     inherits: str = ""
     kind: Literal["chat", "embedding", "media", "local", "list"] = "chat"
