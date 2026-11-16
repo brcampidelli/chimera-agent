@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-142 directories: 127 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
+143 directories: 128 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
