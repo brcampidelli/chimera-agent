@@ -5,7 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.91.0] - 2026-11-16
 ### Added
+
+- **A conversation warns when its prompt cache stops working, and Worth shows the cost per resolved run.** When the share of prompt tokens read from cache falls below 80% across the turns whose route reports cache, the turn receipt and status bar say so once, with the main cause, and rearm when it recovers; a route that reports no cache never warns. Worth gains US$ per resolved run (all runs' cost over the ones that passed), the same per verifier-confirmed run, and the share of runs with a known price; it shows "—" when any run has no price, and stays sorted by name, not ranked. (P1-10, slices d and e) (#1288)
 
 - **`chimera models` and Settings list every role's model, effort and origin.** `GET /api/routing` answers which model each role runs on, at which effort, where that choice came from, and whether the effort is sent on that route. What leaves through it is sanitised: a local path shows only its file name, a URL loses its user, password and query, and a denied provider's message is cleaned the same way. (P1-10, slice b) (#1294)
 
