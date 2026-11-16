@@ -354,7 +354,7 @@ jobs:
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@f4371d1ec7179bfbd04a82a81e3b3af7f720750f # v2
+        uses: Swatinem/rust-cache@eedcf2fb1c22f010a0eb66b92f378c110977f266 # v2
         with:
           workspaces: apps/desktop/src-tauri -> target
 
@@ -548,7 +548,7 @@ jobs:
         uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@f4371d1ec7179bfbd04a82a81e3b3af7f720750f # v2
+        uses: Swatinem/rust-cache@eedcf2fb1c22f010a0eb66b92f378c110977f266 # v2
         with:
           workspaces: apps/desktop/src-tauri -> target
 
