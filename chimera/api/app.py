@@ -134,6 +134,7 @@ from chimera.api.schemas import (
     RequirementsOut,
     RequirementsRequest,
     ResourcesOut,
+    RoutingOut,
     RunReceiptOut,
     SandboxStateOut,
     SearchOut,
@@ -1369,6 +1370,14 @@ def build_api_app(
         from chimera.core.registry import remove as remove_agent
 
         return [a.model_dump() for a in remove_agent(live_settings().home, agent_id)]
+
+    @app.get("/api/routing", dependencies=[guard], response_model=RoutingOut)
+    def routing_endpoint() -> dict[str, Any]:
+        # Read-only: every role's model, effort and origin (`providers/routing.py`). A deployment
+        # policy that denies the whole ladder is answered in `denied`, never as a server error.
+        from chimera.api.config_api import routing_rows
+
+        return routing_rows(get_settings())
 
     @app.get("/api/doctor", dependencies=[guard], response_model=DoctorOut)
     def doctor_endpoint() -> dict[str, Any]:

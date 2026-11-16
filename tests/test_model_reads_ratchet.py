@@ -19,6 +19,8 @@ listed with a reason a reviewer accepts.
 The starting point, counted on ``main`` at 0.90.0, was 97 reads, 9 of which are not Settings at all
 (``NOT_SETTINGS``) and 88 are (``KEPT``). A later slice that migrates a consumer lowers a number in
 ``KEPT``; one that adds a read raises it, which needs a reason a reviewer accepts.
+Slice (b) moved ``providers/privacy.py``, the models block of ``GET /api/config`` and ``chimera models``
+onto the table: 25 reads gone, 63 of Settings left.
 """
 
 from __future__ import annotations
@@ -52,8 +54,7 @@ NOT_SETTINGS: dict[tuple[str, str], tuple[int, str]] = {
 }
 
 _RESOLVER = "A resolver the routing table DELEGATES to (it decides today); it moves only when the table replaces it"
-_PRIVACY = "providers/privacy.py keeps its own role list (`_model_roles`); slice (b) reads `table.rows()` instead"
-_SCREEN = "The Settings screen and the setup wizard show these fields; slice (b) reads the table for them"
+_SCREEN = "The Settings screen and the setup wizard show these fields; slice (b) moved the models block and `chimera models` onto the table, what is left is read elsewhere on the screen"
 _MODALITY = "A media/voice tool reading its own model; migrates when the table has consumers"
 _CONSUMER = "A consumer that reads the model field directly; migrates onto `routing_table()` in a later slice"
 
@@ -67,15 +68,9 @@ KEPT: dict[tuple[str, str], tuple[int, str]] = {
     ("chimera/api/code_api.py", "voice_work_model"): (2, _CONSUMER),
     ("chimera/api/commands_api.py", "default_model"): (1, _CONSUMER),
     ("chimera/api/config_api.py", "chat_voice_model"): (1, _SCREEN),
-    ("chimera/api/config_api.py", "complete_model"): (5, _SCREEN),
+    ("chimera/api/config_api.py", "complete_model"): (4, _SCREEN),
     ("chimera/api/config_api.py", "decision_model"): (2, _SCREEN),
-    ("chimera/api/config_api.py", "default_model"): (4, _SCREEN),
-    ("chimera/api/config_api.py", "embed_model"): (1, _SCREEN),
-    ("chimera/api/config_api.py", "mid_model"): (1, _SCREEN),
-    ("chimera/api/config_api.py", "orchestrator_model"): (1, _SCREEN),
-    ("chimera/api/config_api.py", "voice_model"): (1, _SCREEN),
-    ("chimera/api/config_api.py", "voice_work_model"): (1, _SCREEN),
-    ("chimera/api/config_api.py", "weak_model"): (1, _SCREEN),
+    ("chimera/api/config_api.py", "default_model"): (3, _SCREEN),
     ("chimera/api/config_test.py", "default_model"): (1, _CONSUMER),
     ("chimera/api/desktop_bridge.py", "default_model"): (1, _CONSUMER),
     ("chimera/api/side_chat.py", "default_model"): (1, _CONSUMER),
@@ -84,10 +79,7 @@ KEPT: dict[tuple[str, str], tuple[int, str]] = {
     ("chimera/cli/commands/chat.py", "default_model"): (1, _CONSUMER),
     ("chimera/cli/commands/misc.py", "embed_model"): (3, _CONSUMER),
     ("chimera/cli/commands/serve.py", "default_model"): (1, _CONSUMER),
-    ("chimera/cli/commands/setup.py", "default_model"): (4, _SCREEN),
-    ("chimera/cli/commands/setup.py", "mid_model"): (1, _SCREEN),
-    ("chimera/cli/commands/setup.py", "orchestrator_model"): (1, _SCREEN),
-    ("chimera/cli/commands/setup.py", "weak_model"): (1, _SCREEN),
+    ("chimera/cli/commands/setup.py", "default_model"): (3, _SCREEN),
     ("chimera/cli/decisions_cmd.py", "decision_model"): (1, _CONSUMER),
     ("chimera/cli/review_cmd.py", "default_model"): (1, _CONSUMER),
     ("chimera/core/agent.py", "default_model"): (1, _CONSUMER),
@@ -103,18 +95,6 @@ KEPT: dict[tuple[str, str], tuple[int, str]] = {
     ("chimera/providers/catalog.py", "weak_model"): (2, _RESOLVER),
     ("chimera/providers/gateway.py", "default_model"): (2, _CONSUMER),
     ("chimera/providers/gateway.py", "embed_model"): (1, _CONSUMER),
-    ("chimera/providers/privacy.py", "audio_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "complete_model"): (2, _PRIVACY),
-    ("chimera/providers/privacy.py", "decision_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "default_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "embed_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "image_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "orchestrator_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "review_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "tts_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "video_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "voice_model"): (1, _PRIVACY),
-    ("chimera/providers/privacy.py", "voice_work_model"): (1, _PRIVACY),
     ("chimera/review/reviewer_for.py", "review_model"): (1, _RESOLVER),
     ("chimera/server/voice.py", "chat_voice_model"): (1, _MODALITY),
     ("chimera/tools/media.py", "audio_model"): (1, _MODALITY),
@@ -354,6 +334,7 @@ def test_every_entry_has_a_reason() -> None:
 
 
 def test_the_count_it_started_from() -> None:
-    # 97 raw reads on main at 0.90.0: 9 homonyms + 88 of Settings. This number may fall, never rise.
+    # 97 raw reads on main at 0.90.0: 9 homonyms + 88 of Settings. Slice (b) took it to 63. This
+    # number may fall, never rise.
     assert sum(n for n, _ in NOT_SETTINGS.values()) == 9
-    assert sum(n for n, _ in KEPT.values()) <= 88
+    assert sum(n for n, _ in KEPT.values()) <= 63

@@ -13,10 +13,13 @@ Security screen's privacy card (which reports it) cannot disagree about either.
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chimera.config import Settings
 from chimera.providers.discovery import is_local_model
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.providers.routing import Route
 
 #: The keys of OpenRouter's ``provider`` object that carry the privacy preference — and the ONLY ones
 #: the gateway carries over into a caller's own route pin (``gateway._call_kwargs``).
@@ -214,27 +217,44 @@ def _add(
         entry["roles"].append(role)
 
 
+def _own_slug(route: Route) -> str:
+    """The slug a role was given, or ``""`` for a role that only follows another one.
+
+    The table answers every role (a voice with no model of its own follows the conversation's), and
+    the card lists what a setting WOULD send somewhere, so a role that merely follows is the other
+    role's row, not a second one.
+    """
+    return "" if route.inherits else route.slug
+
+
 def _model_roles(settings: Settings) -> list[tuple[str, str]]:
-    """The chat-model settings: the tier ladder, the casts, the voice and review models."""
-    ladder = settings.tier_ladder()
+    """The chat-model settings: the tier ladder, the casts, the voice and review models.
+
+    Read from the routing table. The fusion cast is the one exception: the card lists the cast the
+    SETTING names (its frontier default included), where the table reports the cast ``--fuse`` would
+    convene, which is the ladder unless a panel was named.
+    """
+    table = settings.routing_table()
+    top = table.route("tier.top")
     roles: list[tuple[str, str]] = [
-        ("default", settings.default_model),
-        ("weak", ladder.weak),
-        ("mid", ladder.mid),
-        ("top", ladder.top),
-        ("orchestrator", settings.orchestrator_model),
-        *(("fallback", m) for m in settings.fallback_models),
+        ("default", table.route("default").slug),
+        ("weak", table.route("tier.weak").slug),
+        ("mid", table.route("tier.mid").slug),
+        ("top", top.slug),
+        # Listed only when the owner named it: with none, "orchestrator" is the ladder's top again.
+        ("orchestrator", top.slug if top.origin != "default" else ""),
+        *(("fallback", m.slug) for m in table.members("fallback")),
         *(("fusion_panel", m) for m in settings.fusion_panel),
         ("fusion_judge", settings.fusion_judge),
         ("fusion_synthesizer", settings.fusion_synthesizer),
         # Skill transfer asks each of these models in turn (`chimera/evolution/context.py`).
-        *(("transfer_panel", m) for m in settings.transfer_panel),
-        ("voice", settings.voice_model),
-        ("voice_work", settings.voice_work_model),
-        ("review", settings.review_model),
+        *(("transfer_panel", m.slug) for m in table.members("transfer.panel")),
+        ("voice", _own_slug(table.route("voice"))),
+        ("voice_work", _own_slug(table.route("voice_work"))),
+        ("review", table.route("review").slug),
     ]
     if settings.semantic_memory:
-        roles.append(("embeddings", settings.embed_model))
+        roles.append(("embeddings", table.route("embed").slug))
     return roles
 
 
@@ -246,28 +266,26 @@ def _surface_roles(settings: Settings) -> list[tuple[str, str]]:
     escalation (`verified.escalation_model`, fed the turn's sources and question), the editor's inline
     completion (Ollama, bare tag), hosted image generation and hosted dictation (OpenAI, by key).
     """
-    from chimera.decisions.factory import default_model_for
-
+    table = settings.routing_table()
     roles: list[tuple[str, str]] = []
     backend = (settings.decision_backend or "local_logprob").strip()
-    model = (settings.decision_model or "").strip()
+    decisions = table.route("decisions").slug
     if backend == "local_logprob":
         # A bare Ollama tag, asked at `ollama_base_url`.
-        roles.append(("decisions", f"ollama/{model or default_model_for(settings, backend)}"))
+        roles.append(("decisions", f"ollama/{decisions}"))
     elif backend == "hosted_verbalized":
         # Through the gateway, so an `openrouter/` slug here DOES carry the preference.
-        roles.append(("decisions", model or default_model_for(settings, backend)))
+        roles.append(("decisions", decisions))
     if settings.verified_answers:
-        from chimera.fusion.verified import escalation_model
-
-        roles.append(("verify_escalation", escalation_model(settings)))
-    if (settings.complete_model or "").strip():
-        roles.append(("completion", f"ollama/{settings.complete_model.strip()}"))
+        roles.append(("verify_escalation", table.route("verify_escalation").slug))
+    completion = table.route("complete").slug.strip()
+    if completion:
+        roles.append(("completion", f"ollama/{completion}"))
     image = (settings.image_backend or "auto").strip().lower()
     if image == "auto" and settings.key_pool("openrouter"):
         # `chimera/tools/media.py`: auto prefers the router, which carries the preference and the
         # image model slug (`image_model`) through its own image endpoint.
-        roles.append(("image", f"openrouter/{settings.image_model}"))
+        roles.append(("image", f"openrouter/{table.route('image').slug}"))
     elif image == "hosted" or (image == "auto" and settings.key_pool("openai")):
         # `chimera/tools/media.py`: the prompt goes to OpenAI's images endpoint.
         roles.append(("image", "openai/gpt-image-1"))
@@ -276,9 +294,9 @@ def _surface_roles(settings: Settings) -> list[tuple[str, str]]:
     # generate_audio and generate_video always go through OpenRouter when its key is set.
     if settings.key_pool("openrouter"):
         if not settings.elevenlabs_api_key:
-            roles.append(("speech", f"openrouter/{settings.tts_model}"))
-        roles.append(("audio", f"openrouter/{settings.audio_model}"))
-        roles.append(("video", f"openrouter/{settings.video_model}"))
+            roles.append(("speech", f"openrouter/{table.route('tts').slug}"))
+        roles.append(("audio", f"openrouter/{table.route('audio').slug}"))
+        roles.append(("video", f"openrouter/{table.route('video').slug}"))
     from chimera.api.attachments import dictation_support
 
     if dictation_support(settings) == ("yes", "openai"):
