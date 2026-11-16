@@ -19,6 +19,34 @@ function originText(origin: string, t: TFunc): string {
   return t("settings.routing.origin.default");
 }
 
+/** The i18n key that says a `via_kind` in the interface language; null when the table has no wording for
+ *  it, and the cell then shows the technical text itself. The ladder's four ways of arriving at a rung
+ *  read the same to a person, so they share one phrase; the exact sentence stays in the cell's title. */
+const VIA_KEYS: Readonly<Record<string, string>> = {
+  setting: "settings.routing.via.setting",
+  preset: "settings.routing.via.preset",
+  override: "settings.routing.via.override",
+  replaced: "settings.routing.via.replaced",
+  empty: "settings.routing.via.empty",
+  ladder: "settings.routing.via.ladder",
+  ladder_top: "settings.routing.via.ladder",
+  escalation_measured: "settings.routing.via.ladder",
+  fusion_ladder: "settings.routing.via.ladder",
+  backend_default: "settings.routing.via.default",
+  product_default: "settings.routing.via.default",
+  profile: "settings.routing.via.profile",
+  review_time: "settings.routing.via.review",
+  unavailable: "settings.routing.via.unavailable",
+};
+
+/** What the Via cell shows: a role that follows another says which; otherwise the origin category in the
+ *  interface language. The engineering sentence (`cost_mode auto preset`) is the tooltip, not the text. */
+export function viaText(row: RoutingRow, t: TFunc): string {
+  if (row.inherits) return t("settings.routing.follows", { role: row.inherits });
+  const key = VIA_KEYS[row.via_kind];
+  return key ? t(key) : row.via;
+}
+
 function effortText(row: RoutingRow, t: TFunc): string {
   if (!row.effort) return "—";
   return row.effort_sent === false
@@ -67,8 +95,8 @@ export function RoutingTable() {
                 <td className="px-2 py-1 font-mono break-all">{routingModelText(row, t)}</td>
                 <td className="px-2 py-1">{effortText(row, t)}</td>
                 <td className="px-2 py-1">{originText(row.origin, t)}</td>
-                <td className="px-2 py-1 text-muted-foreground">
-                  {row.inherits ? t("settings.routing.follows", { role: row.inherits }) : row.via}
+                <td className="px-2 py-1 text-muted-foreground" title={row.via}>
+                  {viaText(row, t)}
                 </td>
               </tr>
             ))}

@@ -32,6 +32,17 @@ function receipt(extra: Partial<CodeTurnDone>) {
 }
 
 describe("the turn receipt", () => {
+  it("says one step in the singular, not '1 passos'", () => {
+    receipt({ steps: 1 });
+    expect(screen.getByText("code.chat.steps.one")).toBeInTheDocument();
+    expect(screen.queryByText("code.chat.steps")).not.toBeInTheDocument();
+  });
+
+  it("keeps the plural for any other count", () => {
+    receipt({ steps: 3 });
+    expect(screen.getByText("code.chat.steps")).toBeInTheDocument();
+  });
+
   it("says a durable fact was saved", () => {
     receipt({ memory_saved: "meu voo é dia 12" });
 

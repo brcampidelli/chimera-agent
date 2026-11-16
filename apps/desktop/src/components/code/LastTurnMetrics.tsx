@@ -1,5 +1,5 @@
 import type { CodeTurnDone } from "@/lib/api";
-import { useNum, useT } from "@/lib/i18n";
+import { stepsText, useNum, useT } from "@/lib/i18n";
 
 /** Steps, tokens and cost of the turn that just finished, for the conversation header.
  *
@@ -15,7 +15,7 @@ export function LastTurnMetrics({ done }: { done: CodeTurnDone | null | undefine
   const cost = done.usd === null ? t("code.chat.unknownCost") : `$${done.usd.toFixed(4)}`;
   return (
     <span className="text-xs text-muted-foreground" data-testid="last-turn-metrics">
-      {t("code.chat.steps", { n: num(done.steps) })} · {t("code.chat.tokenCount", { n: num(tokens) })} · {cost}
+      {done.steps === 1 ? stepsText(t, 1) : t("code.chat.steps", { n: num(done.steps) })} · {t("code.chat.tokenCount", { n: num(tokens) })} · {cost}
     </span>
   );
 }

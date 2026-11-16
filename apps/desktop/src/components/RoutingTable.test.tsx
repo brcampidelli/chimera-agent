@@ -16,6 +16,7 @@ function row(over: Partial<RoutingRow>): RoutingRow {
     origin: "default",
     effort_origin: "default",
     via: "the product's default",
+    via_kind: "product_default",
     inherits: "",
     kind: "chat",
     effort_sent: null,
@@ -49,6 +50,30 @@ describe("RoutingTable", () => {
     expect(screen.getByText("environment")).toBeInTheDocument();
     expect(screen.getByText("follows default")).toBeInTheDocument();
     expect(screen.getByText("chosen when used")).toBeInTheDocument();
+  });
+
+  it("says where a model came from in the interface language, with the technical sentence as the tooltip", async () => {
+    vi.mocked(getRouting).mockResolvedValue(
+      answer({
+        rows: [
+          row({ role: "tier.weak", via: "cost_mode auto preset", via_kind: "preset" }),
+          row({ role: "escalation", via: "ladder_of: [weak, default, top]", via_kind: "ladder" }),
+          row({ role: "decisions", via: "backend hosted_verbalized default", via_kind: "backend_default" }),
+          row({ role: "verified", via: "something the table has no category for", via_kind: "other" }),
+        ],
+      }),
+    );
+    renderWithProviders(<RoutingTable />);
+    await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+    const preset = screen.getByText("cost preset");
+    expect(preset).toHaveAttribute("title", "cost_mode auto preset");
+    expect(screen.getByText("from the model ladder")).toHaveAttribute("title", "ladder_of: [weak, default, top]");
+    expect(screen.getByText("product default")).toHaveAttribute("title", "backend hosted_verbalized default");
+    // An unknown category falls back to the text itself rather than to nothing.
+    expect(screen.getByText("something the table has no category for")).toBeInTheDocument();
+    // The engineering sentences are no longer the cell's text.
+    expect(screen.queryByText("cost_mode auto preset")).toBeNull();
+    expect(screen.queryByText("ladder_of: [weak, default, top]")).toBeNull();
   });
 
   it("says what the policy did instead of an empty table", async () => {

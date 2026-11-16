@@ -17768,6 +17768,11 @@
           "via": {
             "title": "Via",
             "type": "string"
+          },
+          "via_kind": {
+            "default": "other",
+            "title": "Via Kind",
+            "type": "string"
           }
         },
         "required": [

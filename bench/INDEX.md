@@ -33,6 +33,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`context_rot`](context_rot/) | with result | 2 | 2 |
 | [`cost_per_correct`](cost_per_correct/) | with result | 0 | 1 |
 | [`cost_routing`](cost_routing/) | with result | 1 | 1 |
+| [`cron_model_tier`](cron_model_tier/) | with result | 1 | 1 |
 | [`decide_interface`](decide_interface/) | with result | 0 | 1 |
 | [`decision_queue`](decision_queue/) | preregistered, no result | 1 | 0 |
 | [`decision_readout`](decision_readout/) | with result | 1 | 1 |
