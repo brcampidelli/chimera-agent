@@ -26,6 +26,7 @@ from chimera.core.agent import (
 )
 from chimera.governance.sanitize import fence, sanitize_untrusted
 from chimera.orchestration.hierarchy import CUT_OFF_REASONS
+from chimera.providers.catalog import split_effort
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool, refusal
@@ -229,6 +230,25 @@ class SubAgentTool(Tool):
             for source, content in pieces:
                 ledger.record_project_instructions(source, content)
 
+    def _with_agent_effort(self, selected: Any, model: str | None) -> str | None:
+        """``model`` with the effort the agent's file declares, when that may apply.
+
+        Only an agent that DECLARES one gets a suffix, and only from the OWNER's files (a repository
+        file's effort is dropped at parse time; ``from_project`` is checked again here so a path that
+        builds the agent some other way cannot raise it). A ``#effort`` already on the model, whether
+        the owner's session model or the model the owner's agent pins, wins: the owner's explicit
+        choice is never replaced by the agent's. With no model to name (the session passed none) the
+        default the gateway would use is read from the routing table; if there is none either,
+        nothing is appended rather than building ``None#high``. The subagent is a fresh ``Agent`` with
+        its own messages, so the parent's conversation keeps its effort.
+        """
+        if not selected.effort or selected.from_project:
+            return model
+        chosen = model or get_settings().routing_table().route("default").slug
+        if not chosen or split_effort(chosen)[1] is not None:
+            return chosen or model
+        return f"{chosen}#{selected.effort}"
+
     def run(self, **kwargs: Any) -> str:
         task = str(kwargs.get("task", "")).strip()
         if not task:
@@ -262,6 +282,7 @@ class SubAgentTool(Tool):
             # legacy callers, so the named path never goes through it.
             sub = self._registry_of(selected_tools & self._allowed)
             model = selected.model or self._model
+            model = self._with_agent_effort(selected, model)
             max_steps = min(selected.steps, self._max_turns)
             system_prompt = SUBAGENT_SYSTEM + "\n\n" + effective.instructions
             memory_text = self._memory_prompt(selected, sub, selected_tools)

@@ -1,5 +1,5 @@
 ---
-source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
+source_sha256: 98e04cea6d46d08e173e43f42725aa38d3079dd3bb10dea93d09502423e0e091
 ---
 
 # Segurança & salvaguardas
@@ -169,6 +169,23 @@ O app de convidado é também a **única** coisa servida quando o dono abre a po
 LAN alcança essas quatro rotas e nada do que o token do servidor protege. Dito sem rodeios antes de
 entregar um link: um convidado pode pedir ao agente qualquer coisa que o dono pediria, no projeto do
 dono, com as ferramentas e o gasto do dono — sob as costuras padrão da requisição, e sem aprovar cards.
+
+**O que um convidado lê dos turnos do dono.** O que o dono disse e a resposta final do modelo, e nada do que
+a máquina viu ou produziu no meio do caminho. A porta do convidado (`chimera/api/guest_projection.py` e
+`chimera/core/guest_history.py`) é uma lista de permissões aplicada ao stream ao vivo, ao seu replay, à
+conversa guardada e ao histórico enviado ao modelo do turno do próprio convidado. O convidado vê o pedido
+como a pessoa o digitou (um pedido automático, o texto de um documento anexado, um comando expandido ou um
+card proposto pelo modelo aparecem como um marcador), a resposta final do modelo quando o turno terminou
+normalmente (um erro, um limite ou uma primeira passada depois reparada não aparecem: o convidado lê que o
+turno não concluiu) e, para uma ferramenta, só o tipo e o status. O texto entre chamadas de ferramenta não é
+transmitido ao convidado, e o turno do próprio convidado não recebe os resultados de ferramentas, as notas
+de jobs ou de trabalhos do dono, nem as ferramentas de job. Argumentos e resultados de ferramentas, diffs de
+edição, prévias de aprovação, imagens do navegador, a saída do verificador, as fontes de instruções, o custo
+do recibo e os caminhos do host não são enviados, e um tipo de frame que ninguém listou é descartado. Uma
+conversa guardada antes dessas marcas existirem mostra marcadores ao convidado. A janela do próprio dono
+continua recebendo todos os frames. A única coisa que isto não consegue filtrar é a própria resposta final:
+se o modelo citar um arquivo privado com as próprias palavras, o convidado lê — compartilhar uma conversa
+compartilha as suas respostas, e o painel de compartilhamento diz isso.
 
 ### Seu próprio celular ou navegador: parear um dispositivo
 

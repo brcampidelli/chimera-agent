@@ -1,5 +1,5 @@
 ---
-source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
+source_sha256: 98e04cea6d46d08e173e43f42725aa38d3079dd3bb10dea93d09502423e0e091
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -168,6 +168,22 @@ Aplikacja gościa jest też **jedyną** rzeczą serwowaną, gdy właściciel otw
 dociera do tych czterech tras i do niczego, co chroni token serwera. Powiedziane wprost przed wręczeniem
 linku: gość może poprosić agenta o wszystko, o co poprosiłby właściciel, w projekcie właściciela, jego
 narzędziami i za jego pieniądze — w domyślnych ramach żądania, i bez zatwierdzania kart.
+
+**Co gość czyta z tur właściciela.** To, co powiedział właściciel, i końcową odpowiedź modelu — i nic z tego,
+co maszyna widziała lub wytworzyła po drodze. Drzwi gościa (`chimera/api/guest_projection.py` oraz
+`chimera/core/guest_history.py`) to lista dozwolonych elementów stosowana do strumienia na żywo, jego
+odtworzenia, zapisanej rozmowy oraz historii wysyłanej do modelu tury samego gościa. Gość widzi prośbę tak,
+jak wpisała ją osoba (prośba automatyczna, tekst załączonego dokumentu, rozwinięte polecenie lub karta
+zaproponowana przez model są pokazywane jako symbol zastępczy), końcową odpowiedź modelu, gdy tura zakończyła
+się normalnie (błąd, limit lub pierwsze przejście, które potem naprawiono, nie są pokazywane: gość czyta, że
+tura się nie zakończyła), a z narzędzia tylko jego rodzaj i status. Tekst między wywołaniami narzędzi nie jest
+przesyłany gościowi, a tura samego gościa nie otrzymuje wyników narzędzi, notatek o jobach ani o pracach
+właściciela, ani narzędzi do jobów. Argumenty i wyniki narzędzi, diffy edycji, podglądy zatwierdzeń, obrazy z
+przeglądarki, wyjście weryfikatora, źródła instrukcji, koszt z rachunku i ścieżki hosta nie są wysyłane, a typ
+ramki, którego nikt nie wymienił, jest odrzucany. Rozmowa zapisana, zanim te znaczniki istniały, pokazuje
+gościowi symbole zastępcze. Okno samego właściciela nadal otrzymuje każdą ramkę. Jedyne, czego to nie potrafi
+odfiltrować, to sama końcowa odpowiedź: jeśli model zacytuje prywatny plik własnymi słowami, gość to
+przeczyta — udostępnienie rozmowy udostępnia jej odpowiedzi, i mówi o tym panel udostępniania.
 
 ### Twój własny telefon lub przeglądarka: parowanie urządzenia
 

@@ -202,6 +202,14 @@ from chimera.core.diff_self_check import (
     named_paths_of,
 )
 from chimera.core.element_pick import record_page_elements, record_page_origin
+from chimera.core.guest_history import (
+    AUTO,
+    CARD_TURN_TEXT,
+    GUEST_KEY,
+    HUMAN,
+    HUMAN_TEXT_KEY,
+    ORIGIN_KEY,
+)
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.pr_auto_archive import Sweeper
 from chimera.core.pr_auto_archive import has_work as pr_has_work
@@ -2480,6 +2488,20 @@ def _measured_turn(guard: Any, before: Any) -> tuple[list[str], str]:
     return [str(path) for path in change.paths], str(incomplete_reason_of(change) or "")
 
 
+def _turn_origin(req: Any) -> tuple[str, str]:
+    """(origin, human_text) of the message a turn is opened with, sealed at creation.
+
+    ``human`` only when a person typed the request. A close loop's CI log and a card the MODEL proposed
+    (``suggest_task``, run by "do it here") are written by the harness or the model, so they are
+    ``auto``; the card's prompt is never kept as what a person said, only a fixed line.
+    """
+    if getattr(req, "close_loop_follow", None) is not None:
+        return AUTO, ""
+    if getattr(req, "_task_card", None) is not None:
+        return AUTO, CARD_TURN_TEXT
+    return HUMAN, str(req.shown_message)
+
+
 def _final_answer_index(session: Any) -> int | None:
     """The position of the conversation's last message when it is a final answer, else None. A position,
     not a text: two turns of one conversation can hold identical answers."""
@@ -2571,6 +2593,14 @@ class CodeTurnRequest(CodeSeams):
         """The chat platform this turn was sent from, stamped in-process; "" for every other turn."""
         return self._channel_origin
 
+    @property
+    def guest_id(self) -> str:
+        return self._guest_id
+
+    def stamp_guest(self, share_id: str) -> CodeTurnRequest:
+        self._guest_id = share_id
+        return self
+
     def stamp_channel_origin(self, platform: str) -> CodeTurnRequest:
         """This request, marked as sent by the listed owner from ``platform``'s chat."""
         self._channel_origin = platform
@@ -2583,6 +2613,9 @@ class CodeTurnRequest(CodeSeams):
     #: stop being a guest's turn. A private attribute is set only by code in this process
     #: (`stamp_channel_origin`), never parsed, never dumped, and absent from the API schema.
     _channel_origin: str = PrivateAttr(default="")
+    #: The share link a guest's turn came through (`Share.id`), stamped by the guest's own route and
+    #: never read from a body. What makes a turn THIS guest's: a name is only a label.
+    _guest_id: str = PrivateAttr(default="")
     _via_screen: bool = PrivateAttr(default=False)
     #: The desktop bridge forwarded this turn (`VIA_BRIDGE_SCOPE_KEY`, not a paired device). Set only by
     #: :func:`turn_origin` from the scope; the permission switch applies, the browser does not.
@@ -4742,9 +4775,10 @@ def register_code_api(
         # nobody. See `finished_note`.
         # A guest is told only of its own conversation's jobs; the owner's other work in the same
         # folder stays unreported, for the owner's next turn.
-        jobs_note = finished_note(
-            live().home, ws, session_id=(req.session_id or "") if (bool(author) and not req.channel_origin) else None
-        )
+        # Not told to a guest at all: a job note quotes the command and a work's names its answer or
+        # error, and both are the owner's, whatever conversation they ran in.
+        guest_sees_no_machine_notes = guest_runs_nothing(author, req)
+        jobs_note = "" if guest_sees_no_machine_notes else finished_note(live().home, ws, session_id=None)
         if jobs_note:
             note = (note + "\n\n" if note else "") + jobs_note
 
@@ -4752,7 +4786,7 @@ def register_code_api(
         # and the handles to stop or undo one. Only for a conversation that exists: a first message
         # has no works to ask about, and a work's own turn is not told about its siblings.
         extra_tools: list[Tool] = []
-        if background is None and req.session_id:
+        if background is None and req.session_id and not guest_sees_no_machine_notes:
             works_note = works.note(req.session_id)
             if works_note:
                 note = (note + "\n\n" if note else "") + works_note
@@ -5028,7 +5062,7 @@ def register_code_api(
                 published = bus.publish(
                     session_id, event,
                     numbered if isinstance(numbered, dict) else {"value": payload},
-                    turn_id=turn_id, author=author, keep=event != "browser",
+                    turn_id=turn_id, author=author, keep=event != "browser", guest=req.guest_id,
                 )
             # A browser frame is a picture of a moment, tens of kilobytes each, and replay is for
             # the words a dropped connection lost — not for redrawing a page that has moved on.
@@ -5073,8 +5107,11 @@ def register_code_api(
                     "author": author,
                     "attachment_count": len(req.attachments),
                     "started_at": turn_started_at,
+                    # Whether `message` is a person's words or the harness's own request (a CI log
+                    # to fix): a guest is shown the first and a placeholder for the second.
+                    "origin": _turn_origin(req)[0],
                 },
-                turn_id=turn_id, author=author,
+                turn_id=turn_id, author=author, guest=req.guest_id,
             )
             # Findable from outside until it ends. `live_since` is the sequence BEFORE the opening
             # frame, so asking the live stream for what came after it brings the turn back whole.
@@ -5649,6 +5686,11 @@ def register_code_api(
                                     with repair_writes_read_only(command, repair_write_state):
                                         result = session.send(
                                             repair_task,
+                                            origin=AUTO,
+                                            author=author or "",
+                                            continues_turn=True,
+                                            guest_id=req.guest_id,
+                                            project_for_guest=guest_runs_nothing(author, req),
                                             on_token=on_token if req.stream and not fused else None,
                                             on_tool=on_tool,
                                             on_tool_start=on_tool_start,
@@ -5807,10 +5849,12 @@ def register_code_api(
                                 reason = output or "the agent reported a conflict with the test"
                                 output = reason[:4000]
                                 answer = str(payload.get("answer") or "")
-                                if not answer.lstrip().startswith("CONFLICT:"):
+                                composed = not answer.lstrip().startswith("CONFLICT:")
+                                if composed:
                                     answer = f"CONFLICT: {reason}"
                                 payload["answer"] = answer
-                                session.replace_last_answer(answer)
+                                # A line the server composed is not a model answer: nothing to seal.
+                                session.replace_last_answer(answer, **({"candidate": None} if composed else {}))
                             elif state == "failed" and req.verify_retry:
                                 answer = (
                                     f"{answer.rstrip()}\n\nVerification failed after {attempts} "
@@ -5913,6 +5957,13 @@ def register_code_api(
                         raw_answer = str(payload.get("answer") or "")
                         if close_note is not None and raw_answer.strip():
                             payload["answer"] = raw_answer.rstrip() + "\n\n" + close_note
+                    # The model's own final answer AFTER any repair, and only when the turn ended
+                    # normally with it (`CodeSession._seal_final`): what a guest of a shared
+                    # conversation is shown. An error sentence, a cap, a timeout or a fragment is not
+                    # sealed, and the guest is told the turn did not conclude instead.
+                    sealed_answer = session.pending_final_text()
+                    payload["final_answer"] = sealed_answer or ""
+                    payload["final_sealed"] = sealed_answer is not None
                     receipt = {k: v for k, v in payload.items() if k != "answer"}
                     # The files an MCP tool wrote into this turn: path, SHA-256, size and the tool.
                     # The workspace diff below cannot list them, because their folder ignores itself
@@ -5998,6 +6049,10 @@ def register_code_api(
                                 ):
                                     # The answer as shown on `done`, note and any receipt summary included.
                                     session.replace_answer_at(answer_index, str(payload["answer"]))
+                                # The seal is written here, once the turn has closed with its
+                                # definitive answer, onto the stored copy the refresh just read.
+                                if sealed_answer is not None and answer_index is not None:
+                                    session.seal_final_at(answer_index, sealed_answer)
                                 session.remember_receipt(receipt)
                                 with live_turns.writing(turn_id):
                                     store_for.save(session)
@@ -6302,8 +6357,18 @@ def register_code_api(
                         )
                         # The conversation is the agent's, but the RECORD is ours: without this the
                         # sidebar would show an untitled, empty session for work that really happened.
-                        session.messages.append({"role": "user", "content": message})
+                        session.messages.append({
+                            "role": "user", "content": message, ORIGIN_KEY: _turn_origin(req)[0],
+                            HUMAN_TEXT_KEY: _turn_origin(req)[1],
+                            **({GUEST_KEY: req.guest_id} if req.guest_id else {}),
+                        })
+                        # The candidate final answer is only what the agent said after its last tool
+                        # call, and only when it ended its turn normally; the seal is written when
+                        # the turn closes, not here (`CodeSession.seal_final_at`).
                         session.messages.append({"role": "assistant", "content": acp_result.answer})
+                        session.set_pending_final(
+                            acp_result.final_text.strip() if acp_result.stop_reason == "end_turn" else None
+                        )
                         # The pause since this turn is the next turn's to measure; what the external
                         # agent sent is not known, so nothing is compared against it.
                         session.last_turn = external_turn_record(
@@ -6356,6 +6421,15 @@ def register_code_api(
                         idle_compaction = None
                     result = session.send(
                         message,
+                        origin=_turn_origin(req)[0],
+                        author=author or "",
+                        # What the person typed, sealed here, before the attachments' text, the
+                        # expanded command and the mentions' context that `message` carries.
+                        human_text=_turn_origin(req)[1],
+                        guest_id=req.guest_id,
+                        # A guest's model reads the owner's turns as their questions and final
+                        # answers only (`chimera.core.guest_history`).
+                        project_for_guest=guest_runs_nothing(author, req),
                         # Fusion has no token stream (the engine only implements `complete`), so
                         # asking for one would leave the screen blank until the whole panel lands.
                         on_token=on_token if (req.stream and not fused) else None,
@@ -6382,7 +6456,11 @@ def register_code_api(
                     # what shipped, and the next turn's history is not built on a withheld answer.
                     answer, grounded, grounded_usd = _check_grounded(grounded_turn, result)
                     if answer != result.answer:
-                        session.replace_last_answer(answer)
+                        # What replaced the draft is the turn's final answer only when a stronger
+                        # model gave it ("escalated"); a decline sentence is the server's. Either
+                        # way the discarded draft is not the candidate any more.
+                        escalated = bool(grounded and grounded.get("outcome") == "escalated")
+                        session.replace_last_answer(answer, candidate=answer if escalated else None)
                     # Why the cache did not answer, from facts (`chimera/core/cache_miss.py`). None when
                     # the provider reported nothing about the cache: a silent route has no miss to explain.
                     cache_read = result.steplog.cache_read_tokens
@@ -8650,6 +8728,9 @@ def register_code_api(
         start_turn=_start_turn,
         static_dir=static_dir,
         sharing_on=_sharing_on,
+        # Whether a turn of the conversation is running: its last exchange has no sealed answer
+        # until the turn closes, and a guest is told it is in progress.
+        turn_running=lambda session_id: live_turns.of_session(session_id) is not None,
     )
     app.state.guest_server = register_sharing_api(
         app,
