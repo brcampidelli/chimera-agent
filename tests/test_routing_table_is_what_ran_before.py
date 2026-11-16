@@ -44,7 +44,7 @@ from chimera.core.escalation import ladder_of
 from chimera.decisions.factory import BACKENDS, build_backend, default_model_for
 from chimera.fusion.factory import fusion_config
 from chimera.fusion.verified import escalation_model
-from chimera.providers.catalog import COST_MODES, resolve_tiers
+from chimera.providers.catalog import COST_MODES, resolve_tiers, split_effort
 from chimera.providers.routing import ROLE_IDS
 
 SNAPSHOT = Path(__file__).parent / "routing_snapshots" / "matrix.json"
@@ -77,7 +77,7 @@ POLICY = {
 }
 EFFORT = {"plain": "", "effort": "#high"}
 
-PARTS = ("tiers", "rungs", "fusion", "verify_escalation", "decisions", "profiles", "lists")
+PARTS = ("tiers", "rungs", "fusion", "verify_escalation", "decisions", "profiles", "lists", "cascade", "subagent")
 
 
 def _setting_names() -> set[str]:
@@ -131,6 +131,54 @@ def _settings(parts: tuple[str, ...], workdir: Path) -> Settings:
     return Settings(_env_file=None, CHIMERA_HOME=str(workdir), **kwargs)  # type: ignore[call-arg]
 
 
+def _cascade_of(settings: Settings) -> list[str]:
+    """What the two CascadeConfig builders (desktop and CLI) put on the cascade they build."""
+    from chimera.api.app import _api_cascade_backend
+    from chimera.cli.commands._shared import _cascade_backend
+
+    out: list[str] = []
+    for build in (_api_cascade_backend, _cascade_backend):
+        cfg = build(object(), settings).config  # type: ignore[attr-defined,arg-type]
+        out.append(f"{cfg.weak}|{cfg.mid}|{cfg.entry}")
+    return out
+
+
+def _subagent_of(settings: Settings) -> list[str]:
+    """The model a subagent whose file declares ``effort: high`` runs on: the session's own model, and
+    with no session model the default (a plain agent keeps the slug it always got)."""
+    from unittest.mock import patch
+
+    from chimera.core.markdown_agents import MarkdownAgent
+    from chimera.core.registry import AgentDef
+    from chimera.core.subagent import SubAgentTool
+    from chimera.providers import CompletionResult
+    from chimera.tools import EchoTool, ToolRegistry
+
+    class _Backend:
+        model = ""
+
+        def complete(self, _messages: Any, **kwargs: Any) -> CompletionResult:
+            self.model = str(kwargs.get("model"))
+            return CompletionResult(content="done", model="t")
+
+    def agent(effort: str) -> MarkdownAgent:
+        return MarkdownAgent(
+            definition=AgentDef(id="a", name="a", instructions="Go.", allowed_tools=["echo"]),
+            description="d", steps=2, source="owner", from_project=False, effort=effort,
+        )
+
+    out: list[str] = []
+    for session, effort in ((settings.default_model, "high"), (None, "high"), (settings.default_model, "")):
+        backend = _Backend()
+        registry = ToolRegistry()
+        registry.register(EchoTool())
+        tool = SubAgentTool(backend, registry, model=session, max_turns=2, markdown_agents={"a": agent(effort)})
+        with patch("chimera.core.subagent.get_settings", return_value=settings):
+            tool.run(task="work", agent="a")
+        out.append(backend.model)
+    return out
+
+
 def _legacy(settings: Settings) -> dict[str, Any]:
     """What the code that decides today answers, as plain values."""
     tiers = resolve_tiers(settings)
@@ -152,7 +200,14 @@ def _legacy(settings: Settings) -> dict[str, Any]:
         "verify_escalation": escalation_model(settings),
         "decisions": default_model_for(settings, "local_logprob"),
         "profiles": profiles,
+        "cascade": [f"{tiers.weak}|{tiers.mid}|{tiers.entry}"] * 2,
+        # The effort goes on a slug that carries none; the default is what the gateway would use.
+        "subagent": [_plus_high(run_model), _plus_high(run_model), run_model],
     }
+
+
+def _plus_high(slug: str) -> str:
+    return slug if split_effort(slug)[1] else f"{slug}#high"
 
 
 def _table_values(settings: Settings) -> dict[str, Any]:
@@ -176,6 +231,8 @@ def _table_values(settings: Settings) -> dict[str, Any]:
             role: [r.slug, r.origin, r.effort_origin, r.inherits] for role, r in table.routes.items()
         },
         "lists": {role: [r.slug for r in members] for role, members in table.lists.items()},
+        "cascade": _cascade_of(settings),
+        "subagent": _subagent_of(settings),
     }
 
 

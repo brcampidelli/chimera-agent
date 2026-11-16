@@ -37,14 +37,14 @@ DEFAULT_EFFORT = "medium"
 def ladder_of(settings: Any) -> list[str]:
     """``[weak, default, top]`` as provider ids, deduplicated, cheapest first.
 
-    ``resolve_tiers`` supplies the weak and top rungs (the user's own, or the cost mode's); the
-    middle is ``default_model`` because that is what a plain run starts on, not the tier ladder's mid.
+    The routing table decides this (``RoutingTable.escalation_rungs`` is the same list); the function
+    stays because it answers without building the rest of the table. Escalation picks an effort step
+    itself, so the rungs are plain ids and a ``CHIMERA_ROLE_EFFORTS`` entry does not reach them: effort
+    changes only on a NEW attempt (``Escalation.model_for``), never inside a conversation.
     """
-    from chimera.providers.catalog import resolve_tiers
+    from chimera.providers.routing import rungs_of
 
-    tiers = resolve_tiers(settings)
-    rungs = [tiers.weak, settings.default_model, tiers.top]
-    return list(dict.fromkeys(base_slug(r) for r in rungs if r))
+    return rungs_of(settings)
 
 
 def next_step(
