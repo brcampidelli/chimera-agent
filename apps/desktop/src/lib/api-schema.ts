@@ -15063,6 +15063,11 @@ export interface components {
             role: string;
             /** Via */
             via: string;
+            /**
+             * Via Kind
+             * @default other
+             */
+            via_kind: string;
         };
         /** RunReceiptOut */
         RunReceiptOut: {

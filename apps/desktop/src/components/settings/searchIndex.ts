@@ -63,6 +63,17 @@ export const SEARCH_INDEX: readonly SearchEntry[] = [
   { tab: "general", label: "notify.row.minSeconds", hint: "notify.hint.minSeconds" },
   { tab: "general", label: "notify.row.approvals", hint: "notify.hint.approvals" },
   { tab: "general", label: "settings.row.costMode", hint: "settings.hint.costMode" },
+  // Drawn by RoutingTable inside the model card, not as a `<Row>`, which is how it went unfindable.
+  {
+    tab: "general",
+    label: "settings.routing.title",
+    hint: "settings.routing.hint",
+    anchor: "settings-card-model",
+    terms: "settings.search.terms.routing",
+  },
+  // Drawn by SafetyOverviewCard, a card of the Security tab with no `<Row>` in it.
+  { tab: "security", label: "settings.safety.title" },
+  { tab: "security", label: "settings.safety.bypass.title" },
   {
     tab: "general",
     label: "env.settings.title",
@@ -147,6 +158,12 @@ export const SEARCH_INDEX: readonly SearchEntry[] = [
     tab: "general",
     label: "settings.row.claudeUserHostExec",
     hint: "settings.hint.claudeUserHostExec",
+    anchor: "settings-claude-user-host-exec",
+  },
+  // Drawn by ClaudeHooksList right under that switch, with no `<Row>` of its own.
+  {
+    tab: "general",
+    label: "settings.hooks.loaded.title",
     anchor: "settings-claude-user-host-exec",
   },
   {
