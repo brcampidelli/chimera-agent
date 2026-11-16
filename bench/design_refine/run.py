@@ -246,7 +246,7 @@ def run_gen_item(model_key: str, index: int, rep: int) -> None:
 
 def cmd_gen(model_key: str) -> None:
     items = [(i, r) for i in range(len(BRIEFS)) for r in range(REPS)]
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(lambda ir: run_gen_item(model_key, *ir), items))
     print(f"gen done for {model_key}; spent so far US${spent():.4f}")
 
@@ -292,7 +292,7 @@ def build_design(model_key: str, index: int) -> None:
 
 
 def cmd_corpus(model_key: str) -> None:
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(lambda i: build_design(model_key, i), range(len(BRIEFS))))
     made = len(list((RESULTS / model_key / "corpus").glob("*.json")))
     print(f"corpus for {model_key}: {made}/30 designs; spent so far US${spent():.4f}")
@@ -330,10 +330,12 @@ def run_refine_item(model_key: str, index: int, rep: int) -> None:
                 outcome = propose.refine(meter, doc, request, model=meter.model)
             operations = [wire(op) for op in outcome.proposal.operations] if outcome.proposal else []
             ok, attempts, error = outcome.ok, outcome.attempts, outcome.error
+            reads = outcome.read_rounds
         except Exception as exc:
-            operations, ok, attempts, error = [], False, 0, f"halt: {type(exc).__name__}"
+            operations, ok, attempts, error, reads = [], False, 0, f"halt: {type(exc).__name__}", 0
         add_spend(meter.usd)
         _append(out, {"brief": brief.id, "rep": rep, "arm": arm, "screens": len(screens), "how": how,
+                      "read_rounds": reads,
                       "target": target, "request": request, "ok": ok, "attempts": attempts, "error": error,
                       "success": first_attempt_edit(ok, attempts, operations, target),
                       "shape": edit_outcome(operations, target),
@@ -343,7 +345,7 @@ def run_refine_item(model_key: str, index: int, rep: int) -> None:
 
 def cmd_refine(model_key: str) -> None:
     items = [(i, r) for i in range(len(BRIEFS)) for r in range(REPS)]
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(lambda ir: run_refine_item(model_key, *ir), items))
     print(f"refine done for {model_key}; spent so far US${spent():.4f}")
 
@@ -393,4 +395,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, str(REPO / "bench"))
+    from _legacy_defaults import pin_legacy_defaults
+
+    pin_legacy_defaults()  # the five 2026-11-10 defaults, back to the value these numbers used
     main()
