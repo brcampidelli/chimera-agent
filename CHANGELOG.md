@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **`chimera models` and Settings list every role's model, effort and origin.** `GET /api/routing` answers which model each role runs on, at which effort, where that choice came from, and whether the effort is sent on that route. What leaves through it is sanitised: a local path shows only its file name, a URL loses its user, password and query, and a denied provider's message is cleaned the same way. (P1-10, slice b) (#1294)
+
 - **Reasoning effort per role.** `CHIMERA_ROLE_EFFORTS` sets the reasoning effort of the code roles and of the fusion cast, and an agent file's `effort: low|medium|high` now applies to that subagent's own calls. A repository's agent file cannot raise the effort the owner chose. (P1-10, slice c) (#1292)
 
 - **A scheduled job can name its own model, effort and step budget, and sees its last delivery.** `cron add/edit --model --effort --max-steps` and the Schedule screen set them (empty inherits from `serve`, as before); invalid values are refused at save and, for a hand-edited `jobs.json`, inherited with a warning instead of dropping the job. The job's last delivered answer (2 KB, fenced as data) closes its context so it stops repeating itself; a delivery the destination refused counts toward the failure brake and is never treated as delivered. A webhook job naming these fields is refused. (P1-03) (#1287)
