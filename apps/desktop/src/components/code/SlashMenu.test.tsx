@@ -91,7 +91,11 @@ describe("the composer's slash list", () => {
     expect(within(options[3]).getByText("yours")).toBeInTheDocument();
     expect(within(options[4]).getByText("plugin my-plugin")).toBeInTheDocument();
     expect(within(options[5]).getByText("Broken: invalid frontmatter")).toBeInTheDocument();
-    expect(box).toHaveAttribute("aria-expanded", "true");
+    // The box is wired to the list it opened. It no longer says `aria-expanded`: that attribute is
+    // not allowed on a textbox (axe aria-allowed-attr) and a screen reader dropped it; the open
+    // list is what `aria-controls` and the `status` count carry.
+    expect(box).toHaveAttribute("aria-controls", list.id);
+    expect(box).not.toHaveAttribute("aria-expanded");
   });
 
   it("filters as you type", async () => {

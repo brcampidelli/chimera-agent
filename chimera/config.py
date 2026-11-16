@@ -1529,8 +1529,16 @@ class Settings(BaseSettings):
     approval_wait: float = Field(default=300.0, validation_alias="CHIMERA_APPROVAL_WAIT")
 
     # Governance on the unattended surfaces (`serve`, cron, MCP, A2A, messaging): `off` | `observe`
-    # | `enforce`. Off by default, because turning it on changes what a running deployment is
-    # allowed to do and nobody should get that from an upgrade.
+    # | `enforce`. The field's own default is `off`, because turning it on changes what a running
+    # deployment is allowed to do and nobody should get that from an upgrade. What an install GETS
+    # when nobody chose (an empty `CHIMERA_GOVERNANCE=` counts as nobody) is decided once per home
+    # by `get_settings()` (owner decision 2026-11-14, audit P0-15): a NEW home (missing or empty)
+    # starts in `observe`; an EXISTING home (anything in it) keeps `off` and is told, in the log
+    # and on the desktop Settings screen, what `observe` is. `observe` asks nothing and does not
+    # refuse what `enforce` would send to review - it records it - but the fixed BLOCK signatures
+    # (`rm -rf /`, `mkfs`, ...) refuse in every mode the kernel is installed in, so a new install
+    # refuses them where `off` did not. The verdict is written to `governance_default.json` in the home, so
+    # the next boot does not decide again. `CHIMERA_GOVERNANCE` in the environment or `.env` wins.
     #
     # `observe` runs the entire stack and refuses nothing, recording every action enforcement WOULD
     # have refused. That middle state exists because the failure it guards against is silent: with
@@ -2161,4 +2169,9 @@ def get_settings() -> Settings:
     delivered = launch_secrets.server_token()
     if delivered and not os.environ.get("CHIMERA_SERVER_TOKEN"):
         settings.server_token = delivered
+    # A home nobody chose a governance mode for: `observe` if it is new, `off` plus a notice if it
+    # already holds state (`chimera/governance/first_boot.py`). An explicit mode always wins.
+    from chimera.governance import first_boot
+
+    first_boot.apply(settings)
     return settings

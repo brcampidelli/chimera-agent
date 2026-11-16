@@ -248,14 +248,27 @@ export function needsCodeKey(reason: string | null | undefined): "code.approval.
 export function ApprovalCard({
   question,
   onAnswered,
+  announce = false,
 }: {
   question: ApprovalQuestionLike;
   onAnswered: () => void;
+  /** Say the question aloud when it appears. Off by default: the card in a Radix dialog or on the
+   *  Governance list is reached by moving there, and the dialog already announces itself. The card
+   *  that slides in above the composer is not, so the conversation turns this on. */
+  announce?: boolean;
 }) {
   const t = useT();
   const pct = useP();
   const toast = useOptionalToast();
   const suggestion = question.suggestion ?? null;
+  // The question whose alert this card raised. Latched from the `announce` it was MOUNTED with, so
+  // the parent turning `announce` off after the first commit (it has by then recorded the id) does
+  // not pull the alert out of the document before it has been heard, and a card remounted for a
+  // question already announced starts with none.
+  const [spoken, setSpoken] = useState<string | null>(announce ? question.id : null);
+  useEffect(() => {
+    if (announce && spoken !== question.id) setSpoken(question.id);
+  }, [announce, question.id, spoken]);
   const [busy, setBusy] = useState(false);
   const [labelled, setLabelled] = useState(false);
   const [remembering, setRemembering] = useState(false);
@@ -375,6 +388,18 @@ export function ApprovalCard({
         expired ? "border-bad/40 bg-bad/5" : "border-accent/40 bg-accent/5",
       )}
     >
+      {/* A turn that stops to ask for a decision must be heard by someone who cannot see the card:
+          otherwise the agent waits and `wait_seconds` runs down in silence. Assertive (`alert`), not
+          polite, because nothing else will happen until this is answered; written once per question
+          (keyed), so the card reused for the next question announces that one, and it is the ONLY
+          live text here — the countdown below stays polite. The buttons keep the refuse-first order. */}
+      {spoken === question.id ? (
+        <p key={question.id} role="alert" className="sr-only">
+          {suggestion ? t("code.approval.suggestion.title") : t("code.approval.title")}
+          {". "}
+          {suggestion ? t("code.approval.suggestion.by", { hint: suggestion.client_hint || "-" }) : question.reason}
+        </p>
+      ) : null}
       <div className="flex items-center gap-2 font-medium">
         {expired ? (
           <ShieldX className="h-4 w-4 text-bad-foreground" aria-hidden="true" />

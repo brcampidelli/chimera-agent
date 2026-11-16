@@ -33,6 +33,7 @@ const en: Dict = {
   "settings.hint.idleCompaction": "After a pause longer than the provider's cache lifetime (5 minutes on Anthropic) the cache has already expired, so the history is shortened before the next turn. Off sends the whole history.",
   "settings.search.terms.idleCompaction": "compaction, cache, idle, pause, history, context, TTL, tokens",
   "status.cacheMiss": "Last cache miss: {cause}",
+  "status.cacheWarning": "Cache is serving {rate} of this conversation (below {threshold}). Main cause: {cause}",
   "code.chat.idleCompacted": "History shortened after a pause: {before} → {after} tokens (estimated)",
   "code.chat.miss.first_turn": "first turn, nothing cached yet",
   "code.chat.miss.ttl_expired": "cache expired during the pause",
@@ -1310,6 +1311,10 @@ const en: Dict = {
     "enforce — refuse what the policy stops",
   "settings.governance.cost":
     "Measured on 33 real tool calls from this repository: 20 allowed, 2 warned, 3 sent for review, 8 refused. The 8 are fixed signatures and are refused in observe too. Applies to the next chat turn and the next run; the cron daemon and the messaging adapters keep what they started with until the app is relaunched.",
+  "settings.governance.notice":
+    "This install already had data when governance became configurable, so serve, cron, MCP and the bots on it still run with governance off. New installs start in observe, which asks nothing and does not refuse what enforce would send to review, it only records it; the fixed hard blocks (such as rm -rf /) refuse in every mode but off. Nothing was changed for you: pick observe above to try it, then read it with chimera report governance.",
+  "settings.governance.notice.dismiss":
+    "Dismiss",
   "settings.row.approvalWebhook":
     "Where approvals are asked",
   "settings.hint.approvalWebhook":
@@ -2951,6 +2956,9 @@ const en: Dict = {
   "code.chat.steps": "{n} steps",
   "code.chat.toolCallsIn": "{n} tool call(s) in {time}",
   "shell.drawer.label": "Side panel",
+  "code.chat.failed": "Failed: {reason}",
+  "code.chat.failed.apiKey": "invalid API key",
+  "code.chat.failed.unknown": "unknown error",
   "code.chat.complete": "Complete",
   "code.chat.waiting": "Waiting for you",
   "code.chat.menu": "Conversation actions",
@@ -3097,6 +3105,12 @@ const en: Dict = {
     "Of the passes, how many were judged by an executable command rather than by a model reading the answer.",
   "code.worth.attempts": "attempts",
   "code.worth.cost": "cost",
+  "code.worth.perResolved": "per resolved",
+  "code.worth.perVerified": "per verified",
+  "code.worth.perResolvedNote":
+    "Cost per resolved is the group's whole spend, failed runs included, divided by the runs that passed. It is blank when nothing passed or when any run has no known price. Not an experiment: it is not ranked.",
+  "code.worth.resolvedN": "{n} resolved",
+  "code.worth.coverage": "{pct} of runs priced",
   "code.worth.costUnknown": "{known}/{runs} priced",
   "code.worth.noProfile": "none",
   "code.worth.empty":
@@ -3955,6 +3969,7 @@ const pt: Dict = {
   "settings.hint.idleCompaction": "Após uma pausa maior que a vida do cache do provedor (5 minutos na Anthropic), o cache já expirou, então o histórico é encurtado antes do próximo turno. Desligado envia o histórico inteiro.",
   "settings.search.terms.idleCompaction": "compactação, cache, ociosa, pausa, histórico, contexto, TTL, tokens",
   "status.cacheMiss": "Último miss de cache: {cause}",
+  "status.cacheWarning": "O cache atende {rate} desta conversa (abaixo de {threshold}). Causa principal: {cause}",
   "code.chat.idleCompacted": "Histórico encurtado após a pausa: {before} → {after} tokens (estimado)",
   "code.chat.miss.first_turn": "primeiro turno, nada em cache ainda",
   "code.chat.miss.ttl_expired": "o cache expirou durante a pausa",
@@ -5227,6 +5242,10 @@ const pt: Dict = {
     "aplicar — recusa o que a política barra",
   "settings.governance.cost":
     "Medido em 33 chamadas reais de ferramenta deste repositório: 20 liberadas, 2 com aviso, 3 para revisão, 8 recusadas. As 8 são assinaturas fixas e são recusadas também em observar. Vale a partir do próximo turno de conversa e da próxima execução; o cron e os adaptadores de mensagem mantêm o que começaram até o app ser reaberto.",
+  "settings.governance.notice":
+    "Esta instalação já tinha dados quando a governança passou a ser configurável, então serve, cron, MCP e os bots dela continuam com a governança desligada. Instalações novas começam em observar, que não pede aprovação e não recusa o que aplicar mandaria para revisão, só registra; os bloqueios duros (como rm -rf /) recusam em qualquer modo exceto desligado. Nada foi mudado por você: escolha observar acima para experimentar e leia o resultado com chimera report governance.",
+  "settings.governance.notice.dismiss":
+    "Dispensar",
   "settings.row.approvalWebhook":
     "Onde as aprovações são pedidas",
   "settings.hint.approvalWebhook":
@@ -6876,6 +6895,9 @@ const pt: Dict = {
   "code.chat.steps": "{n} passos",
   "code.chat.toolCallsIn": "{n} chamada(s) de ferramenta em {time}",
   "shell.drawer.label": "Painel lateral",
+  "code.chat.failed": "Falhou: {reason}",
+  "code.chat.failed.apiKey": "chave de API inválida",
+  "code.chat.failed.unknown": "erro desconhecido",
   "code.chat.complete": "Concluída",
   "code.chat.waiting": "Aguardando você",
   "code.chat.menu": "Ações da conversa",
@@ -7025,6 +7047,12 @@ const pt: Dict = {
     "Das aprovações, quantas foram julgadas por um comando executável em vez de um modelo lendo a resposta.",
   "code.worth.attempts": "tentativas",
   "code.worth.cost": "custo",
+  "code.worth.perResolved": "por resolvida",
+  "code.worth.perVerified": "por verificada",
+  "code.worth.perResolvedNote":
+    "O custo por resolvida é o gasto inteiro do grupo, execuções que falharam incluídas, dividido pelas que passaram. Fica em branco quando nada passou ou quando alguma execução não tem preço conhecido. Não é experimento: não há ranking.",
+  "code.worth.resolvedN": "{n} resolvidas",
+  "code.worth.coverage": "{pct} das execuções com preço",
   "code.worth.costUnknown": "{known}/{runs} com preço",
   "code.worth.noProfile": "nenhum",
   "code.worth.empty":

@@ -26,3 +26,31 @@ export function shownMissCause(
   if (cacheRead !== 0 || !cause || cause === "none") return null;
   return cause;
 }
+
+/** The conversation's cache rate crossing under its threshold, as the turn receipt carries it
+ *  (`cache_warning`, from `session_cache_warning` in `chimera/core/cache_miss.py`). Set on the turn
+ *  that crossed and absent on every other, so a conversation that stays under is not nagged. */
+export interface CacheWarning {
+  /** 0..1, over the turns the route reported a cache for, the first turn left out. */
+  rate: number;
+  threshold: number;
+  /** The cause that cost the most tokens, one of the fixed causes of `cache_miss.py`. */
+  cause: string;
+  turns: number;
+}
+
+/** The warning's sentence, or null when the turn carried none. A cause of `none` or an unknown
+ *  string is drawn as "not identified", never left out: the warning is about the rate, and the
+ *  cause only qualifies it. */
+export function cacheWarningText(
+  warning: CacheWarning | null | undefined,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  pct: (n: number) => string,
+): string | null {
+  if (!warning) return null;
+  return t("status.cacheWarning", {
+    rate: pct(Math.round(warning.rate * 100)),
+    threshold: pct(Math.round(warning.threshold * 100)),
+    cause: t(missLabelKey(warning.cause)),
+  });
+}

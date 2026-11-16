@@ -21,6 +21,31 @@ function Cost({ group, t }: { group: ProfileWorth; t: TFunc }) {
   );
 }
 
+/** What one resolved task cost, failures included, or why that cannot be said.
+ *
+ *  Blank (an em dash) when nothing passed or when any run is unpriced: the quotient does not exist
+ *  in the first case, and in the second the numerator is not known. The coverage is printed beside
+ *  it either way, so a dash says whether one price is missing or all of them. No colour ranks one
+ *  group's figure against another's: these groups are not comparable. */
+function PerResolved({ group, t }: { group: ProfileWorth; t: TFunc }) {
+  // A server older than these fields omits them: absent is read as null, never as a number.
+  const usd = (n: number | null | undefined) => (n == null ? "—" : `$${n.toFixed(4)}`);
+  const resolved = group.resolved_n ?? group.passed;
+  const coverage = group.price_coverage ?? (group.runs > 0 ? group.usd_known_runs / group.runs : 0);
+  return (
+    <>
+      <span data-testid="usd-per-resolved">{usd(group.usd_per_resolved)}</span>
+      <span className="block text-xs text-muted-foreground">
+        {t("code.worth.resolvedN", { n: resolved })} ·{" "}
+        {t("code.worth.coverage", { pct: `${Math.round(coverage * 100)}%` })}
+      </span>
+      <span className="block text-xs text-muted-foreground">
+        {t("code.worth.perVerified")}: <span data-testid="usd-per-verified">{usd(group.usd_per_verified)}</span>
+      </span>
+    </>
+  );
+}
+
 function Row({ group, t }: { group: ProfileWorth; t: TFunc }) {
   const label = group.profile
     ? t(`code.roles.profile.${group.profile}` as const)
@@ -51,8 +76,11 @@ function Row({ group, t }: { group: ProfileWorth; t: TFunc }) {
         ) : null}
       </td>
       <td className="py-1 pr-3 text-right tabular-nums">{group.attempts_total}</td>
-      <td className="py-1 text-right tabular-nums">
+      <td className="py-1 pr-3 text-right tabular-nums">
         <Cost group={group} t={t} />
+      </td>
+      <td className="py-1 text-right tabular-nums">
+        <PerResolved group={group} t={t} />
       </td>
     </tr>
   );
@@ -120,7 +148,8 @@ export function WorthPanel({ workspace }: { workspace?: string } = {}) {
               <th className="pb-1 pr-3 text-right font-normal">{t("code.worth.runs")}</th>
               <th className="pb-1 pr-3 text-right font-normal">{t("code.worth.passed")}</th>
               <th className="pb-1 pr-3 text-right font-normal">{t("code.worth.attempts")}</th>
-              <th className="pb-1 text-right font-normal">{t("code.worth.cost")}</th>
+              <th className="pb-1 pr-3 text-right font-normal">{t("code.worth.cost")}</th>
+              <th className="pb-1 text-right font-normal">{t("code.worth.perResolved")}</th>
             </tr>
           </thead>
           <tbody>
@@ -135,6 +164,7 @@ export function WorthPanel({ workspace }: { workspace?: string } = {}) {
       {!any_readable ? (
         <p className="text-xs text-warn-foreground">{t("code.worth.tooFew", { n: readable_n })}</p>
       ) : null}
+      <p className="text-xs text-muted-foreground">{t("code.worth.perResolvedNote")}</p>
       <p className="text-xs text-muted-foreground">{t("code.worth.notAnExperiment")}</p>
       <DelegationSavings />
     </div>

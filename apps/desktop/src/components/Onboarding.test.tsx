@@ -359,4 +359,13 @@ describe("models already on this machine", () => {
     expect(keyField()).toBeTruthy();
     expect(screen.queryByText("Models already on this machine")).toBeNull();
   });
+
+  it("names the cost-mode select by its visible label", async () => {
+    // The label had no `htmlFor` and the select no id: a screen reader announced "combo box" with
+    // no name on the first-run screen.
+    renderWithProviders(<Onboarding onSkip={() => {}} />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Anthropic" })).toBeTruthy());
+    const select = screen.getByRole("combobox", { name: /cost/i });
+    expect(select.tagName).toBe("SELECT");
+  });
 });

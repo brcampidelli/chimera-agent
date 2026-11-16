@@ -137,4 +137,16 @@ describe("NamedEndpoints — Settings › Connections", () => {
     const card = document.getElementById("settings-card-endpoints")!;
     expect(await within(card).findByText("Could not read the endpoints.")).toBeInTheDocument();
   });
+
+  it("gives every form field the bordered .field look, which carries the focus ring", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<NamedEndpoints />);
+    await user.click(await screen.findByRole("button", { name: "Add endpoint" }));
+    for (const label of ["Name", /Base URL/, /Key variable/]) {
+      // A bare transparent input has no visible edge and no focus indicator.
+      const input = screen.getByLabelText(label);
+      expect(input).toHaveClass("field");
+      expect(input.className).not.toMatch(/outline-(hidden|none)/);
+    }
+  });
 });

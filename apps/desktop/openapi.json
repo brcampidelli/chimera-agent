@@ -1819,6 +1819,11 @@
             "title": "Governance",
             "type": "string"
           },
+          "governance_notice": {
+            "default": false,
+            "title": "Governance Notice",
+            "type": "boolean"
+          },
           "hooks": {
             "default": false,
             "title": "Hooks",
@@ -16218,6 +16223,11 @@
             "title": "Passed By Verifier",
             "type": "integer"
           },
+          "price_coverage": {
+            "default": 0.0,
+            "title": "Price Coverage",
+            "type": "number"
+          },
           "profile": {
             "anyOf": [
               {
@@ -16234,6 +16244,11 @@
             "title": "Profile Source",
             "type": "string"
           },
+          "resolved_n": {
+            "default": 0,
+            "title": "Resolved N",
+            "type": "integer"
+          },
           "reverted": {
             "title": "Reverted",
             "type": "integer"
@@ -16249,6 +16264,28 @@
           "usd_known_runs": {
             "title": "Usd Known Runs",
             "type": "integer"
+          },
+          "usd_per_resolved": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Per Resolved"
+          },
+          "usd_per_verified": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Per Verified"
           },
           "usd_total": {
             "anyOf": [

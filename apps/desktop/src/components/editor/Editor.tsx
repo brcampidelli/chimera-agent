@@ -196,6 +196,9 @@ export function Editor({
           doc,
           extensions: [
             base,
+            // The contenteditable CodeMirror builds has no name of its own, so a screen reader
+            // lands on "edit, multi-line" with no hint of which file this is.
+            EditorView.contentAttributes.of({ "aria-label": path, "aria-multiline": "true" }),
             ...(extra ? [extra] : []),
             languageConf.of(languageFor(path)),
             readOnlyConf.of(readOnlyOf(readOnly)),
