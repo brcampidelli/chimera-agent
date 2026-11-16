@@ -1,5 +1,5 @@
 ---
-source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
+source_sha256: 98e04cea6d46d08e173e43f42725aa38d3079dd3bb10dea93d09502423e0e091
 ---
 
 # Sécurité & garde-fous
@@ -194,6 +194,24 @@ atteint ces quatre routes et rien de ce que protège le jeton du serveur. À dir
 remettre un lien : un invité peut demander à l'agent tout ce que le propriétaire lui demanderait, dans le
 projet du propriétaire, avec ses outils et sa dépense — sous les coutures par défaut de la requête, et
 sans approuver de cartes.
+
+**Ce qu'un invité lit des tours du propriétaire.** Ce que le propriétaire a dit et la réponse finale du
+modèle, et rien de ce que la machine a vu ou produit entre-temps. La porte de l'invité
+(`chimera/api/guest_projection.py` et `chimera/core/guest_history.py`) est une liste d'autorisations appliquée
+au flux en direct, à sa relecture, à la conversation enregistrée et à l'historique envoyé au modèle du tour de
+l'invité lui-même. L'invité voit la demande telle que la personne l'a saisie (une demande automatique, le texte
+d'un document joint, une commande développée ou une carte proposée par le modèle apparaissent sous la forme
+d'un marqueur), la réponse finale du modèle lorsque le tour s'est terminé normalement (une erreur, une limite
+ou une première passe ensuite réparée ne sont pas montrées : l'invité lit que le tour n'a pas abouti) et, pour
+un outil, seulement son type et son statut. Le texte entre deux appels d'outils n'est pas diffusé à l'invité,
+et le tour de l'invité lui-même ne reçoit ni les résultats d'outils, ni les notes de jobs ou de travaux du
+propriétaire, ni les outils de jobs. Les arguments et résultats d'outils, les diffs d'édition, les aperçus
+d'approbation, les images du navigateur, la sortie du vérificateur, les sources d'instructions, le coût du reçu
+et les chemins de l'hôte ne sont pas envoyés, et un type de frame que personne n'a listé est écarté. Une
+conversation enregistrée avant l'existence de ces marques montre des marqueurs à l'invité. La fenêtre du
+propriétaire reçoit toujours tous les frames. La seule chose que cela ne peut pas filtrer est la réponse finale
+elle-même : si le modèle cite un fichier privé avec ses propres mots, l'invité le lit — partager une
+conversation partage ses réponses, et le panneau de partage le dit.
 
 ### Votre propre téléphone ou navigateur : associer un appareil
 

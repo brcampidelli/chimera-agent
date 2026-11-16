@@ -416,4 +416,14 @@ describe("Code — the file viewer minimises and closes", () => {
     expect(pane.querySelector("pre")).toHaveClass("whitespace-pre-wrap");
     expect(within(pane).getByRole("button", { name: "Wrap long lines" })).toHaveAttribute("aria-pressed", "true");
   });
+
+  it("names the editor textarea by the file and gives it a focus ring", async () => {
+    const user = await openFile();
+    await user.click(await screen.findByRole("button", { name: /^Edit$/ }));
+
+    const editor = editorOf();
+    expect(editor).toHaveAccessibleName("app.py");
+    expect(editor.className).toContain("focus-visible:outline-ring");
+    expect(editor.className).not.toMatch(/outline-(hidden|none)/);
+  });
 });

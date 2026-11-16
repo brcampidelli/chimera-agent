@@ -399,7 +399,12 @@ def test_the_code_session_replaces_only_a_final_answer() -> None:
     session = CodeSession(agent=None)  # type: ignore[arg-type]
     session.messages = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "draft"}]
     assert session.replace_last_answer("shipped") is True
-    assert session.messages[-1] == {"role": "assistant", "content": "shipped"}
+    # The shipped text replaces the draft; the draft is kept under `model_answer` (the model's own
+    # words, which a guest's view of the turn is built from), and a second replacement keeps the first.
+    assert session.messages[-1] == {"role": "assistant", "content": "shipped", "model_answer": "draft"}
+    assert session.replace_last_answer("shipped again") is True
+    assert session.messages[-1] == {
+        "role": "assistant", "content": "shipped again", "model_answer": "draft"}
 
     session.messages.append({"role": "assistant", "content": "", "tool_calls": [{"id": "1"}]})
     assert session.replace_last_answer("x") is False

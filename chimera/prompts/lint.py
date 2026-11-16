@@ -42,6 +42,21 @@ _CAPS = re.compile(r"\b[A-Z][A-Z]{2,}\b")
 #: Lower case on purpose: every fence is spelled that way, and an edit format's ``<<<<<<< SEARCH``
 #: marker is not a fence.
 _FENCE = re.compile(r"<<\s*(?!end\b)([a-z][a-z0-9-]*)")
+#: The inline syntax ``code_api`` used before P1-12 (``<project-verify untrusted>...</project-verify>``):
+#: a tag whose opening carries the word ``untrusted``. All of them count as ONE syntax, named below,
+#: because what matters to the model is "an inline tag marks data", not which tag name was picked.
+_INLINE_FENCE = re.compile(r"<[a-z][a-z0-9-]*\s+untrusted\s*>")
+INLINE_FENCE_NAME = "<tag untrusted>"
+#: Rule 2 of the plan, as a ceiling the source must stay under (``tests/test_the_prompt_lint_reports``).
+MAX_FENCE_SYNTAXES = 2
+
+
+def fence_syntaxes(text: str) -> set[str]:
+    """Every fence syntax ``text`` uses: ``<<marker`` names, plus the inline tag form as one name."""
+    found = {m.group(1).lower() for m in _FENCE.finditer(text)}
+    if _INLINE_FENCE.search(text):
+        found.add(INLINE_FENCE_NAME)
+    return found
 _LANGUAGE = re.compile(
     r"[^.\n]*\b(?:answer|reply|write|respond)\b[^.\n]*\blanguage\b[^.\n]*[.\n]"
     r"|[^.\n]*\blanguage\b[^.\n]*\b(?:answer|reply|write|respond)\b[^.\n]*[.\n]",
@@ -63,6 +78,27 @@ AFFECTIVE_SELF_CLAIMS = (
      "claims love or longing"),  # Love and longing are affective bonds, not service capabilities.
     (re.compile(r"\bI(?:'m| am)\s+(?:here for you|on your side)\b", re.IGNORECASE),
      "claims personal allegiance or availability"),  # These imply relational loyalty or an unlimited bond.
+)
+#: The same census in Portuguese (the app's second language; the bot and the owner both read it).
+#: Same rule as the English list: a concrete self-claim, not first-person language in general. The
+#: ratchet used to read English only, so a Portuguese string claiming a feeling passed at ceiling 0.
+AFFECTIVE_SELF_CLAIMS_PT = (
+    (re.compile(r"\b(?:eu\s+)?(?:me\s+)?importo\s+(?:muito\s+)?com\s+(?:voc[eê]|vc)\b", re.IGNORECASE),
+     "claims personal care for the user"),
+    (re.compile(r"\b(?:estou\s+me\s+sentindo|me\s+sinto|sinto\s+(?:saudades?|tristeza|alegria|medo|orgulho))\b",
+                re.IGNORECASE),
+     "claims a feeling"),
+    (re.compile(r"\b(?:confie\s+em\s+mim|pode\s+confiar\s+em\s+mim)\b", re.IGNORECASE),
+     "asks for trust in the agent"),
+    (re.compile(r"\b(?:eu\s+)?(?:te\s+)?prometo\b", re.IGNORECASE),
+     "makes a personal promise"),
+    (re.compile(r"\b(?:sou\s+)?(?:seu|sua)\s+(?:amigo|amiga|companheir[oa])\b", re.IGNORECASE),
+     "claims friendship"),
+    (re.compile(r"\b(?:eu\s+)?te\s+(?:amo|adoro)\b|\bsinto\s+(?:a\s+)?sua\s+falta\b|\bestou\s+com\s+saudades\b",
+                re.IGNORECASE),
+     "claims love or longing"),
+    (re.compile(r"\b(?:estou\s+aqui\s+por\s+voc[eê]|estou\s+(?:ao|do)\s+seu\s+lado)\b", re.IGNORECASE),
+     "claims personal allegiance or availability"),
 )
 #: The words per section the plan budgets for the largest layers (L0 and each L1 module).
 WORD_BUDGET = 250
@@ -124,9 +160,9 @@ def source_fences(root: Path | None = None) -> dict[str, list[str]]:
             continue  # this module names fences in order to describe them
         rel = path.relative_to(base.parent).as_posix()
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str) and "<<" in node.value:
-                for marker in _FENCE.finditer(node.value):
-                    found.setdefault(marker.group(1).lower(), set()).add(rel)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str) and "<" in node.value:
+                for marker in fence_syntaxes(node.value):
+                    found.setdefault(marker, set()).add(rel)
     return {marker: sorted(files) for marker, files in sorted(found.items())}
 
 
@@ -134,7 +170,7 @@ def lint(texts: dict[str, str], tools: set[str] | None = None) -> Report:
     """Check ``{section id: text}`` against the composition rules. Pure: no registry, no files."""
     report = Report()
     for section, text in sorted(texts.items()):
-        for marker in sorted({m.group(1).lower() for m in _FENCE.finditer(text)}):
+        for marker in sorted(fence_syntaxes(text)):
             report.fences.setdefault(marker, []).append(section)
         words = len(text.split())
         shouted = [w for w in _CAPS.findall(text) if w not in _NOT_SHOUTING]
@@ -156,6 +192,20 @@ def lint(texts: dict[str, str], tools: set[str] | None = None) -> Report:
             Finding("fences", "*", f"{len(report.fences)} fence syntaxes: " + ", ".join(sorted(report.fences)))
         )
     return report
+
+
+def _ui_values(path: Path, dictionary: str, label: str) -> list[tuple[str, str]]:
+    """String values (not keys) of one language's i18n dictionary, ``const <dictionary>: Dict = {``."""
+    source = path.read_text(encoding="utf-8")
+    start = source.index(f"const {dictionary}: Dict = {{")
+    end = source.index("\n};", start)
+    block = source[start:end]
+    values = re.findall(r":\s*(\"(?:\\.|[^\"\\])*\")", block)
+    return [(f"desktop i18n {label}[{index}]", ast.literal_eval(value)) for index, value in enumerate(values)]
+
+
+def _portuguese_ui_values(path: Path) -> list[tuple[str, str]]:
+    return _ui_values(path, "pt", "pt")
 
 
 def _english_ui_values(path: Path) -> list[tuple[str, str]]:
@@ -181,7 +231,7 @@ def _server_template_strings(server_dir: Path) -> list[tuple[str, str]]:
 def check_affective_text(section: str, text: str) -> list[Finding]:
     """Check one source string for concrete affective/relational self-claims."""
     findings: list[Finding] = []
-    for pattern, description in AFFECTIVE_SELF_CLAIMS:
+    for pattern, description in (*AFFECTIVE_SELF_CLAIMS, *AFFECTIVE_SELF_CLAIMS_PT):
         for match in pattern.finditer(text):
             findings.append(Finding("affective self-claim", section,
                                     f"{description}: {match.group(0)}"))
@@ -203,6 +253,7 @@ def affective_self_claims(root: Path | None = None) -> list[Finding]:
         for section in SECTIONS if (text := section.text()) is not None
     ]
     corpus.extend(_english_ui_values(repo / "apps/desktop/src/lib/i18n.tsx"))
+    corpus.extend(_portuguese_ui_values(repo / "apps/desktop/src/lib/i18n.tsx"))
     corpus.extend(_server_template_strings(repo / "chimera/server"))
     return [finding for section, text in corpus for finding in check_affective_text(section, text)]
 

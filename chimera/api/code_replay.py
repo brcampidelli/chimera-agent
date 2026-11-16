@@ -22,6 +22,14 @@ import json
 from typing import Any
 
 from chimera.core.agent_batch_note import AGENT_BATCH_KEY, is_batch_note
+from chimera.core.guest_history import (
+    AUTHOR_KEY,
+    GUEST_KEY,
+    HUMAN_TEXT_KEY,
+    ORIGIN_KEY,
+    is_sealed_final,
+    model_final_answer,
+)
 
 
 def _text(content: Any) -> str:
@@ -87,7 +95,13 @@ def exchanges_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
             continue
 
         if role == "user":
-            exchanges.append({"you": _text(message.get("content")), "answer": "", "tools": [], "edits": []})
+            # `origin` / `author` say who wrote the opening message (`guest_history`): a guest is shown
+            # the question only when it is provably a person's.
+            exchanges.append({
+                "you": _text(message.get("content")), "answer": "", "tools": [], "edits": [],
+                "origin": message.get(ORIGIN_KEY), "author": message.get(AUTHOR_KEY),
+                "human_text": message.get(HUMAN_TEXT_KEY), "guest_id": message.get(GUEST_KEY),
+            })
             pending = {}
             continue
 
@@ -98,6 +112,12 @@ def exchanges_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
                 # Concatenated, not replaced: a turn can answer, call a tool, then answer again, and
                 # keeping only the last part would drop the reasoning that led to the call.
                 exchange["answer"] = f"{exchange['answer']}\n{text}".strip() if exchange["answer"] else text
+            if is_sealed_final(message):
+                # The turn's FINAL answer, as the model said it, and only where the turn sealed one
+                # (it ended normally with the model's answer). A guest is shown this and not
+                # `answer`, which joins every text of the turn; a fragment before an internal retry
+                # or an error sentence is never sealed, and is not guessed at from its content.
+                exchange["final_answer"] = model_final_answer(message)
             for call in message.get("tool_calls") or []:
                 if not isinstance(call, dict):
                     continue

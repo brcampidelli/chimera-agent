@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from chimera.core.agent import Agent, AgentConfig
 from chimera.prompts import fingerprint
 from chimera.prompts.lint import (
@@ -68,7 +70,11 @@ def test_the_registry_report_sees_what_the_study_found() -> None:
     """The study counted five fence syntaxes and two language rules by hand. The report on the
     shipped prompts must see at least the ones that are in registered text, or it is blind."""
     report = lint_registry()
-    assert len(report.source_fences) >= 3, report.source_fences
+    # Was `>= 3`: a floor that proved the census could see the scattered syntaxes. P1-12 converged
+    # them, so the floor now says the census still reads the source (two syntaxes it can name:
+    # `external-data` and the grader's `answer`), and the ceiling lives in
+    # `test_the_source_uses_at_most_two_fence_syntaxes`. A census that found none would pass both.
+    assert {"external-data", "answer"} <= set(report.source_fences), report.source_fences
     assert "external-data" in report.fences  # the one the default prompt names
     assert report.by_rule("language rule")
     assert any(f.detail == "edit_file" for f in report.by_rule("tool in prose"))
@@ -128,3 +134,68 @@ def test_the_lint_carries_a_tool_schema_section_per_surface() -> None:
     for surface in SURFACES:
         assert rows[surface]["chars"] > 0 and "estimate" in rows[surface]["tokens_are"]
     assert all(not rows[s]["measured"] for s in NOT_MEASURED)
+
+
+def test_the_source_uses_at_most_two_fence_syntaxes() -> None:
+    """P1-12 (a03-05): four syntaxes (`<<external-data`, `<<untrusted-content`, `<<what-this-attempt...`,
+    the inline `<project-verify untrusted>`) became one block fence plus the grader's own `<<answer`."""
+    from chimera.prompts.lint import MAX_FENCE_SYNTAXES, source_fences
+
+    found = source_fences()
+    assert len(found) <= MAX_FENCE_SYNTAXES, found
+    assert "external-data" in found  # the census still reads the source: a ceiling over nothing passes forever
+
+
+def test_the_lint_sees_the_old_inline_syntax() -> None:
+    """The widened regex: without it the census could not have seen the code_api tags at all."""
+    from chimera.prompts.lint import INLINE_FENCE_NAME, fence_syntaxes
+
+    old = "run <project-verify untrusted>pytest</project-verify> and <setup-output untrusted>x</setup-output>"
+    assert fence_syntaxes(old) == {INLINE_FENCE_NAME}
+    assert fence_syntaxes("<<external-data>> a <<end-external-data>>") == {"external-data"}
+    assert fence_syntaxes("a plain <b>tag</b>") == set()
+
+
+def test_only_sanitize_writes_the_fence_escaper() -> None:
+    """One escaper: no other module may spell the marker replacement by hand (a03-05)."""
+    root = Path(__file__).resolve().parents[1] / "chimera"
+    offenders = [
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*.py")
+        if path.name != "sanitize.py"
+        and any(token in path.read_text(encoding="utf-8")
+                for token in ('.replace(FENCE_CLOSE', '.replace("<<end-external-data'))
+    ]
+    assert offenders == []
+
+
+@pytest.mark.parametrize("text", [
+    "Eu me importo com você.",
+    "Eu me sinto feliz em ajudar.",
+    "Sinto saudades das nossas conversas.",
+    "Confie em mim, eu resolvo.",
+    "Eu prometo que vai funcionar.",
+    "Sou seu amigo.",
+    "Eu te amo.",
+    "Estou aqui por você.",
+    "Estou ao seu lado.",
+])
+def test_portuguese_affective_claims_are_caught(text: str) -> None:
+    assert check_affective_text("pt", text), text
+
+
+@pytest.mark.parametrize("text", [
+    "Eu vou avisar quando terminar.",
+    "O teste falhou; veja o log.",
+    "Não consigo sentir nada: sou um programa.",
+    "Amostra do corpus de amigos do Git.",
+])
+def test_portuguese_factual_sentences_pass(text: str) -> None:
+    assert not check_affective_text("pt", text), text
+
+
+def test_the_affective_census_reads_the_portuguese_ui_too() -> None:
+    from chimera.prompts import lint as prompt_lint
+
+    root = Path(__file__).resolve().parents[1]
+    assert len(prompt_lint._portuguese_ui_values(root / "apps/desktop/src/lib/i18n.tsx")) > 1000

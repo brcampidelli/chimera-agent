@@ -242,10 +242,11 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label htmlFor="ob-cost-mode" className="text-xs font-medium text-muted-foreground">
               {t("onboarding.costMode")}
             </label>
             <select
+              id="ob-cost-mode"
               className={inputCls}
               value={costMode}
               onChange={(e) => setCostMode(e.target.value)}

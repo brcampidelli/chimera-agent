@@ -54,6 +54,7 @@ import { Usage } from "@/components/Usage";
 import { SystemOneCard } from "@/components/SystemOneCard";
 import { KeepAwakeCard } from "@/components/KeepAwakeCard";
 import { DeferSavingNote } from "@/components/DeferSavingNote";
+import { RoutingTable } from "@/components/RoutingTable";
 import { EnvironmentsCard } from "@/components/EnvironmentsCard";
 import { FoldersCard } from "@/components/FoldersCard";
 import { VoiceCard } from "@/components/VoiceCard";
@@ -217,6 +218,16 @@ function AutonomyCard({
 }) {
   const t = useT();
   const [confirmingHostExec, setConfirmingHostExec] = useState(false);
+  // The notice about an existing install left on governance "off" is shown until dismissed. The
+  // dismissal is per browser profile: it is a courtesy, not a setting, and the server keeps saying
+  // so in its log either way.
+  const [noticeDismissed, setNoticeDismissed] = useState(() => {
+    try {
+      return localStorage.getItem("chimera.governanceNoticeDismissed") === "1";
+    } catch {
+      return false;
+    }
+  });
 
   return (
     <Card id="settings-card-autonomy" title={t("settings.card.autonomy")}>
@@ -518,6 +529,28 @@ function AutonomyCard({
         <p className="px-4 pb-3 text-xs text-muted-foreground">
           {t("settings.governance.cost")}
         </p>
+      )}
+      {c.autonomy.governance_notice && !noticeDismissed && (
+        <div
+          role="note"
+          className="mx-4 mb-3 flex items-start justify-between gap-3 rounded-xl border border-border px-3 py-2 text-xs text-muted-foreground"
+        >
+          <p>{t("settings.governance.notice")}</p>
+          <button
+            type="button"
+            className="shrink-0 underline"
+            onClick={() => {
+              setNoticeDismissed(true);
+              try {
+                localStorage.setItem("chimera.governanceNoticeDismissed", "1");
+              } catch {
+                /* a private window: the notice simply returns next time */
+              }
+            }}
+          >
+            {t("settings.governance.notice.dismiss")}
+          </button>
+        </div>
       )}
       <Row
         label={t("settings.row.approvalWebhook")}
@@ -1796,6 +1829,8 @@ export function Settings({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["config"] });
       qc.invalidateQueries({ queryKey: ["doctor"] });
+      // A saved model changes which model each role runs on; the table under the model rows reads it.
+      qc.invalidateQueries({ queryKey: ["routing"] });
       // The Storage card says where the next worktree goes, which a saved folder changes.
       qc.invalidateQueries({ queryKey: ["storage"] });
       // A changed sandbox changes what a command can reach; the network rows read it from there.
@@ -2217,6 +2252,9 @@ export function Settings({
                       onSave={(v) => save({ CHIMERA_FALLBACK_MODELS: v })}
                     />
                   </Row>
+                  <div className="px-4 py-3">
+                    <RoutingTable />
+                  </div>
                   <Row
                     label={t("settings.row.cascade")}
                     hint={t("settings.hint.cascade")}

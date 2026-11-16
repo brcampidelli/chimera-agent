@@ -360,8 +360,25 @@ export function worthReport(profiles: Partial<ProfileWorth>[] = [], over: Partia
     attempts_total: 1,
     usd_total: 0.01,
     usd_known_runs: 1,
+    // Placeholders, replaced below by what the test said or by what the server would derive.
+    resolved_n: 0,
+    price_coverage: 0,
+    usd_per_resolved: null,
+    usd_per_verified: null,
     ...p,
-  }));
+  })).map((g, i) => {
+    const said = profiles[i];
+    // Derived from what the test said when it did not say them itself, so a group with an unknown
+    // total never carries a per-resolved cost the server would not have produced.
+    const per = (n: number) => (g.usd_total === null || n <= 0 ? null : Math.round((g.usd_total / n) * 1e6) / 1e6);
+    return {
+      ...g,
+      resolved_n: said.resolved_n ?? g.passed,
+      price_coverage: said.price_coverage ?? (g.runs > 0 ? g.usd_known_runs / g.runs : 0),
+      usd_per_resolved: "usd_per_resolved" in said ? (said.usd_per_resolved ?? null) : per(g.passed),
+      usd_per_verified: "usd_per_verified" in said ? (said.usd_per_verified ?? null) : per(g.passed_by_verifier),
+    };
+  });
   return {
     profiles: groups,
     total_runs: groups.reduce((n, g) => n + g.runs, 0),

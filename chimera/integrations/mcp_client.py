@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import threading
 from collections.abc import Callable
@@ -458,7 +459,6 @@ class StreamableHTTPMCPSession:
         the browser itself, and the Test is reachable through the desktop bridge: an agent driving
         the app could start a sign-in on the owner's screen.
         """
-        import os
         from pathlib import Path
 
         headers: dict[str, str] = dict(cfg.headers)
@@ -678,11 +678,17 @@ class StdioMCPSession:
         The resolved path is used for it so the SDK never has to find the launcher again, and every
         other launch keeps the exact command and argument list it was configured with.
         """
-        from chimera.proc.stdio import batch_safe_arguments, is_batch_launcher, resolve_program
+        from chimera.proc.stdio import batch_safe_arguments, is_batch_launcher, launch_program
 
-        program = resolve_program(self.command)
+        # THE resolution the artifact identity hashed (`proc.stdio.launch_program`, with the server's
+        # `cwd` and its own `PATH`): what runs is the absolute file the pin was computed for, not
+        # whatever the SDK or the OS would have found for the bare name. Unresolvable stays as written, so
+        # the failure is the real one ("not found") and not a different path's.
+        program = launch_program(
+            self.command, cwd=self.cwd, path=(self.env or {}).get("PATH") or None
+        ) or self.command
         if not is_batch_launcher(program):
-            return self.command, list(self.args)
+            return program, list(self.args)
         return program, batch_safe_arguments(program, self.args)
 
     def start(self) -> StdioMCPSession:

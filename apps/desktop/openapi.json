@@ -1819,6 +1819,11 @@
             "title": "Governance",
             "type": "string"
           },
+          "governance_notice": {
+            "default": false,
+            "title": "Governance Notice",
+            "type": "boolean"
+          },
           "hooks": {
             "default": false,
             "title": "Hooks",
@@ -13255,6 +13260,13 @@
             "title": "Args",
             "type": "array"
           },
+          "artifact_unverifiable": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Artifact Unverifiable",
+            "type": "array"
+          },
           "command": {
             "title": "Command",
             "type": "string"
@@ -16218,6 +16230,11 @@
             "title": "Passed By Verifier",
             "type": "integer"
           },
+          "price_coverage": {
+            "default": 0.0,
+            "title": "Price Coverage",
+            "type": "number"
+          },
           "profile": {
             "anyOf": [
               {
@@ -16234,6 +16251,11 @@
             "title": "Profile Source",
             "type": "string"
           },
+          "resolved_n": {
+            "default": 0,
+            "title": "Resolved N",
+            "type": "integer"
+          },
           "reverted": {
             "title": "Reverted",
             "type": "integer"
@@ -16249,6 +16271,28 @@
           "usd_known_runs": {
             "title": "Usd Known Runs",
             "type": "integer"
+          },
+          "usd_per_resolved": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Per Resolved"
+          },
+          "usd_per_verified": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Per Verified"
           },
           "usd_total": {
             "anyOf": [
@@ -17565,6 +17609,175 @@
           }
         },
         "title": "RolesQuery",
+        "type": "object"
+      },
+      "RoutingMemberOut": {
+        "description": "One slug of a list role (the panel, the fallbacks, the escalation rungs).",
+        "properties": {
+          "effort": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort"
+          },
+          "effort_sent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Sent"
+          },
+          "local_file": {
+            "default": false,
+            "title": "Local File",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "RoutingMemberOut",
+        "type": "object"
+      },
+      "RoutingOut": {
+        "description": "``GET /api/routing`` \u2014 which model each role runs on, and why.",
+        "properties": {
+          "cost_mode": {
+            "title": "Cost Mode",
+            "type": "string"
+          },
+          "denied": {
+            "default": "",
+            "title": "Denied",
+            "type": "string"
+          },
+          "ladder_source": {
+            "title": "Ladder Source",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RoutingRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "ladder_source",
+          "cost_mode"
+        ],
+        "title": "RoutingOut",
+        "type": "object"
+      },
+      "RoutingRowOut": {
+        "description": "One role of the routing table: the model it runs on, and where that choice came from.",
+        "properties": {
+          "effort": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort"
+          },
+          "effort_origin": {
+            "title": "Effort Origin",
+            "type": "string"
+          },
+          "effort_sent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort Sent"
+          },
+          "inherits": {
+            "default": "",
+            "title": "Inherits",
+            "type": "string"
+          },
+          "kind": {
+            "default": "chat",
+            "enum": [
+              "chat",
+              "embedding",
+              "media",
+              "local",
+              "list"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "local_file": {
+            "default": false,
+            "title": "Local File",
+            "type": "boolean"
+          },
+          "members": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RoutingMemberOut"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "via": {
+            "title": "Via",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "model",
+          "origin",
+          "effort_origin",
+          "via"
+        ],
+        "title": "RoutingRowOut",
         "type": "object"
       },
       "RunReceiptOut": {
@@ -31975,6 +32188,24 @@
           }
         },
         "summary": "Resources Endpoint"
+      }
+    },
+    "/api/routing": {
+      "get": {
+        "operationId": "routing_endpoint_api_routing_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Routing Endpoint"
       }
     },
     "/api/runs": {

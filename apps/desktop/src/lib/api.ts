@@ -1,3 +1,4 @@
+import type { CacheWarning } from "@/lib/cache-miss";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
 import { taskCardOf, type ProposedTaskCard, type TaskSuggestionStartInput } from "@/lib/taskSuggestions";
 import {
@@ -97,6 +98,7 @@ import type {
   ShellPrefsChange,
   WeeklyReview,
   DeferSaving,
+  Routing,
   StorageReport,
   WorktreePrune,
   LogRotate,
@@ -576,6 +578,8 @@ export const labelDecision = (decisionId: string, event: boolean) =>
 export const getTools = () => json<Tools>("/api/tools");
 // What CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save here. Read-only; never connects a server.
 export const getDeferSaving = () => json<DeferSaving>("/api/tools/defer-saving");
+// Every role of the routing table: its model, effort, origin and how it was reached. Read-only.
+export const getRouting = () => json<Routing>("/api/routing");
 
 // --- Filesystem (read-only tree + file viewer for the Code screen) ---
 // Both are path-scoped server-side to the workspace; a `..` escape is a 400, a binary/dir is an
@@ -1876,6 +1880,8 @@ export interface CodeTurnDone {
   /** Why the cache did not answer, one of the fixed causes in `chimera/core/cache_miss.py`. Null when
    *  the provider was silent. Drawn only on a turn that read nothing from the cache. */
   cache_miss_cause?: string | null;
+  /** Set only on the turn that took the conversation's cache rate under 80%. */
+  cache_warning?: CacheWarning | null;
   /** Set when this turn's history was shortened for a pause longer than the cache lived. The sizes are
    *  estimates: the provider has not counted the shorter history yet. */
   idle_compaction?: {
@@ -2608,6 +2614,17 @@ export interface ProfileWorth {
   // without it, a null is indistinguishable from "no data" and a number from "all of it".
   usd_total: number | null;
   usd_known_runs: number;
+  // How many runs passed: the denominator of `usd_per_resolved`.
+  // Optional: a server older than this field omits it, and absent reads as the group's `passed`.
+  resolved_n?: number;
+  // `usd_known_runs / runs`, 0..1. Read beside a null `usd_per_resolved`: it says whether one price
+  // is missing or all of them.
+  price_coverage?: number;
+  // The group's WHOLE cost (failures included) per run that passed. Null when nothing passed or when
+  // any run is unpriced — a partial sum is never divided.
+  usd_per_resolved?: number | null;
+  // The same, per pass an executable verifier approved.
+  usd_per_verified?: number | null;
 }
 
 export interface WorthReport {

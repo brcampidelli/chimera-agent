@@ -1083,6 +1083,11 @@ class AutonomyCfgOut(BaseModel):
     ``off``, so on a stock install the only thing between the model and a `git push --force`
     inside the workspace is the folder jail."""
 
+    governance_notice: bool = False
+    """True on an EXISTING install whose governance is still ``off`` because nobody chose a mode
+    (``chimera/governance/first_boot.py``): new installs start in ``observe``, this one was left
+    alone, and the Settings screen says so once, dismissibly. Never true when a mode was chosen."""
+
     egress_allow: list[str] = Field(default_factory=list)
     """Hosts where a query-string GET is not treated as a way out while the run holds untrusted
     content. Empty by default: nothing is exempt until the owner names it.
@@ -2264,6 +2269,50 @@ class CodePythonOut(BaseModel):
     source: Literal["interpreter", "path", "missing"] = "missing"
     frozen: bool = False
     looked_for: list[str] = Field(default_factory=list)
+
+
+class RoutingMemberOut(BaseModel):
+    """One slug of a list role (the panel, the fallbacks, the escalation rungs)."""
+
+    model: str
+    effort: Literal["low", "medium", "high"] | None = None
+    effort_sent: bool | None = None
+    #: The model is a file on this machine and ``model`` is its name only; the folders are not sent.
+    local_file: bool = False
+
+
+class RoutingRowOut(BaseModel):
+    """One role of the routing table: the model it runs on, and where that choice came from."""
+
+    role: str
+    #: Empty for a role whose model is picked when it is used (the reviewer). For a list role, the
+    #: slugs joined by commas; ``members`` has them one by one.
+    model: str
+    effort: Literal["low", "medium", "high"] | None = None
+    #: ``default`` ``env`` ``config`` ``agent`` ``job`` ``request``. ``env`` means the variable was in
+    #: the environment Chimera started with, so the Settings screen cannot change it durably.
+    origin: str
+    effort_origin: str
+    #: One line saying how the model was reached: the setting, the preset or the derivation.
+    via: str
+    #: The role this one follows while it has no model of its own; empty when it has one.
+    inherits: str = ""
+    kind: Literal["chat", "embedding", "media", "local", "list"] = "chat"
+    #: Whether the gateway would put ``effort`` on the wire for this route; null when there is none.
+    effort_sent: bool | None = None
+    #: As in ``RoutingMemberOut``: ``model`` is the file name of a local file, never its path.
+    local_file: bool = False
+    members: list[RoutingMemberOut] = []
+
+
+class RoutingOut(BaseModel):
+    """``GET /api/routing`` — which model each role runs on, and why."""
+
+    rows: list[RoutingRowOut]
+    ladder_source: str
+    cost_mode: str
+    #: Set (with ``rows`` empty) when the deployment policy leaves no model for the tier ladder.
+    denied: str = ""
 
 
 class DoctorOut(BaseModel):
@@ -4029,6 +4078,10 @@ class McpServerOut(BaseModel):
     last_test: McpLastTestOut | None = None
     # Null unless this server's tools changed since they were approved; then no run receives it.
     manifest_held: McpManifestHeldOut | None = None
+    # Why what this server RUNS could not be fully verified when it was pinned (an unpinned package
+    # version, a module outside cwd/PYTHONPATH, a folder over the hashing limits). Not a hold: the
+    # owner is told. Empty when the identity is complete, or for a URL server.
+    artifact_unverifiable: list[str] = Field(default_factory=list)
     # The host of a streamable-HTTP server; null for stdio. Never the whole URL (a query string may
     # carry a key).
     url_host: str | None = None

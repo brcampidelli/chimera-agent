@@ -5040,6 +5040,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Routing Endpoint */
+        get: operations["routing_endpoint_api_routing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs": {
         parameters: {
             query?: never;
@@ -7369,6 +7386,11 @@ export interface components {
              * @default off
              */
             governance: string;
+            /**
+             * Governance Notice
+             * @default false
+             */
+            governance_notice: boolean;
             /**
              * Hooks
              * @default false
@@ -12908,6 +12930,8 @@ export interface components {
         McpServerOut: {
             /** Args */
             args: string[];
+            /** Artifact Unverifiable */
+            artifact_unverifiable?: string[];
             /** Command */
             command: string;
             /**
@@ -14339,6 +14363,11 @@ export interface components {
             passed: number;
             /** Passed By Verifier */
             passed_by_verifier: number;
+            /**
+             * Price Coverage
+             * @default 0
+             */
+            price_coverage: number;
             /** Profile */
             profile: string | null;
             /**
@@ -14346,6 +14375,11 @@ export interface components {
              * @default user
              */
             profile_source: string;
+            /**
+             * Resolved N
+             * @default 0
+             */
+            resolved_n: number;
             /** Reverted */
             reverted: number;
             /** Runs */
@@ -14354,6 +14388,10 @@ export interface components {
             unproductive: number;
             /** Usd Known Runs */
             usd_known_runs: number;
+            /** Usd Per Resolved */
+            usd_per_resolved?: number | null;
+            /** Usd Per Verified */
+            usd_per_verified?: number | null;
             /** Usd Total */
             usd_total: number | null;
         };
@@ -14950,6 +14988,81 @@ export interface components {
              * @enum {string}
              */
             profile: "economy" | "balanced" | "max";
+        };
+        /**
+         * RoutingMemberOut
+         * @description One slug of a list role (the panel, the fallbacks, the escalation rungs).
+         */
+        RoutingMemberOut: {
+            /** Effort */
+            effort?: ("low" | "medium" | "high") | null;
+            /** Effort Sent */
+            effort_sent?: boolean | null;
+            /**
+             * Local File
+             * @default false
+             */
+            local_file: boolean;
+            /** Model */
+            model: string;
+        };
+        /**
+         * RoutingOut
+         * @description ``GET /api/routing`` — which model each role runs on, and why.
+         */
+        RoutingOut: {
+            /** Cost Mode */
+            cost_mode: string;
+            /**
+             * Denied
+             * @default
+             */
+            denied: string;
+            /** Ladder Source */
+            ladder_source: string;
+            /** Rows */
+            rows: components["schemas"]["RoutingRowOut"][];
+        };
+        /**
+         * RoutingRowOut
+         * @description One role of the routing table: the model it runs on, and where that choice came from.
+         */
+        RoutingRowOut: {
+            /** Effort */
+            effort?: ("low" | "medium" | "high") | null;
+            /** Effort Origin */
+            effort_origin: string;
+            /** Effort Sent */
+            effort_sent?: boolean | null;
+            /**
+             * Inherits
+             * @default
+             */
+            inherits: string;
+            /**
+             * Kind
+             * @default chat
+             * @enum {string}
+             */
+            kind: "chat" | "embedding" | "media" | "local" | "list";
+            /**
+             * Local File
+             * @default false
+             */
+            local_file: boolean;
+            /**
+             * Members
+             * @default []
+             */
+            members: components["schemas"]["RoutingMemberOut"][];
+            /** Model */
+            model: string;
+            /** Origin */
+            origin: string;
+            /** Role */
+            role: string;
+            /** Via */
+            via: string;
         };
         /** RunReceiptOut */
         RunReceiptOut: {
@@ -25020,6 +25133,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResourcesOut"];
+                };
+            };
+        };
+    };
+    routing_endpoint_api_routing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutingOut"];
                 };
             };
         };

@@ -177,6 +177,23 @@ LAN reaches those four routes and nothing the server token protects. Say it plai
 out a link: a guest can ask the agent to do anything the owner can ask it, in the owner's project,
 with the owner's tools and spend — under the request's default seams, and short of approving cards.
 
+**What a guest reads of the owner's turns.** What the owner said and the model's final answer, and
+nothing the machine saw or produced in between. The guest's door (`chimera/api/guest_projection.py`
+and `chimera/core/guest_history.py`) is an allowlist applied to the live stream, to its replay, to
+the stored conversation and to the history sent to the model of the guest's own turn. A guest is
+shown the request as the person typed it (an automatic request, the text of an attached document, an
+expanded command or a card the model proposed is shown as a placeholder), the model's final answer
+once the turn has closed normally (an error, a cap or a first pass that was then repaired is not
+shown: the guest reads that the turn did not conclude), and for a tool only its kind and status. The
+text between tool calls is not streamed to a guest, and a guest's own turn is not given the owner's
+tool results, job or work notes, or job tools. Tool arguments and results, edit diffs, approval
+previews, browser pictures, the verifier's output, instruction sources, the receipt's cost and the
+host's paths are not sent, and a frame type nobody listed is dropped. A conversation stored before
+these marks existed shows placeholders to a guest. The owner's own window still gets every frame.
+The one thing this cannot filter is the final answer itself: if the model quotes a private file in
+its words, the guest reads it — sharing a conversation shares its answers, and the sharing panel
+says so.
+
 ### Your own phone or browser: pairing a device
 
 A guest link is for somebody else. For the owner on their own phone there is pairing: `chimera pair`

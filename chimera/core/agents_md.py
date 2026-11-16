@@ -800,7 +800,7 @@ def _untrusted_heading(rel: str) -> str:
     And the fence markers are neutralised with the placeholder :func:`fence` uses inside a body:
     outside the fence, a copy of a marker is a fence the attacker drew.
     """
-    from chimera.governance.sanitize import FENCE_CLOSE, FENCE_OPEN, sanitize_untrusted
+    from chimera.governance.sanitize import neutralize_markers, sanitize_untrusted
 
     flat = " ".join(sanitize_untrusted(rel).splitlines())
-    return flat.replace(FENCE_CLOSE, "⟦fence⟧").replace(FENCE_OPEN, "⟦fence⟧")
+    return neutralize_markers(flat)

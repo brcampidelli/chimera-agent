@@ -47,7 +47,12 @@ from chimera.integrations.mcp_config import (
     save_test_records,
     tests_path_for,
 )
-from chimera.integrations.mcp_pins import approve_change, held_change, tool_cues
+from chimera.integrations.mcp_pins import (
+    approve_change,
+    held_change,
+    pinned_unverifiable,
+    tool_cues,
+)
 from chimera.telemetry import get_logger
 
 _log = get_logger("api.mcp")
@@ -185,6 +190,7 @@ def list_servers(home: Path) -> dict[str, Any]:
             "env_keys": sorted(s.env),
             "last_test": _last_test(tests, s),
             "manifest_held": _held(home, s.name),
+            "artifact_unverifiable": pinned_unverifiable(_mcp_path(home), s.name),
             "disabled": s.disabled,
             "url_host": _url_host(s),
             "oauth": _oauth_state(home, s, tests),

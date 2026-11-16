@@ -177,6 +177,10 @@ def _captured_session(
     monkeypatch.delenv("CHIMERA_GOVERNANCE", raising=False)
     if governance is not None:
         monkeypatch.setenv("CHIMERA_GOVERNANCE", governance)
+    else:
+        # The STOCK deployment is an existing install (a new home now defaults to observe, `first_boot`),
+        # so give the home some prior state: this test is about what an existing install is left as.
+        (tmp_path / "memory.db").write_bytes(b"x")
     from chimera.config import get_settings
 
     get_settings.cache_clear()

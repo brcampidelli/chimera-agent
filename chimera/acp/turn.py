@@ -59,6 +59,9 @@ class AcpTurnResult:
     """What the external agent did, in the shape the Code screen already reports."""
 
     answer: str = ""
+    #: Only what the agent said AFTER its last tool call: the closing message, not the narration
+    #: between steps that ``answer`` joins. What a guest of a shared conversation is shown.
+    final_text: str = ""
     stop_reason: str = ""
     tool_names: list[str] = field(default_factory=list)
     edited: list[str] = field(default_factory=list)
@@ -277,11 +280,14 @@ class AcpTurn:
             if chunk and self._on_token is not None:
                 self._on_token(chunk)
             self._result.answer += chunk
+            self._result.final_text += chunk
         elif kind == "tool_call":
+            self._result.final_text = ""
             call_id = str(update.get("toolCallId") or "")
             if call_id:
                 self._calls[call_id] = dict(update)
         elif kind == "tool_call_update":
+            self._result.final_text = ""
             self._tool_update(update)
         elif kind == "usage_update":
             self._usage(update)

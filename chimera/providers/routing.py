@@ -25,8 +25,19 @@ independently, where its reasoning effort came from, because the two are chosen 
 * ``request`` / ``job`` / ``agent`` — an override passed to :meth:`RoutingTable.route`. Nothing passes
   one yet; the arguments exist so the precedence is written down once, before the consumers arrive.
 
-Effort is read only from the ``#effort`` suffix of a slug (``openrouter/x/y#high``), which is how it
-travels today. Above all of this, and reused rather than restated, sit the owner's deployment policy
+Effort travels as the ``#effort`` suffix of a slug (``openrouter/x/y#high``), and a role can ALSO be
+given one by ``CHIMERA_ROLE_EFFORTS`` (``code.plan=high,code.explore=low``; empty = nobody sets one
+and every route is exactly what it was). The suffix a slug already carries wins over that setting, and
+the table says so (:attr:`RoutingTable.notes`). A malformed entry is a note too, never an exception.
+
+**Where an effort may be applied.** :data:`EFFORT_ROLES` are the roles whose consumer calls the model
+with its OWN context, so the effort is fixed when that call starts and never changes in the middle of
+a conversation: a profile's explore/plan/edit/review (``roles.resolve`` runs once per run and the
+result is frozen in the ``RolePlan``), and the fusion panel, judge and synthesiser (each stage is a
+fresh call). A role whose consumer does not read the table yet (the conversation's own ``default``,
+``cron``, ``subagent``...) is not in that set, and naming it is a note rather than a setting that
+looks accepted and never reaches the wire. A subagent's effort comes from ITS file
+(:mod:`chimera.core.subagent`), a job's from the job (P1-03). Above all of this, and reused rather than restated, sit the owner's deployment policy
 (a denied provider's rung is replaced), reachability by the configured keys, and the rule that an
 editor never escalates onto its reviewer's model.
 
@@ -43,12 +54,19 @@ imported inside :func:`build_routing_table`.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
-from chimera.providers.catalog import ReasoningEffort, TierLadder, split_effort
+from chimera.providers.catalog import (
+    REASONING_EFFORTS,
+    ReasoningEffort,
+    TierLadder,
+    base_slug,
+    split_effort,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
@@ -58,6 +76,67 @@ Kind = Literal["chat", "embedding", "media", "local", "list"]
 
 #: Strongest first. An override from a closer scope replaces the model of a further one.
 PRECEDENCE: tuple[Origin, ...] = ("request", "job", "agent", "env", "config", "default")
+
+
+#: Roles a ``CHIMERA_ROLE_EFFORTS`` entry can reach today, because their consumers read it from here
+#: (see the module docstring for why each is a call with its own context).
+EFFORT_ROLES: frozenset[str] = frozenset({
+    "code.explore", "code.plan", "code.edit", "code.review",
+    "fusion.panel", "fusion.judge", "fusion.synthesizer",
+})
+
+
+def parse_role_efforts(raw: object) -> tuple[dict[str, ReasoningEffort], tuple[str, ...]]:
+    """``(role -> effort, notes)`` for ``code.plan=high,code.explore=low``. Never raises.
+
+    A bad entry is dropped and explained; the good ones around it still count, because one typo in a
+    list must not silently turn off the rest. A role named twice keeps the LAST value, with a note.
+    """
+    efforts: dict[str, ReasoningEffort] = {}
+    notes: list[str] = []
+    for chunk in str(raw or "").split(","):
+        entry = chunk.strip()
+        if not entry:
+            continue
+        role, sep, level = (part.strip().lower() for part in entry.partition("="))
+        if not sep:
+            notes.append(f"role_efforts: {entry!r} is not role=effort; ignored")
+        elif role not in ROLE_IDS:
+            notes.append(f"role_efforts: {role!r} is not a role the table knows; ignored")
+        elif level not in REASONING_EFFORTS:
+            notes.append(
+                f"role_efforts: {role}={level or '(empty)'} is not low, medium or high; ignored"
+            )
+        elif role not in EFFORT_ROLES:
+            notes.append(
+                f"role_efforts: {role} does not take a role effort yet (no consumer reads it); "
+                f"ignored. Roles that do: {', '.join(sorted(EFFORT_ROLES))}"
+            )
+        else:
+            if role in efforts:
+                notes.append(f"role_efforts: {role} is set twice; the last value ({level}) counts")
+            efforts[role] = level
+    return efforts, tuple(notes)
+
+
+def role_efforts_of(settings: Settings) -> dict[str, ReasoningEffort]:
+    """The valid ``CHIMERA_ROLE_EFFORTS`` entries of ``settings``; empty when nobody set any."""
+    return parse_role_efforts(getattr(settings, "role_efforts", ""))[0]
+
+
+def with_role_effort(settings: Settings, role: str, slug: str | None) -> str | None:
+    """``slug`` with ``#effort`` added when ``role`` has one and the slug carries none; else as given.
+
+    The one place the rule "a suffix already on the slug wins" is written for consumers that hold a
+    slug (the profile's roles, the fusion cast). With no entry for ``role`` the slug is returned
+    untouched, character for character, which is what makes an empty setting change nothing.
+    """
+    if not slug:
+        return slug
+    effort = role_efforts_of(settings).get(role)
+    if effort is None or split_effort(slug)[1] is not None:
+        return slug
+    return f"{slug}#{effort}"
 
 
 @dataclass(frozen=True)
@@ -142,6 +221,106 @@ ROLES: tuple[RoleSpec, ...] = (
 ROLE_IDS: tuple[str, ...] = tuple(spec.id for spec in ROLES)
 
 
+_LOCAL_PATH = re.compile(r"^(?:[/~]|\.{1,2}[/\\]|[A-Za-z]:[/\\]|\\\\|file://)")
+
+
+# Up to whitespace, a quote or an angle bracket, and no further: stopping at `)` or `]` as well left
+# the rest of a query OUTSIDE the match (`?token=abc)def456` published `)def456`). The query is dropped
+# whole, so a closing bracket swallowed with it costs a cosmetic character at most.
+_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://[^\s'\"<>]+")
+# A path between quotes runs to the closing quote, spaces included: `repr()` of a setting
+# (`unknown decision backend '/home/x/Client Name/backend'`) is how a value lands in a message, and
+# cutting at the first space published the folder names after it.
+_QUOTED_PATH = re.compile(r"""(['"])((?:[A-Za-z]:[/\\]|\\\\|~[/\\]|\.{1,2}[/\\]|/)[^'"]*)\1""")
+_PATH_IN_TEXT = re.compile(
+    r"(?<![\w:/.\\])(?:[A-Za-z]:[/\\]|\\\\|~[/\\]|\.{1,2}[/\\]|/(?=[^\s'\"<>/]))[^\s'\"<>]*"
+)
+
+
+def _bare_url(match: re.Match[str]) -> str:
+    from urllib.parse import urlsplit, urlunsplit
+
+    try:
+        parts = urlsplit(match.group(0))
+        host = parts.hostname or ""
+        netloc = f"{host}:{parts.port}" if parts.port else host
+        return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
+    except ValueError:
+        return "[redacted]"
+
+
+def _file_name(path: str) -> str:
+    return re.split(r"[/\\]+", path.rstrip("/\\"))[-1] or "?"
+
+
+def public_text(text: str) -> str:
+    """Any string that leaves through the public view: a path is its file name, a URL has no
+    ``user:pass@`` and no query, and the rest goes through the repo's redactor.
+
+    Free text is what leaks: ``ProviderDeniedError`` names the whole model slug, and ``via`` repeats
+    the value of a setting. So this works INSIDE a sentence, not only on a value that is one.
+    """
+    if not text:
+        return text
+    from chimera.core.redact import redact
+
+    text = _URL.sub(_bare_url, text)
+    text = _QUOTED_PATH.sub(lambda m: m.group(1) + _file_name(m.group(2)) + m.group(1), text)
+    text = _PATH_IN_TEXT.sub(lambda m: _file_name(m.group(0)), text)
+    return redact(text)
+
+
+def public_model(model: str) -> tuple[str, bool]:
+    """``(what a screen may show, is it a local file)`` for a role's model.
+
+    A role's "model" can be a path on this machine (a Piper voice, a diffusers checkpoint): the
+    execution needs the whole path, but the API, the Settings panel and ``chimera models`` must not
+    publish the folder names in it, which can name a client. Only the file name is shown, flagged as a
+    local file. Anything else is :func:`public_text`.
+    """
+    if not model:
+        return model, False
+    if _LOCAL_PATH.match(model) and "://" not in model.split("/", 1)[0]:
+        return _file_name(model), True
+    return public_text(model), False
+
+
+def _publish(value: Any, key: str = "") -> Any:
+    """Every string of a public answer, wherever it sits. A field added later is covered by default."""
+    if isinstance(value, str):
+        return public_model(value)[0] if key == "model" else public_text(value)
+    if isinstance(value, dict):
+        return {k: _publish(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_publish(v, key) for v in value]
+    return value
+
+
+def public_routing(settings: Settings) -> dict[str, Any]:
+    """The ONE public answer: ``GET /api/routing``, the Settings panel and ``chimera models`` all
+    render this and nothing else, so no field reaches a screen except through :func:`_publish`.
+
+    ``ProviderDeniedError`` is the table's one deliberate raise (the deployment policy leaves no model
+    for the ladder). It is answered as data (``denied``), not as a server error: the screen has to say
+    what the policy did, and a 500 would read as a fault in the product. Its message names the whole
+    model, URL credentials included, which is why it goes through the same sanitiser.
+    """
+    from chimera.providers.gateway import ProviderDeniedError
+
+    try:
+        table = settings.routing_table()
+    except ProviderDeniedError as exc:
+        denied: dict[str, Any] = _publish(
+            {"rows": [], "ladder_source": "", "cost_mode": settings.cost_mode, "denied": str(exc)}
+        )
+        return denied
+    answer: dict[str, Any] = _publish({
+        "rows": table.describe(), "ladder_source": table.ladder_source,
+        "cost_mode": settings.cost_mode, "denied": "",
+    })
+    return answer
+
+
 @dataclass(frozen=True)
 class RoutingTable:
     """The resolved routes of one :class:`~chimera.config.Settings`, at the moment it was built.
@@ -159,6 +338,10 @@ class RoutingTable:
     _tiers: TierLadder = field(repr=False, compare=False)
     _rungs: tuple[str, ...] = field(repr=False, compare=False)
     _settings: Any = field(repr=False, compare=False)
+    notes: tuple[str, ...] = ()
+    """What the table could not honour, one line each: a malformed or unsupported
+    ``CHIMERA_ROLE_EFFORTS`` entry, and an effort that lost to the ``#effort`` its slug already carried.
+    Empty when there is nothing to say, which is always the case with ``CHIMERA_ROLE_EFFORTS`` unset."""
 
     def route(
         self,
@@ -207,6 +390,50 @@ class RoutingTable:
         """Every role's route in registry order, list roles as their summary row."""
         return list(self.routes.values())
 
+    def members(self, role: str) -> tuple[Route, ...]:
+        """The slugs of a list role (panel, escalation, fallback), one route each; empty for any other."""
+        return self.lists.get(role, ())
+
+    def effort_sent(self, route: Route) -> bool | None:
+        """Whether the gateway would put ``route``'s effort on the wire: ``None`` when it has none.
+
+        The same rule the escalation ladder asks (``gateway.route_takes_effort``), without a gateway:
+        building one exports the configured keys into the process environment, which a read of the
+        table must not do. ``thinking`` is a property of a run, so it is not part of this answer.
+        """
+        if route.effort is None or not route.model:
+            return None
+        from chimera.providers.gateway import route_takes_effort
+
+        return route_takes_effort(route.model, self._settings)
+
+    def describe(self) -> list[dict[str, Any]]:
+        """Every row as plain data, for the screen and ``GET /api/routing``: the route, whether its
+        effort would be sent, and each member of a list role.
+
+        The PUBLIC form: a model that is a local path is its file name with ``local_file`` set, and a
+        URL has no credentials (:func:`public_model`). The table itself keeps the real value.
+        """
+        out: list[dict[str, Any]] = []
+        for route in self.rows():
+            model, local = public_model(route.model) if route.kind != "list" else (route.model, False)
+            members: list[dict[str, Any]] = []
+            for m in self.members(route.role):
+                name, member_local = public_model(m.model)
+                members.append({
+                    "model": name, "effort": m.effort, "effort_sent": self.effort_sent(m),
+                    "local_file": member_local,
+                })
+            if route.kind == "list":
+                model = ",".join(f"{x['model']}#{x['effort']}" if x["effort"] else x["model"] for x in members)
+            out.append({
+                "role": route.role, "model": model, "effort": route.effort,
+                "origin": route.origin, "effort_origin": route.effort_origin, "via": route.via,
+                "inherits": route.inherits, "kind": route.kind,
+                "effort_sent": self.effort_sent(route), "local_file": local, "members": members,
+            })
+        return _publish(out)  # type: ignore[no-any-return]
+
     def profile_routes(self, profile: Any) -> dict[str, Route]:
         """The four code roles a profile (``economy`` | ``balanced`` | ``max``) would run on.
 
@@ -219,20 +446,29 @@ class RoutingTable:
         This is not what a run uses unless it was given a profile; the table's ``code.*`` rows
         describe the run that was given none.
         """
-        from chimera.api.roles import resolve, review_model_for
+        from chimera.api.roles import _profile_base, resolve, review_model_for
 
         plan = resolve(profile, self._settings)
+        raw = _profile_base(profile, self._settings)[0]
         chosen = {
             "explore": plan.models.explore, "plan": plan.models.plan, "edit": plan.models.edit,
             "review": review_model_for(plan),
         }
+        before = {"explore": raw.explore, "plan": raw.plan, "edit": raw.edit, "review": raw.review}
+        efforts = role_efforts_of(self._settings)
+        from_role = _origin_of(self._settings, "role_efforts") if efforts else "default"
         default = self.routes["default"]
         out: dict[str, Route] = {}
         for name, slug in chosen.items():
             role = f"code.{name}"
             if slug:
                 model, effort = split_effort(slug)
-                out[role] = Route(role, model, effort, "default", "default", f"profile {profile}")
+                # The effort came from CHIMERA_ROLE_EFFORTS exactly when the rung's own slug had none.
+                added = effort is not None and split_effort(before[name] or "")[1] is None
+                out[role] = Route(
+                    role, model, effort, "default", from_role if added else "default",
+                    f"profile {profile}" + ("; effort from CHIMERA_ROLE_EFFORTS" if added else ""),
+                )
             else:
                 why = "the reviewer would be the editor" if name == "review" else "the profile leaves it unset"
                 out[role] = Route(
@@ -240,6 +476,60 @@ class RoutingTable:
                     f"profile {profile}: {why}, so the run's model", inherits="default",
                 )
         return out
+
+
+def rungs_of(settings: Any, tiers: TierLadder | None = None) -> list[str]:
+    """``[weak, default, top]`` as provider ids, deduplicated, cheapest first.
+
+    ``resolve_tiers`` supplies the weak and top rungs (the user's own, or the cost mode's); the
+    middle is ``default_model`` because that is what a plain run starts on, not the tier ladder's mid.
+    ``chimera.core.escalation.ladder_of`` is this function. The rungs are plain ids: escalation picks
+    an effort step itself (``next_step``), so a role effort has no place here.
+    """
+    from chimera.providers.catalog import resolve_tiers
+
+    ladder = tiers if tiers is not None else resolve_tiers(settings)
+    rungs = [ladder.weak, settings.default_model, ladder.top]
+    return list(dict.fromkeys(base_slug(r) for r in rungs if r))
+
+
+def _ladder_cast(settings: Any) -> Any:
+    """The fusion config a user's settings mean, BEFORE any role effort: their ladder unless they
+    named the models."""
+    from chimera.fusion.engine import FusionConfig
+    from chimera.providers.catalog import resolve_tiers
+
+    config = FusionConfig.from_settings(settings)
+    explicit: set[str] = set(getattr(settings, "model_fields_set", set()))
+    if "fusion_panel" in explicit:
+        return config
+    ladder = resolve_tiers(settings)
+    # dict.fromkeys: dedupe while keeping order. A cost mode can point two tiers at the same model
+    # (``cheap`` sets mid == top), and a panel that asks one model the same question twice is paying
+    # twice for one opinion and calling the agreement a signal.
+    config.panel = list(dict.fromkeys([ladder.top, ladder.mid, ladder.weak]))
+    # The judge and the synthesiser follow the ladder only when the user did not name them: an
+    # explicit `CHIMERA_FUSION_JUDGE` is a choice, the same as an explicit panel.
+    if "fusion_judge" not in explicit:
+        config.judge = ladder.top
+    if "fusion_synthesizer" not in explicit:
+        config.synthesizer = ladder.top
+    return config
+
+
+def fusion_cast(settings: Any, *, with_efforts: bool = True) -> Any:
+    """The fusion config the consumers run: :func:`_ladder_cast` plus ``fusion.*`` role efforts.
+
+    ``chimera.fusion.factory.fusion_config`` is this function. Each stage of fusion is a fresh model
+    call with its own context, so an effort set here is fixed before the stage starts.
+    """
+    config = _ladder_cast(settings)
+    if not with_efforts:
+        return config  # what the table reads: it adds the efforts itself, to say where they came from
+    config.panel = [with_role_effort(settings, "fusion.panel", m) for m in config.panel]
+    config.judge = with_role_effort(settings, "fusion.judge", config.judge)
+    config.synthesizer = with_role_effort(settings, "fusion.synthesizer", config.synthesizer)
+    return config
 
 
 # --- building ---------------------------------------------------------------------------------
@@ -350,7 +640,9 @@ def _fusion_routes(settings: Settings) -> tuple[list[Route], Origin, str, Route,
     """
     from chimera.fusion.factory import fusion_config
 
-    config = fusion_config(settings)
+    # Through the consumer's own entry point (a role it cannot resolve becomes "unavailable"), but
+    # without the efforts: `_apply_role_efforts` adds them with the origin they really have.
+    config = fusion_config(settings, with_efforts=False)
     explicit = set(settings.model_fields_set)
     panel_explicit = "fusion_panel" in explicit
     if panel_explicit:
@@ -391,13 +683,56 @@ def _list_route(settings: Settings, spec: RoleSpec) -> list[Route]:
     return [_route(spec.id, s, origin, spec.field) for s in getattr(settings, spec.field)]
 
 
+def _with_effort(route: Route, want: ReasoningEffort, origin: Origin, notes: list[str]) -> Route:
+    """``route`` at effort ``want``, unless its own slug already carries one (the suffix wins)."""
+    if not route.model:
+        return route  # a role that could not be resolved has nothing to raise
+    if route.effort is not None and not route.inherits:
+        if route.effort != want:
+            notes.append(
+                f"role_efforts: {route.role}={want} not applied: {route.model} already carries "
+                f"#{route.effort}, and the slug's own effort wins"
+            )
+        return route
+    where = " (applies when a profile routes this role)" if route.role.startswith("code.") else ""
+    return replace(
+        route, effort=want, effort_origin=origin,
+        via=f"{route.via}; effort from CHIMERA_ROLE_EFFORTS{where}",
+    )
+
+
+def _apply_role_efforts(
+    settings: Settings, routes: dict[str, Route], lists: dict[str, tuple[Route, ...]]
+) -> tuple[str, ...]:
+    """Put ``CHIMERA_ROLE_EFFORTS`` on the routes it names; the notes it could not honour.
+
+    Done after every route exists, so no route is built from another that has not had its effort
+    yet: none of :data:`EFFORT_ROLES` is inherited FROM by another row.
+    """
+    efforts, parse_notes = parse_role_efforts(getattr(settings, "role_efforts", ""))
+    notes = list(parse_notes)
+    if not efforts:
+        return tuple(notes)
+    origin = _origin_of(settings, "role_efforts")
+    for role, want in efforts.items():
+        if role in lists:
+            members = tuple(_with_effort(m, want, origin, notes) for m in lists[role])
+            lists[role] = members
+            routes[role] = replace(
+                routes[role], model=",".join(m.slug for m in members),
+                via=f"{routes[role].via}; effort from CHIMERA_ROLE_EFFORTS",
+            )
+        else:
+            routes[role] = _with_effort(routes[role], want, origin, notes)
+    return tuple(notes)
+
+
 def build_routing_table(settings: Settings) -> RoutingTable:
     """Resolve every role in :data:`ROLES` for ``settings``, delegating to the legacy resolvers."""
-    from chimera.core.escalation import ladder_of
     from chimera.providers.catalog import resolve_tiers
 
     tiers = resolve_tiers(settings)
-    rungs = tuple(ladder_of(settings))
+    rungs = tuple(rungs_of(settings, tiers))
     fusion: tuple[list[Route], Origin, str, Route, Route] | Exception
     try:
         fusion = _fusion_routes(settings)
@@ -456,6 +791,7 @@ def build_routing_table(settings: Settings) -> RoutingTable:
             _field_route(settings, spec, routes["default"]) if spec.how == "field"
             else _inherit_route(spec, routes)
         )
+    notes = _apply_role_efforts(settings, routes, lists)
     ordered = {role: routes[role] for role in ROLE_IDS}
     return RoutingTable(
         routes=MappingProxyType(ordered),
@@ -464,4 +800,5 @@ def build_routing_table(settings: Settings) -> RoutingTable:
         _tiers=tiers,
         _rungs=rungs,
         _settings=settings,
+        notes=notes,
     )

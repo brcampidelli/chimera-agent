@@ -1,5 +1,5 @@
 ---
-source_sha256: 4529153cc0888316db4ac1e91211162af160166b181f7d1022b71aec9d25fc03
+source_sha256: 98e04cea6d46d08e173e43f42725aa38d3079dd3bb10dea93d09502423e0e091
 ---
 
 # Seguridad y salvaguardas
@@ -187,6 +187,24 @@ la LAN alcanza esas cuatro rutas y nada de lo que protege el token del servidor.
 entregar un enlace: un invitado puede pedirle al agente cualquier cosa que el dueño le pediría, en el
 proyecto del dueño, con sus herramientas y su gasto — bajo las costuras por defecto de la petición, y sin
 aprobar tarjetas.
+
+**Lo que un invitado lee de los turnos del dueño.** Lo que el dueño dijo y la respuesta final del modelo, y
+nada de lo que la máquina vio o produjo por el camino. La puerta del invitado (`chimera/api/guest_projection.py`
+y `chimera/core/guest_history.py`) es una lista de permitidos aplicada al stream en vivo, a su repetición, a la
+conversación guardada y al historial que se envía al modelo del turno del propio invitado. Al invitado se le
+muestra la petición tal como la persona la escribió (una petición automática, el texto de un documento adjunto,
+un comando expandido o una tarjeta propuesta por el modelo se muestran como un marcador), la respuesta final del
+modelo cuando el turno terminó con normalidad (un error, un límite o una primera pasada que luego se reparó no
+se muestran: el invitado lee que el turno no concluyó) y, de una herramienta, solo su tipo y su estado. El texto
+entre llamadas a herramientas no se transmite al invitado, y el turno del propio invitado no recibe los
+resultados de herramientas, las notas de trabajos en segundo plano o de works del dueño, ni las herramientas de
+jobs. Los argumentos y resultados de herramientas, los diffs de edición, las vistas previas de aprobación, las
+imágenes del navegador, la salida del verificador, las fuentes de instrucciones, el coste del recibo y las
+rutas del host no se envían, y un tipo de frame que nadie listó se descarta. Una conversación guardada antes de
+que existieran estas marcas muestra marcadores al invitado. La ventana del propio dueño sigue recibiendo todos
+los frames. Lo único que esto no puede filtrar es la propia respuesta final: si el modelo cita un archivo
+privado con sus palabras, el invitado lo lee — compartir una conversación comparte sus respuestas, y el panel
+de compartir lo dice.
 
 ### Tu propio teléfono o navegador: vincular un dispositivo
 

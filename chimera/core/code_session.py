@@ -38,6 +38,12 @@ from typing import TYPE_CHECKING, Any, Protocol
 from chimera.core.agent import AgentResult, ToolActivity, is_guidance
 from chimera.core.agent_batch_note import batch_note_message, is_batch_note
 from chimera.core.bypass_switches import BypassSwitches, open_switches
+from chimera.core.cache_miss import (
+    CACHE_WINDOW_TURNS,
+    CacheTurn,
+    CacheWarning,
+    cache_warning_between,
+)
 from chimera.core.checkout import Checkout, checkout_of
 from chimera.core.code_session_marks import (
     CodeSessionMarks,
@@ -48,6 +54,17 @@ from chimera.core.code_session_marks import (
 from chimera.core.context_budget import compact, estimate_tokens, is_compaction_note, restored_task
 from chimera.core.conversation_title import choose_title
 from chimera.core.filelock import atomic_write_text, exclusively, read_text, retrying
+from chimera.core.guest_history import (
+    AUTHOR_KEY,
+    FINAL_KEY,
+    GUEST_KEY,
+    HUMAN,
+    HUMAN_TEXT_KEY,
+    MODEL_ANSWER_KEY,
+    ORIGIN_KEY,
+    message_text,
+    project_history,
+)
 from chimera.core.redact import redact_json
 from chimera.providers.cache_ttl import cache_ttl_seconds
 from chimera.providers.gateway import MessageLike
@@ -172,6 +189,24 @@ def _title_of(content: str) -> str:
     if shortened == title[:80]:
         shortened = title[:79].rsplit(" ", 1)[0]
     return shortened or title[:80]
+
+
+class _Unchanged:
+    """The marker for "leave the candidate final answer as it is" (a distinct type, so that None can
+    mean "there is no model answer to seal")."""
+
+
+UNCHANGED = _Unchanged()
+
+
+def _replaced(message: dict[str, Any], text: str) -> dict[str, Any]:
+    """``message`` with its text replaced by what the server shipped, keeping the model's own words.
+
+    The first replacement stores what the model said under ``model_answer``, so a view that must not
+    carry what the server appended (a verifier's output, a receipt summary) can still read the answer.
+    """
+    kept = message.get(MODEL_ANSWER_KEY)
+    return {**message, "content": text, MODEL_ANSWER_KEY: kept if isinstance(kept, str) else message_text(message.get("content"))}
 
 
 def _as_dict(message: MessageLike) -> dict[str, Any]:
@@ -301,6 +336,9 @@ class CodeSession:
     """
     max_messages: int = DEFAULT_MAX_MESSAGES
     receipts: list[dict[str, Any]] = field(default_factory=list)
+    #: The candidate final answer of the turn in progress; in memory only, never stored. See
+    #: `_final_candidate`.
+    _pending_final: str | None = field(default=None, repr=False, compare=False)
     """One receipt per completed turn, oldest first — what the turn cost, what stopped it, what it
     verified.
 
@@ -350,6 +388,14 @@ class CodeSession:
     None for a conversation no turn has finished (every file written before this field), which is
     also what makes the first turn's miss read as a first turn rather than as an expiry."""
 
+    cache_turns: list[dict[str, Any]] = field(default_factory=list)
+    """What each finished turn contributed to this conversation's cache rate
+    (:class:`chimera.core.cache_miss.CacheTurn` records), newest last and bounded.
+
+    The warning that a conversation is paying for its prompt again is about the conversation, not a
+    turn, so the window has to outlive one: it is stored with the file and read back after a restart.
+    Absent in every file written before this field, which reads as no turns yet."""
+
     idle_view: dict[str, Any] | None = None
     """What the model is SENT in place of the oldest messages, after a long pause.
 
@@ -360,6 +406,17 @@ class CodeSession:
 
     Stored, because the next turn inside the cache's lifetime has to send the same prefix this one
     just cached; sending the full history again would pay for a prefix nobody has cached."""
+
+    def record_cache_turn(self, turn: CacheTurn) -> CacheWarning | None:
+        """Add a finished turn to the window and say whether it took the cache rate under the
+        threshold (:func:`chimera.core.cache_miss.session_cache_warning`). Call once per turn."""
+        # Two windows, each exactly what is retained at that moment: the one the conversation held
+        # before this turn, and the one it holds after (this turn in, the oldest out at the cap).
+        # Comparing a 201-turn window and keeping 200 judged a rate nobody was looking at.
+        before = [t for t in (CacheTurn.from_record(r) for r in self.cache_turns) if t is not None]
+        self.cache_turns = [*self.cache_turns, turn.to_record()][-CACHE_WINDOW_TURNS:]
+        after = [t for t in (CacheTurn.from_record(r) for r in self.cache_turns) if t is not None]
+        return cache_warning_between(before, after)
 
     def history_for_model(self) -> list[MessageLike]:
         """The history a turn sends: the stored messages, with the idle compaction applied when set."""
@@ -469,8 +526,22 @@ class CodeSession:
         should_stop: Callable[[], bool] | None = None,
         spend: SpendBudget | None = None,
         take_guidance: Callable[[], list[str]] | None = None,
+        origin: str = HUMAN,
+        author: str = "",
+        human_text: str | None = None,
+        guest_id: str = "",
+        continues_turn: bool = False,
+        project_for_guest: bool = False,
     ) -> AgentResult:
         """Run one turn with the previous turns as history, and absorb the result.
+
+        ``origin`` says who wrote ``task`` (``guest_history.HUMAN`` or ``AUTO``) and ``author`` names
+        the share link's guest when one sent it; both are marked on the stored message, with
+        ``human_text`` (what the person typed, before anything was appended to ``task``) and
+        ``guest_id`` (the share link's identity). ``continues_turn`` is an internal retry of the
+        same turn: the previous run's final seal is withdrawn, so only the last answer is final. With
+        ``project_for_guest`` the model is sent the PROJECTED history (`guest_history.project_history`)
+        and the stored conversation keeps the whole one, with only what the run added appended to it.
 
         ``spend`` is the turn's meter when the caller owns it (the app's, which also sums what the
         turns running at once spend). Forwarded like ``should_stop``: only when given, and only to
@@ -514,7 +585,14 @@ class CodeSession:
             extra["spend"] = spend
         if take_guidance is not None and _accepts(self.agent.run, "take_guidance"):
             extra["take_guidance"] = take_guidance
-        sent = self.history_for_model()
+        # A new run starts with no candidate: a repair that raises must leave none behind.
+        self._pending_final = None
+        if continues_turn:
+            self._withdraw_final_seals()
+        sent: list[MessageLike] = (
+            list(project_history(self.messages, guest_id)) if project_for_guest
+            else self.history_for_model()
+        )
         result = self.agent.run(
             task,
             on_token=on_token,
@@ -523,8 +601,81 @@ class CodeSession:
             history=list(sent),
             **extra,
         )
-        self.absorb(result, sent=sent, task=task)
+        self.absorb(result, sent=sent, task=task, projected=project_for_guest)
+        self._mark_opener(task, origin=origin, author=author, human_text=human_text, guest_id=guest_id)
+        self._pending_final = self._final_candidate(result)
         return result
+
+    def _final_candidate(self, result: AgentResult) -> str | None:
+        """The model's answer of this run when it ended normally with one, else None.
+
+        Only a CANDIDATE: nothing is written to the stored messages here. The turn is not over
+        (a verifier and its repairs may follow), and a seal on a pass that is then repaired, or on a
+        turn that fails afterwards, would be saved and read by a guest as the final answer. The
+        turn's close writes the seal (`seal_final_at`), once, for the definitive pass.
+        """
+        answer = str(result.answer or "")
+        if result.stopped_reason != "final" or not answer.strip() or not self.messages:
+            return None
+        last = _as_dict(self.messages[-1])
+        if (
+            last.get("role") == "assistant"
+            and not last.get("tool_calls")
+            and not is_batch_note(last)
+            and message_text(last.get("content")) == answer
+        ):
+            return answer
+        return None
+
+    def pending_final_text(self) -> str | None:
+        """The candidate final answer of the turn being closed (None: nothing may be sealed)."""
+        return self._pending_final
+
+    def set_pending_final(self, text: str | None) -> None:
+        """Set the candidate by hand: an external agent's turn, which has no run to read it from."""
+        self._pending_final = text if text and text.strip() else None
+
+    def seal_final_at(self, index: int, text: str) -> bool:
+        """Seal the final answer at ``index``, the position it held when the turn ended: the model's
+        own ``text`` is kept apart from whatever the server shipped in its place. Position decides,
+        as in `replace_answer_at`, because two turns can hold identical answers."""
+        if not 1 <= index < len(self.messages):
+            return False
+        message = _as_dict(self.messages[index])
+        if message.get("role") != "assistant" or message.get("tool_calls") or is_batch_note(message):
+            return False
+        self.messages[index] = {**message, FINAL_KEY: True, MODEL_ANSWER_KEY: text}
+        return True
+
+    def _withdraw_final_seals(self) -> None:
+        """Take the seal off the current turn's earlier final answer(s) before it is retried."""
+        for index in range(len(self.messages) - 1, -1, -1):
+            message = _as_dict(self.messages[index])
+            if message.get("role") == "user" and not message.get("guidance"):
+                return
+            if message.get(FINAL_KEY):
+                self.messages[index] = {k: v for k, v in message.items() if k != FINAL_KEY}
+
+    def _mark_opener(
+        self, task: str, *, origin: str, author: str, human_text: str | None, guest_id: str
+    ) -> None:
+        """Mark the user message that opened the turn just absorbed: who wrote it.
+
+        Found from the end by its text, because the transcript is the agent's and the agent builds
+        that message. A message not found stays unmarked, which a guest's view reads as "not
+        provably a person's" and hides.
+        """
+        for message in reversed(self.messages):
+            if isinstance(message, dict) and message.get("role") == "user" and not message.get("guidance"):
+                if message_text(message.get("content")) == task:
+                    message[ORIGIN_KEY] = origin
+                    if author:
+                        message[AUTHOR_KEY] = author
+                    if human_text is not None:
+                        message[HUMAN_TEXT_KEY] = human_text
+                    if guest_id:
+                        message[GUEST_KEY] = guest_id
+                return
 
     def absorb(
         self,
@@ -532,6 +683,7 @@ class CodeSession:
         *,
         sent: list[MessageLike] | None = None,
         task: str | None = None,
+        projected: bool = False,
     ) -> None:
         """Replace the conversation with the transcript the run actually produced.
 
@@ -551,31 +703,45 @@ class CodeSession:
             return
         body = [m for m in result.transcript if _as_dict(m).get("role") != "system"]
         view = self.idle_view
-        if sent is None or view is None or list(sent) == list(self.messages):
+        if not projected and (sent is None or view is None or list(sent) == list(self.messages)):
             self.messages = trim_to_a_safe_boundary(body, self.max_messages)
             return
         # The run began from the shortened history. What it added is everything after that history,
         # unless the run itself compacted and rewrote the start: then the turn is found by its task.
-        added = body[len(sent) :] if body[: len(sent)] == sent else _added_by(body, task, result.answer)
+        held: list[MessageLike] = sent or []
+        added = body[len(held) :] if body[: len(held)] == held else _added_by(body, task, result.answer)
         combined = [*self.messages, *added]
         self.messages = trim_to_a_safe_boundary(combined, self.max_messages)
         dropped = len(combined) - len(self.messages)
-        covers = int(view["covers"]) - dropped
-        # Trimming took messages the note stood for; none left to stand for means no note.
-        self.idle_view = {**view, "covers": covers} if covers > 0 else None
+        if view is not None:
+            covers = int(view["covers"]) - dropped
+            # Trimming took messages the note stood for; none left to stand for means no note.
+            self.idle_view = {**view, "covers": covers} if covers > 0 else None
 
-    def replace_last_answer(self, text: str) -> bool:
+    def replace_last_answer(
+        self, text: str, *, candidate: str | None | _Unchanged = UNCHANGED
+    ) -> bool:
         """Put ``text`` where the last turn's final answer is — what shipped, when a check after the
         run replaced the draft (`chimera/fusion/verified.py`). Only the final assistant message, and
         only one with no tool calls: an answer is never spliced into the middle of a tool exchange.
-        Returns whether anything was replaced."""
+        Returns whether anything was replaced.
+
+        ``candidate`` is what becomes the turn's final answer when the turn closes
+        (`pending_final_text`). Left alone when ``text`` is the model's own answer with something
+        appended (a verdict, a note): the candidate is still the model's words. A string when
+        ``text`` IS a final answer a model gave in place of the draft (a stronger model's correction
+        of a draft the sources did not support): the discarded draft must not be sealed. ``None``
+        when the text came from the server (a decline sentence, a conflict line it composed): there
+        is then no model answer to seal, and a guest is told the turn did not conclude."""
         if not self.messages:
             return False
         last = _as_dict(self.messages[-1])
         # A batch's record is not this turn's answer, even when it landed last.
         if last.get("role") != "assistant" or last.get("tool_calls") or is_batch_note(last):
             return False
-        self.messages[-1] = {**last, "content": text}
+        self.messages[-1] = _replaced(last, text)
+        if not isinstance(candidate, _Unchanged):
+            self.set_pending_final(candidate)
         return True
 
     def replace_answer_at(self, index: int, text: str) -> bool:
@@ -590,7 +756,7 @@ class CodeSession:
             return False
         if is_batch_note(message):
             return False
-        self.messages[index] = {**message, "content": text}
+        self.messages[index] = _replaced(message, text)
         return True
 
     def note_agent_batch(self, record: dict[str, Any]) -> None:
@@ -640,6 +806,7 @@ class CodeSession:
             **({"environment": dict(self.environment)} if self.environment else {}),
             **({"last_turn": dict(self.last_turn)} if self.last_turn is not None else {}),
             **({"idle_view": dict(self.idle_view)} if self.idle_view else {}),
+            **({"cache_turns": [dict(t) for t in self.cache_turns]} if self.cache_turns else {}),
         }
 
     def remember_receipt(self, receipt: dict[str, Any]) -> None:
@@ -699,6 +866,14 @@ def _idle_view_of(raw: object) -> dict[str, Any] | None:
     ):
         return {"covers": raw["covers"], "lead": list(raw["lead"])}
     return None
+
+
+def _cache_turns_of(raw: object) -> list[dict[str, Any]]:
+    """The stored cache window, keeping only what reads back as a turn."""
+    if not isinstance(raw, list):
+        return []
+    kept = [r for r in raw if CacheTurn.from_record(r) is not None]
+    return [dict(r) for r in kept][-CACHE_WINDOW_TURNS:]
 
 
 def _last_turn_of(raw: object) -> dict[str, Any] | None:
@@ -1263,6 +1438,7 @@ class CodeSessionStore:
         # since the last turn that ended, and that is what a stored conversation holds.
         session.last_turn = stored.last_turn
         session.idle_view = stored.idle_view
+        session.cache_turns = list(stored.cache_turns)
         if not session.pin_changed:
             session.selected_model = stored.selected_model
 
@@ -1300,6 +1476,7 @@ class CodeSessionStore:
             environment=environment_record(data.get("environment")),
             last_turn=_last_turn_of(data.get("last_turn")),
             idle_view=_idle_view_of(data.get("idle_view")),
+            cache_turns=_cache_turns_of(data.get("cache_turns")),
         )
 
     def _latest_pull_request(self, session_id: str, legacy: object) -> dict[str, Any] | None:
