@@ -12,7 +12,8 @@ message.
 
 Measured, not assumed (``bench/planner_ab/RESULTS.md``, margin -5 pp on pass rate, 90% t interval,
 23 tasks x k=3): DeepSeek v3.2 no-plan minus plan +5.8 pp [-2.0, +13.6] (passes the margin); GLM-5.3-flash
--1.5 pp [-8.2, +5.3] (does NOT: the lower limit is below -5 pp). Cost of no-plan / plan 0.97 and 0.85.
+-1.5 pp [-8.2, +5.3] (does NOT: the lower limit is below -5 pp). Recorded no-plan / plan cost ratios
+were 0.97 and 0.85. The latter omitted the CLI planner's costs, leaving the actual ratio unknown.
 Not adopted: one executor failed, so the constant stays False. Qwen3-coder-next was not run (its
 pilot projected US$ 4.2 against a remaining ceiling of US$ 2.8, pre-registered all-or-nothing).
 """

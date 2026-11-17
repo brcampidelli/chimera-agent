@@ -15230,7 +15230,10 @@ export interface components {
             task: string;
             /** Thread Id */
             thread_id?: string | null;
-            /** Use Planner */
+            /**
+             * Use Planner
+             * @description Whether to generate an initial plan when no explicit plan is supplied. Null uses the default policy (currently on). An explicit plan is used initially; a stall can replace it when replan is true and the planner is enabled.
+             */
             use_planner?: boolean | null;
             /** Verify */
             verify?: string | null;

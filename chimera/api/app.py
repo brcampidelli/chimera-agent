@@ -374,9 +374,8 @@ class RunRequest(CodeSeams):
     """The workspace root to run in. None = the workspace the desktop app was launched with."""
     max_attempts: int = 3
     plan: str | None = None
-    """An approved/edited plan (the raw text from the plan preview). When set, the run uses THIS plan
-    verbatim instead of re-planning — the worker follows the exact steps the human reviewed. None =
-    the run plans for itself as before."""
+    """An approved/edited plan from the preview. The first attempt uses it as supplied. A later
+    stall can replace it when re-planning is enabled."""
     gen_tests: bool = False
     """Turn the approved requirement checklist into EXECUTABLE pytest and gate on that.
 
@@ -403,11 +402,14 @@ class RunRequest(CodeSeams):
     this is a field the caller sets rather than a rule the loop infers.
     """
 
-    use_planner: bool | None = None
-    """Plan before working. ``None`` = the default policy (``chimera.core.planner_policy``): on today.
-
-    ``False`` skips the planning call; ``True`` forces it. Ignored when ``plan`` is set — an approved
-    plan is followed verbatim and makes no planning call either way."""
+    use_planner: bool | None = Field(
+        default=None,
+        description=(
+            "Whether to generate an initial plan when no explicit plan is supplied. "
+            "Null uses the default policy (currently on). An explicit plan is used initially; "
+            "a stall can replace it when replan is true and the planner is enabled."
+        ),
+    )
 
     replan: bool = False
     """On a stall, rebuild the plan from the accumulated failure causes instead of nudging.

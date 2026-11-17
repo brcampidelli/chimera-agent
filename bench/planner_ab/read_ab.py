@@ -100,13 +100,15 @@ def main() -> None:
         print(f"   d(noplan-plan) pass  mean={m:+.4f}  90% t [{lo:+.4f}, {hi:+.4f}]  non-inferior(>-0.05)={r['noninferior']}")
         print(f"   d(noplan-plan) score mean={ms:+.4f}  90% t [{los:+.4f}, {his:+.4f}]")
         print(f"   tasks noplan worse/equal/better = {r['worse']}/{r['equal']}/{r['better']};  cost noplan/plan = {r['cost_ratio']:.3f}")
+        if r["tag"] == "glm":
+            print("   GLM's recorded ratio omits the single-model planner's cost and covers only metered calls.")
     inf = [r for r in results if r["informative"]]
     fams = {FAMILY[r["tag"]] for r in inf}
     cond1 = len(fams) >= 2
     cond2 = all(r["noninferior"] for r in inf) and bool(inf)
     cond3 = all(r["cost_ratio"] <= 1.05 for r in inf) and bool(inf)
     print(f"\nconditions: >=2 families={cond1} ({sorted(fams)})  non-inferior on every informative executor={cond2}  "
-          f"no-plan not dearer by >5%={cond3}")
+          f"recorded no-plan cost not dearer by >5%={cond3}")
     print("VERDICT:", "ADOPT planner-off when the run has a verifier" if cond1 and cond2 and cond3 else "NOT ADOPTED")
 
 

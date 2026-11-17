@@ -510,10 +510,15 @@ def solve(
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
+    from chimera.orchestration.metering import MeteredBackend
+
     workspace_path = Path(workspace)
     gateway = LLMGateway()
+    # The worker already prices itself through AgentResult.usd. The planner and reviewer
+    # share one meter underneath their backends so the receipt also includes their calls.
+    meter = MeteredBackend(gateway, label="overhead")
     backend: SupportsComplete = gateway
-    planner_backend: SupportsComplete = gateway
+    planner_backend: SupportsComplete = meter
     # --cascade (or CHIMERA_CASCADE): tiered routing weak -> gate -> mid -> gate -> fusion.
     # Takes precedence over --fuse (the cascade already has fusion as its top rung).
     if cascade or settings.cascade:
@@ -533,7 +538,7 @@ def solve(
         # so an explicit --fuse routes the plan through fusion directly. Auto-fuse keeps
         # planning single unless asked, to bound cost.
         if fuse:
-            planner_backend = engine
+            planner_backend = fusion_engine(meter)
 
     # Collective (cross-model) skill evolution is meaningful whenever the run's reasoning peak is
     # fusion over a multi-model panel — true for BOTH --fuse and --cascade (the cascade's top rung is
@@ -554,13 +559,6 @@ def solve(
     # the same function the desktop endpoint uses: a bench that drives the CLI has to exercise the
     # routing the app ships, or it measures something nobody uses.
     roles = _resolve_cli_roles(profile, role_models, settings)
-    # One meter per run, wrapping the gateway UNDERNEATH the non-worker backends — see
-    # chimera.orchestration.metering. The worker is not metered: it prices itself via
-    # AgentResult.usd, and routing it here too would double-count every step.
-    from chimera.orchestration.metering import MeteredBackend
-
-    meter = MeteredBackend(gateway, label="overhead")
-
     # Built OUTSIDE `_run_solve` on purpose: the worktree path calls that function again on retry,
     # and a ledger created inside it would be discarded along with the evidence of what the run was
     # not allowed to do — which is the one fact this whole mechanism exists to keep.
