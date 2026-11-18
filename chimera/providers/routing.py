@@ -656,7 +656,7 @@ def _memory_extract_route(settings: Settings, spec: RoleSpec, default: Route) ->
         return _route(spec.id, value, _origin_of(settings, spec.field), spec.field)
     return Route(
         spec.id, default.model, default.effort, _origin_of(settings, spec.field),
-        default.effort_origin, "no extraction pin: uses the global default model", inherits="default",
+        default.effort_origin, "no model of its own: uses the global default model", inherits="default",
     )
 
 
