@@ -27,6 +27,7 @@ import threading
 import time
 import types
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -72,12 +73,16 @@ _LEDGER_LOCK = threading.Lock()
 
 
 # ----------------------------------------------------------------------------------------- baseline
+@lru_cache(maxsize=1)
 def baseline_prompts() -> types.ModuleType:
-    """``chimera/design/prompts.py`` as it was at BASE_SHA, executed as its own module."""
-    text = subprocess.run(
-        ["git", "show", f"{BASE_SHA}:chimera/design/prompts.py"], cwd=REPO, check=True,
-        capture_output=True,
-    ).stdout
+    """Load and verify the registered baseline before any paid call."""
+    try:
+        text = subprocess.run(
+            ["git", "show", f"{BASE_SHA}:chimera/design/prompts.py"], cwd=REPO, check=True,
+            capture_output=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SystemExit("registered baseline unavailable; fetch the historical commit before paid runs") from exc
     if hashlib.sha256(text).hexdigest() != BASE_PROMPTS_SHA256:
         raise SystemExit("the baseline prompt file is not the registered one")
     module = types.ModuleType("baseline_prompts")
@@ -85,22 +90,21 @@ def baseline_prompts() -> types.ModuleType:
     return module
 
 
-OLD = baseline_prompts()
-
-
 def baseline_generate_user(doc: DesignDocument, brief: str) -> str:
-    return OLD.HTML_GENERATE.format(
+    old = baseline_prompts()
+    return old.HTML_GENERATE.format(
         brief=propose._untrusted(brief[: propose.MAX_BRIEF]),
         constraints=propose._untrusted(propose._dumps({})),
         tokens=propose._untrusted(propose._dumps(wire(doc.tokens))),
         assets=propose._untrusted(propose._dumps([])),
         document=propose._untrusted(propose._dumps(propose.summarize(doc))),
-        operations=OLD.HTML_OPERATIONS_GUIDE,
+        operations=old.HTML_OPERATIONS_GUIDE,
     )
 
 
 def baseline_refine_user(doc: DesignDocument, request: str) -> str:
-    return OLD.HTML_REFINE.format(
+    old = baseline_prompts()
+    return old.HTML_REFINE.format(
         request=propose._untrusted(request[: propose.MAX_BRIEF]),
         selected=propose._untrusted(propose._dumps([])),
         comments=propose._untrusted(propose._dumps([])),
@@ -108,7 +112,7 @@ def baseline_refine_user(doc: DesignDocument, request: str) -> str:
         document=propose._untrusted(propose._dumps(propose.summarize(doc))),
         html_sources=propose._untrusted(propose.html_sources(doc)),
         html_selection=propose._selected_html(doc, None),
-        operations=OLD.HTML_OPERATIONS_GUIDE,
+        operations=old.HTML_OPERATIONS_GUIDE,
     )
 
 
@@ -297,6 +301,7 @@ def _arm_order(index: int, rep: int) -> tuple[str, str]:
 
 # --------------------------------------------------------------------------------------- generation
 def generate(meter: Meter, doc: DesignDocument, brief_text: str, arm: str) -> propose.ProposalOutcome:
+    baseline_prompts()
     if arm == "A":
         return propose._proposal_call(meter, doc, baseline_generate_user(doc, brief_text),
                                       model=meter.model, id_factory=new_id)
@@ -332,6 +337,7 @@ def run_gen_item(model_key: str, index: int, rep: int) -> None:
 
 
 def cmd_gen(model_key: str) -> None:
+    baseline_prompts()  # fail before any worker or paid call
     items = [(i, r) for i in range(len(BRIEFS)) for r in range(REPS)]
     with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(lambda ir: run_gen_item(model_key, *ir), items))
@@ -377,6 +383,7 @@ def build_design(model_key: str, index: int) -> None:
 
 
 def cmd_corpus(model_key: str) -> None:
+    baseline_prompts()  # fail before any worker or paid call
     with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(lambda i: build_design(model_key, i), range(len(BRIEFS))))
     made = len(list((RESULTS / model_key / "corpus").glob("*.json")))
@@ -392,6 +399,7 @@ def load_design(model_key: str, brief_id: str) -> DesignDocument | None:
 
 # ------------------------------------------------------------------------------------------ refine
 def run_refine_item(model_key: str, index: int, rep: int) -> None:
+    baseline_prompts()
     brief = BRIEFS[index]
     doc = load_design(model_key, brief.id)
     if doc is None:
@@ -428,6 +436,7 @@ def run_refine_item(model_key: str, index: int, rep: int) -> None:
 
 
 def cmd_refine(model_key: str) -> None:
+    baseline_prompts()  # fail before any worker or paid call
     items = [(i, r) for i in range(len(BRIEFS)) for r in range(REPS)]
     with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(lambda ir: run_refine_item(model_key, *ir), items))
