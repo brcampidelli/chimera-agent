@@ -120,3 +120,10 @@ About 690 calls at about US$ 0.0002 each: **about US$ 0.15** (`ctrl` ≈ US$ 0.0
 - Whether the facts help later (nothing asks a later question).
 - The pre-filter on Spanish, French, German, Chinese or Japanese: it lets those through by construction, so its drop rate there is zero and its recall cost is not measured.
 - A real-traffic saving: the projection above is arithmetic on a bench, and the whole call is 0.37% of the owner's spend.
+
+### Post-run documentation of the original registration
+
+- **§11 — Interval and denominators.** The registered interval for proportions (precision and recall) is Wilson 95%. Keep the **120 decision-set runs** (60 turns × 2 replicas; 48 expected-fact slots) separate from the **28 held-out expected-fact slots**. The held-out stratum is reported separately and gates only R-filter.
+- **§12 — Margin and interpretation.** The registered decisions use the stated absolute thresholds and cost clause. A one- or two-fact difference is within the replica floor and is not read as an effect.
+- **§13 — Controls.** Before interpreting any arm, the control must have **exactly 31/31 saves correct and 0 poison**. Only control recall has a tolerance, within 3 facts of 33/36. If any control condition fails, no other arm is read for a decision. The offline positive control must also pass, including the planted-tail case.
+- **§14 — Model scope.** The registration covers the specified default model and one weak model, on one day. The DeepInfra control checks the instrument. Conclusions are limited to the registered models and conditions.

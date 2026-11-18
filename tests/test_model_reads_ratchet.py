@@ -257,7 +257,9 @@ def _kinds(source: str) -> list[str]:
 
 
 def test_the_model_fields_are_the_sixteen_the_audit_counted() -> None:
-    assert len(FIELDS) == 16, sorted(FIELDS)
+    # 16 audited + `memory_extract_model` (P1-02), which is read ONLY through the routing table
+    # (`routing_table().route("memory_extract")`): it adds a field and no read, so `KEPT` is untouched.
+    assert len(FIELDS) == 17, sorted(FIELDS)
 
 
 def test_reads_of_model_fields_are_pinned_and_can_only_fall() -> None:

@@ -1175,6 +1175,21 @@ class Settings(BaseSettings):
     # usage log records. The messaging bots never extract, whatever this says: anyone who can reach
     # a bot would be writing the owner's memory. Set CHIMERA_MEMORY_EXTRACT=0 to stop it.
     memory_extract: bool = Field(default=True, validation_alias="CHIMERA_MEMORY_EXTRACT")
+    # P1-02: blank or "default" uses CHIMERA_DEFAULT_MODEL, independently of a conversation pin.
+    # Set an explicit slug to opt in to a different model (including the weak rung's slug). A
+    # pinned route fails quietly if unavailable. The benchmark control missed 31/31 and gave
+    # no basis to change the default or the 6,000-character answer slice.
+    # See bench/memory_extraction/RESULTS-P1-02.md.
+    memory_extract_model: str = Field(default="", validation_alias="CHIMERA_MEMORY_EXTRACT_MODEL")
+    # P1-02: skip the extraction call when the user's own words are plainly English or Portuguese
+    # and name no one (`chimera.memory.extract.worth_a_call`). OFF, and it stays off: measured on
+    # 2026-11-16 it saved 27% of the calls on the frozen corpus and lost 2 of 36 expected facts
+    # (a Portuguese turn with the subject pronoun dropped) and 4 of 28 on turns it was not built
+    # from ("Allergic to shellfish, so no paella"); it also lets Spanish through the wrong way.
+    # `bench/memory_extraction/RESULTS-P1-02.md`.
+    memory_extract_prefilter: bool = Field(
+        default=False, validation_alias="CHIMERA_MEMORY_EXTRACT_PREFILTER"
+    )
 
     # Send a chat's earlier turns as the model's own messages, tool calls included, with the
     # profile and recalled facts in the turn context, instead of one flattened user message

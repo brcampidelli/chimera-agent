@@ -55,6 +55,7 @@ site/
 
 # Local benchmark run outputs (harness + tasks are tracked; per-run results are not)
 bench/local_lift/results/
+bench/memory_extraction/results/p1-02/runtime/
 bench/fusion_paired/results/
 bench/fusion_aggregate/results/
 bench/cost_routing/results/
