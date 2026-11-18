@@ -187,6 +187,51 @@ def test_solve_puts_skills_and_cards_in_the_turn_not_the_system_prompt(
     assert configs and all(isinstance(c, AgentConfig) and c.turn_context for c in configs)
 
 
+@pytest.mark.parametrize("strict", [False, True])
+def test_solve_shares_its_cap_with_the_metered_planner(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, strict: bool
+) -> None:
+    from typer.testing import CliRunner
+
+    from chimera.cli.main import app
+    from chimera.orchestration.receipts import price_delegation
+    from chimera.providers import CompletionResult
+
+    model = "openrouter/openai/gpt-4o"
+    calls: list[list[Any]] = []
+
+    class _Backend:
+        def planned_calls(self, *_args: Any) -> list[tuple[str, int]]:
+            return [(model, 2_000)]
+
+        def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+            calls.append(messages)
+            return CompletionResult(
+                content="1. Read the parser", model=model, prompt_tokens=1000, completion_tokens=30,
+            )
+
+    monkeypatch.setenv("CHIMERA_STRICT_SPEND_CAP", str(strict).lower())
+    monkeypatch.setattr("chimera.providers.LLMGateway", _Backend)
+    result = CliRunner().invoke(
+        app, ["solve", "fix it", "--workspace", str(_repo(tmp_path)), "--model", model,
+              "--max-usd", "0.0001", "--no-manager", "--no-remember", "--no-collect",
+              "--no-evolve-skills"],
+    )
+
+    assert result.exit_code == 1, result.output
+    rows = _rows(tmp_path / "home" / "runs.jsonl")
+    assert len(rows) == 1 and rows[0]["ending"] == "spend"
+    assert len(rows[0]["attempts"]) == 1
+    attempt = rows[0]["attempts"][0]
+    if strict:
+        assert calls == []
+        assert attempt["usd"] == 0.0 and attempt["prompt_tokens"] == 0
+    else:
+        assert len(calls) == 1 and "planning assistant" in str(calls[0])
+        assert attempt["prompt_tokens"] == 1000 and attempt["completion_tokens"] == 30
+        assert rows[0]["usd"] == attempt["overhead_usd"] == price_delegation(model, 1000, 30)
+
+
 # --- the loop: a reviewer on the author's own model does not decide ---------------------------
 
 

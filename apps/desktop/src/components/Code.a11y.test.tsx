@@ -65,12 +65,17 @@ describe("Code — what assistive technology hears", () => {
     const chip = screen.getByTestId("conversation-status");
     expect(chip).toHaveAttribute("aria-live", "polite");
     expect(chip).toHaveAttribute("aria-atomic", "true");
-    // The state vocabulary, short phrases only: never the answer.
-    expect(chip.textContent).toBe("Complete");
+    // Before any turn there is nothing complete to say. This used to assert "Complete" on a fresh
+    // conversation, which pinned the bug: a screen reader was told a turn had finished that never ran.
+    expect(chip.textContent).toBe("");
+    expect(chip).toHaveClass("hidden");
 
     await user.type(screen.getByPlaceholderText(/^Ask about this code/), "go");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText(/a long final answer/);
+    // The state vocabulary, short phrases only: never the answer.
+    expect(chip.textContent).toBe("Complete");
+    expect(chip).not.toHaveClass("hidden");
     expect(chip.textContent).not.toMatch(/answer/);
     expect(chip.closest("[aria-live='off']")).toBeNull();
   });

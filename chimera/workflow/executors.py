@@ -20,6 +20,23 @@ from chimera.workflow.runner import StepExecutor, StepResult
 _MAX_OUTPUT = 2000
 
 
+def _optional_bool(value: object) -> bool | None:
+    """A workflow ``with:`` value as a tri-state: YAML booleans, or the strings people type for them.
+
+    Anything else is ``None`` (use the default) rather than a guess: a typo in ``use_planner`` must
+    not silently pick a side.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        word = value.strip().lower()
+        if word in {"true", "yes", "on", "1"}:
+            return True
+        if word in {"false", "no", "off", "0"}:
+            return False
+    return None
+
+
 def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, StepExecutor]:
     from chimera.providers import LLMGateway
 
@@ -65,6 +82,7 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
             Planner,
             WorkspaceGuard,
         )
+        from chimera.core.planner_policy import resolve_use_planner
         from chimera.core.verify import CommandVerifier
         from chimera.evolution import build_evolution_context
         from chimera.tools import default_registry
@@ -88,7 +106,13 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
             verifier=CommandVerifier(str(verify), workspace, source="workflow") if verify else None,
             guard=WorkspaceGuard(workspace),
             **evo.apply_to(),
-            config=AutonomousConfig(max_attempts=int(step.with_.get("max_attempts", 2))),
+            config=AutonomousConfig(
+                max_attempts=int(step.with_.get("max_attempts", 2)),
+                # `with.use_planner: false` skips the planning call; absent = the default policy.
+                use_planner=resolve_use_planner(
+                    _optional_bool(step.with_.get("use_planner")), has_verifier=bool(verify)
+                ),
+            ),
         )
         outcome = auto.run(str(step.with_.get("task", "")))
         return StepResult(outcome.success, outcome.answer)

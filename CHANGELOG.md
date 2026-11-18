@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Memory extraction measurement and opt-in controls.** The P1-02 control did not meet its 31/31-save requirement, and the registered benchmark is inconclusive for adoption. The 6,000-character cap and global extraction model remain the defaults. An explicit extraction-model pin and deterministic pre-filter are opt-in. (P1-02)
+
+- **Planner switch on every autonomous entrance.** `use_planner` is now settable on Kanban lanes, `/api/runs` and workflow solve steps; the default stays on because the registered A/B did not clear the -5 pp margin on both model families. (P1-01) (#1301)
+
+- **Cron model tiers, measured.** A paired bench on 8 synthetic jobs found the cheap tier fully correct on 7 of them in 3 of 3 seeds, at only ~17% lower cost per job; it changes no default and does not cover the 21 production jobs. (P1-03) (#1299)
+
+### Fixed
+
+- **Settings search finds the model table; routing and receipts read right in Portuguese.** The "which model runs each role" table is searchable, its Via column is translated, a new conversation no longer says "Complete", an answer-only turn no longer reports a failed close loop, and "1 step" is singular. (P1-20) (#1300)
+
+### Changed
+
+- **Prompt blocks and a proportionality experiment.** The language rule and the "data, not instructions" sentence are each one block now, the registry scan sees prompts written as locals, and a proportionality block exists behind `CHIMERA_PROPORTIONALITY`, off because the paired bench showed no gain on deepseek-chat-v3.1. (P1-17) (#1302)
+
 ## [0.91.0] - 2026-11-16
 ### Added
 

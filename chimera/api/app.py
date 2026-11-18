@@ -374,9 +374,8 @@ class RunRequest(CodeSeams):
     """The workspace root to run in. None = the workspace the desktop app was launched with."""
     max_attempts: int = 3
     plan: str | None = None
-    """An approved/edited plan (the raw text from the plan preview). When set, the run uses THIS plan
-    verbatim instead of re-planning — the worker follows the exact steps the human reviewed. None =
-    the run plans for itself as before."""
+    """An approved/edited plan from the preview. The first attempt uses it as supplied. A later
+    stall can replace it when re-planning is enabled."""
     gen_tests: bool = False
     """Turn the approved requirement checklist into EXECUTABLE pytest and gate on that.
 
@@ -402,6 +401,15 @@ class RunRequest(CodeSeams):
     asked to explain an architecture changes no files and is not thereby a failure, which is why
     this is a field the caller sets rather than a rule the loop infers.
     """
+
+    use_planner: bool | None = Field(
+        default=None,
+        description=(
+            "Whether to generate an initial plan when no explicit plan is supplied. "
+            "Null uses the default policy (currently on). An explicit plan is used initially; "
+            "a stall can replace it when replan is true and the planner is enabled."
+        ),
+    )
 
     replan: bool = False
     """On a stall, rebuild the plan from the accumulated failure causes instead of nudging.
@@ -4035,6 +4043,7 @@ def _build_solve_agent(
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.core.planner import Plan
+    from chimera.core.planner_policy import resolve_use_planner
     from chimera.core.runstate import RunCheckpointer
     from chimera.core.spec_test import SpecTestGenerator
     from chimera.core.verify import CommandVerifier
@@ -4252,7 +4261,10 @@ def _build_solve_agent(
         # Half the scaffold lift this project measured, unreachable from any screen until now
         # because it lived only as a CLI flag.
         require_diff=req.require_diff,
-        config=AutonomousConfig(max_attempts=req.max_attempts),
+        config=AutonomousConfig(
+            max_attempts=req.max_attempts,
+            use_planner=resolve_use_planner(req.use_planner, has_verifier=bool(verify_command)),
+        ),
     )
 
 
