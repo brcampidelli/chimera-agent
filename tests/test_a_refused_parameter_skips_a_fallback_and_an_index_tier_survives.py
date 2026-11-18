@@ -100,8 +100,22 @@ def test_a_primary_that_cannot_force_a_call_raises_even_with_the_gateways_own_ex
 # --------------------------------------------------------------------- the spend cap
 
 
+@pytest.fixture
+def published_prices() -> None:
+    from chimera.providers.listing import ModelOption, remember_models
+
+    # These tests reach the gateway's error paths after strict admission.
+    assert remember_models([
+        ModelOption(
+            slug=slug, label=slug, vendor="Anthropic", source="openrouter",
+            input_per_m=input_per_m, output_per_m=output_per_m,
+        )
+        for slug, input_per_m, output_per_m in [(SONNET, 2.0, 10.0), (HAIKU, 0.10, 0.50)]
+    ])
+
+
 def test_a_refusal_before_the_wire_gives_the_reservation_back(
-    monkeypatch: pytest.MonkeyPatch, seen: list[dict[str, Any]]
+    published_prices: None, seen: list[dict[str, Any]]
 ) -> None:
     """Nothing left the process, so nothing was billed: the cap is not charged the worst case."""
     from chimera.orchestration.budget import SpendBudget, SpendCappedBackend
@@ -116,7 +130,7 @@ def test_a_refusal_before_the_wire_gives_the_reservation_back(
 
 
 def test_a_genuinely_unknown_error_still_forfeits_the_reservation(
-    monkeypatch: pytest.MonkeyPatch, seen: list[dict[str, Any]]
+    published_prices: None, seen: list[dict[str, Any]]
 ) -> None:
     """The control: only the pre-send refusal is exempt. A provider error may have been billed."""
     from chimera.orchestration.budget import SpendBudget, SpendCappedBackend
@@ -186,9 +200,9 @@ def test_a_variant_with_its_own_price_keeps_its_own_long_tier(monkeypatch: pytes
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: (0.05, 0.25))
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (0.005, 0.0625))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: (100_000, 0.25, 1.25, 0.025, 0.3125))
+    monkeypatch.setattr(listing, "known_model", lambda _slug: listing.Remembered(
+        0.05, 0.25, None, None, None, cache_read_per_m=0.005, cache_write_per_m=0.0625, long_prompt=(100_000, 0.25, 1.25, 0.025, 0.3125),
+    ))
     price = resolve_price(f"{HAIKU}:batch")
     assert price is not None and price.long_prompt is not None
     assert cost_usd(price, 150_000, 1_000) == pytest.approx(0.03875)
@@ -202,9 +216,9 @@ def test_an_older_cached_row_without_overrides_still_borrows_the_tables_tier_at_
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: (0.10, 0.50))
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (0.01, 0.125))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: None)
+    monkeypatch.setattr(listing, "known_model", lambda _slug: listing.Remembered(
+        0.1, 0.5, None, None, None, cache_read_per_m=0.01, cache_write_per_m=0.125,
+    ))
     price = resolve_price(HAIKU)
     assert price is not None and price.long_prompt is not None
 

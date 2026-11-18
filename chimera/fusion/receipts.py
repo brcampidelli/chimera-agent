@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
@@ -55,6 +57,10 @@ class ModelPrice:
     the row's price and not of the pattern text, so a `set_price` that happens to reuse a catalogue
     pattern is still a route-level override. Left out of equality: it says how a row is MATCHED, not
     what it costs."""
+    reserve: bool = field(default=False, compare=False, repr=False)
+    """Whether this price is a CATALOGUE fallback row (set by `register_catalog_prices`) rather than
+    something a person typed with `set_price`. Only reserve rows compete on specificity in
+    `resolve_price`; an explicit override wins by position, whatever slug it names."""
 
 
 def tier_is_estimate(price: ModelPrice, prompt_tokens: int | None, *, aggregate: bool) -> bool:
@@ -268,7 +274,12 @@ def set_price(pattern: str, price: ModelPrice) -> None:
 
     Matched against the whole slug, unless ``price.by_identity`` is set (only the catalogue's Claude
     rows do): a hand-typed override names a route, even when its text equals a catalogue pattern.
+
+    Folds the catalogue in first, so an override typed BEFORE the first lookup is still in front of
+    it: `register_catalog_prices` prepends too, and would otherwise sit on top of a person's number.
     """
+    if not _catalog_registered:
+        _ensure_catalog_registered()
     _PRICES.insert(0, (pattern.lower(), price))
 
 
@@ -314,7 +325,28 @@ def _ensure_catalog_registered() -> None:
 _LOCAL_ZERO = ModelPrice(0.0, 0.0)
 
 
-def resolve_price(model: str) -> ModelPrice | None:
+_admission_prices: ContextVar[Mapping[str, ModelPrice] | None] = ContextVar(
+    "admission_prices", default=None,
+)
+
+
+@contextmanager
+def using_admission_prices(prices: Mapping[str, ModelPrice] | None) -> Iterator[None]:
+    if prices is None:
+        yield
+        return
+    token = _admission_prices.set(prices)
+    try:
+        yield
+    finally:
+        _admission_prices.reset(token)
+
+
+def admission_prices_active() -> bool:
+    return _admission_prices.get() is not None
+
+
+def resolve_price(model: str, *, require_fresh_openrouter: bool = False) -> ModelPrice | None:
     """The list price for ``model``, or ``None`` if unknown (never guessed).
 
     Five sources, most specific first, and the ORDER is the whole design:
@@ -337,6 +369,9 @@ def resolve_price(model: str) -> ModelPrice | None:
        shipped catalogue is folded in here, once, on the first lookup.
     5. Local models, which bill nothing.
 
+    With ``require_fresh_openrouter``, paid OpenRouter routes need a current published row to
+    admit a request under a strict ceiling. Exact overrides and free routes are known up front.
+
     Why the index sits BETWEEN the two table lookups rather than after both: those patterns are
     substrings, and a substring is a guess about a family. ``deepseek-chat`` matched
     ``deepseek-chat-v3.1`` and priced it at the v3 rate — off by 3x on output — for as long as both
@@ -344,7 +379,7 @@ def resolve_price(model: str) -> ModelPrice | None:
     family, and worse evidence than a price a human typed for that one model.
     """
     from chimera.providers.gateway import _is_local_model
-    from chimera.providers.listing import known_cache_price, known_long_prompt, known_price
+    from chimera.providers.listing import fresh_openrouter_price_record, known_model
 
     _ensure_catalog_registered()
     # Reasoning effort is a request option, not part of the provider's model identity. Receipts
@@ -353,6 +388,8 @@ def resolve_price(model: str) -> ModelPrice | None:
 
     price_model = base_slug(model)
     norm = price_model.lower()
+    if not require_fresh_openrouter and (quotes := _admission_prices.get()) is not None:
+        return quotes.get(norm)
     for pattern, price in _PRICES:
         if pattern == norm:
             return price
@@ -369,9 +406,20 @@ def resolve_price(model: str) -> ModelPrice | None:
     family = next(
         (price for pattern, price in _PRICES if _pattern_in(pattern, norm, identity, price)), None
     )
-    live = known_price(price_model)
-    if live is not None:
-        read, write = known_cache_price(price_model)
+    # Among CATALOGUE rows only: one whose pattern IS the slug without its provider prefix names this
+    # very model and beats a sibling that is merely a substring of it. `z-ai/glm-5.3` is inside
+    # `z-ai/glm-5.3-flash`, and the later-registered flagship row used to price the flash model at
+    # 1.40/4.40 — 39x its cost (planner A/B, 2026-11-16). A `set_price` override is never displaced:
+    # if it came first, `family` is not a reserve row and this does not run.
+    if family is not None and family.reserve:
+        tail = norm.split("/", 1)[-1]
+        family = next((p for pat, p in _PRICES if p.reserve and pat == tail), family)
+    fresh_required = require_fresh_openrouter and norm.startswith("openrouter/")
+    record = fresh_openrouter_price_record(price_model) if fresh_required else known_model(price_model)
+    if record is not None and record.input_per_m is not None and record.output_per_m is not None:
+        live = (record.input_per_m, record.output_per_m)
+        read, write = record.cache_read_per_m, record.cache_write_per_m
+        published = record.long_prompt
         # An index row with no cache rate is usually a file written before the parser read them
         # (`model-prices.json` outlives upgrades), not a provider saying "no cache". The table may
         # know the rate — but only borrow it from a row at the SAME input/output price: a family
@@ -380,7 +428,6 @@ def resolve_price(model: str) -> ModelPrice | None:
         if family is not None and (family.input_per_m, family.output_per_m) == live:
             read = family.cache_read_per_m if read is None else read
             write = family.cache_write_per_m if write is None else write
-        published = known_long_prompt(price_model)
         if published is not None:
             # The index publishes this variant's OWN long-prompt tier (`pricing.overrides`), which is
             # what a `:batch` slug needs: its short price differs from the table's, so the table's
@@ -399,6 +446,9 @@ def resolve_price(model: str) -> ModelPrice | None:
             long_prompt_over=borrowed_over, long_prompt=borrowed,
         )
 
+    if fresh_required:
+        # A catalogue estimate cannot authorize a paid call with no current published price.
+        return None
     if family is not None:
         return family
     # After the table, not before: an explicit `set_price` for a local model must still win.
@@ -416,10 +466,16 @@ class StageCost:
     prompt_tokens: int | None
     completion_tokens: int | None
     usd: float | None
+    usd_estimated: bool = False
 
 
 def price_stage(usage: StageUsage) -> StageCost:
     """Turn a :class:`StageUsage` into a :class:`StageCost` at the stage model's own rate."""
+    if usage.cost is not None:
+        return StageCost(
+            usage.stage, usage.model, usage.prompt_tokens, usage.completion_tokens,
+            usage.cost.usd if usage.cost.unpriced is None else None, usage.cost.estimated,
+        )
     price = resolve_price(usage.model)
     usd: float | None = None
     if price is not None:

@@ -37,8 +37,9 @@ from chimera.orchestration.budget import (
     BudgetExceeded,
     SpendBudget,
     SpendExceeded,
+    quote_spend,
+    quoted_pricing,
     settle_failed_attempts,
-    worst_case_usd,
 )
 from chimera.providers.failover import FailoverReason, classify, is_transient_network
 from chimera.providers.fusion_guard import carries_tools, fusion_forbidden
@@ -2598,12 +2599,13 @@ class Agent:
         """
         asked = {} if self.config.thinking is None else {"thinking": self.config.thinking}
         streams = on_token is not None and hasattr(self.backend, "stream_complete")
+        quote = None
         if spend is not None:
             # Strict (the owner's `CHIMERA_STRICT_SPEND_CAP`, off by default) also asks whether THIS
             # call's worst case still fits; priced only then, so a run without it pays nothing for
             # the question and refuses exactly as before.
-            worst = (
-                worst_case_usd(
+            quote = (
+                quote_spend(
                     self.backend, messages,
                     {"model": model or self.config.model, "tools": tools, **asked}, strict=True,
                     # A streamed step makes one streamed attempt before the batch chain, and that
@@ -2613,7 +2615,7 @@ class Agent:
                 if spend.strict and spend.capped
                 else None
             )
-            reason = spend.admit(worst)
+            reason = spend.admit(quote.worst if quote is not None else None)
             if reason is not None:
                 # `SpendExceeded`, not the parent: a `SpendBudget` refusing is always about the
                 # money, so `stopped_reason` reads "spend" and a reader can tell which ceiling was
@@ -2622,21 +2624,22 @@ class Agent:
                 # this line was the one place the loop disagreed with itself, so a dollar cap
                 # reported "budget" through the agent and "spend" through the backend.
                 raise SpendExceeded(reason)
-        result = self._call_model(
-            messages, tools=tools, on_token=on_token if streams else None, model=model,
-            kind=kind, asked=asked, on_notice=on_notice,
-        )
-        usage.add(result)
-        if spend is not None:
-            # The model that ANSWERED: a cascade or a failover can reply on a different one, and
-            # charging the requested model invents a price for a call that never happened.
-            spend.record_result(result)
-            # Strict only: an attempt the gateway gave up on before this one answered may have been
-            # billed, and the result above prices only the one that answered.
-            settle_failed_attempts(
-                spend, result, messages, {"model": model or self.config.model, "tools": tools, **asked}
+        with quoted_pricing(quote):
+            result = self._call_model(
+                messages, tools=tools, on_token=on_token if streams else None, model=model,
+                kind=kind, asked=asked, on_notice=on_notice,
             )
-        return result
+            usage.add(result)
+            if spend is not None:
+                # The model that ANSWERED: a cascade or a failover can reply on a different one, and
+                # charging the requested model invents a price for a call that never happened.
+                spend.record_result(result)
+                # Strict only: an attempt the gateway gave up on before this one answered may have been
+                # billed, and the result above prices only the one that answered.
+                settle_failed_attempts(
+                    spend, result, messages, {"model": model or self.config.model, "tools": tools, **asked}
+                )
+            return result
 
     def _call_model(
         self,

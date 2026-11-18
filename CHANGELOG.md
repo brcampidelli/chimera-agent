@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Receipt pricing outside serve.** Receipts use the public OpenRouter price index, model-specific rates apply to exact slugs, strict calls keep the admitted quote, and the gpt-oss-20b catalogue row is refreshed. (#1305)
+
 - **Settings search finds the model table; routing and receipts read right in Portuguese.** The "which model runs each role" table is searchable, its Via column is translated, a new conversation no longer says "Complete", an answer-only turn no longer reports a failed close loop, and "1 step" is singular. (P1-20) (#1300)
 
 ### Changed

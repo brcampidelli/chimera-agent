@@ -200,9 +200,10 @@ class ToolRouter:
         names = {name for name, _ in menu}
         self.stats.calls += 1
         from chimera.orchestration.budget import (
+            quoted_pricing,
             settle_failed_attempts,
+            strict_admission,
             strict_charge_raised,
-            strict_refusal,
         )
 
         prompt = self._prompt(task, messages, menu)
@@ -210,36 +211,37 @@ class ToolRouter:
         # Under a strict ceiling this call asks first, like every step does: it spends from the same
         # budget, and a ceiling only the steps asked could be passed by the router. Refused, the
         # step runs with every tool, exactly as on a failure. Off this answers None.
-        why = strict_refusal(spend, self.backend, prompt, asked)
+        quote, why = strict_admission(spend, self.backend, prompt, asked)
         if why is not None:
             _log.debug("tool router not called: %s", why)
             self.stats.fallbacks += 1
             return None
-        try:
-            from chimera.governance.wire_context import ROUTER, wire_kind
+        with quoted_pricing(quote):
+            try:
+                from chimera.governance.wire_context import ROUTER, wire_kind
 
-            # Not a step: the opt-in wire log records it as the router's call (S30-61).
-            with wire_kind(ROUTER):
-                result = self.backend.complete(prompt, **asked)
-        except Exception as exc:  # an optimisation may not take the run down
-            _log.debug("tool router call failed: %s", exc)
-            # Admitted under a strict ceiling and then raised: it may have been billed (a timeout
-            # after generation), and counting only a fallback left the ledger below the real spend.
-            strict_charge_raised(spend, self.backend, prompt, asked, exc)
-            self.stats.fallbacks += 1
-            return None
-        if usage is not None:
-            usage.add(result)
-        if spend is not None:
-            spend.record_result(result)
-            settle_failed_attempts(spend, result, prompt, asked)
-        # Priced the way every other call in this repository is priced. `CompletionResult` carries
-        # TOKENS, not money — `result.usd` is not a field, so reading it would have made the
-        # router's cost read 0.00 on every row while it really spent, and the arm this experiment
-        # exists to compare would have been the cheap one by construction.
-        from chimera.orchestration.receipts import price_completion
+                # Not a step: the opt-in wire log records it as the router's call (S30-61).
+                with wire_kind(ROUTER):
+                    result = self.backend.complete(prompt, **asked)
+            except Exception as exc:  # an optimisation may not take the run down
+                _log.debug("tool router call failed: %s", exc)
+                # Admitted under a strict ceiling and then raised: it may have been billed (a timeout
+                # after generation), and counting only a fallback left the ledger below the real spend.
+                strict_charge_raised(spend, quote, asked, exc)
+                self.stats.fallbacks += 1
+                return None
+            if usage is not None:
+                usage.add(result)
+            if spend is not None:
+                spend.record_result(result)
+                settle_failed_attempts(spend, result, prompt, asked)
+            # Priced the way every other call in this repository is priced. `CompletionResult` carries
+            # TOKENS, not money — `result.usd` is not a field, so reading it would have made the
+            # router's cost read 0.00 on every row while it really spent, and the arm this experiment
+            # exists to compare would have been the cheap one by construction.
+            from chimera.orchestration.receipts import price_completion
 
-        self.stats.usd += float(price_completion(result).usd or 0.0)
+            self.stats.usd += float(price_completion(result).usd or 0.0)
         word = self._word(str(getattr(result, "content", "") or ""), names)
         if word is None:
             self.stats.fallbacks += 1

@@ -18,9 +18,9 @@ import os
 import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from chimera.config import Settings, get_settings
 from chimera.governance import wire_context
@@ -44,6 +44,9 @@ from chimera.providers.privacy import PRIVACY_FIELDS, openrouter_privacy
 from chimera.providers.prompt_cache import apply_rolling_cache_control
 from chimera.providers.thinking import ThinkFilter, strip_think
 from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:
+    from chimera.orchestration.receipts import CompletionCost
 
 _log = get_logger("providers.gateway")
 
@@ -155,6 +158,10 @@ class CompletionResult(BaseModel):
     """The EXACT cost of this result, when it stands for several calls whose cost was known one by one
     (a cascade's k samples: a sample the local response cache served cost nothing, a long one paid the
     long tier). None for a plain single call, which is priced from its own tokens."""
+    _settled_cost: CompletionCost | None = PrivateAttr(default=None)
+    """Settled token price, separate from an exact reported cost in ``usd``."""
+    _failed_attempt_cost: CompletionCost | None = PrivateAttr(default=None)
+    """Estimated amount already charged for failed attempts before this answer."""
     aggregate: bool = False
     """True when the token counts are a SUM over several calls (a cascade's samples). With no exact
     ``usd`` such a result is of UNKNOWN cost: its totals cannot price it (no prompt length to read a
@@ -716,6 +723,11 @@ class LLMGateway:
         self._warned_effort_unsupported = False
         self._warn_lock = threading.Lock()
         self._export_keys_to_env()
+        # Every entrypoint that runs a turn builds a gateway, not only `serve`; this only STARTS the fetch (never waits): the receipt it prints
+        # is priced from the provider's index only if that index has been fetched into this home.
+        from chimera.providers import listing
+
+        listing.warm_prices_for_turns(self.settings)
 
     @property
     def settings(self) -> Settings:
@@ -1507,8 +1519,15 @@ class LLMGateway:
         (:func:`chimera.orchestration.budget.worst_case_usd`). The key count is the pool's size,
         an upper bound on what :meth:`_key_order` returns, read without advancing the rotator.
         """
+        candidates = self.planned_calls(model, max_tokens)
+        if any(candidate.lower().startswith("openrouter/") for candidate, _ in candidates):
+            # A gateway can outlive its price file. Give a later strict turn a way to retry
+            # after an expired cache or ended backoff without rebuilding the gateway.
+            from chimera.providers import listing
+
+            listing.warm_prices_for_turns(self.settings)
         attempts: list[tuple[str, int | None]] = []
-        for candidate, bound in self.planned_calls(model, max_tokens):
+        for candidate, bound in candidates:
             keys = len(self.settings.credential_pool(candidate.split("/", 1)[0]))
             attempts.extend([(candidate, bound)] * max(1, keys))
         return attempts

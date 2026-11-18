@@ -35,9 +35,7 @@ def fresh_table(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: None)
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (None, None))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: None)
+    monkeypatch.setattr(listing, "known_model", lambda _slug: None)
 
 
 # ------------------------------------------------------------------ 1. the run's exact cost wins
@@ -88,9 +86,9 @@ def test_a_batch_variant_read_from_an_old_index_file_still_pays_a_long_tier(
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: (0.05, 0.25))
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (0.005, 0.0625))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: None)
+    monkeypatch.setattr(listing, "known_model", lambda _slug: listing.Remembered(
+        0.05, 0.25, None, None, None, cache_read_per_m=0.005, cache_write_per_m=0.0625,
+    ))
     price = resolve_price(f"{HAIKU}:batch")
     assert price is not None and price.long_prompt is not None and price.long_prompt_over == 100_000
     assert (price.long_prompt.input_per_m, price.long_prompt.output_per_m) == pytest.approx((0.25, 1.25))
@@ -104,9 +102,9 @@ def test_a_published_tier_still_wins_over_the_scaled_one(monkeypatch: pytest.Mon
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: (0.05, 0.25))
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (None, None))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: (100_000, 0.30, 1.40, None, None))
+    monkeypatch.setattr(listing, "known_model", lambda _slug: listing.Remembered(
+        0.05, 0.25, None, None, None, cache_read_per_m=None, cache_write_per_m=None, long_prompt=(100_000, 0.30, 1.40, None, None),
+    ))
     price = resolve_price(f"{HAIKU}:batch")
     assert price is not None and price.long_prompt is not None
     assert (price.long_prompt.input_per_m, price.long_prompt.output_per_m) == (0.30, 1.40)
@@ -119,9 +117,9 @@ def test_a_model_whose_family_has_no_tier_gets_none_from_the_borrowing(
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: (0.9, 3.0))
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (None, None))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: None)
+    monkeypatch.setattr(listing, "known_model", lambda _slug: listing.Remembered(
+        0.9, 3.0, None, None, None, cache_read_per_m=None, cache_write_per_m=None,
+    ))
     price = resolve_price("openrouter/anthropic/claude-sonnet-5.5:batch")
     assert price is not None and price.long_prompt is None
 

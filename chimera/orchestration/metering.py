@@ -26,6 +26,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any
 
+from chimera.fusion.receipts import admission_prices_active
 from chimera.orchestration.receipts import _as_count, _stages_of, price_completion, price_delegation
 from chimera.telemetry import get_logger
 
@@ -111,21 +112,10 @@ class MeteredBackend:
         # can answer on a different model than the caller named, and pricing the requested one would
         # invent a number for a call that never happened.
         model = str(getattr(result, "model", "") or requested_model or "")
-        usd = (
-            price_delegation(
-                model,
-                prompt,
-                completion,
-                cache_read_tokens=_as_count(getattr(result, "cache_read_tokens", None)),
-                cache_write_tokens=_as_count(getattr(result, "cache_write_tokens", None)),
-                calls=_as_count(getattr(result, "calls", None)),
-                aggregate=getattr(result, "aggregate", False) is True,
-            )
-            if model
-            else None
-        )
         if (
-            _stages_of(result)
+            admission_prices_active()
+            or getattr(result, "_settled_cost", None) is not None
+            or _stages_of(result)
             or isinstance(getattr(result, "usd", None), int | float)
             or getattr(result, "aggregate", False) is True
         ):
@@ -136,6 +126,20 @@ class MeteredBackend:
             # exact cost (an agent run's tally) is read as that cost, never re-priced from its sums.
             cost = price_completion(result)
             usd = None if cost.unpriced is not None else cost.usd
+        else:
+            usd = (
+                price_delegation(
+                    model,
+                    prompt,
+                    completion,
+                    cache_read_tokens=_as_count(getattr(result, "cache_read_tokens", None)),
+                    cache_write_tokens=_as_count(getattr(result, "cache_write_tokens", None)),
+                    calls=_as_count(getattr(result, "calls", None)),
+                    aggregate=getattr(result, "aggregate", False) is True,
+                )
+                if model
+                else None
+            )
         with self._lock:
             self.calls += 1
             self.prompt_tokens += prompt

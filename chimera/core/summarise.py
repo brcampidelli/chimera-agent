@@ -127,9 +127,10 @@ def rule_summariser(
             return to_note(older)
         try:
             from chimera.orchestration.budget import (
+                quoted_pricing,
                 settle_failed_attempts,
+                strict_admission,
                 strict_charge_raised,
-                strict_refusal,
             )
             from chimera.providers.gateway import Message
 
@@ -139,29 +140,30 @@ def rule_summariser(
             # spends from the run's budget between two steps, and a ceiling only the steps asked
             # could be passed by it. Refused, the span gets the structural note, as on a failure.
             # Off this answers None and nothing changes.
-            why = strict_refusal(spend, backend, prompt, asked)
+            quote, why = strict_admission(spend, backend, prompt, asked)
             if why is not None:
                 _log.info("compaction summariser not called: %s", why)
                 return to_note(older)
             from chimera.governance.wire_context import SUMMARY, wire_kind
 
-            try:
-                # Not a step: the opt-in wire log records it as the summariser's call, and the run
-                # claims it in its trace, so it no longer reads as a step the trace lost (S30-61).
-                with wire_kind(SUMMARY):
-                    result = backend.complete(prompt, **asked)
-            except Exception as exc:
-                # Admitted under a strict ceiling and then raised: it may have been billed, so its
-                # worst case is charged before the note below replaces the span. Only the model
-                # call: an error after it was charged by `record_result` and is not charged twice.
-                strict_charge_raised(spend, backend, prompt, asked, exc)
-                raise
-            if usage is not None:
-                usage.add(result)
-            if spend is not None:
-                spend.record_result(result)
-                settle_failed_attempts(spend, result, prompt, asked)
-            answer = result.content
+            with quoted_pricing(quote):
+                try:
+                    # Not a step: the opt-in wire log records it as the summariser's call, and the run
+                    # claims it in its trace, so it no longer reads as a step the trace lost (S30-61).
+                    with wire_kind(SUMMARY):
+                        result = backend.complete(prompt, **asked)
+                except Exception as exc:
+                    # Admitted under a strict ceiling and then raised: it may have been billed, so its
+                    # worst case is charged before the note below replaces the span. Only the model
+                    # call: an error after it was charged by `record_result` and is not charged twice.
+                    strict_charge_raised(spend, quote, asked, exc)
+                    raise
+                if usage is not None:
+                    usage.add(result)
+                if spend is not None:
+                    spend.record_result(result)
+                    settle_failed_attempts(spend, result, prompt, asked)
+                answer = result.content
         except Exception as exc:  # a compaction must not fail on a summariser
             _log.warning("compaction summariser failed, using the structural note: %s", exc)
             return to_note(older)
