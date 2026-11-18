@@ -144,9 +144,12 @@ def _memory_extractor(
     """
     if memory is None or not settings.memory_extract:
         return None
-    from chimera.memory.extract import MemoryExtractor
+    from chimera.memory.extract import MemoryExtractor, extraction_model
 
-    return MemoryExtractor(memory, usage_home=Path(settings.home), usage_id=usage_id)
+    return MemoryExtractor(
+        memory, model=lambda: extraction_model(settings), usage_home=Path(settings.home),
+        usage_id=usage_id, prefilter=settings.memory_extract_prefilter,
+    )
 
 
 @memory_app.command("add")

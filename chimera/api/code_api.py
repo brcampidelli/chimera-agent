@@ -3032,10 +3032,11 @@ def _extract_after_turn(
     if not getattr(settings, "memory_extract", False) or memory is None or not answer.strip():
         return
     try:
-        from chimera.memory.extract import MemoryExtractor
+        from chimera.memory.extract import MemoryExtractor, extraction_model
 
         MemoryExtractor(
-            memory, usage_home=Path(settings.home), usage_id=session_id
+            memory, model=extraction_model(settings), usage_home=Path(settings.home),
+            usage_id=session_id, prefilter=bool(getattr(settings, "memory_extract_prefilter", False)),
         ).after_turn(message, answer, tainted=tainted)
     except Exception as exc:  # the turn is over and paid for; memory is extra
         _log.warning("memory extraction setup failed: %s", type(exc).__name__)

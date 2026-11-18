@@ -253,6 +253,9 @@ def _model_roles(settings: Settings) -> list[tuple[str, str]]:
         ("voice_work", _own_slug(table.route("voice_work"))),
         ("review", table.route("review").slug),
     ]
+    if settings.memory_extract:
+        # After every turn, the user's words and the answer's opening go to this model (P1-02).
+        roles.append(("memory_extract", table.route("memory_extract").slug))
     if settings.semantic_memory:
         roles.append(("embeddings", table.route("embed").slug))
     return roles

@@ -1,0 +1,7 @@
+pre-filter, offline (worth_a_call False = no model call):
+  LOSES s16 (1 expected): 'Corro meia maratona todo ano e treino às 6 da manhã. Que café da manhã'
+  LOSES H13 (1 expected): 'Allergic to shellfish, so no paella. Dinner ideas for tonight?'
+  LOSES H14 (1 expected): 'Alérgica a dipirona, então nada disso. Qual analgésico posso tomar?'
+  orig  expected facts lost 1 of 18 (x2 replicas = 2 of 36); turns that save nothing and are dropped (calls saved): 12 of 31
+  long  expected facts lost 0 of 6 (x2 replicas = 0 of 12); turns that save nothing and are dropped (calls saved): 4 of 6
+  held  expected facts lost 2 of 14 (x2 replicas = 4 of 28); turns that save nothing and are dropped (calls saved): 0 of 0

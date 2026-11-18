@@ -169,7 +169,7 @@ class RoleSpec:
     id: str
     how: str
     """Which resolver reads it: ``tier`` ``default`` ``inherit`` ``field`` ``review`` ``fusion``
-    ``verified`` ``decisions`` ``list`` ``escalation``."""
+    ``verified`` ``decisions`` ``memory_extract`` ``list`` ``escalation``."""
     field: str = ""
     kind: Kind = "chat"
     inherits: str = ""
@@ -199,6 +199,7 @@ ROLES: tuple[RoleSpec, ...] = (
     RoleSpec("design", "inherit", inherits="default"),
     RoleSpec("verify_escalation", "verified", "verified_answers_escalate_model"),
     RoleSpec("decisions", "decisions", "decision_model"),
+    RoleSpec("memory_extract", "memory_extract", "memory_extract_model"),
     # Fusion.
     RoleSpec("fusion.panel", "fusion", "fusion_panel", kind="list"),
     RoleSpec("fusion.judge", "fusion", "fusion_judge"),
@@ -643,6 +644,22 @@ def _field_route(settings: Settings, spec: RoleSpec, default: Route) -> Route:
     return _route(spec.id, "", "default", f"{spec.field} is empty", kind=spec.kind)
 
 
+def memory_extract_pin(settings: Settings) -> str:
+    """Read the explicit extraction pin without resolving the routing table."""
+    value = str(getattr(settings, "memory_extract_model", "") or "").strip()
+    return "" if value == "default" else value
+
+
+def _memory_extract_route(settings: Settings, spec: RoleSpec, default: Route) -> Route:
+    """After-turn extraction uses the global default unless the owner pins its own slug."""
+    if value := memory_extract_pin(settings):
+        return _route(spec.id, value, _origin_of(settings, spec.field), spec.field)
+    return Route(
+        spec.id, default.model, default.effort, _origin_of(settings, spec.field),
+        default.effort_origin, "no model of its own: uses the global default model", inherits="default",
+    )
+
+
 def _inherit_route(spec: RoleSpec, routes: Mapping[str, Route]) -> Route:
     parent = routes[spec.inherits]
     return Route(
@@ -817,6 +834,8 @@ def build_routing_table(settings: Settings) -> RoutingTable:
             routes[spec.id] = _summary(spec.id, members, origin, spec.field)
         elif spec.how == "decisions":
             routes[spec.id] = _guarded(settings, spec, _decisions_route)
+        elif spec.how == "memory_extract":
+            routes[spec.id] = _memory_extract_route(settings, spec, routes["default"])
         elif spec.how == "verified":
             routes[spec.id] = _guarded(settings, spec, _verified_route)
         elif spec.how == "review":

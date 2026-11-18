@@ -65,3 +65,21 @@ def test_a_typed_setting_and_a_role_effort_keep_their_category() -> None:
     assert rows["default"]["via_kind"] == "setting"
     assert "effort from" in rows["fusion.judge"]["via"]
     assert rows["fusion.judge"]["via_kind"] != "other"
+
+
+@pytest.mark.parametrize(
+    ("pin", "kind", "model", "inherits"),
+    [
+        ("", "follows", "ollama_chat/qwen3", "default"),
+        ("default", "follows", "ollama_chat/qwen3", "default"),
+        ("openrouter/example/pick-1", "setting", "openrouter/example/pick-1", ""),
+    ],
+)
+def test_memory_extraction_describes_global_inheritance_and_explicit_pins(
+    pin: str, kind: str, model: str, inherits: str,
+) -> None:
+    settings = _settings(
+        CHIMERA_DEFAULT_MODEL="ollama_chat/qwen3", CHIMERA_MEMORY_EXTRACT_MODEL=pin,
+    )
+    row = next(r for r in settings.routing_table().describe() if r["role"] == "memory_extract")
+    assert (row["via_kind"], row["model"], row["inherits"]) == (kind, model, inherits)

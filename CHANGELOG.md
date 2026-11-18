@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Memory extraction measurement and opt-in controls.** The P1-02 control did not meet its 31/31-save requirement, and the registered benchmark is inconclusive for adoption. The 6,000-character cap and global extraction model remain the defaults. An explicit extraction-model pin and deterministic pre-filter are opt-in. (P1-02) (#1303)
+
 - **Planner switch on every autonomous entrance.** `use_planner` is now settable on Kanban lanes, `/api/runs` and workflow solve steps; the default stays on because the registered A/B did not clear the -5 pp margin on both model families. (P1-01) (#1301)
 
 - **Cron model tiers, measured.** A paired bench on 8 synthetic jobs found the cheap tier fully correct on 7 of them in 3 of 3 seeds, at only ~17% lower cost per job; it changes no default and does not cover the 21 production jobs. (P1-03) (#1299)
