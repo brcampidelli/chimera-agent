@@ -18,14 +18,11 @@ what this corpus can say about real conversations (PREREGISTRATION.md §7).
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
+from bench.edit_tools.tasks import TASKS as _EDIT_TASKS
+
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent / "edit_tools"))
-
-from tasks import TASKS as _EDIT_TASKS  # noqa: E402
-
 FIXTURE = HERE / "read_fixture"
 
 #: Each `must` is a list of regexes ALL of which have to match the final answer (case-insensitive).

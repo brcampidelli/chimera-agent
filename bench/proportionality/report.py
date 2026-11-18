@@ -41,14 +41,19 @@ def cluster_mean_ci(per_item: dict[str, list[float]]) -> tuple[float, float, flo
 
 def main(path: str) -> int:
     rows = [json.loads(x) for x in Path(path).read_text(encoding="utf-8").splitlines() if x.strip()]
-    spent = sum(r["usd"] for r in rows)
-    print(f"runs {len(rows)}  spend US$ {spent:.4f}  errors {sum(1 for r in rows if r['error'])}")
+    known = [r["usd"] for r in rows if isinstance(r.get("usd"), (int, float))]
+    spent = sum(known)
+    spend_text = f"US$ {spent:.4f}" if len(known) == len(rows) else f"at least US$ {spent:.4f} (unknown costs)"
+    print(f"runs {len(rows)}  spend {spend_text}  errors {sum(1 for r in rows if r['error'])}")
     verdict: dict[str, bool] = {}
 
     read = _pairs(rows, "read")
     n_read = sum(len(v) for v in read.values())
     print(f"\nREAD  pairs {n_read} (need >= 24)")
     for key, label in (("steps", "P1 steps"), ("completion_tokens", "P2 output tokens")):
+        if not n_read:
+            print(f"  {label}: inconclusive (no valid pairs)")
+            continue
         deltas = {i: [on[key] - off[key] for off, on in v] for i, v in read.items()}
         mean, lo, hi = cluster_mean_ci(deltas)
         off_mean = statistics.fmean([off[key] for v in read.values() for off, _ in v])
@@ -56,10 +61,11 @@ def main(path: str) -> int:
         ok = mean < 0 and hi < 0 and rel <= -0.10
         verdict[label] = ok
         print(f"  {label:18} OFF mean {off_mean:8.2f}  delta {mean:+8.2f} ({rel:+.1%})  CI95 [{lo:+.2f}, {hi:+.2f}]  -> {'MEETS' if ok else 'does not meet'}")
-    c_off = statistics.fmean([off["ok"] for v in read.values() for off, _ in v])
-    c_on = statistics.fmean([on["ok"] for v in read.values() for _, on in v])
-    verdict["G1"] = c_on >= c_off - 0.05
-    print(f"  G1 correct   OFF {c_off:.1%}  ON {c_on:.1%}  diff {100*(c_on-c_off):+.1f} pp  -> {'holds' if verdict['G1'] else 'FAILS'}")
+    if n_read:
+        c_off = statistics.fmean([off["ok"] for v in read.values() for off, _ in v])
+        c_on = statistics.fmean([on["ok"] for v in read.values() for _, on in v])
+        verdict["G1"] = c_on >= c_off - 0.05
+        print(f"  G1 correct   OFF {c_off:.1%}  ON {c_on:.1%}  diff {100*(c_on-c_off):+.1f} pp  -> {'holds' if verdict['G1'] else 'FAILS'}")
 
     edit = _pairs(rows, "edit")
     n_edit = sum(len(v) for v in edit.values())
@@ -67,7 +73,7 @@ def main(path: str) -> int:
     e_on = statistics.fmean([on["ok"] for v in edit.values() for _, on in v]) if n_edit else 0.0
     per_item = {i: [float(on["ok"]) - float(off["ok"]) for off, on in v] for i, v in edit.items()}
     mean, lo, hi = cluster_mean_ci(per_item) if n_edit else (0.0, 0.0, 0.0)
-    verdict["G2"] = e_on >= e_off - 0.05
+    verdict["G2"] = bool(n_edit) and e_on >= e_off - 0.05
     from chimera.eval.proportions import tost_mean
 
     tost = tost_mean([statistics.fmean(v) for v in per_item.values() if v], 0.05) if n_edit else None
@@ -75,29 +81,34 @@ def main(path: str) -> int:
     disc_off = sum(1 for v in edit.values() for off, on in v if off["ok"] and not on["ok"])
     print(f"\nEDIT  pairs {n_edit} (need >= 22)")
     print(f"  G2 pass      OFF {e_off:.1%}  ON {e_on:.1%}  diff {100*(e_on-e_off):+.1f} pp  CI95(t, over items) [{100*lo:+.1f}, {100*hi:+.1f}] pp  "
-          f"discordant ON-only {disc_on} / OFF-only {disc_off}  -> {'holds' if verdict['G2'] else 'FAILS'}")
+          f"discordant ON-only {disc_on} / OFF-only {disc_off}  -> {'holds' if verdict['G2'] else ('FAILS' if n_edit else 'inconclusive (no valid pairs)')}")
     if tost is not None:
         print(f"  TOST non-inferiority at -5 pp (reported, not decisive; §12): 90% interval "
               f"[{100*tost.low:+.1f}, {100*tost.high:+.1f}] pp -> non_inferior={tost.non_inferior}")
-    for key in ("steps", "completion_tokens"):
-        print(f"  secondary {key}: OFF {statistics.fmean([off[key] for v in edit.values() for off, _ in v]):.1f}  "
-              f"ON {statistics.fmean([on[key] for v in edit.values() for _, on in v]):.1f}")
-    print(f"  ON runs that changed no file: {sum(1 for v in edit.values() for _, on in v if on['files_changed'] == 0)} "
-          f"(OFF: {sum(1 for v in edit.values() for off, _ in v if off['files_changed'] == 0)})")
+    if n_edit:
+        for key in ("steps", "completion_tokens"):
+            print(f"  secondary {key}: OFF {statistics.fmean([off[key] for v in edit.values() for off, _ in v]):.1f}  "
+                  f"ON {statistics.fmean([on[key] for v in edit.values() for _, on in v]):.1f}")
+        print(f"  ON runs that changed no file: {sum(1 for v in edit.values() for _, on in v if on['files_changed'] == 0)} "
+              f"(OFF: {sum(1 for v in edit.values() for off, _ in v if off['files_changed'] == 0)})")
 
     control = _pairs(rows, "control")
     print("\nCONTROL")
-    g3 = True
+    from bench.proportionality import corpus
+
+    required_controls = {item["id"] for item in corpus.CONTROL}
+    controls_complete = all(control.get(item) for item in required_controls)
+    g3 = controls_complete
     for item, v in sorted(control.items()):
         off_n, on_n = sum(1 for off, _ in v if off["ok"]), sum(1 for _, on in v if on["ok"])
         g3 &= on_n >= off_n
         print(f"  {item:14} OFF {off_n}/{len(v)}  ON {on_n}/{len(v)}")
     verdict["G3"] = g3
-    print(f"  G3 -> {'holds' if g3 else 'FAILS'}")
+    print(f"  G3 -> {'holds' if g3 else ('FAILS' if controls_complete else 'inconclusive (missing controls)')}")
 
-    enough = n_read >= 24 and n_edit >= 22
+    enough = n_read >= 24 and n_edit >= 22 and controls_complete
     adopt = enough and all(verdict.values())
-    print(f"\nDECISION: {'ADOPT' if adopt else ('INCONCLUSIVE (too few pairs)' if not enough else 'NOT ADOPTED')}  {verdict}")
+    print(f"\nDECISION: {'ADOPT' if adopt else ('INCONCLUSIVE (too few pairs or missing controls)' if not enough else 'NOT ADOPTED')}  {verdict}")
     return 0
 
 

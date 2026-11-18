@@ -50,3 +50,20 @@ decision and all thresholds are unchanged. Run on the first version of `report.p
 
 `PROPORTIONALITY_BLOCK` stays in `chimera/core/agent.py`, **off** (`CHIMERA_PROPORTIONALITY`), with this number in
 its docstring and in the registry (`loop.proportionality`, status `null`, "measured on deepseek-chat-v3.1").
+
+## Collection deviations disclosed after review
+
+The historical runner reused one `CHIMERA_HOME` across arms and replicas, with cached settings;
+therefore runs were not isolated as §4 required and carry a possible shared-state confound. The
+first-four-pair cost projection and an agent-level remaining budget were not enforced. The reported
+US$ 1.12 is the recorded tally, not proof that those limits were enforced. Edit tests were executed
+on the host against generated code; the later isolated grader was not used for this dataset. These
+limitations qualify all historical comparisons. Raw rows remain unchanged; the observed decision
+remains NOT ADOPTED and the flag remains off.
+
+For future collection, prepare a local Docker image named `chimera-proportionality-pytest:local`
+with Python and pytest already installed. The runner checks it offline before any paid call, uses
+no network or host fallback for grading, and mounts only a disposable fixture copy. A per-run
+`max_usd` uses the remaining absolute ceiling and strict spend mode reserves each call before it starts.
+Pair admission uses the registered $4.50 stop plus an estimated reserve for the second arm; the
+forecast cannot guarantee a pair completes if its actual cost differs from the pilot. Any failure or unknown cost stops collection.
