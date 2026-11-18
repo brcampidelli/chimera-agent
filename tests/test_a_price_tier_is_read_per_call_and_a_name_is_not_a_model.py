@@ -46,8 +46,7 @@ def fresh_table(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: None)
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (None, None))
+    monkeypatch.setattr(listing, "known_model", lambda _slug: None)
 
 
 # --------------------------------------------------------------------- a run of three calls

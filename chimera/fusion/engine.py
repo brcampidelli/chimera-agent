@@ -28,12 +28,15 @@ from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from chimera.config import get_settings
 from chimera.core.redact import redact
 from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:
+    from chimera.orchestration.receipts import CompletionCost
 
 _log = get_logger("fusion.engine")
 
@@ -95,6 +98,7 @@ class PanelResponse:
 
     ``error`` is redacted text for the trace. A spend ceiling or a missing key turned into text and
     then into :class:`FusionFailed` would no longer match the caller's ``except SpendExceeded``."""
+    cost: CompletionCost | None = field(default=None, repr=False, compare=False)
 
     def answered(self) -> bool:
         """True when this panelist produced an answer that can be compared with another one.
@@ -122,12 +126,15 @@ class StageUsage:
     # at its own rate. Without them every stage billed its whole prompt at the input rate.
     cache_read_tokens: int | None = None
     cache_write_tokens: int | None = None
+    cost: CompletionCost | None = None
 
 
 def _stage_usage(stage: Literal["judge", "synth"], result: CompletionResult) -> StageUsage:
+    from chimera.orchestration.receipts import recorded_completion_cost
+
     return StageUsage(
         stage, result.model, result.prompt_tokens, result.completion_tokens,
-        result.cache_read_tokens, result.cache_write_tokens,
+        result.cache_read_tokens, result.cache_write_tokens, recorded_completion_cost(result, include_failed=True),
     )
 
 
@@ -703,7 +710,28 @@ class FusionEngine:
             messages, model=model, temperature=temperature,
             max_tokens=budget * 2 if first == "length" else budget,
         )
-        return again.model_copy(update={"route_meta": {**(again.route_meta or {}), "retried_after": first or "none reported"}})
+        from chimera.orchestration.receipts import (
+            combine_completion_costs,
+            receipt_completion_cost,
+            recorded_completion_cost,
+        )
+
+        retried = again.model_copy(update={
+            "route_meta": {**(again.route_meta or {}), "retried_after": first or "none reported"},
+        })
+        if recorded_completion_cost(result) is not None or recorded_completion_cost(again) is not None:
+            # Each try was settled separately. Preserve both amounts without overwriting a
+            # provider-reported cost on either source result.
+            retried.usd = None
+            retried._settled_cost = combine_completion_costs(
+                (receipt_completion_cost(result), receipt_completion_cost(again))
+            )
+            retried._failed_attempt_cost = None  # Both attempts' reserves are in the combined amount.
+            retried.prompt_tokens = _sum_opt((result.prompt_tokens, again.prompt_tokens))
+            retried.completion_tokens = _sum_opt((result.completion_tokens, again.completion_tokens))
+            retried.cache_read_tokens = _sum_opt((result.cache_read_tokens, again.cache_read_tokens))
+            retried.cache_write_tokens = _sum_opt((result.cache_write_tokens, again.cache_write_tokens))
+        return retried
 
     def _run_selective(self, messages: list[MessageLike]) -> FusionTrace:
         """Probe a few models first; short-circuit on agreement, else escalate to full.
@@ -823,13 +851,26 @@ class FusionEngine:
                 for u in trace.usage
             ],
         }
-        return CompletionResult(
+        result = CompletionResult(
             content=trace.final,
             model="fusion",
             prompt_tokens=trace.prompt_tokens(),
             completion_tokens=trace.completion_tokens(),
             route_meta=route_meta,
         )
+        if any(usage.cost is not None for usage in trace.usage):
+            from chimera.fusion.receipts import price_stage
+            from chimera.orchestration.receipts import CompletionCost, combine_completion_costs
+
+            costs = []
+            for usage in trace.usage:
+                if usage.cost is not None:
+                    costs.append(usage.cost)
+                else:
+                    usd = price_stage(usage).usd
+                    costs.append(CompletionCost(usd or 0.0, usage.model if usd is None else None))
+            result._settled_cost = combine_completion_costs(costs)
+        return result
 
     # -- stages ------------------------------------------------------------
     def _run_panel(
@@ -839,6 +880,8 @@ class FusionEngine:
         messages = _without_tools(messages)
 
         def call(model: str) -> PanelResponse:
+            from chimera.orchestration.receipts import recorded_completion_cost
+
             try:
                 result = self.backend.complete(
                     messages, model=model, temperature=self.config.temperature_for(model)
@@ -851,6 +894,7 @@ class FusionEngine:
                     finish_reason=str(getattr(result, "finish_reason", "") or ""),
                     cache_read_tokens=result.cache_read_tokens,
                     cache_write_tokens=result.cache_write_tokens,
+                    cost=recorded_completion_cost(result, include_failed=True),
                 )
             except Exception as exc:  # one model failing must not sink the panel
                 _log.warning("panel model %s failed: %s", model, exc)
@@ -953,7 +997,7 @@ class FusionEngine:
         usage: list[StageUsage] = [
             StageUsage(
                 "panel", r.model, r.prompt_tokens, r.completion_tokens,
-                r.cache_read_tokens, r.cache_write_tokens,
+                r.cache_read_tokens, r.cache_write_tokens, r.cost,
             )
             for r in panel
             if r.error is None

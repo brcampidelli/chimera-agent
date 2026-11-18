@@ -16,7 +16,7 @@ def test_qwen_coder_cached_prompt_uses_the_published_read_price(
 ) -> None:
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
     monkeypatch.setattr(receipts, "_PRICES", [])
-    monkeypatch.setattr(listing, "known_price", lambda model: None)
+    monkeypatch.setattr(listing, "known_model", lambda model: None)
     register_catalog_prices()
 
     price = receipts.resolve_price("openrouter/qwen/qwen3-coder")
@@ -50,7 +50,7 @@ def test_catalog_models_with_published_cache_read_rates_reach_receipts(
 ) -> None:
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
     monkeypatch.setattr(receipts, "_PRICES", [])
-    monkeypatch.setattr(listing, "known_price", lambda model: None)
+    monkeypatch.setattr(listing, "known_model", lambda model: None)
     register_catalog_prices()
 
     price = receipts.resolve_price(slug)

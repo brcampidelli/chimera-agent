@@ -42,7 +42,7 @@ def sem_indice(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
     Two separate pieces of isolation, both load-bearing:
 
-    `known_price` is stubbed out because it reads `model-prices.json` from the home directory, and a
+    `known_model` is stubbed out because it reads `model-prices.json` from the home directory, and a
     machine whose cache happens to be warm would make this test measure the developer's disk rather
     than the code.
 
@@ -51,7 +51,7 @@ def sem_indice(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     the leak would be invisible when this file runs alone, which is the worst kind: green here, red
     in the full suite, in a file nobody changed.
     """
-    monkeypatch.setattr("chimera.providers.listing.known_price", lambda slug: None)
+    monkeypatch.setattr("chimera.providers.listing.known_model", lambda slug: None)
     original = list(receipts._PRICES)
     registrado = receipts._catalog_registered
     yield

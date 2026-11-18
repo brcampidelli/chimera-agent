@@ -506,7 +506,7 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
     # missing price is exactly the state this improves on, never a reason not to start.
     from chimera.providers import listing
 
-    listing.start_price_warmup(settings)
+    listing.warm_prices_for_turns(settings, force=True)
 
     llm = LLMGateway()
     from chimera.fusion import RoutedBackend

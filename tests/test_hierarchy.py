@@ -263,9 +263,11 @@ def test_unverified_envelope_is_dropped_not_synthesized(tmp_path: Path) -> None:
     assert result.envelopes == []
     assert result.fell_back is True
     assert result.answer == "single-agent answer"
-    # The rejected worker attempts AND the fallback are all audited.
+    # Rejected worker attempts, the decomposition and the fallback are all audited once.
     persisted = load_delegations(tmp_path / "delegations.jsonl")
-    assert [r.tier for r in persisted] == ["mid", "mid", "top"]
+    assert persisted == result.receipts
+    assert [r.tier for r in persisted] == ["mid", "mid", "top", "top"]
+    assert persisted[2].task_id == "decompose"
 
 
 def test_trivial_subtask_runs_inline_skipping_worker(tmp_path: Path) -> None:

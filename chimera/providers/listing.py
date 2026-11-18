@@ -30,12 +30,15 @@ price does not support, and it is the number a spend ceiling would divide by.
 from __future__ import annotations
 
 import json
+import os
+import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
+from chimera.core.filelock import atomic_write_text
 from chimera.deployment_policy import DeploymentPolicy, load_policy, provider_of
 from chimera.telemetry import get_logger
 
@@ -415,6 +418,10 @@ def _ollama_options(base_url: str) -> list[ModelOption]:
     ]
 
 
+def _provider_allowed(policy: DeploymentPolicy, provider: str) -> bool:
+    return not policy.denied("provider.use", provider)
+
+
 def available_models(
     settings: Any,
     *,
@@ -444,7 +451,7 @@ def available_models(
     named = (provider or "").strip().lower()
     # Lowercased like `named`, so the curated filter compares one spelling with one spelling.
     configured = [named] if named else [p.lower() for p in settings.configured_providers()]
-    providers = [p for p in configured if not policy.denied("provider.use", p)]
+    providers = [p for p in configured if _provider_allowed(policy, p)]
     if named and not providers:
         # The wizard asked what a denied provider's key buys: nothing on this install.
         return ModelListing(models=(), sources=(), reason="no_provider")
@@ -573,9 +580,18 @@ class Remembered:
     long_prompt: tuple[int, float, float, float | None, float | None] | None = None
 
 
-# (path, mtime, table). Keyed by path and mtime so a test that repoints CHIMERA_HOME, or a fetch that
-# rewrites the file, is picked up without a process restart.
-_index_cache: tuple[Path, float, dict[str, Remembered]] | None = None
+# Cache the file identity as well as its timestamps. Consecutive atomic replacements can have
+# the same mtime (even in nanoseconds) on a filesystem whose clock has coarser resolution.
+_index_cache: tuple[Path, os.stat_result, dict[str, Remembered]] | None = None
+
+
+def _same_price_index(left: os.stat_result, right: os.stat_result) -> bool:
+    return (
+        os.path.samestat(left, right)
+        and left.st_mtime_ns == right.st_mtime_ns
+        and left.st_ctime_ns == right.st_ctime_ns
+        and left.st_size == right.st_size
+    )
 
 
 def _price_cache_path() -> Path:
@@ -584,8 +600,8 @@ def _price_cache_path() -> Path:
     return Path(get_settings().home) / PRICE_CACHE_NAME
 
 
-def remember_models(models: Sequence[ModelOption], *, home: Path | None = None) -> None:
-    """Persist what a freshly fetched listing knows about each model. Never raises.
+def remember_models(models: Sequence[ModelOption], *, home: Path | None = None) -> bool:
+    """Persist what a freshly fetched listing knows about each model. Return whether it reached disk.
 
     ``home`` is the data folder to write into; None reads the current settings. A caller that was
     handed its settings — the warm-up thread — passes their folder, because by the time a thread
@@ -616,62 +632,74 @@ def remember_models(models: Sequence[ModelOption], *, home: Path | None = None) 
         for m in models
     }
     if not kept:
-        return
+        return False
     path = Path(home) / PRICE_CACHE_NAME if home is not None else _price_cache_path()
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
         # `fetched_at` is stored for a human reading the file, not consulted: a price from last month
         # is a better estimate than no price, and expiring it would put "unknown" back on screen for
         # anyone who has been offline for a while.
         payload = {"fetched_at": _now_iso(), "models": kept}
-        path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    except Exception as exc:  # a read-only home must not break a turn
+        atomic_write_text(path, json.dumps(payload, indent=2, sort_keys=True))
+    except OSError as exc:  # a read-only home must not break a turn
         _log.debug("could not write the model cache at %s: %s", path, exc)
+        return False
+    return True
 
 
-def _remembered(slug: str) -> Remembered | None:
-    """What the last fetch knew about this EXACT slug, or None.
+def _load_price_index(path: Path) -> tuple[float, dict[str, Remembered]] | None:
+    """Read one version of the index or None when the cache is missing.
 
-    Reads the file at most once per (path, mtime) — this is called inside the loop that prices a
-    turn, so it must not touch the disk on every call, and it must never do I/O over the network.
+    Reuses the parsed table while the file is unchanged. This runs in the loop that prices a turn
+    and must never fetch over the network.
 
     Reads the OLD shape too (`{"prices": {slug: [in, out]}}`), because an install that upgraded from
     0.48.0rc2 has one on disk and deleting its prices to gain capabilities would be a downgrade.
     """
     global _index_cache
-    path = _price_cache_path()
     try:
-        mtime = path.stat().st_mtime
+        current = path.stat()
     except OSError:
         return None  # no cache yet: the caller falls back to its own table, as it always did
 
-    if _index_cache is None or _index_cache[0] != path or _index_cache[1] != mtime:
-        table: dict[str, Remembered] = {}
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-            for key, value in (raw.get("models") or {}).items():
-                if isinstance(value, dict):
-                    table[str(key)] = Remembered(
-                        _as_price(value.get("in")),
-                        _as_price(value.get("out")),
-                        value.get("vision") if isinstance(value.get("vision"), bool) else None,
-                        value.get("tools") if isinstance(value.get("tools"), bool) else None,
-                        value.get("context_k") if isinstance(value.get("context_k"), int) else None,
-                        _as_price(value.get("cache_read")),
-                        _as_price(value.get("cache_write")),
-                        _as_long_prompt(value.get("long_prompt")),
-                    )
-            for key, value in (raw.get("prices") or {}).items():  # the 0.48.0rc2 shape
-                if isinstance(value, list) and len(value) == 2 and str(key) not in table:
-                    table[str(key)] = Remembered(
-                        _as_price(value[0]), _as_price(value[1]), None, None, None
-                    )
-        except Exception as exc:  # a truncated cache is a missing cache
-            _log.debug("could not read the model cache at %s: %s", path, exc)
-            table = {}
-        _index_cache = (path, mtime, table)
+    cached = _index_cache
+    if cached is not None and cached[0] == path and _same_price_index(cached[1], current):
+        return current.st_mtime, cached[2]
+    table: dict[str, Remembered] = {}
+    try:
+        with path.open(encoding="utf-8") as handle:
+            # A replace between stat and open must not cache the new bytes under the old identity.
+            current = os.fstat(handle.fileno())
+            raw = json.load(handle)
+        for key, value in (raw.get("models") or {}).items():
+            if isinstance(value, dict):
+                table[str(key)] = Remembered(
+                    _as_price(value.get("in")),
+                    _as_price(value.get("out")),
+                    value.get("vision") if isinstance(value.get("vision"), bool) else None,
+                    value.get("tools") if isinstance(value.get("tools"), bool) else None,
+                    value.get("context_k") if isinstance(value.get("context_k"), int) else None,
+                    _as_price(value.get("cache_read")),
+                    _as_price(value.get("cache_write")),
+                    _as_long_prompt(value.get("long_prompt")),
+                )
+        for key, value in (raw.get("prices") or {}).items():  # the 0.48.0rc2 shape
+            if isinstance(value, list) and len(value) == 2 and str(key) not in table:
+                table[str(key)] = Remembered(
+                    _as_price(value[0]), _as_price(value[1]), None, None, None
+                )
+    except FileNotFoundError:
+        return None
+    except Exception as exc:  # a truncated cache is a missing cache
+        _log.debug("could not read the model cache at %s: %s", path, exc)
+        table = {}
+    _index_cache = (path, current, table)
+    return current.st_mtime, table
 
-    return _index_cache[2].get(slug)
+
+def known_model(slug: str) -> Remembered | None:
+    """One immutable row from the last index, including prices and capabilities."""
+    index = _load_price_index(_price_cache_path())
+    return None if index is None else index[1].get(slug)
 
 
 def _as_price(value: Any) -> float | None:
@@ -689,7 +717,7 @@ def _as_long_prompt(value: Any) -> tuple[int, float, float, float | None, float 
 
 def known_price(slug: str) -> tuple[float, float] | None:
     """USD per 1M (input, output) for this EXACT slug, or None when we have never seen it priced."""
-    found = _remembered(slug)
+    found = known_model(slug)
     if found is None or found.input_per_m is None or found.output_per_m is None:
         return None
     return (found.input_per_m, found.output_per_m)
@@ -698,7 +726,7 @@ def known_price(slug: str) -> tuple[float, float] | None:
 def known_long_prompt(slug: str) -> tuple[int, float, float, float | None, float | None] | None:
     """``(over_tokens, input, output, cache_read, cache_write)`` of this EXACT slug's long-prompt tier
     as the index published it, or None (no tier published, or the slug was never seen)."""
-    found = _remembered(slug)
+    found = known_model(slug)
     return None if found is None else found.long_prompt
 
 
@@ -708,7 +736,7 @@ def known_cache_price(slug: str) -> tuple[float | None, float | None]:
     Separate from :func:`known_price` rather than widening its tuple: a model can be priced with no
     cache rate at all, and that must stay "priced, cache rate unknown", not "unpriced".
     """
-    found = _remembered(slug)
+    found = known_model(slug)
     if found is None:
         return (None, None)
     return (found.cache_read_per_m, found.cache_write_per_m)
@@ -721,14 +749,14 @@ def known_window(slug: str) -> int | None:
     holds nineteen models and the index the app already downloads holds four hundred and
     thirty-one. A slug was 'unknown' only because nothing wrote its window down.
     """
-    found = _remembered(slug)
+    found = known_model(slug)
     if found is None or not found.context_k:
         return None
     return int(found.context_k) * 1000
 
 def known_tools(slug: str) -> bool | None:
     """Whether the last OpenRouter listing says this model supports tool calls."""
-    found = _remembered(slug.removeprefix("openrouter/"))
+    found = known_model(slug.removeprefix("openrouter/"))
     return found.tools if found is not None else None
 
 
@@ -744,7 +772,7 @@ def known_vision(slug: str) -> bool | None:
     Exact slugs only, and only what the provider published. A model we have never fetched returns
     None and the caller falls back to whatever it did before.
     """
-    found = _remembered(slug)
+    found = known_model(slug)
     return found.vision if found is not None else None
 
 
@@ -754,15 +782,126 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def start_price_warmup(settings: Any) -> None:
-    """Run `warm_price_cache` once per boot on a named daemon thread.
+def start_price_warmup(settings: Any) -> threading.Thread | None:
+    """Run `warm_price_cache` on a named daemon thread; return the started thread.
 
     A seam the test suite replaces (tests/conftest.py): left live, the thread outlives the command
     that started it and its request lands on whichever test runs next.
     """
-    import threading
+    thread = threading.Thread(
+        target=warm_price_cache, args=(settings,), name="price-warmup", daemon=True
+    )
+    thread.start()
+    return thread
 
-    threading.Thread(target=warm_price_cache, args=(settings,), name="price-warmup", daemon=True).start()
+
+# Launch and publication share the same lock; a second gateway must see the thread that won.
+_warm_lock = threading.Lock()
+_warm_state: dict[Path, threading.Thread] = {}
+# Used only if the home cannot record its persistent backoff.
+_retry_in_process: dict[Path, float] = {}
+
+#: A cache older than this is refreshed. Prices on the index flip route by route, and a command that
+#: never opens the model menu would otherwise price every receipt from a file written weeks ago.
+PRICE_CACHE_MAX_AGE_S = 24 * 3600
+
+#: After a failed fetch nothing asks again for this long — persisted in the home, so an offline
+#: machine does not pay a request (or a thread) for every process it starts.
+PRICE_RETRY_AFTER_S = 3600
+PRICE_BACKOFF_NAME = "model-prices.retry-after"
+
+
+def _backoff_active(home: Path) -> bool:
+    if _retry_in_process.get(home, 0.0) > time.monotonic():
+        return True
+    _retry_in_process.pop(home, None)
+    try:
+        return time.time() - (home / PRICE_BACKOFF_NAME).stat().st_mtime < PRICE_RETRY_AFTER_S
+    except OSError:
+        return False
+
+
+def _set_backoff(home: Path, failed: bool) -> None:
+    path = home / PRICE_BACKOFF_NAME
+    try:
+        if failed:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(_now_iso(), encoding="utf-8")
+        else:
+            path.unlink(missing_ok=True)
+    except OSError as exc:
+        _log.debug("could not record the price backoff at %s: %s", path, exc)
+        if failed:
+            with _warm_lock:
+                _retry_in_process[home] = time.monotonic() + PRICE_RETRY_AFTER_S
+        return
+    with _warm_lock:
+        _retry_in_process.pop(home, None)
+
+
+def _openrouter_warmup_allowed(settings: Any) -> bool:
+    return (
+        "openrouter" in settings.configured_providers()
+        and _provider_allowed(load_policy(settings), "openrouter")
+    )
+
+
+def _warmup_running(home: Path) -> bool:
+    thread = _warm_state.get(home)
+    return thread is not None and thread.is_alive()
+
+
+def _fresh_price_index(home: Path) -> dict[str, Remembered]:
+    index = _load_price_index(home / PRICE_CACHE_NAME)
+    if index is None or time.time() - index[0] >= PRICE_CACHE_MAX_AGE_S:
+        return {}
+    return index[1]
+
+
+def fresh_openrouter_price_record(slug: str) -> Remembered | None:
+    """Return a published row suitable for strict spend admission at this instant."""
+    try:
+        home = _price_cache_path().parent.resolve()
+    except (OSError, RuntimeError):
+        return None
+    with _warm_lock:
+        if _warmup_running(home) or _backoff_active(home):
+            return None
+        return _fresh_price_index(home).get(slug)
+
+
+def warm_prices_for_turns(settings: Any, *, force: bool = False) -> None:
+    """Start fetching the provider's prices for a process that runs turns. Never blocks, never raises.
+
+    `chimera solve`, `chat`, `run`, a bench: none of them goes through `serve`, which is the only
+    place that used to start the warm-up. On a data folder with no `model-prices.json` their receipts
+    fell back to the hand-kept table, and for `z-ai/glm-5.3-flash` that table's substring pass landed
+    on the `glm-5.3` row — US$ 1.4 per million input tokens instead of 0.04, a 39x overstatement
+    measured by the planner A/B (2026-11-16).
+
+    It only STARTS the thread. A receipt is priced when its turn ends (`resolve_price` reads the cache
+    file on every call), so a fetch that has landed by then is used and one that has not leaves the
+    reserve row in place, as before; nothing waits. A gateway is built inside event loops and on the
+    way to a prompt, and holding either for a third party's index is the wrong trade.
+
+    The provider needs to be configured and permitted by the deployment policy. A fresh, nonempty
+    index is reused unless ``force`` is set. A running fetch or the on-disk retry deadline prevents
+    another attempt, even when forced.
+    """
+    try:
+        if not _openrouter_warmup_allowed(settings):
+            return
+        home = Path(settings.home).resolve()
+        with _warm_lock:
+            if _warmup_running(home) or _backoff_active(home):
+                return
+            if not force and _fresh_price_index(home):
+                return
+            thread = start_price_warmup(settings)
+            if thread is not None:
+                _warm_state[home] = thread
+    except Exception as exc:  # pricing must never take a turn down with it
+        _log.debug("could not start the price warm-up: %s", exc)
 
 
 def warm_price_cache(settings: Any) -> None:
@@ -773,16 +912,22 @@ def warm_price_cache(settings: Any) -> None:
     rest — and a number that appears for some users and not others is harder to trust than one that
     is consistently absent.
 
-    Only when an OpenRouter key is configured. The index is public and would answer regardless, but
-    someone whose models all come from elsewhere has no reason to make the call, and an app that
-    reaches a third party for no benefit to that user is doing it for itself.
+    A failed fetch or write leaves a retry deadline in the home (:data:`PRICE_BACKOFF_NAME`).
+    Only a nonempty index successfully published on disk clears it.
     """
     try:
-        if "openrouter" not in settings.configured_providers():
+        home = Path(settings.home).resolve()
+        # The caller may have queued the thread before the owner changed the deployment policy.
+        if not _openrouter_warmup_allowed(settings):
             return
+    except Exception as exc:
+        _log.debug("could not authorize the price warm-up: %s", exc)
+        return
+
+    written = False
+    try:
         models, reason = openrouter_models()
-        if reason == "":
-            # Into the folder of the settings this warm-up was started with, not the current one.
-            remember_models(models, home=Path(settings.home))
+        written = reason == "" and remember_models(models, home=home)
     except Exception as exc:  # a warm-up must never take the process with it
         _log.debug("price cache warm-up failed: %s", exc)
+    _set_backoff(home, failed=not written)

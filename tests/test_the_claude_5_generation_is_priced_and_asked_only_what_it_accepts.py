@@ -53,9 +53,7 @@ def fresh_table(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(receipts, "_catalog_registered", False)
     import chimera.providers.listing as listing
 
-    monkeypatch.setattr(listing, "known_price", lambda _slug: None)
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (None, None))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: None)
+    monkeypatch.setattr(listing, "known_model", lambda _slug: None)
 
 
 # --------------------------------------------------------------------------- prices
@@ -145,9 +143,9 @@ def test_the_long_prompt_tier_survives_the_live_index(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(receipts, "_PRICES", list(receipts._PRICES))
     monkeypatch.setattr(receipts, "_catalog_registered", False)
-    monkeypatch.setattr(listing, "known_price", lambda _slug: (0.10, 0.50))
-    monkeypatch.setattr(listing, "known_cache_price", lambda _slug: (0.01, 0.125))
-    monkeypatch.setattr(listing, "known_long_prompt", lambda _slug: None)
+    monkeypatch.setattr(listing, "known_model", lambda _slug: listing.Remembered(
+        0.1, 0.5, None, None, None, cache_read_per_m=0.01, cache_write_per_m=0.125,
+    ))
     price = resolve_price(HAIKU)
     assert price is not None and price.long_prompt is not None
     assert cost_usd(price, 200_000, 0) == round(200_000 * 0.50 / 1e6, 6)

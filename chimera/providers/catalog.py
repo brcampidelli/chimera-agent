@@ -288,8 +288,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/openai/gpt-oss-20b", "weak", "OpenAI",
-        0.018, 0.09, tools=True, context_k=131, also_seen=((0.03, 0.13),),
-        notes="the paid variant; the :free one was withdrawn on 2026-08-21. Read 0.03/0.13 here until\n        the live check on main turned red on 2026-09-24: the index now quotes 0.018/0.09. The old\n        figure stays in also_seen in case the route flips back",
+        0.075, 0.30, tools=True, context_k=131, also_seen=((0.03, 0.13), (0.018, 0.09)),
+        notes="the paid variant; the :free one was withdrawn on 2026-08-21. Read 0.03/0.13 here until\n        the live check on main turned red on 2026-09-24: the index now quotes 0.018/0.09. The old\n        figure stays in also_seen in case the route flips back. On 2026-11-16 the live check on main turned red again: the index quotes 0.075 in / 0.30 out, input four times dearer and output over three times; the row takes the live pair and 0.018/0.09 joins also_seen",
     ),
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
@@ -771,5 +771,6 @@ def register_catalog_prices() -> None:
                     # A catalogue Claude row names a MODEL and is matched on its identity; the flag is
                     # on the row's price, so a later `set_price` with the same text is not.
                     by_identity="claude-" in pattern,
+                    reserve=True,
                 ),
             )

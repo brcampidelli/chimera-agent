@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -45,12 +45,15 @@ from chimera.orchestration.budget import (
 from chimera.orchestration.envelope_verify import EnvelopeVerifier
 from chimera.orchestration.events import OrchEvent, OrchEventSink
 from chimera.orchestration.receipts import (
+    CompletionCost,
     DelegationReceipt,
     ProfitEstimate,
     append_delegation,
+    combine_completion_costs,
     estimate_profitability,
     estimate_tokens,
     make_receipt,
+    receipt_completion_cost,
 )
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.orchestration.spec import EffortBudget, ResultEnvelope, TaskSpec
@@ -60,6 +63,13 @@ from chimera.telemetry import get_logger
 _log = get_logger("orchestration.hierarchy")
 
 TaskShape = Literal["parallel_read", "sequential_write", "simple"]
+
+
+@dataclass(frozen=True)
+class _OverheadUsage:
+    tokens: int
+    tokens_estimated: bool
+    cost: CompletionCost | None = None
 
 #: Static worker system prompt — BYTE-IDENTICAL for every worker of the tier, on
 #: purpose: an identical prefix is a shared provider-cache prefix across workers.
@@ -436,14 +446,16 @@ class HierarchicalOrchestrator:
         else:
             _log.debug("%d distinct sources -> guaranteed-gain region, skipping profit veto", sources)
 
-        specs, decompose_tokens, decompose_estimated = self._decompose_metered(task)
+        specs, decompose = self._decompose_metered(task)
         if not specs:
             return self._fallback(
-                task, shape, reason="decomposition failed", code="decompose_failed"
+                task, shape, reason="decomposition failed", code="decompose_failed",
+                prior_receipts=self._overhead_receipts(task, decompose),
             )
         return self.run_prepared(
             task, specs, shape=shape,
-            overhead_tokens=decompose_tokens, overhead_estimated=decompose_estimated,
+            overhead_tokens=decompose.tokens, overhead_estimated=decompose.tokens_estimated,
+            overhead_cost=decompose.cost,
         )
 
     def run_prepared(
@@ -454,6 +466,7 @@ class HierarchicalOrchestrator:
         shape: TaskShape = "parallel_read",
         overhead_tokens: int = 0,
         overhead_estimated: bool = False,
+        overhead_cost: CompletionCost | None = None,
     ) -> HierarchyResult:
         """Run with a caller-supplied decomposition (recipes know their own split —
         no top-model decompose call is spent, hence ``overhead_tokens=0`` by default)."""
@@ -475,11 +488,13 @@ class HierarchicalOrchestrator:
             overhead_tokens=overhead_tokens,
         )
         envelopes, receipts = self._dispatch(specs)
+        decompose = _OverheadUsage(overhead_tokens, overhead_estimated, overhead_cost)
         # Ordered before the empty check, not after it, and a test caught why: cancelling makes
         # every worker return nothing, so an emptiness check that runs first sees "all delegations
         # failed" and routes a CANCELLED run into the single-agent fallback — a whole top-model
         # call, which is the one cost stopping exists to avoid.
         if self._stopped():
+            receipts += self._overhead_receipts(task, decompose)
             # Before synthesis for the same reason. The verified envelopes are returned as they
             # stand: a consumer that streamed them already has every summary this run produced.
             return self._finish(
@@ -490,10 +505,11 @@ class HierarchicalOrchestrator:
             )
         if not envelopes:
             return self._fallback(
-                task, shape, reason="all delegations failed", code="workers_failed"
+                task, shape, reason="all delegations failed", code="workers_failed",
+                prior_receipts=receipts + self._overhead_receipts(task, decompose),
             )
 
-        answer, synth_tokens, synth_estimated, recalled_tainted = self._synthesize(task, envelopes)
+        answer, synth, recalled_tainted = self._synthesize(task, envelopes)
         # Tainted when anything the answer was made from was: a worker that read a fetched page, or
         # a tainted fact the top model was handed as prior knowledge. Stored clean, the lesson is
         # recalled by the next autonomous run as clean - the laundering S30-25 closed for
@@ -505,9 +521,7 @@ class HierarchicalOrchestrator:
         # "saving" would credit the hierarchy for a measured cost that omits its overhead while
         # the counterfactual is a full inline agent. Counterfactual=0: a single inline agent pays
         # no decompose/synth overhead, so this overhead correctly REDUCES the reported saving.
-        overhead = self._overhead_receipts(
-            task, overhead_tokens, overhead_estimated, synth_tokens, synth_estimated
-        )
+        overhead = self._overhead_receipts(task, decompose, synth)
         all_receipts = receipts + overhead
         measured = sum(r.total_tokens for r in all_receipts)
         counterfactual = sum(r.counterfactual_tokens or 0 for r in receipts) or None
@@ -524,23 +538,19 @@ class HierarchicalOrchestrator:
         )
 
     def _overhead_receipts(
-        self, task: str, decompose_tokens: int, decompose_estimated: bool,
-        synth_tokens: int, synth_estimated: bool,
+        self, task: str, decompose: _OverheadUsage, synth: _OverheadUsage | None = None,
     ) -> list[DelegationReceipt]:
         """Receipts for the orchestrator's own top-model calls (decompose + synth). cf=0 (inline
         pays no orchestration overhead), so they add to measured cost AND subtract from the saving."""
         out: list[DelegationReceipt] = []
-        for label, toks, est in (
-            ("decompose", decompose_tokens, decompose_estimated),
-            ("synthesis", synth_tokens, synth_estimated),
-        ):
-            if toks <= 0:
+        for label, usage in (("decompose", decompose), ("synthesis", synth)):
+            if usage is None or (usage.tokens <= 0 and usage.cost is None):
                 continue
             out.append(make_receipt(
                 TaskSpec(task_id=label, objective=task),
                 tier="top", model=self.top_model,
-                prompt_tokens=toks, completion_tokens=0, tokens_estimated=est,
-                counterfactual_tokens=0, counterfactual_model=self.top_model,
+                prompt_tokens=usage.tokens, completion_tokens=0, tokens_estimated=usage.tokens_estimated,
+                counterfactual_tokens=0, counterfactual_model=self.top_model, cost=usage.cost,
             ))
         if self.receipts_path is not None:
             for receipt in out:
@@ -596,12 +606,11 @@ class HierarchicalOrchestrator:
         """Top model -> JSON subtasks, pydantic-validated, ONE repair retry, N capped."""
         return self._decompose_metered(task)[0]
 
-    def _decompose_metered(self, task: str) -> tuple[list[TaskSpec], int, bool]:
-        """decompose() + the tokens it actually spent (so run() can meter the overhead honestly).
-
-        Returns (specs, total_decompose_tokens, any_estimated)."""
+    def _decompose_metered(self, task: str) -> tuple[list[TaskSpec], _OverheadUsage]:
+        """Return the decomposition and the usage of the calls that produced it."""
         r1 = self._complete_top(_DECOMPOSE_SYSTEM, task)
         tokens, estimated = _result_tokens(r1, _DECOMPOSE_SYSTEM + task + (r1.content or ""))
+        costs = [receipt_completion_cost(r1)]
         specs = self._parse_specs(r1.content)
         if specs is None:  # one bounded repair attempt
             repair = (
@@ -612,11 +621,13 @@ class HierarchicalOrchestrator:
             t2, e2 = _result_tokens(r2, _DECOMPOSE_SYSTEM + repair + (r2.content or ""))
             tokens += t2
             estimated = estimated or e2
+            costs.append(receipt_completion_cost(r2))
             specs = self._parse_specs(r2.content)
+        usage = _OverheadUsage(tokens, estimated, combine_completion_costs(costs))
         if not specs:
-            return [], tokens, estimated
+            return [], usage
         cap = self.config.effort.workers_for("parallel_read", len(specs))
-        return [_carry_request(spec, task) for spec in specs[:cap]], tokens, estimated
+        return [_carry_request(spec, task) for spec in specs[:cap]], usage
 
     def _parse_specs(self, raw: str) -> list[TaskSpec] | None:
         text = raw.strip()
@@ -748,7 +759,7 @@ class HierarchicalOrchestrator:
         if inline:
             return self._run_inline_subtask(spec, n_subtasks=n_subtasks)
         budget = TokenBudget(spec.effort.max_tokens)
-        backend = BudgetedBackend(self.gateway, budget, mode="hard")
+        backend = BudgetedBackend(self.gateway, budget, mode="hard", capture_cost=True)
         kit = self._worker_kit()
         worker = RoleAgent(
             Role("worker", WORKER_SYSTEM, model=self.mid_model),
@@ -849,8 +860,8 @@ class HierarchicalOrchestrator:
             profitable_estimate=gate.profitable,
             cache_read_tokens=budget.cache_read or None,
             cache_write_tokens=budget.cache_write or None,
-            # The one receipt whose tokens are a SUM over the worker's calls; the others describe one
-            # call and stay exact.
+            # Tokens are aggregated for display. Costs use each call's own model, tier and quote.
+            cost=backend.receipt_cost,
             aggregate=True,
         )
         if not verified:
@@ -958,17 +969,17 @@ class HierarchicalOrchestrator:
             model=self.top_model,
         )
         raw = result.content or ""
-        tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
-        estimated = tokens == 0
-        if estimated:
-            tokens = estimate_tokens(spec.render() + raw)
+        tokens, estimated = _result_tokens(result, spec.render() + raw)
         receipt = make_receipt(
             spec,
             tier="top",
-            model=self.top_model,
-            prompt_tokens=tokens,
-            completion_tokens=0,
+            model=result.model or self.top_model,
+            prompt_tokens=result.prompt_tokens if not estimated else tokens,
+            completion_tokens=result.completion_tokens if not estimated else 0,
             tokens_estimated=estimated,
+            cache_read_tokens=result.cache_read_tokens,
+            cache_write_tokens=result.cache_write_tokens,
+            cost=receipt_completion_cost(result),
             counterfactual_tokens=gate.delegate_est_tokens,  # what delegating would have cost
             counterfactual_model=self.mid_model,
             profitable_estimate=gate.profitable,
@@ -979,11 +990,8 @@ class HierarchicalOrchestrator:
 
     def _synthesize(
         self, task: str, envelopes: list[ResultEnvelope]
-    ) -> tuple[str, int, bool, bool]:
-        """Top model over SUMMARIES ONLY; fusion only on real conflict (Self-MoA rule).
-
-        Returns (answer, synth_tokens, estimated, recalled_tainted) — the tokens are metered as
-        orchestrator overhead; the last is whether the prior knowledge held a tainted fact."""
+    ) -> tuple[str, _OverheadUsage, bool]:
+        """Return the answer, synthesis usage and whether the recalled context was tainted."""
         summaries = "\n\n".join(
             f"### {env.task_id}\n{env.summary}"
             + (f"\n(gaps: {'; '.join(env.gaps)})" if env.gaps else "")
@@ -1021,10 +1029,11 @@ class HierarchicalOrchestrator:
                 model=self.top_model,
             )
         tokens, estimated = _result_tokens(result, prompt + (result.content or ""))
-        return result.content, tokens, estimated, recalled_tainted
+        return result.content, _OverheadUsage(tokens, estimated, receipt_completion_cost(result)), recalled_tainted
 
     def _fallback(
-        self, task: str, shape: TaskShape, *, reason: str, code: str = "shape"
+        self, task: str, shape: TaskShape, *, reason: str, code: str = "shape",
+        prior_receipts: Sequence[DelegationReceipt] = (),
     ) -> HierarchyResult:
         """Single-agent path (top model, one shot) — the always-correct default.
 
@@ -1046,17 +1055,17 @@ class HierarchicalOrchestrator:
         if self.identity:
             messages.insert(0, Message(role="system", content=self.identity))
         result = self.gateway.complete(messages, model=self.top_model)
-        tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
-        estimated = tokens == 0
-        if estimated:
-            tokens = estimate_tokens(task + (result.content or ""))
+        tokens, estimated = _result_tokens(result, task + (result.content or ""))
         receipt = make_receipt(
             TaskSpec(task_id=f"fallback-{uuid.uuid4().hex[:8]}", objective=task, context=reason),
             tier="top",
-            model=self.top_model,
+            model=result.model or self.top_model,
             prompt_tokens=result.prompt_tokens if not estimated else tokens,
             completion_tokens=result.completion_tokens if not estimated else 0,
             tokens_estimated=estimated,
+            cache_read_tokens=result.cache_read_tokens,
+            cache_write_tokens=result.cache_write_tokens,
+            cost=receipt_completion_cost(result),
             profitable_estimate=False,
         )
         if self.receipts_path is not None:
@@ -1068,9 +1077,9 @@ class HierarchicalOrchestrator:
             HierarchyResult(
                 answer=result.content,
                 shape=shape,
-                receipts=[receipt],
+                receipts=[*prior_receipts, receipt],
                 fell_back=True,
-                total_tokens=tokens,
+                total_tokens=tokens + sum(r.total_tokens for r in prior_receipts),
             )
         )
 

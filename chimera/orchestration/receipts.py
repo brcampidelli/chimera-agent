@@ -18,13 +18,20 @@ Honesty rules (inherited from fusion receipts):
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from collections.abc import Iterable
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel
 
-from chimera.fusion.receipts import cost_usd, resolve_price, tier_is_estimate
+from chimera.fusion.receipts import (
+    ModelPrice,
+    admission_prices_active,
+    cost_usd,
+    resolve_price,
+    tier_is_estimate,
+)
 from chimera.orchestration.spec import TaskSpec
 from chimera.telemetry import get_logger
 
@@ -48,8 +55,7 @@ class DelegationReceipt(BaseModel):
     tokens_estimated: bool = False
     """True when any token count came from the chars/4 fallback, not the provider."""
     usd_estimated: bool = False
-    """True when ``usd`` is an upper bound: the tokens are a SUM over calls of unknown size and the
-    total is over a long-prompt threshold, so the long tier was charged to all of them."""
+    """True when the amount includes an admission quote, a failed-attempt reserve or a long-tier upper bound."""
     cache_read_tokens: int | None = None
     """Prompt-cache HIT tokens the provider billed cheap (M17). None = unknown/none."""
     cache_write_tokens: int | None = None
@@ -110,7 +116,7 @@ def _as_count(value: object) -> int | None:
 
 
 def _price_one(
-    model: str,
+    price: ModelPrice | None,
     prompt: object,
     completion: object,
     cache_read: object = None,
@@ -125,12 +131,10 @@ def _price_one(
     path the spend cap consults, and a missing number that masquerades as $0.00 is exactly how a
     ceiling stops being one.
     """
-    if not model:
+    if price is None or (prompt is None and completion is None):
         return None
-    if prompt is None and completion is None and resolve_price(model) is not None:
-        return None
-    return price_delegation(
-        model,
+    return cost_usd(
+        price,
         _as_count(prompt),
         _as_count(completion),
         cache_read_tokens=_as_count(cache_read),
@@ -158,7 +162,49 @@ class CompletionCost:
     usd: float
     unpriced: str | None
     estimated: bool = False
-    """True when ``usd`` is an upper bound (an aggregate over the long-prompt threshold)."""
+    """True for an admission quote, a failed-attempt reserve or a long-tier upper bound."""
+
+
+def combine_completion_costs(costs: Iterable[CompletionCost]) -> CompletionCost:
+    """Add recorded amounts, carrying unknown costs and estimate provenance."""
+    usd = 0.0
+    unpriced = None
+    estimated = False
+    for cost in costs:
+        usd += cost.usd
+        unpriced = unpriced or cost.unpriced
+        estimated = estimated or cost.estimated
+    return CompletionCost(round(usd, 6), unpriced, estimated)
+
+
+def _reported_completion_cost(result: object) -> CompletionCost | None:
+    exact = getattr(result, "usd", None)
+    if isinstance(exact, int | float) and not isinstance(exact, bool):
+        return CompletionCost(float(exact), None)
+    return None
+
+
+def _with_failed_attempts(result: object, answer: CompletionCost) -> CompletionCost:
+    failed = getattr(result, "_failed_attempt_cost", None)
+    if isinstance(failed, CompletionCost):
+        return combine_completion_costs((answer, failed))
+    return answer
+
+
+def recorded_completion_cost(result: object, *, include_failed: bool = False) -> CompletionCost | None:
+    """Cost already carried by the completion, without resolving another tariff."""
+    cost = _reported_completion_cost(result)
+    if cost is None:
+        settled = getattr(result, "_settled_cost", None)
+        cost = settled if isinstance(settled, CompletionCost) else None
+    if cost is not None and include_failed:
+        return _with_failed_attempts(result, cost)
+    return cost
+
+
+def receipt_completion_cost(result: object) -> CompletionCost:
+    """The answered call plus any failed-attempt reserves already charged by the budget."""
+    return _with_failed_attempts(result, price_completion(result))
 
 
 def price_completion(result: object) -> CompletionCost:
@@ -172,41 +218,50 @@ def price_completion(result: object) -> CompletionCost:
 
     ``usd`` is what could be priced and ``unpriced`` names the first stage that could not, so a
     partly-known total is reported as a floor with the gap named, never as a complete figure.
+    A strict call retains its tariff estimate on the result so later receipt readers can use it.
     """
-    unpriced: str | None = None
-    model = str(getattr(result, "model", "") or "")
     # A result that carries its OWN exact cost is that cost, and it outranks every reconstruction,
     # the per-stage one included: an agent run's `route_meta.stages` describes its LAST step only, so
     # rebuilding the run from them priced a 0.1495 run at 0.0825 (its last call of 160k). The cost is
     # known per call (the tally priced each call as it happened, a cascade priced each sample); the
     # token counts are sums, and pricing them again replaces a known figure with a guess.
-    exact = getattr(result, "usd", None)
-    if isinstance(exact, int | float) and not isinstance(exact, bool):
-        return CompletionCost(float(exact), None)
+    if not admission_prices_active():
+        return recorded_completion_cost(result) or _price_token_usage(result)
+    if (reported := _reported_completion_cost(result)) is not None:
+        return reported
+
+    from chimera.providers.gateway import CompletionResult
+
+    cost = replace(_price_token_usage(result), estimated=True)
+    if isinstance(result, CompletionResult):
+        result._settled_cost = cost
+    return cost
+
+
+def _price_token_usage(result: object) -> CompletionCost:
+    model = str(getattr(result, "model", "") or "")
     if getattr(result, "aggregate", False) is True:
         # A sum over several calls whose own cost is UNKNOWN stays unknown: neither the stages (one
         # step of them) nor the totals (no prompt length to read a tier from) can stand in for it.
         return CompletionCost(0.0, model or "(an agent run)")
     stages = _stages_of(result)
     if stages:
-        total = 0.0
+        costs = []
         for stage in stages:
             stage_model = str(stage.get("model") or "")
             usd = _price_one(
-                stage_model,
+                resolve_price(stage_model) if stage_model else None,
                 stage.get("prompt_tokens"),
                 stage.get("completion_tokens"),
                 stage.get("cache_read_tokens"),
                 stage.get("cache_write_tokens"),
             )
-            if usd is None:
-                unpriced = unpriced or (stage_model or "(unnamed model)")
-                continue
-            total += usd
-        return CompletionCost(round(total, 6), unpriced)
+            costs.append(CompletionCost(usd or 0.0, stage_model if usd is None else None))
+        return combine_completion_costs(costs)
 
+    price = resolve_price(model) if model else None
     usd = _price_one(
-        model,
+        price,
         getattr(result, "prompt_tokens", None),
         getattr(result, "completion_tokens", None),
         getattr(result, "cache_read_tokens", None),
@@ -217,7 +272,6 @@ def price_completion(result: object) -> CompletionCost:
     )
     if usd is None:
         return CompletionCost(0.0, model or "(unnamed model)")
-    price = resolve_price(model)
     estimated = (
         price is not None
         and tier_is_estimate(
@@ -287,15 +341,26 @@ def make_receipt(
     cache_read_tokens: int | None = None,
     cache_write_tokens: int | None = None,
     aggregate: bool = False,
+    cost: CompletionCost | None = None,
 ) -> DelegationReceipt:
     """Assemble a priced receipt; the counterfactual is priced at the top model's rate.
 
     ``aggregate=True`` for a receipt whose ``prompt_tokens`` is a SUM over a delegation's calls (the
     worker's whole budget). A long-prompt tier is then read off the total, an upper bound, and the
-    receipt says so (``usd_estimated``). A receipt for ONE call leaves it False and is exact.
+    receipt says so (``usd_estimated``). A supplied cost keeps the rates and estimate provenance
+    already used for those calls, including strict admission quotes and exact reported costs.
     """
-    price = resolve_price(model)
-    usd_estimated = price is not None and tier_is_estimate(price, prompt_tokens, aggregate=aggregate)
+    if cost is None:
+        price = resolve_price(model)
+        if price is not None:
+            cost = CompletionCost(
+                cost_usd(
+                    price, prompt_tokens, completion_tokens, cache_read_tokens=cache_read_tokens,
+                    cache_write_tokens=cache_write_tokens, aggregate=aggregate,
+                ),
+                None,
+                tier_is_estimate(price, prompt_tokens, aggregate=aggregate),
+            )
     counterfactual_usd: float | None = None
     if counterfactual_tokens is not None and counterfactual_model:
         # Rough split: assume the counterfactual is mostly prompt-side (context-heavy).
@@ -309,15 +374,8 @@ def make_receipt(
         model=model,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        usd=price_delegation(
-            model,
-            prompt_tokens,
-            completion_tokens,
-            cache_read_tokens=cache_read_tokens,
-            cache_write_tokens=cache_write_tokens,
-            aggregate=aggregate,
-        ),
-        usd_estimated=usd_estimated,
+        usd=cost.usd if cost is not None and cost.unpriced is None else None,
+        usd_estimated=cost.estimated if cost is not None else False,
         tokens_estimated=tokens_estimated,
         counterfactual_tokens=counterfactual_tokens,
         counterfactual_usd=counterfactual_usd,

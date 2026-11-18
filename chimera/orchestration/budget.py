@@ -16,11 +16,21 @@ from __future__ import annotations
 
 import math
 import threading
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Literal
 
-from chimera.orchestration.receipts import estimate_tokens
+from chimera.fusion.receipts import ModelPrice, cost_usd, resolve_price, using_admission_prices
+from chimera.orchestration.receipts import (
+    CompletionCost,
+    combine_completion_costs,
+    estimate_tokens,
+    price_completion,
+    receipt_completion_cost,
+)
+from chimera.providers.catalog import base_slug
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -237,9 +247,10 @@ class SpendBudget:
             return (
                 "spend cap (strict): this call's worst case cannot be priced in advance (a fused or "
                 "cascade run, which picks its models and how many calls to make as it goes; a call "
-                "with no completion bound; or a model with no price), so it could pass the "
-                f"${self.max_usd:.4f} ceiling. Under a strict ceiling such a run does not start: "
-                "turn strict off to run it"
+                "with no completion bound; a model with no price; or an OpenRouter price index "
+                "that is unavailable or refreshing), so it could pass the "
+                f"${self.max_usd:.4f} ceiling. If the price index is refreshing, retry when it is ready. "
+                "Otherwise, to admit a call of unknown cost, turn strict off"
             )
         committed = self._spent + self._reserved
         if committed + worst_case > self.max_usd:
@@ -286,7 +297,7 @@ class SpendBudget:
         usd = price_delegation(model, prompt_tokens, completion_tokens) if model else None
         self.charge(usd, label=model or "(unnamed model)")
 
-    def record_result(self, result: object) -> None:
+    def record_result(self, result: object) -> CompletionCost:
         """Charge one completed call by its STAGES when it has them, else by the model that answered.
 
         A fused turn answers as ``model="fusion"`` — a label no price table resolves — so every such
@@ -294,14 +305,13 @@ class SpendBudget:
         Stages are priced at their own models' rates, which is what the receipt code has always done
         for display and what the ceiling never did for enforcement.
         """
-        from chimera.orchestration.receipts import price_completion
-
         cost = price_completion(result)
         if cost.unpriced is not None and self._unpriced_model is None:
             self._unpriced_model = cost.unpriced
         # Added even when part is unknown: the priced stages really were spent, and a floor with the
         # gap named beats a zero. `blocked()` refuses the next call either way.
         self._spent += cost.usd
+        return cost
 
 
 class TokenBudget:
@@ -388,10 +398,18 @@ class BudgetedBackend:
         budget: TokenBudget,
         *,
         mode: Literal["hard", "soft", "count_only"] = "hard",
+        capture_cost: bool = False,
     ) -> None:
         self.inner = inner
         self.budget = budget
         self.mode = mode
+        self._receipt_costs: list[CompletionCost] | None = [] if capture_cost else None
+
+    @property
+    def receipt_cost(self) -> CompletionCost | None:
+        if self._receipt_costs is None:
+            return None
+        return combine_completion_costs(self._receipt_costs)
 
     def complete(
         self,
@@ -439,6 +457,8 @@ class BudgetedBackend:
             text_fallback=prompt_text + (result.content or ""),
         )
         self.budget.note_cache(result.cache_read_tokens, result.cache_write_tokens)
+        if self._receipt_costs is not None:
+            self._receipt_costs.append(receipt_completion_cost(result))
         return result
 
 
@@ -490,25 +510,24 @@ def settle_failed_attempts(
     attempts = getattr(result, "failed_attempts", None) or []
     if not attempts:
         return
-    from chimera.orchestration.receipts import price_delegation
-
     prompt = _prompt_bound(messages, kwargs, strict=True)
     charge = getattr(spend, "charge", None)
     if not callable(charge):
         return
+    costs = []
     for model, bound in attempts:
-        usd = price_delegation(model, prompt, bound) if isinstance(bound, int) else None
+        price = resolve_price(model)
+        usd = _strict_leg_cost(price, prompt, bound) if price is not None and isinstance(bound, int) else None
         charge(usd, label=str(model), estimated=True)
+        costs.append(CompletionCost(usd or 0.0, model if usd is None else None, estimated=True))
+    if isinstance(result, CompletionResult):
+        result._failed_attempt_cost = combine_completion_costs(costs)
 
 
 def strict_charge_raised(
-    spend: object,
-    backend: object,
-    messages: Sequence[MessageLike],
-    kwargs: dict[str, Any],
-    exc: BaseException,
+    spend: object, quote: SpendQuote | None, kwargs: dict[str, Any], exc: BaseException,
 ) -> None:
-    """Under a strict ceiling, charge a call ADMITTED by :func:`strict_refusal` that then raised.
+    """Under a strict ceiling, charge a call ADMITTED by :func:`strict_admission` that then raised.
 
     The summariser and the tool router swallow their failures (an optimisation may not take the run
     down), and both only counted a fallback: a timeout after generation, billed by the provider, left
@@ -516,7 +535,7 @@ def strict_charge_raised(
     against that low number. This is what :meth:`SpendCappedBackend.complete` does for the same
     error through :meth:`SpendBudget.forfeit`: the worst case is charged and the total marked
     estimated, unless the error provably left before anything was billed (:func:`_never_billed`).
-    Off (or with no ceiling) it does nothing, as :func:`strict_refusal` asked nothing.
+    Off (or with no ceiling) it does nothing, as :func:`strict_admission` asked nothing.
     """
     if not _strict_and_capped(spend) or _never_billed(exc):
         return
@@ -525,14 +544,16 @@ def strict_charge_raised(
         return
     # The same worst case admission priced; None (nothing could price it) is charged as unpriced,
     # which is sticky and refuses what follows rather than assuming the call was free.
-    worst = worst_case_usd(backend, messages, kwargs, strict=True)
-    charge(worst, label=str(kwargs.get("model") or "(a call that raised)"), estimated=True)
+    charge(
+        quote.worst if quote is not None else None,
+        label=str(kwargs.get("model") or "(a call that raised)"), estimated=True,
+    )
 
 
-def strict_refusal(
+def strict_admission(
     spend: object, backend: object, messages: Sequence[MessageLike], kwargs: dict[str, Any]
-) -> str | None:
-    """Why a call must not start under a STRICT ceiling, or None (always None when not strict).
+) -> tuple[SpendQuote | None, str | None]:
+    """The quote and any refusal for the calls beside the worker's strict steps.
 
     For the calls a run makes beside its steps (the compaction summariser, the tool router): they
     spend from the same :class:`SpendBudget`, and a strict ceiling that only its steps asked could
@@ -540,12 +561,38 @@ def strict_refusal(
     before, and the default cap is not this commit's to tighten.
     """
     if not _strict_and_capped(spend):
-        return None
+        return None, None
     admit = getattr(spend, "admit", None)
     if not callable(admit):
-        return None
-    why = admit(worst_case_usd(backend, messages, kwargs, strict=True))
-    return None if why is None else str(why)
+        return None, None
+    quote = quote_spend(backend, messages, kwargs, strict=True)
+    why = admit(quote.worst if quote is not None else None)
+    return quote, None if why is None else str(why)
+
+
+@dataclass(frozen=True)
+class SpendQuote:
+    """One call's reservation and the immutable tariffs used to compute it."""
+
+    worst: float
+    prices: Mapping[str, ModelPrice] | None
+
+
+def quoted_pricing(quote: SpendQuote | None) -> AbstractContextManager[None]:
+    return using_admission_prices(quote.prices if quote is not None else None)
+
+
+def _strict_leg_cost(price: ModelPrice, prompt: int, bound: int) -> float:
+    # A short prompt can reach either tier when the upper bound crosses the threshold.
+    # Cache writes can cost more than fresh tokens, so reserve the dearest prompt rate.
+    tiers = [price]
+    if price.long_prompt is not None and price.long_prompt_over is not None and prompt > price.long_prompt_over:
+        tiers.append(price.long_prompt)
+    return round(max(
+        (prompt * max(tier.input_per_m, tier.cache_read_per_m or 0.0, tier.cache_write_per_m or 0.0)
+         + max(0, bound) * tier.output_per_m) / 1_000_000
+        for tier in tiers
+    ), 6)
 
 
 def worst_case_usd(
@@ -556,6 +603,19 @@ def worst_case_usd(
     strict: bool = False,
     stream: bool = False,
 ) -> float | None:
+    """The reservation for a call, or None if it cannot be priced."""
+    quote = quote_spend(backend, messages, kwargs, strict=strict, stream=stream)
+    return quote.worst if quote is not None else None
+
+
+def quote_spend(
+    backend: object,
+    messages: Sequence[MessageLike],
+    kwargs: dict[str, Any],
+    *,
+    strict: bool = False,
+    stream: bool = False,
+) -> SpendQuote | None:
     """The most one ``backend.complete(messages, **kwargs)`` can cost, in dollars, or None when that
     cannot be known.
 
@@ -591,8 +651,6 @@ def worst_case_usd(
     the gateway reports it in ``failed_attempts`` for :func:`settle_failed_attempts` to charge. Off
     it changes nothing, since the dearest leg is already in the list.
     """
-    from chimera.orchestration.receipts import price_delegation
-
     model: object = kwargs.get("model")
     bound: object = kwargs.get("max_tokens")
     legs: list[tuple[object, object]]
@@ -615,13 +673,18 @@ def worst_case_usd(
         return None
     prompt = _prompt_bound(messages, kwargs, strict=strict)
     costs: list[float] = []
+    prices: dict[str, ModelPrice] = {}
     for leg_model, leg_bound in legs:
         if not isinstance(leg_model, str) or not leg_model or not isinstance(leg_bound, int):
             return None
-        usd = price_delegation(leg_model, prompt, leg_bound)
-        if usd is None:
-            return None
-        costs.append(usd)
+        slug = base_slug(leg_model).lower()
+        price = prices.get(slug)
+        if price is None:
+            price = resolve_price(leg_model, require_fresh_openrouter=strict)
+            if price is None:
+                return None
+            prices[slug] = price
+        costs.append(_strict_leg_cost(price, prompt, leg_bound) if strict else cost_usd(price, prompt, leg_bound))
     if not costs:
         return None
     if strict and stream:
@@ -631,7 +694,7 @@ def worst_case_usd(
     hold = sum(costs) if strict else max(costs)
     if hold <= 0 and not whole_chain:
         return None
-    return hold
+    return SpendQuote(hold, MappingProxyType(prices) if strict else None)
 
 
 def _never_billed(exc: BaseException) -> bool:
@@ -710,14 +773,15 @@ class SpendCappedBackend:
         self._lock = threading.Lock()
 
     def complete(self, messages: list[MessageLike], **kwargs: Any) -> CompletionResult:
-        hold = self._worst_case(messages, kwargs)
+        quote = quote_spend(self.inner, messages, kwargs, strict=self.budget.strict and self.budget.capped)
+        hold = quote.worst if quote is not None else None
         if hold is None and self.budget.capped and not self.budget.strict:
             with self._lock:
                 why = self.budget.blocked()
                 if why is not None:
                     raise SpendExceeded(why)
                 result = self.inner.complete(messages, **kwargs)
-                self.budget.record_result(result)
+                result._settled_cost = self.budget.record_result(result)
                 return result
 
         with self._lock:
@@ -728,31 +792,27 @@ class SpendCappedBackend:
                 raise SpendExceeded(why)
             if hold is not None:
                 self.budget.reserve(hold)
-        try:
-            result = self.inner.complete(messages, **kwargs)
-        except BaseException as exc:
-            if hold is not None:
-                with self._lock:
-                    if _never_billed(exc):
-                        self.budget.release(hold)
-                    else:
-                        self.budget.forfeit(hold)
-            raise
-        with self._lock:
-            if hold is not None:
-                self.budget.release(hold)
-            # By stages when the turn has them: a fused turn answers as `model="fusion"`, which no
-            # price table resolves, and charging that at $0.00 would let the cap sleep through the
-            # most expensive call the app makes.
-            self.budget.record_result(result)
-            # Strict only: the attempts that raised before this one answered may have been billed.
-            settle_failed_attempts(self.budget, result, messages, kwargs)
-        return result
-
-    def _worst_case(self, messages: list[MessageLike], kwargs: dict[str, Any]) -> float | None:
-        """The most this call can cost, in dollars, or None when that cannot be known
-        (:func:`worst_case_usd`, with the prompt bounded by its bytes when the ceiling is strict)."""
-        return worst_case_usd(self.inner, messages, kwargs, strict=self.budget.strict)
+        with quoted_pricing(quote):
+            try:
+                result = self.inner.complete(messages, **kwargs)
+            except BaseException as exc:
+                if hold is not None:
+                    with self._lock:
+                        if _never_billed(exc):
+                            self.budget.release(hold)
+                        else:
+                            self.budget.forfeit(hold)
+                raise
+            with self._lock:
+                if hold is not None:
+                    self.budget.release(hold)
+                # By stages when the turn has them: a fused turn answers as `model="fusion"`, which no
+                # price table resolves, and charging that at $0.00 would let the cap sleep through the
+                # most expensive call the app makes.
+                result._settled_cost = self.budget.record_result(result)
+                # Strict only: the attempts that raised before this one answered may have been billed.
+                settle_failed_attempts(self.budget, result, messages, kwargs)
+            return result
 
     def __getattr__(self, name: str) -> Any:
         """Everything else is the wrapped backend's. A gateway carries more than ``complete``, and a
