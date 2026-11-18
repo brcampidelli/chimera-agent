@@ -134,7 +134,7 @@ import {
   transcriptFilename,
   type TranscriptExchange,
 } from "@/lib/transcript";
-import { useNum, useT, type TFunc } from "@/lib/i18n";
+import { stepsText, useNum, useT, type TFunc } from "@/lib/i18n";
 import { formatElapsed } from "@/components/code/Elapsed";
 
 export { formatElapsed };
@@ -563,7 +563,7 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {/* Null, not zero: an external turn's steps happened inside somebody else's loop and it did
           not report them. Rendering "0 steps" would say it did nothing. */}
       {done.steps !== null ? (
-        <Badge>{t("code.chat.steps", { n: done.steps })}</Badge>
+        <Badge>{stepsText(t, done.steps)}</Badge>
       ) : null}
       {done.model && !done.external ? <Badge>{done.model}</Badge> : null}
       {done.context_peak_tokens !== null && done.context_peak_tokens > 0 ? (
@@ -1425,6 +1425,17 @@ export function Conversation({
     publishSide({ plan: view ? { ...view, clearAwaiting: clearPlanAwaiting } : null });
   }, [publishSide, planKey, clearPlanAwaiting]);
   const approvalWaiting = pendingApproval !== null;
+  // What the header chip says about the turn; null when there is no turn yet. A conversation that has
+  // not had one has nothing "complete", and a chip saying so was announced to a screen reader too.
+  const statusText: string | null = busy
+    ? t("code.chat.working")
+    : pendingApproval || pendingUserQuestion
+      ? t("code.chat.waiting")
+      : latestExchange?.failed
+        ? t("code.chat.failed", { reason: failureReason(latestExchange.error, t) })
+        : latestExchange
+          ? t("code.chat.complete")
+          : null;
   // Each question is announced once. Minimising the card unmounts it and opening it remounts it, and
   // a remount alone would raise the assertive alert again; the ids live here, in the parent that
   // survives that, and are written after the commit that carried the alert.
@@ -2745,16 +2756,15 @@ export function Conversation({
           // status bar leaves the chat turn to this chip (see AgentStatusBar) so it is not said twice.
           aria-live="polite"
           aria-atomic="true"
-          className="rounded-chip bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground"
+          // Mounted even when empty: a live region has to exist BEFORE its text changes to be read.
+          // With no turn there is nothing to complete, so it says nothing and draws no chip.
+          className={cn(
+            "text-xs text-muted-foreground",
+            statusText ? "rounded-chip bg-surface-2 px-2 py-0.5" : "hidden",
+          )}
           data-testid="conversation-status"
         >
-          {busy
-            ? t("code.chat.working")
-            : pendingApproval || pendingUserQuestion
-              ? t("code.chat.waiting")
-              : latestExchange?.failed
-                ? t("code.chat.failed", { reason: failureReason(latestExchange.error, t) })
-                : t("code.chat.complete")}
+          {statusText}
         </span>
         <LastTurnMetrics done={latestExchange?.done} />
         {/* Who else is in this conversation right now, by the names they gave. */}

@@ -24,10 +24,16 @@ request" and behaved correctly throughout. Same job, two prompts, one of them to
 from __future__ import annotations
 
 from chimera.core.checklist import _EXTRACT_SYSTEM, _GRADE_SYSTEM
+from chimera.prompts.blocks import language_rule
+
+#: The sentence both prompts of this feature carry, from the one block (P1-17). It used to be typed
+#: twice, in two wordings, and these tests asserted a substring of each.
+EXTRACT_RULE = language_rule(of="task", subject="each `text`")
+DRAFT_RULE = language_rule(of="request", subject="it")
 
 
 def test_the_extraction_is_told_to_answer_in_the_task_s_language() -> None:
-    assert "SAME LANGUAGE" in _EXTRACT_SYSTEM
+    assert EXTRACT_RULE in _EXTRACT_SYSTEM
 
 
 def test_it_says_why_rather_than_only_what() -> None:
@@ -41,8 +47,8 @@ def test_the_two_prompts_of_this_feature_agree() -> None:
     rule and the other not is how a user gets half a feature in their own language."""
     from chimera.orchestration.draft import _SYSTEM as DRAFTER
 
-    assert "same language as the request" in DRAFTER
-    assert "SAME LANGUAGE" in _EXTRACT_SYSTEM
+    assert DRAFT_RULE in DRAFTER
+    assert EXTRACT_RULE in _EXTRACT_SYSTEM
 
 
 def test_the_grader_is_not_asked_to_translate() -> None:
@@ -50,7 +56,7 @@ def test_the_grader_is_not_asked_to_translate() -> None:
     receives requirement texts and returns them with a verdict; telling it to write in the task's
     language would invite it to REPHRASE what it echoes, and the caller matches those strings to
     decide what was missed."""
-    assert "SAME LANGUAGE" not in _GRADE_SYSTEM
+    assert "language of the" not in _GRADE_SYSTEM
     assert "one entry per" in _GRADE_SYSTEM
 
 

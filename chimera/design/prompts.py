@@ -9,6 +9,8 @@ marker where a tag pair would not; and the JSON keys are the camelCase wire name
 
 from __future__ import annotations
 
+from chimera.prompts.blocks import language_rule
+
 BASE_INSTRUCTION = """\
 You are the design assistant of Chimera Design. Turn the user's intent into an original, editable \
 visual artefact that is consistent with the selected design system.
@@ -31,9 +33,10 @@ to the context. Avoid generic text, decoration without purpose and components re
 the user has not provided the content.
 - Answer strictly in the JSON schema given. Keep justifications short, and say so when a request \
 cannot be represented with the operations available.
-- Write the human-readable fields (summary, assumptions, checks, questions) in the language of the \
-user's brief or request.
-"""
+- """ + language_rule(
+    of="user's brief or request",
+    subject="the human-readable fields (summary, assumptions, checks, questions)",
+) + "\n"
 
 GENERATE = """\
 Create a first visual proposal from the data below.

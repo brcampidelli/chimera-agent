@@ -206,6 +206,9 @@ _MODEL_CASES: dict[str, tuple[dict[str, str], str, str, str, str]] = {
         {"CHIMERA_SEMANTIC_MEMORY": "true"}, "CHIMERA_EMBED_MODEL", "sentinel/e", "sentinel", "embeddings"
     ),
     "review_model": ({}, "CHIMERA_REVIEW_MODEL", "sentinel/m", "sentinel", "review"),
+    "memory_extract_model": (
+        {}, "CHIMERA_MEMORY_EXTRACT_MODEL", "sentinel/m", "sentinel", "memory_extract"
+    ),
     "complete_model": ({}, "CHIMERA_COMPLETE_MODEL", "qwen2.5-coder:7b-base", "ollama", "completion"),
     "voice_model": ({}, "CHIMERA_VOICE_MODEL", "sentinel/m", "sentinel", "voice"),
     "voice_work_model": ({}, "CHIMERA_VOICE_WORK_MODEL", "sentinel/m", "sentinel", "voice_work"),

@@ -26,8 +26,9 @@ from chimera.design.propose import (
 )
 from chimera.design.tokens import default_tokens
 from chimera.governance.sanitize import FENCE_CLOSE, FENCE_OPEN
+from chimera.prompts.blocks import data_not_instructions
 from chimera.providers.gateway import CompletionResult
-from chimera.tools.design import HTML_DESIGN_TURN_NOTE
+from chimera.tools.design import DESIGN_TURN_NOTE, HTML_DESIGN_TURN_NOTE
 
 #: sha256 of ``prompts.HTML_GENERATE`` before the rules were split into constants. The first-proposal
 #: prompt is the one the bench's generation ruler measures; moving its text into shared constants must
@@ -101,7 +102,7 @@ def test_the_lean_refinement_prompt_does_not_repeat_the_rules_in_its_own_words()
     assert "Do not use HTML injection, eval/Function" not in prompts.HTML_REFINE_LEAN
 
 
-# ---- flag off: what the model receives is what main sent -------------------------------------------
+# ---- flag off: historical evidence and the 3853e7dd integration reference --------------------------
 
 #: sha256 of the full messages (system + user, as JSON) a first proposal and a refinement of ``_doc(3)``
 #: sent at b53dd4fe, rebuilt from that commit's prompt file by bench/design_refine's baseline.
@@ -110,6 +111,16 @@ OLD_REFINE_MESSAGES = "9e926756be1879fd6d374daab4cd99bef5c947c5b3daeafa424aa164c
 #: sha256 of ``prompts.HTML_REFINE`` and of the HTML turn note at b53dd4fe.
 OLD_REFINE_PROMPT = "21d8c602b5e7b8c1515a3ceae235ef3b889cfe8dd694c3b18ce94949111c8c61"
 OLD_TURN_NOTE = "bb84930c990ee56d6f451743b0643271f0f326c567a8933a85adf6585da2d726"
+
+#: Verified by evaluating the tracked templates and full messages at 3853e7dd, after #1302.
+#: The historical hashes above remain the evidence for b53dd4fe; the turn note intentionally
+#: changed when the data-not-instructions block was composed and must not be reverted.
+REFERENCE_BASE = "020324cc83940d8623a817ccb8cb6a51a59fc7a940dabf9eb6c3b35d1388f8ab"
+REFERENCE_HTML_BASE = "d83889d5e99b84979deaacee669d83c10df42cf9eef3f7afdc53d3df7db3ef37"
+REFERENCE_GENERATE_MESSAGES = "5cbb9f3e7b34b9e0e9321af0a6a9f42aa713795a6dca080380bfeba84723fcd9"
+REFERENCE_REFINE_MESSAGES = "9e926756be1879fd6d374daab4cd99bef5c947c5b3daeafa424aa164c550346d"
+REFERENCE_DESIGN_NOTE = "5416fa993b6f6024728ba949b1353215421542de95f8e6ad4d904ff9fbd6a16b"
+REFERENCE_HTML_NOTE = "7d429a1cd086ebaf788712f0290e065db76d325713276a3f8db8e7535d0792ea"
 
 
 class _Capture(Replies):
@@ -122,23 +133,31 @@ def _digest(messages: list[dict[str, Any]]) -> str:
     return hashlib.sha256(json.dumps(messages).encode()).hexdigest()
 
 
-def test_with_the_flag_off_a_first_proposal_sends_exactly_what_main_sent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_with_the_flag_off_a_first_proposal_matches_integration_reference(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(propose, "LEAN_REFINE", False)
     backend = _Capture(_edit())
     propose.propose(backend, _doc(3), "A landing page.", {})
-    assert _digest(backend.messages) == OLD_GENERATE_MESSAGES
+    assert _digest(backend.messages) == REFERENCE_GENERATE_MESSAGES
+    assert REFERENCE_GENERATE_MESSAGES == OLD_GENERATE_MESSAGES
 
 
-def test_with_the_flag_off_a_refinement_sends_exactly_what_main_sent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_with_the_flag_off_a_refinement_matches_integration_reference(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(propose, "LEAN_REFINE", False)
     backend = _Capture(_edit())
     refine(backend, _doc(3), 'On the "Plans" screen, rename the heading.')
-    assert _digest(backend.messages) == OLD_REFINE_MESSAGES
+    assert _digest(backend.messages) == REFERENCE_REFINE_MESSAGES
+    assert REFERENCE_REFINE_MESSAGES == OLD_REFINE_MESSAGES
 
 
-def test_the_refinement_prompt_and_the_turn_note_are_main_s_bytes() -> None:
+def test_disabled_templates_and_turn_notes_match_integration_reference() -> None:
+    assert hashlib.sha256(prompts.BASE_INSTRUCTION.encode()).hexdigest() == REFERENCE_BASE
+    assert hashlib.sha256(prompts.HTML_BASE_INSTRUCTION.encode()).hexdigest() == REFERENCE_HTML_BASE
     assert hashlib.sha256(prompts.HTML_REFINE.encode()).hexdigest() == OLD_REFINE_PROMPT
-    assert hashlib.sha256(HTML_DESIGN_TURN_NOTE.encode()).hexdigest() == OLD_TURN_NOTE
+    assert hashlib.sha256(DESIGN_TURN_NOTE.encode()).hexdigest() == REFERENCE_DESIGN_NOTE
+    assert hashlib.sha256(HTML_DESIGN_TURN_NOTE.encode()).hexdigest() == REFERENCE_HTML_NOTE
+    assert REFERENCE_HTML_NOTE != OLD_TURN_NOTE
+    assert data_not_instructions("canvas content and briefs", plural=True) in HTML_DESIGN_TURN_NOTE
+    assert data_not_instructions("canvas text and briefs", plural=True) in DESIGN_TURN_NOTE
 
 
 def test_the_flag_ships_off() -> None:

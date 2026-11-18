@@ -1587,6 +1587,17 @@ const en: Dict = {
   "settings.routing.origin.config": "settings",
   "settings.routing.unavailable": "Could not read the routing table.",
   "settings.routing.denied": "Your deployment policy leaves no model for the tier ladder: {reason}",
+  "settings.routing.via.setting": "your setting",
+  "settings.routing.via.preset": "cost preset",
+  "settings.routing.via.override": "override for this use",
+  "settings.routing.via.replaced": "replaced by policy or keys",
+  "settings.routing.via.empty": "not set",
+  "settings.routing.via.ladder": "from the model ladder",
+  "settings.routing.via.default": "product default",
+  "settings.routing.via.profile": "from the profile",
+  "settings.routing.via.review": "chosen at review time",
+  "settings.routing.via.unavailable": "unavailable",
+  "settings.search.terms.routing": "role, effort, routing, model per role, origin, via, tier, fusion, reasoning",
   "settings.row.autoConsolidate": "Tidy memory",
   "settings.hint.autoConsolidate":
     "after a fact is saved, merge near-duplicates once memory outgrows its budget",
@@ -2971,6 +2982,7 @@ const en: Dict = {
   "code.chat.tool.copy": "copy",
   "code.chat.tool.copied": "copied",
   "code.chat.steps": "{n} steps",
+  "code.chat.steps.one": "1 step",
   "code.chat.toolCallsIn": "{n} tool call(s) in {time}",
   "shell.drawer.label": "Side panel",
   "code.chat.failed": "Failed: {reason}",
@@ -5540,6 +5552,17 @@ const pt: Dict = {
   "settings.routing.origin.config": "configurações",
   "settings.routing.unavailable": "Não foi possível ler a tabela de roteamento.",
   "settings.routing.denied": "A política de implantação não deixa nenhum modelo para a escada de tiers: {reason}",
+  "settings.routing.via.setting": "sua configuração",
+  "settings.routing.via.preset": "predefinição de custo",
+  "settings.routing.via.override": "substituído para este uso",
+  "settings.routing.via.replaced": "trocado pela política ou pelas chaves",
+  "settings.routing.via.empty": "não definido",
+  "settings.routing.via.ladder": "da escada de modelos",
+  "settings.routing.via.default": "padrão do produto",
+  "settings.routing.via.profile": "do perfil",
+  "settings.routing.via.review": "escolhido na hora da revisão",
+  "settings.routing.via.unavailable": "indisponível",
+  "settings.search.terms.routing": "papel, esforço, roteamento, modelo por papel, origem, via, tier, fusão, raciocínio",
   "settings.row.autoConsolidate": "Arrumar a memória",
   "settings.hint.autoConsolidate":
     "depois de guardar um fato, funde quase duplicados quando a memória passa do orçamento",
@@ -6930,6 +6953,7 @@ const pt: Dict = {
   "code.chat.tool.copy": "copiar",
   "code.chat.tool.copied": "copiado",
   "code.chat.steps": "{n} passos",
+  "code.chat.steps.one": "1 passo",
   "code.chat.toolCallsIn": "{n} chamada(s) de ferramenta em {time}",
   "shell.drawer.label": "Painel lateral",
   "code.chat.failed": "Falhou: {reason}",
@@ -10871,6 +10895,7 @@ const es: Dict = {
   "code.chat.tool.copy": "copiar",
   "code.chat.tool.copied": "copiado",
   "code.chat.steps": "{n} pasos",
+  "code.chat.steps.one": "1 paso",
   "code.chat.toolCallsIn": "{n} llamada(s) de herramienta en {time}",
   "shell.drawer.label": "Panel lateral",
   "code.chat.complete": "Completada",
@@ -11898,6 +11923,17 @@ const es: Dict = {
   "settings.routing.origin.config": "ajustes",
   "settings.routing.unavailable": "No se pudo leer la tabla de enrutamiento.",
   "settings.routing.denied": "La política de tu implementación no deja ningún modelo para la escalera de tiers: {reason}",
+  "settings.routing.via.setting": "tu ajuste",
+  "settings.routing.via.preset": "preajuste de costo",
+  "settings.routing.via.override": "anulado para este uso",
+  "settings.routing.via.replaced": "reemplazado por la política o las claves",
+  "settings.routing.via.empty": "sin definir",
+  "settings.routing.via.ladder": "de la escalera de modelos",
+  "settings.routing.via.default": "predeterminado del producto",
+  "settings.routing.via.profile": "del perfil",
+  "settings.routing.via.review": "elegido al revisar",
+  "settings.routing.via.unavailable": "no disponible",
+  "settings.search.terms.routing": "rol, esfuerzo, enrutamiento, modelo por rol, origen, vía, tier, fusión, razonamiento",
 };
 
 const fr: Dict = {
@@ -14834,6 +14870,7 @@ const fr: Dict = {
   "code.chat.tool.copy": "copier",
   "code.chat.tool.copied": "copié",
   "code.chat.steps": "{n} étapes",
+  "code.chat.steps.one": "1 étape",
   "code.chat.toolCallsIn": "{n} appel(s) d'outil en {time}",
   "shell.drawer.label": "Panneau latéral",
   "code.chat.complete": "Terminée",
@@ -15864,6 +15901,17 @@ const fr: Dict = {
   "settings.routing.origin.config": "réglages",
   "settings.routing.unavailable": "Impossible de lire la table de routage.",
   "settings.routing.denied": "La politique de votre déploiement ne laisse aucun modèle pour l'échelle de tiers : {reason}",
+  "settings.routing.via.setting": "votre réglage",
+  "settings.routing.via.preset": "préréglage de coût",
+  "settings.routing.via.override": "remplacé pour cet usage",
+  "settings.routing.via.replaced": "remplacé par la politique ou les clés",
+  "settings.routing.via.empty": "non défini",
+  "settings.routing.via.ladder": "de l'échelle de modèles",
+  "settings.routing.via.default": "valeur par défaut du produit",
+  "settings.routing.via.profile": "du profil",
+  "settings.routing.via.review": "choisi au moment de la revue",
+  "settings.routing.via.unavailable": "indisponible",
+  "settings.search.terms.routing": "rôle, effort, routage, modèle par rôle, origine, via, tier, fusion, raisonnement",
 };
 
 const de: Dict = {
@@ -18796,6 +18844,7 @@ const de: Dict = {
   "code.chat.tool.copy": "kopieren",
   "code.chat.tool.copied": "kopiert",
   "code.chat.steps": "{n} Schritte",
+  "code.chat.steps.one": "1 Schritt",
   "code.chat.toolCallsIn": "{n} Werkzeugaufruf(e) in {time}",
   "shell.drawer.label": "Seitenbereich",
   "code.chat.complete": "Abgeschlossen",
@@ -19827,6 +19876,17 @@ const de: Dict = {
   "settings.routing.origin.config": "Einstellungen",
   "settings.routing.unavailable": "Die Routing-Tabelle konnte nicht gelesen werden.",
   "settings.routing.denied": "Deine Deployment-Richtlinie lässt kein Modell für die Tier-Leiter übrig: {reason}",
+  "settings.routing.via.setting": "deine Einstellung",
+  "settings.routing.via.preset": "Kostenvoreinstellung",
+  "settings.routing.via.override": "für diese Nutzung überschrieben",
+  "settings.routing.via.replaced": "durch Richtlinie oder Schlüssel ersetzt",
+  "settings.routing.via.empty": "nicht gesetzt",
+  "settings.routing.via.ladder": "aus der Modellleiter",
+  "settings.routing.via.default": "Produktstandard",
+  "settings.routing.via.profile": "aus dem Profil",
+  "settings.routing.via.review": "bei der Prüfung gewählt",
+  "settings.routing.via.unavailable": "nicht verfügbar",
+  "settings.search.terms.routing": "Rolle, Aufwand, Routing, Modell pro Rolle, Herkunft, Via, Tier, Fusion, Reasoning",
 };
 
 const zh: Dict = {
@@ -22694,6 +22754,7 @@ const zh: Dict = {
   "code.chat.tool.copy": "复制",
   "code.chat.tool.copied": "已复制",
   "code.chat.steps": "{n} 步",
+  "code.chat.steps.one": "1 步",
   "code.chat.toolCallsIn": "{n} 次工具调用，用时 {time}",
   "shell.drawer.label": "侧边栏",
   "code.chat.complete": "已完成",
@@ -23705,6 +23766,17 @@ const zh: Dict = {
   "settings.routing.origin.config": "设置",
   "settings.routing.unavailable": "无法读取路由表。",
   "settings.routing.denied": "你的部署策略没有为分级阶梯留下任何模型：{reason}",
+  "settings.routing.via.setting": "你的设置",
+  "settings.routing.via.preset": "成本预设",
+  "settings.routing.via.override": "本次使用的覆盖",
+  "settings.routing.via.replaced": "被策略或密钥替换",
+  "settings.routing.via.empty": "未设置",
+  "settings.routing.via.ladder": "来自模型阶梯",
+  "settings.routing.via.default": "产品默认",
+  "settings.routing.via.profile": "来自配置档",
+  "settings.routing.via.review": "审查时选择",
+  "settings.routing.via.unavailable": "不可用",
+  "settings.search.terms.routing": "角色, 强度, 路由, 每个角色的模型, 来源, 分级, 融合, 推理",
 };
 
 const ja: Dict = {
@@ -26619,6 +26691,7 @@ const ja: Dict = {
   "code.chat.tool.copy": "コピー",
   "code.chat.tool.copied": "コピー済み",
   "code.chat.steps": "{n} ステップ",
+  "code.chat.steps.one": "1 ステップ",
   "code.chat.toolCallsIn": "{n} 回のツール呼び出し、{time}",
   "shell.drawer.label": "サイドパネル",
   "code.chat.complete": "完了",
@@ -27644,6 +27717,17 @@ const ja: Dict = {
   "settings.routing.origin.config": "設定",
   "settings.routing.unavailable": "ルーティングテーブルを読み取れませんでした。",
   "settings.routing.denied": "デプロイのポリシーにより、ティアのラダー用のモデルが残っていません：{reason}",
+  "settings.routing.via.setting": "あなたの設定",
+  "settings.routing.via.preset": "コストのプリセット",
+  "settings.routing.via.override": "この利用での上書き",
+  "settings.routing.via.replaced": "ポリシーまたはキーで置き換え",
+  "settings.routing.via.empty": "未設定",
+  "settings.routing.via.ladder": "モデルのラダーから",
+  "settings.routing.via.default": "製品の既定",
+  "settings.routing.via.profile": "プロファイルから",
+  "settings.routing.via.review": "レビュー時に選択",
+  "settings.routing.via.unavailable": "利用不可",
+  "settings.search.terms.routing": "ロール, 役割, 労力, エフォート, ルーティング, ロール別モデル, 由来, ティア, フュージョン, 推論",
 };
 
 const it: Dict = {
@@ -30575,6 +30659,7 @@ const it: Dict = {
   "code.chat.tool.copy": "copia",
   "code.chat.tool.copied": "copiato",
   "code.chat.steps": "{n} passi",
+  "code.chat.steps.one": "1 passo",
   "code.chat.toolCallsIn": "{n} chiamata/e di strumento in {time}",
   "shell.drawer.label": "Pannello laterale",
   "code.chat.complete": "Completata",
@@ -31603,6 +31688,17 @@ const it: Dict = {
   "settings.routing.origin.config": "impostazioni",
   "settings.routing.unavailable": "Impossibile leggere la tabella di instradamento.",
   "settings.routing.denied": "La policy del tuo deployment non lascia alcun modello per la scala dei tier: {reason}",
+  "settings.routing.via.setting": "la tua impostazione",
+  "settings.routing.via.preset": "preset di costo",
+  "settings.routing.via.override": "sovrascritto per questo uso",
+  "settings.routing.via.replaced": "sostituito da policy o chiavi",
+  "settings.routing.via.empty": "non impostato",
+  "settings.routing.via.ladder": "dalla scala dei modelli",
+  "settings.routing.via.default": "predefinito del prodotto",
+  "settings.routing.via.profile": "dal profilo",
+  "settings.routing.via.review": "scelto al momento della revisione",
+  "settings.routing.via.unavailable": "non disponibile",
+  "settings.search.terms.routing": "ruolo, impegno, instradamento, modello per ruolo, origine, via, tier, fusione, ragionamento",
 };
 
 const pl: Dict = {
@@ -34525,6 +34621,7 @@ const pl: Dict = {
   "code.chat.tool.copy": "kopiuj",
   "code.chat.tool.copied": "skopiowano",
   "code.chat.steps": "kroki: {n}",
+  "code.chat.steps.one": "1 krok",
   "code.chat.toolCallsIn": "{n} wywołań narzędzi w {time}",
   "shell.drawer.label": "Panel boczny",
   "code.chat.complete": "Ukończona",
@@ -35552,6 +35649,17 @@ const pl: Dict = {
   "settings.routing.origin.config": "ustawienia",
   "settings.routing.unavailable": "Nie udało się odczytać tabeli routingu.",
   "settings.routing.denied": "Polityka Twojego wdrożenia nie zostawia żadnego modelu dla drabiny tierów: {reason}",
+  "settings.routing.via.setting": "Twoje ustawienie",
+  "settings.routing.via.preset": "ustawienie kosztów",
+  "settings.routing.via.override": "nadpisane dla tego użycia",
+  "settings.routing.via.replaced": "zastąpione przez politykę lub klucze",
+  "settings.routing.via.empty": "nie ustawiono",
+  "settings.routing.via.ladder": "z drabiny modeli",
+  "settings.routing.via.default": "domyślne produktu",
+  "settings.routing.via.profile": "z profilu",
+  "settings.routing.via.review": "wybrany podczas przeglądu",
+  "settings.routing.via.unavailable": "niedostępne",
+  "settings.search.terms.routing": "rola, wysiłek, routing, model na rolę, pochodzenie, via, tier, fuzja, rozumowanie",
 };
 
 const ru: Dict = {
@@ -38477,6 +38585,7 @@ const ru: Dict = {
   "code.chat.tool.copy": "копировать",
   "code.chat.tool.copied": "скопировано",
   "code.chat.steps": "шагов: {n}",
+  "code.chat.steps.one": "1 шаг",
   "code.chat.toolCallsIn": "{n} вызов(ов) инструментов за {time}",
   "shell.drawer.label": "Боковая панель",
   "code.chat.complete": "Завершено",
@@ -39507,6 +39616,17 @@ const ru: Dict = {
   "settings.routing.origin.config": "настройки",
   "settings.routing.unavailable": "Не удалось прочитать таблицу маршрутизации.",
   "settings.routing.denied": "Политика вашего развёртывания не оставляет ни одной модели для лестницы тиров: {reason}",
+  "settings.routing.via.setting": "ваша настройка",
+  "settings.routing.via.preset": "пресет стоимости",
+  "settings.routing.via.override": "переопределено для этого использования",
+  "settings.routing.via.replaced": "заменено политикой или ключами",
+  "settings.routing.via.empty": "не задано",
+  "settings.routing.via.ladder": "из лестницы моделей",
+  "settings.routing.via.default": "по умолчанию в продукте",
+  "settings.routing.via.profile": "из профиля",
+  "settings.routing.via.review": "выбирается при проверке",
+  "settings.routing.via.unavailable": "недоступно",
+  "settings.search.terms.routing": "роль, усилие, маршрутизация, модель для роли, источник, via, тир, фьюжн, рассуждение",
 };
 
 export const DICTS: Record<Lang, Dict> = {
@@ -39540,6 +39660,12 @@ function interpolate(
   return template.replace(/\{(\w+)\}/g, (_, k: string) =>
     k in params ? String(params[k]) : `{${k}}`,
   );
+}
+
+/** "1 step" / "3 steps": the singular has its own key, because "1 passos" is wrong in every language
+ *  that inflects, and a number substituted into one template cannot say it. */
+export function stepsText(t: (key: string, params?: Record<string, string | number>) => string, n: number): string {
+  return n === 1 ? t("code.chat.steps.one") : t("code.chat.steps", { n });
 }
 
 export type TFunc = (

@@ -1,0 +1,20 @@
+runs 150  spend US$ 1.1246  errors 0
+
+READ  pairs 36 (need >= 24)
+  P1 steps           OFF mean     2.08  delta    +0.03 (+1.3%)  CI95 [-0.16, +0.22]  -> does not meet
+  P2 output tokens   OFF mean   213.89  delta   -20.42 (-9.5%)  CI95 [-59.79, +18.96]  -> does not meet
+  G1 correct   OFF 100.0%  ON 100.0%  diff +0.0 pp  -> holds
+
+EDIT  pairs 33 (need >= 22)
+  G2 pass      OFF 87.9%  ON 90.9%  diff +3.0 pp  CI95(t, over items) [-3.7, +9.8] pp  discordant ON-only 1 / OFF-only 0  -> holds
+  TOST non-inferiority at -5 pp (reported, not decisive; §12): 90% interval [-2.5, +8.5] pp -> non_inferior=True
+  secondary steps: OFF 14.0  ON 14.2
+  secondary completion_tokens: OFF 795.5  ON 833.4
+  ON runs that changed no file: 0 (OFF: 0)
+
+CONTROL
+  c01_bakery     OFF 0/3  ON 2/3
+  c02_specific   OFF 3/3  ON 3/3
+  G3 -> holds
+
+DECISION: NOT ADOPTED  {'P1 steps': False, 'P2 output tokens': False, 'G1': True, 'G2': True, 'G3': True}
