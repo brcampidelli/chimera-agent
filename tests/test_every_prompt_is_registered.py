@@ -64,6 +64,66 @@ def _prompt_shaped_constants() -> set[str]:
     return found
 
 
+#: A prompt written as a local inside a method (``system = "You are ..."``). The module-level scan
+#: above cannot see it, and that is how the two `data_skills` prompts and three `code_skills` ones
+#: stayed outside the registry (audit 2026-11, a03-10). Narrower than PROMPT_NAME on purpose: a local
+#: called ``note`` or ``header`` is usually a value, not a prompt.
+LOCAL_PROMPT_NAME = re.compile(r"^(system|system_prompt|prompt|instruction|instructions)$", re.IGNORECASE)
+#: Shorter than that is a label, not a prompt. The shortest real one found is 146 characters.
+LOCAL_PROMPT_MIN_CHARS = 60
+
+
+def _literal_chars(node: ast.expr) -> int | None:
+    """Characters of fixed text in a string literal, an f-string or a ``+`` of those; else None.
+
+    An f-string counts its literal parts only, so a prompt that interpolates a runtime value still
+    measures as the prompt it is. Anything else (a call, a name, a ``.format``) is not a literal, and
+    the scan leaves it to the registry entry that points at the function composing it.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return len(node.value)
+    if isinstance(node, ast.JoinedStr):
+        return sum(len(v.value) for v in node.values if isinstance(v, ast.Constant))
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _literal_chars(node.left), _literal_chars(node.right)
+        return None if left is None or right is None else left + right
+    return None
+
+
+def _local_prompt_literals() -> set[str]:
+    """``module:Class.method`` (or ``module:function``) of every function that builds a prompt as a
+    local literal. Registered when an entry points at that function or at its class."""
+    found: set[str] = set()
+
+    def visit(body: list[ast.stmt], module: str, scope: tuple[str, ...]) -> None:
+        for node in body:
+            if isinstance(node, ast.ClassDef):
+                visit(node.body, module, (*scope, node.name))
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                qualname = ".".join((*scope, node.name))
+                for inner in ast.walk(node):
+                    if (
+                        isinstance(inner, ast.Assign)
+                        and len(inner.targets) == 1
+                        and isinstance(inner.targets[0], ast.Name)
+                        and LOCAL_PROMPT_NAME.match(inner.targets[0].id)
+                        and (_literal_chars(inner.value) or 0) >= LOCAL_PROMPT_MIN_CHARS
+                    ):
+                        found.add(f"{module}:{qualname}")
+
+    for path in sorted((ROOT / "chimera").rglob("*.py")):
+        module = ".".join(path.relative_to(ROOT).with_suffix("").parts)
+        visit(ast.parse(path.read_text(encoding="utf-8")).body, module, ())
+    return found
+
+
+def _is_registered(finding: str, registered: set[str]) -> bool:
+    """A function is covered by an entry for itself or for the class that owns it."""
+    module, _, qualname = finding.partition(":")
+    parts = qualname.split(".")
+    return any(f"{module}:{'.'.join(parts[:n])}" in registered for n in range(len(parts), 0, -1))
+
+
 def test_ids_are_unique_and_well_formed() -> None:
     ids = [s.id for s in SECTIONS]
     assert len(ids) == len(set(ids)), "duplicate ids in the registry"
@@ -129,6 +189,16 @@ def test_no_prompt_shaped_constant_escapes_the_registry() -> None:
     assert not missing, (
         "prompt-shaped constants not in chimera/prompts/registry.py (register them, or list them in "
         f"NOT_PROMPTS with the reason no model reads them): {missing}"
+    )
+
+
+def test_no_prompt_written_as_a_local_escapes_the_registry() -> None:
+    registered = {s.source for s in SECTIONS}
+    missing = sorted(f for f in _local_prompt_literals() if not _is_registered(f, registered))
+    assert not missing, (
+        "functions that build a prompt as a local literal (`system = \"...\"`) and are in no "
+        "registry entry. Move the text to a module constant and register that, or register the "
+        f"function with `_i(...)`: {missing}"
     )
 
 

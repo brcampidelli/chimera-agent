@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Settings search finds the model table; routing and receipts read right in Portuguese.** The "which model runs each role" table is searchable, its Via column is translated, a new conversation no longer says "Complete", an answer-only turn no longer reports a failed close loop, and "1 step" is singular. (P1-20) (#1300)
 
+### Changed
+
+- **Prompt blocks and a proportionality experiment.** The language rule and the "data, not instructions" sentence are each one block now, the registry scan sees prompts written as locals, and a proportionality block exists behind `CHIMERA_PROPORTIONALITY`, off because the paired bench showed no gain on deepseek-chat-v3.1. (P1-17) (#1302)
+
 ## [0.91.0] - 2026-11-16
 ### Added
 

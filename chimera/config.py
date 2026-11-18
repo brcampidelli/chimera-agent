@@ -408,6 +408,10 @@ class Settings(BaseSettings):
     # walls on the in-sample set and 9/15 on a fresh one — not fit, so still off. Its named gaps: a
     # widget drawn just after `load`, and block pages that carry no challenge marker.
     browser_situation: bool = Field(default=False, validation_alias="CHIMERA_BROWSER_SITUATION")
+    # The proportionality block (P1-17, audit 2026-11 a03-02; ``chimera.core.agent.PROPORTIONALITY_BLOCK``):
+    # "a question that can be answered from what you can read gets a direct answer". OFF: the number
+    # that decides it is in ``bench/proportionality/RESULTS.md`` and the docstring of the block.
+    proportionality: bool = Field(default=False, validation_alias="CHIMERA_PROPORTIONALITY")
     # Where the browser may go (study 29, P5.2; `chimera/tools/browser_reach.py`). Both EMPTY by
     # default, and empty is exactly the browser that shipped before them: any public site, no loopback.
     # `CHIMERA_BROWSER_SITES` (hosts and `*.domain`, comma-separated) only narrows: a top-level page

@@ -228,4 +228,4 @@ def test_the_owners_language_wins_where_the_stage_names_another(tmp_path: Path) 
 
     synth = _system_of(backend, "Synthesize ONE final answer")
     assert "unless the owner's instructions name a language" in synth
-    assert synth.index("SAME LANGUAGE") < synth.index("Always answer in português")
+    assert synth.index("in the language of the user's task") < synth.index("Always answer in português")
