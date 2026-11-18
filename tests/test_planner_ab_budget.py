@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import shlex
 import shutil
 import subprocess
@@ -320,7 +321,11 @@ def test_concurrency_outside_the_preregistered_limit_is_rejected_before_start(
     with pytest.raises(SystemExit) as error:
         run_ab.main()
     assert error.value.code == 2
-    assert "choose from 1, 2, 3, 4" in capsys.readouterr().err
+    stderr = capsys.readouterr().err
+    match = re.search(r"argument --concurrency: .*\(choose from ([^)]+)\)", stderr)
+    assert match is not None, stderr
+    choices = tuple(choice.strip().strip("'\"") for choice in match[1].split(","))
+    assert choices == ("1", "2", "3", "4")
 
 
 @pytest.mark.skipif(sys.platform == "win32" or shutil.which("bash") is None, reason="Bash launcher")
