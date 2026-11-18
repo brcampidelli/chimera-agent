@@ -247,6 +247,9 @@ class CompletionResult(BaseModel):
     tools_unavailable: bool = Field(default=False, repr=False, exclude=True)
     """Image URLs returned by the provider, retained out of receipts and logs for safe extraction."""
 
+    # Internal limit for callers that need to explain a cut-off after a model fallback.
+    _request_max_tokens: int | None = PrivateAttr(default=None)
+
     reasoning: str = Field(default="", repr=False, exclude=True)
     """The model's reasoning, as the route returned it beside the answer. Never the answer.
 
@@ -1128,6 +1131,48 @@ class LLMGateway:
         # (a stale cooldown must never leave the gateway with zero keys and a hard failure).
         return self._cred_pool.available(order) or order
 
+    def _completion_request(
+        self,
+        resolved: str,
+        kwargs: dict[str, Any],
+        *,
+        max_tokens: int | None,
+        thinking: bool | None,
+        effort: str | None,
+        design_generation: bool,
+    ) -> tuple[dict[str, Any], int | None, str | None]:
+        """Build one candidate's request, including its cap and the effort its receipt can name."""
+        design_deepseek = False
+        if design_generation and resolved == "openrouter/deepseek/deepseek-v4-flash-0731":
+            import litellm
+
+            api_base = (
+                kwargs.get("api_base", self.settings.api_base)
+                or litellm.api_base
+                or os.environ.get("OPENROUTER_API_BASE")
+            )
+            design_deepseek = not api_base or api_base.rstrip("/") == "https://openrouter.ai/api/v1"
+        if design_deepseek:
+            # P1-06's pilot got an empty length stop with native JSON mode. Its Design
+            # prompt already asks for an object, and reasoning can spend the whole reply.
+            if kwargs.get("response_format") == {"type": "json_object"}:
+                kwargs = {key: value for key, value in kwargs.items() if key != "response_format"}
+            if thinking is None and effort is None:
+                thinking = False
+            # A different primary can have asked for 16k. That budget would filter out
+            # 8k OpenRouter routes if passed on to this fallback.
+            max_tokens = min(max_tokens, 8_000) if max_tokens is not None else 8_000
+        provider = self._provider_kwargs(resolved, thinking=thinking, reasoning_effort=effort)
+        merged = _call_kwargs(provider, kwargs)
+        if design_deepseek and effort is not None:
+            # Inspect the merged body: a caller can override the thinking switch and send
+            # the effort after all. Scrubbing refused parameters never drops an effort value.
+            body = merged.get("extra_body")
+            reasoning = body.get("reasoning") if isinstance(body, dict) else None
+            if isinstance(reasoning, dict) and reasoning.get("enabled") is False and "effort" not in reasoning:
+                effort = None
+        return merged, max_tokens, effort
+
     def complete(
         self,
         messages: list[MessageLike],
@@ -1137,6 +1182,7 @@ class LLMGateway:
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
         thinking: bool | None = None,
+        design_generation: bool = False,
         **kwargs: Any,
     ) -> CompletionResult:
         """Run a synchronous chat completion (with the fallback chain) and normalize it."""
@@ -1173,7 +1219,10 @@ class LLMGateway:
         # so every blocking call that asked for reasoning off — `decisions.hosted`, the agent loop
         # without a token callback, `bench/jev_decisions` — ran with the model's own default.
         effort = self._requested_effort(model)
-        extra = self._provider_kwargs(resolved, thinking=thinking, reasoning_effort=effort)
+        primary_kwargs, max_tokens, primary_effort = self._completion_request(
+            resolved, kwargs, max_tokens=max_tokens, thinking=thinking,
+            effort=effort, design_generation=design_generation,
+        )
         message_dicts = _to_message_dicts(messages)
 
         # HORIZON-style prompt caching: serve an identical tool-free request from cache.
@@ -1188,7 +1237,7 @@ class LLMGateway:
         if cache is not None and tools is None and temperature == 0:
             # Fold the other response-affecting request fields into the key so e.g. two calls that
             # differ only in top_p / seed / stop / response_format / api_base don't collide.
-            key_params = {k: v for k, v in _call_kwargs(extra, kwargs).items() if k != "api_key"}
+            key_params = {k: v for k, v in primary_kwargs.items() if k != "api_key"}
             cache_key = CompletionCache.key(
                 model=resolved,
                 messages=message_dicts,
@@ -1203,11 +1252,11 @@ class LLMGateway:
                 # the original count under cache_read_tokens, so a cost tally doesn't double-count a $0
                 # served-from-cache turn as if the tokens were spent again.
                 cached_total = (hit.get("prompt_tokens") or 0) + (hit.get("completion_tokens") or 0)
+                # Older hits may name the requested effort even though the key's body disables it.
+                cached_model = hit.get("model") if primary_effort == effort else None
                 return CompletionResult(
                     content=hit.get("content", ""),
-                    # Stored as the receipt named it (with the variant it was sent, if any); the
-                    # effort is part of the key, so a `#high` hit was a `#high` call.
-                    model=hit.get("model") or self._receipt_model(resolved, effort),
+                    model=cached_model or self._receipt_model(resolved, primary_effort),
                     prompt_tokens=0,
                     completion_tokens=0,
                     cache_read_tokens=cached_total or None,
@@ -1222,18 +1271,6 @@ class LLMGateway:
             provider = self._route_key(candidate)
             api_keys: tuple[str | None, ...] = tuple(self._key_order(provider)) or (None,)
             next_model = False
-            # Per candidate: the reasoning switch is an OpenRouter parameter, and a fallback on another
-            # route must not be sent one it would refuse.
-            candidate_extra = (
-                extra
-                if candidate == resolved
-                else self._provider_kwargs(
-                    candidate, thinking=thinking, reasoning_effort=effort
-                )
-            )
-            candidate_max = (
-                max_tokens if candidate == resolved else self._bounded(budget, candidate)
-            )
             # A caller's response_format was chosen for the primary's provider. This call sets no
             # drop_params, so a fallback on another provider that does not take the parameter would
             # fail outright where the primary would have answered; it is not sent there.
@@ -1243,7 +1280,13 @@ class LLMGateway:
             # The merge that WILL be sent, validated as such: the gateway's own `extra_body` (a route
             # pin, the privacy preference) replaces a caller's in a plain dict merge and would hide a
             # forced `tool_choice` the caller put there, which `_call_kwargs` then restores.
-            merged_kwargs = _call_kwargs(candidate_extra, candidate_kwargs)
+            if candidate == resolved:
+                merged_kwargs, candidate_max, candidate_effort = primary_kwargs, max_tokens, primary_effort
+            else:
+                merged_kwargs, candidate_max, candidate_effort = self._completion_request(
+                    candidate, candidate_kwargs, max_tokens=self._bounded(budget, candidate),
+                    thinking=thinking, effort=effort, design_generation=design_generation,
+                )
             try:
                 reject_forced_tool_choice(candidate, merged_kwargs)
             except UnsupportedParameterError:
@@ -1275,10 +1318,10 @@ class LLMGateway:
                     if api_key:
                         self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
+                    if design_generation and candidate_max != budget:
+                        result._request_max_tokens = candidate_max
                     self._tag_endpoint(result, candidate)
-                    # A fallback on an accepting route receives the same requested effort; a
-                    # fallback that cannot accept it was called without that parameter.
-                    result.model = self._receipt_model(candidate, effort)
+                    result.model = self._receipt_model(candidate, candidate_effort)
                     if failed:
                         result.failed_attempts = list(failed)
                     self._tap_wire(result, call_messages, candidate)
@@ -1635,6 +1678,7 @@ class LLMGateway:
         tools: list[dict[str, Any]] | None = None,
         on_delta: Callable[[str], None] | None = None,
         thinking: bool | None = None,
+        design_generation: bool = False,
         **kwargs: Any,
     ) -> CompletionResult:
         """Streaming completion that still returns a normalized :class:`CompletionResult`.
@@ -1650,12 +1694,12 @@ class LLMGateway:
         max_tokens = self._bounded(budget, resolved)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        call_kwargs = _without_refused(resolved, _call_kwargs(
-            self._provider_kwargs(
-                resolved, thinking=thinking, reasoning_effort=self._requested_effort(model)
-            ),
-            kwargs,
-        ))
+        effort = self._requested_effort(model)
+        request_kwargs, max_tokens, sent_effort = self._completion_request(
+            resolved, kwargs, max_tokens=max_tokens, thinking=thinking,
+            effort=effort, design_generation=design_generation,
+        )
+        call_kwargs = _without_refused(resolved, request_kwargs)
         keys = self._key_order(self._route_key(resolved))
         if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
             call_kwargs["api_key"] = placeholder
@@ -1719,6 +1763,8 @@ class LLMGateway:
                 mark_model(exc, resolved)  # as in `complete`: the refusal names its model
                 raise
             _log.warning("stream failed before any output (%s); falling back to a batch call", exc)
+            if design_generation:
+                kwargs.update(design_generation=True, thinking=thinking)
             result = self.complete(
                 messages, model=model, temperature=temperature, max_tokens=budget, tools=tools,
                 **kwargs,
@@ -1743,10 +1789,9 @@ class LLMGateway:
         filed = _answer_filed_as_reasoning(text, thought, finish_reason, tool_calls)
         if filed:
             _warn_answer_in_reasoning(resolved, provider, generation_id, len(thought))
-        effort = self._requested_effort(model)
         result = CompletionResult(
             content=text,
-            model=self._receipt_model(resolved, effort),
+            model=self._receipt_model(resolved, sent_effort),
             tool_calls=tool_calls,
             prompt_tokens=usage.get("prompt_tokens"),
             completion_tokens=usage.get("completion_tokens"),
@@ -1760,6 +1805,8 @@ class LLMGateway:
             reasoning=thought,
             answer_in_reasoning=filed,
         )
+        if design_generation and max_tokens != budget:
+            result._request_max_tokens = max_tokens
         self._tag_endpoint(result, resolved)
         self._tap_wire(result, sent, resolved)
         self._warn_if_truncated(result, sent, tools, call_kwargs, resolved)
