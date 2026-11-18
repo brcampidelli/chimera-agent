@@ -539,6 +539,19 @@ def _analyse(board: Artboard, tokens: DesignTokens, notes: _Notes) -> tuple[list
     # must be too_complex; avoid processing declarations merely to reach the same refusal.
     if len(tree.elements) * (5 * len(rules) + 1) > budget.left:
         raise TooComplex
+    # A single declaration-heavy rule can exhaust the same budget on its matches.
+    # Count only potentially unaffordable rules before allocating or sorting their entries;
+    # inherited custom properties on :root still cost one match, not every descendant.
+    costly = [rule for rule in rules if 10 * len(rule.decls) * len(tree.elements) > budget.left]
+    matches_left = [budget.left // (10 * len(rule.decls)) for rule in costly]
+    if costly:
+        for el in tree.elements:
+            classes, element_id = set(el.attrs.get("class", "").split()), el.attrs.get("id")
+            for i, rule in enumerate(costly):
+                if selector_matches(rule.selector, el.tag, classes, element_id):
+                    matches_left[i] -= 1
+                    if matches_left[i] < 0:
+                        raise TooComplex
     for el in tree.elements:
         _compute(el, rules, root_px, notes, budget)
         if el.tag == "html":
