@@ -97,6 +97,10 @@ class CloseLoopWiring:
                 return None
             # Measured only now, when the loop is on: a turn with the switch off pays no diff.
             paths, incomplete = measure()
+            if not paths and not incomplete:
+                # An answer-only turn changed nothing, so it has nothing to verify and nothing to close.
+                # Saying "verification did not pass" on it read as a failure of a turn that did not fail.
+                return None
             gate = gate_reason(verified=verified, self_check_clean=self_check_clean, incomplete=incomplete)
             if gate:
                 return CloseLoop(turn_id=turn_id, skipped_reason=gate)

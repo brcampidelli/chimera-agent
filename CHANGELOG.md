@@ -5,7 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
 ### Added
+
+- **Planner switch on every autonomous entrance.** `use_planner` is now settable on Kanban lanes, `/api/runs` and workflow solve steps; the default stays on because the registered A/B did not clear the -5 pp margin on both model families. (P1-01) (#1301)
+
+- **Cron model tiers, measured.** A paired bench on 8 synthetic jobs found the cheap tier fully correct on 7 of them in 3 of 3 seeds, at only ~17% lower cost per job; it changes no default and does not cover the 21 production jobs. (P1-03) (#1299)
+
+### Fixed
+
+- **Settings search finds the model table; routing and receipts read right in Portuguese.** The "which model runs each role" table is searchable, its Via column is translated, a new conversation no longer says "Complete", an answer-only turn no longer reports a failed close loop, and "1 step" is singular. (P1-20) (#1300)
+
+### Changed
+
+- **Prompt blocks and a proportionality experiment.** The language rule and the "data, not instructions" sentence are each one block now, the registry scan sees prompts written as locals, and a proportionality block exists behind `CHIMERA_PROPORTIONALITY`, off because the paired bench showed no gain on deepseek-chat-v3.1. (P1-17) (#1302)
+
+## [0.91.0] - 2026-11-16
+### Added
+
+- **A conversation warns when its prompt cache stops working, and Worth shows the cost per resolved run.** When the share of prompt tokens read from cache falls below 80% across the turns whose route reports cache, the turn receipt and status bar say so once, with the main cause, and rearm when it recovers; a route that reports no cache never warns. Worth gains US$ per resolved run (all runs' cost over the ones that passed), the same per verifier-confirmed run, and the share of runs with a known price; it shows "—" when any run has no price, and stays sorted by name, not ranked. (P1-10, slices d and e) (#1288)
 
 - **`chimera models` and Settings list every role's model, effort and origin.** `GET /api/routing` answers which model each role runs on, at which effort, where that choice came from, and whether the effort is sent on that route. What leaves through it is sanitised: a local path shows only its file name, a URL loses its user, password and query, and a denied provider's message is cleaned the same way. (P1-10, slice b) (#1294)
 

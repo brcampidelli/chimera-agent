@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.governance.drift import Requirement, Spec
+from chimera.prompts.blocks import language_rule
 
 #: Bounds on a drafted spec. A spec with one requirement barely verifies anything; a spec with
 #: twenty is a wall of text nobody reads before approving, which is the same as no review at all.
@@ -66,7 +67,7 @@ Rules:
   - Keep every regex simple and close to literal text. A regex that is too precise will never
     match and the project will never finish.
   - `text` is what a non-programmer reads to decide whether this spec is right, so it must
-    describe what `target` actually checks. Write it in the same language as the request.
+    describe what `target` actually checks. """ + language_rule(of="request", subject="it") + """
   - Do not invent a technology the request did not name unless the request cannot be built
     without one.
 """

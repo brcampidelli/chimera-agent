@@ -26,6 +26,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
+from chimera.prompts.blocks import language_rule
 from chimera.providers.gateway import Message, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -39,7 +40,9 @@ _EXTRACT_SYSTEM = (
     '{"items": [{"text": "...", "kind": "do|avoid|include"}]}. Each item is ONE checkable '
     'requirement: "do" = an action that must happen, "avoid" = something that must NOT happen, '
     '"include" = something the output must contain. Split compound requirements; keep each atomic '
-    "and literal. Write each `text` in the SAME LANGUAGE as the task — this list is read by the "
+    "and literal. "
+    + language_rule(of="task", subject="each `text`")
+    + " This list is read by the "
     "person who wrote that task, and a checklist somebody cannot read is a checklist they cannot "
     "correct. Do NOT solve the task. Output ONLY the JSON object."
 )

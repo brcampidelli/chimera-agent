@@ -23,6 +23,9 @@ from typing import Any
 import pytest
 
 from chimera.config import Settings
+from chimera.core.agent import AgentResult
+from chimera.core.planner import Plan
+from chimera.core.supervisor import Review
 from chimera.providers import CompletionResult
 
 
@@ -94,3 +97,38 @@ def test_generation_only_replaces_the_weaker_gate(tmp_path: Path) -> None:
 
     source = inspect.getsource(AutonomousAgent.run)
     assert "self.spec_test_generator is not None and self.verifier is None and requirements" in source
+
+
+@pytest.mark.parametrize("use_planner", [True, False])
+def test_an_explicit_plan_wins_initially_but_does_not_disable_a_stall_replan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, use_planner: bool
+) -> None:
+    agent = _agent(
+        tmp_path, plan="1. Approved step", replan=True, use_planner=use_planner, max_attempts=3,
+    )
+    prompts: list[str] = []
+    plan_calls = 0
+
+    def fail(task: str) -> AgentResult:
+        prompts.append(task)
+        return AgentResult(answer="incomplete", steps=1, stopped_reason="done")
+
+    def replan(task: str, *, context: str) -> Plan:
+        nonlocal plan_calls
+        plan_calls += 1
+        assert len(prompts) == 2
+        return Plan.from_text("1. Revised step")
+
+    monkeypatch.setattr(agent, "escalation", None)
+    monkeypatch.setattr(agent.worker, "run", fail)
+    monkeypatch.setattr(agent.manager, "review", lambda *_a, **_k: Review(False, "same failure"))
+    monkeypatch.setattr(agent.planner, "plan", replan)
+    agent.run("fix the parser")
+
+    assert len(prompts) == 3
+    assert "Approved step" in prompts[0]
+    assert "Approved step" in prompts[1]
+    if use_planner:
+        assert plan_calls == 1 and "Revised step" in prompts[2]
+    else:
+        assert plan_calls == 0 and "Approved step" in prompts[2]

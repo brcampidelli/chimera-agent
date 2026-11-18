@@ -47,10 +47,15 @@ def _refusals(approvals: Any) -> str:
 class SolveLane:
     """Works a card with the Tier-2 autonomous loop (verify-or-revert)."""
 
-    def __init__(self, *, workspace: Path, model: str | None = None, max_attempts: int = 2) -> None:
+    def __init__(
+        self, *, workspace: Path, model: str | None = None, max_attempts: int = 2,
+        use_planner: bool | None = None,
+    ) -> None:
         self.workspace = workspace
         self.model = model
         self.max_attempts = max_attempts
+        #: ``None`` = the default policy (``chimera.core.planner_policy``); a bool is the owner's word.
+        self.use_planner = use_planner
 
     def for_workspace(self, workspace: Path) -> SolveLane:
         """The same lane bound to another directory — how a card gets run in isolation.
@@ -61,7 +66,10 @@ class SolveLane:
         other had just done. Rebinding is a new instance, not a mutation, because the caller keeps
         using the original for the next batch.
         """
-        return SolveLane(workspace=workspace, model=self.model, max_attempts=self.max_attempts)
+        return SolveLane(
+            workspace=workspace, model=self.model, max_attempts=self.max_attempts,
+            use_planner=self.use_planner,
+        )
 
     def run(self, card: KanbanCard) -> LaneResult:
         from chimera.config import get_settings
@@ -74,6 +82,7 @@ class SolveLane:
             Planner,
             WorkspaceGuard,
         )
+        from chimera.core.planner_policy import resolve_use_planner
         from chimera.core.verify import CommandVerifier
         from chimera.evolution import build_evolution_context
         from chimera.governance.profile import governed_profile
@@ -131,7 +140,10 @@ class SolveLane:
             guard=WorkspaceGuard(self.workspace),
             spine_workspace=self.workspace,
             **evo.apply_to(),
-            config=AutonomousConfig(max_attempts=self.max_attempts),
+            config=AutonomousConfig(
+                max_attempts=self.max_attempts,
+                use_planner=resolve_use_planner(self.use_planner, has_verifier=bool(card.verify)),
+            ),
         )
         result = auto.run(card.action)
         # The refusals travel with the answer. `governed_profile` says in its own docstring
@@ -171,7 +183,8 @@ class AgentLane:
     """
 
     def __init__(
-        self, agent: AgentDef, *, workspace: Path, model: str | None = None, max_attempts: int = 2
+        self, agent: AgentDef, *, workspace: Path, model: str | None = None, max_attempts: int = 2,
+        use_planner: bool | None = None,
     ) -> None:
         self.agent = agent
         self.workspace = workspace
@@ -179,11 +192,13 @@ class AgentLane:
         # model on an agent said something more specific than the flag that dispatched the board.
         self.model = agent.model or model
         self.max_attempts = max_attempts
+        self.use_planner = use_planner  # None = the default policy; see ``SolveLane``
 
     def for_workspace(self, workspace: Path) -> AgentLane:
         """The same agent bound to another directory. See ``SolveLane.for_workspace``."""
         return AgentLane(
-            self.agent, workspace=workspace, model=self.model, max_attempts=self.max_attempts
+            self.agent, workspace=workspace, model=self.model, max_attempts=self.max_attempts,
+            use_planner=self.use_planner,
         )
 
     def run(self, card: KanbanCard) -> LaneResult:
@@ -197,6 +212,7 @@ class AgentLane:
             Planner,
             WorkspaceGuard,
         )
+        from chimera.core.planner_policy import resolve_use_planner
         from chimera.core.registry import as_role
         from chimera.core.verify import CommandVerifier
         from chimera.evolution import build_evolution_context
@@ -263,7 +279,10 @@ class AgentLane:
             guard=WorkspaceGuard(self.workspace),
             spine_workspace=self.workspace,
             **evo.apply_to(),
-            config=AutonomousConfig(max_attempts=self.max_attempts),
+            config=AutonomousConfig(
+                max_attempts=self.max_attempts,
+                use_planner=resolve_use_planner(self.use_planner, has_verifier=bool(card.verify)),
+            ),
         )
         result = auto.run(card.action)
         # Same as `SolveLane`: a caller that throws the approvals away cannot tell "the job did its

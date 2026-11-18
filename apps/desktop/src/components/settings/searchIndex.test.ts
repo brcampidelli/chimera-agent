@@ -48,6 +48,32 @@ export function rowLabelKeys(sources: readonly string[]): Set<string> {
   return keys;
 }
 
+/**
+ * The `settings.*.title` keys of the components Settings draws inside its screens. A table, a list or
+ * a card made by another component carries its heading as `t("settings.<name>.title")` and no `<Row>`,
+ * so the row check above cannot see it: the model-routing table and the safety card were both
+ * unfindable ("papel", "esforço" and "roteamento" answered "nothing matches") for exactly that reason.
+ */
+export function drawnTitleKeys(settingsSource: string, componentSources: ReadonlyMap<string, string>): Set<string> {
+  const keys = new Set<string>();
+  for (const [name, source] of componentSources) {
+    if (!new RegExp(`<${name}[\\s/>]`).test(settingsSource)) continue;
+    for (const match of source.matchAll(/\bt\(\s*"(settings\.[\w.]+\.title)"/g)) keys.add(match[1]);
+  }
+  return keys;
+}
+
+/** The non-test components under components/ (not settings/), by their file's base name. */
+function componentsByName(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const entry of readdirSync(COMPONENTS, { withFileTypes: true })) {
+    if (entry.isFile() && /\.tsx$/.test(entry.name) && !/\.test\.tsx$/.test(entry.name)) {
+      out.set(entry.name.replace(/\.tsx$/, ""), readFileSync(join(COMPONENTS, entry.name), "utf8"));
+    }
+  }
+  return out;
+}
+
 /** The row labels a given index leaves out. */
 export function uncovered(keys: ReadonlySet<string>, index: readonly Pick<SearchEntry, "label">[]): string[] {
   const covered = new Set(index.map((entry) => entry.label));
@@ -71,6 +97,27 @@ describe("the Settings search index", () => {
     // The same check against a source that gained a row, and against the index as it stood.
     const withNewRow = `${settingsSources().join("\n")}\n<Row label={t("settings.row.aBrandNewRow")} hint="x">`;
     expect(uncovered(rowLabelKeys([withNewRow]), SEARCH_INDEX)).toContain("settings.row.aBrandNewRow");
+  });
+
+  it("really finds the titles of the components Settings draws", () => {
+    const keys = drawnTitleKeys(readFileSync(join(COMPONENTS, "Settings.tsx"), "utf8"), componentsByName());
+    expect(keys.has("settings.routing.title")).toBe(true);
+    expect(keys.has("settings.safety.title")).toBe(true);
+  });
+
+  it("has an entry for every card another component draws for Settings", () => {
+    const keys = drawnTitleKeys(readFileSync(join(COMPONENTS, "Settings.tsx"), "utf8"), componentsByName());
+    const missing = uncovered(keys, SEARCH_INDEX);
+    const list = missing.join(", ");
+    expect(missing, `components Settings draws whose title has no entry in searchIndex.ts: ${list}`).toEqual([]);
+  });
+
+  it("fails when a component Settings draws is added without an entry", () => {
+    const settings = `${readFileSync(join(COMPONENTS, "Settings.tsx"), "utf8")}
+<BrandNewTable />`;
+    const components = new Map(componentsByName());
+    components.set("BrandNewTable", 'return <h3>{t("settings.brandNew.title")}</h3>;');
+    expect(uncovered(drawnTitleKeys(settings, components), SEARCH_INDEX)).toContain("settings.brandNew.title");
   });
 
   it("covers every tab", () => {

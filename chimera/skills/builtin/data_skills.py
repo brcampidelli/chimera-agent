@@ -22,6 +22,32 @@ def _require_str(kwargs: dict[str, Any], *keys: str) -> str | None:
     return None
 
 
+#: The system prompt of :class:`DataAnalysisSkill`. Registered in `chimera/prompts/registry.py` (a03-10:
+#: it was a local inside `run`, which the registry scan could not see).
+DATA_ANALYSIS_SYSTEM = (
+    "You are an expert data scientist. Write ONE self-contained Python script that accomplishes "
+    "the task with pandas, numpy and scikit-learn (matplotlib only if a plot is asked for). "
+    "Load the data, do the analysis, and PRINT clear results — metrics and the key numbers. When "
+    "modelling, pick a simple correct model (LogisticRegression / RandomForest / KMeans / "
+    "LinearRegression), use a train/test split, and report an honest score. Handle missing values. "
+    "Output ONLY the Python code — no prose, no markdown fences."
+)
+
+#: The system prompt of :class:`DataVisualizationSkill`; registered like the one above.
+DATA_VISUALIZATION_SYSTEM = (
+    "You are an expert data-visualization engineer. Write ONE self-contained Python script that "
+    "produces the requested chart and SAVES it to a file. Rules: "
+    "(1) For STATIC charts use matplotlib/seaborn and set the headless backend FIRST — "
+    "`import matplotlib; matplotlib.use('Agg')` BEFORE `import matplotlib.pyplot as plt`; never "
+    "call plt.show(). (2) For INTERACTIVE charts use plotly and save with fig.write_html(path). "
+    "(3) Prefer seaborn for statistical / DataFrame charts. (4) Pick the chart type that fits the "
+    "data (line=trend, bar=comparison, scatter=correlation, hist/box=distribution). (5) Label the "
+    "axes and title; for matplotlib use bbox_inches='tight' and a sane dpi. (6) Save to the given "
+    "output path and PRINT that path as the last line of output. Handle a missing dataset "
+    "gracefully. Output ONLY the Python code — no prose, no markdown fences."
+)
+
+
 class DataAnalysisSkill(LLMSkill):
     """Write a self-contained pandas + scikit-learn script for a data-analysis task."""
 
@@ -37,14 +63,7 @@ class DataAnalysisSkill(LLMSkill):
         if task is None:
             return SkillResult(ok=False, error="missing required string 'task'")
         dataset = _require_str(kwargs, "dataset", "data") or "the dataset the user described"
-        system = (
-            "You are an expert data scientist. Write ONE self-contained Python script that accomplishes "
-            "the task with pandas, numpy and scikit-learn (matplotlib only if a plot is asked for). "
-            "Load the data, do the analysis, and PRINT clear results — metrics and the key numbers. When "
-            "modelling, pick a simple correct model (LogisticRegression / RandomForest / KMeans / "
-            "LinearRegression), use a train/test split, and report an honest score. Handle missing values. "
-            "Output ONLY the Python code — no prose, no markdown fences."
-        )
+        system = DATA_ANALYSIS_SYSTEM
         return SkillResult(ok=True, output=self.ask(system, f"Task: {task}\nData: {dataset}"))
 
 
@@ -72,17 +91,6 @@ class DataVisualizationSkill(LLMSkill):
             return SkillResult(ok=False, error="missing required string 'task'")
         dataset = _require_str(kwargs, "dataset", "data") or "the dataset the user described"
         out = _require_str(kwargs, "out", "output") or "chart.png"
-        system = (
-            "You are an expert data-visualization engineer. Write ONE self-contained Python script that "
-            "produces the requested chart and SAVES it to a file. Rules: "
-            "(1) For STATIC charts use matplotlib/seaborn and set the headless backend FIRST — "
-            "`import matplotlib; matplotlib.use('Agg')` BEFORE `import matplotlib.pyplot as plt`; never "
-            "call plt.show(). (2) For INTERACTIVE charts use plotly and save with fig.write_html(path). "
-            "(3) Prefer seaborn for statistical / DataFrame charts. (4) Pick the chart type that fits the "
-            "data (line=trend, bar=comparison, scatter=correlation, hist/box=distribution). (5) Label the "
-            "axes and title; for matplotlib use bbox_inches='tight' and a sane dpi. (6) Save to the given "
-            "output path and PRINT that path as the last line of output. Handle a missing dataset "
-            "gracefully. Output ONLY the Python code — no prose, no markdown fences."
-        )
+        system = DATA_VISUALIZATION_SYSTEM
         prompt = f"Task: {task}\nData: {dataset}\nSave the chart to: {out}"
         return SkillResult(ok=True, output=self.ask(system, prompt))
