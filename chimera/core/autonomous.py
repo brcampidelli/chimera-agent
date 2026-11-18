@@ -71,6 +71,7 @@ from chimera.evolution.stagnation import StagnationDetector
 from chimera.evolution.trace_probe import anti_pattern_hint
 from chimera.governance.sanitize import fence
 from chimera.orchestration.budget import SpendBudget, SpendCappedBackend, SpendExceeded
+from chimera.orchestration.metering import add_usd
 from chimera.providers.catalog import base_slug, split_effort
 from chimera.telemetry import get_logger
 
@@ -795,6 +796,7 @@ class AutonomousAgent:
         #: model-per-role profile cheapest-looking exactly where it spends most. Optional: without
         #: one, receipts carry the worker-only cost they always did.
         self.meter = meter
+        self._pending_overhead: tuple[float | None, int, int] = (0.0, 0, 0)
         self.config = config or AutonomousConfig()
 
     def _emit(self, event: AgentEvent) -> None:
@@ -915,6 +917,34 @@ class AutonomousAgent:
         cap = getattr(getattr(self.worker, "config", None), "max_usd", None)
         return SpendBudget(cap) if cap else None
 
+    def _take_overhead(self) -> tuple[float | None, int, int]:
+        """Take overhead carried by the checkpoint and collected since it was saved."""
+        usd, prompt, completion = self._pending_overhead
+        self._pending_overhead = (0.0, 0, 0)
+        if self.meter is None:
+            return usd, prompt, completion
+        live_usd, live_prompt, live_completion = self.meter.take()
+        return add_usd(usd, live_usd), prompt + live_prompt, completion + live_completion
+
+    def _capped_planner(self, spend: SpendBudget | None) -> Planner | None:
+        """The initial plan and every re-plan draw on the same ceiling as the worker."""
+        if spend is None or self.planner is None or not self.config.use_planner:
+            return self.planner
+        inner = getattr(self.planner, "backend", None)
+        if inner is None:
+            return self.planner
+        from chimera.fusion.engine import FusionEngine
+
+        capped = copy.copy(self.planner)
+        if isinstance(inner, FusionEngine):
+            # A fused plan's panel, judge and synthesizer must reserve and settle separately.
+            engine = copy.copy(inner)
+            engine.backend = SpendCappedBackend(inner.backend, spend)
+            capped.backend = engine
+        else:
+            capped.backend = SpendCappedBackend(inner, spend)
+        return capped
+
     def _capped_manager(self, spend: SpendBudget | None) -> Manager | None:
         """The reviewer, drawing on the run's money instead of on nothing.
 
@@ -1024,6 +1054,7 @@ class AutonomousAgent:
 
     def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
         self._carried_taint = False
+        self._pending_overhead = (0.0, 0, 0)
         # Attempts restored below are part of this evolution decision too: do not judge only the
         # tail attempt and let a protected earlier edit disappear across a process restart.
         self._resumed_attempts: list[Attempt] = []
@@ -1127,25 +1158,22 @@ class AutonomousAgent:
         # normalized — the raw `task` stays the identity used for memory keys / experience below, so a
         # normalized run still dedups against the same task. Deterministic no-op on non-bug or short tasks.
         plan_task = normalize_task(task) if self.config.normalize_task else task
-        # A caller-supplied plan (plan mode) is used as-is and skips the planning call entirely — the
-        # run executes the exact steps the human approved. Otherwise plan normally (when enabled).
-        if self.provided_plan is not None:
-            plan = self.provided_plan
-        elif self.planner and self.config.use_planner:
-            plan = self.planner.plan(plan_task, context=context)
-        else:
-            plan = None
+        # Establish the run ceiling before planning so the worker starts with the money left.
+        spend = self._run_budget()
+        planner = self._capped_planner(spend)
+        plan = self.provided_plan
         # Outer-loop ledger (Magentic-One): accumulates *why* attempts fail so a re-plan on
         # stall is smarter than the first plan. Only when re-planning is enabled and there's a
         # planner to re-run — otherwise the stall path keeps the cheap advisory pivot.
         task_ledger = (
             TaskLedger(task=task)
-            if self.replan_on_stall and self.planner and self.config.use_planner
+            if self.replan_on_stall and planner and self.config.use_planner
             else None
         )
         attempts: list[Attempt] = []
         feedback = ""
         start_index = 1
+        saved = None
         # Durable resume (LangGraph-style thread): if this thread has a live checkpoint, restore
         # the loop state and continue from where the crash left off instead of starting over.
         if self.checkpointer is not None and thread_id:
@@ -1154,6 +1182,21 @@ class AutonomousAgent:
                 task = str(saved.get("task", task))
                 attempts = [Attempt(**a) for a in saved.get("attempts", [])]
                 self._resumed_attempts = list(attempts)
+                self._pending_overhead = tuple(saved.get("pending_overhead", (0.0, 0, 0)))
+                if spend is not None:
+                    if (debits := saved.get("spend_debits")) is not None:
+                        usd, estimated, unpriced_model = debits
+                        spend.charge(usd, estimated=estimated)
+                        if unpriced_model is not None:
+                            spend.charge(None, label=unpriced_model)
+                    else:
+                        # Legacy or uncapped runs only have receipt amounts. Each attempt already
+                        # includes its attributed overhead; only the pending overhead is additional.
+                        for attempt in attempts:
+                            spend.charge(attempt.usd, label=attempt.model or f"attempt {attempt.index}")
+                        spend.charge(self._pending_overhead[0], label="pending overhead")
+                steps = saved.get("plan_steps")
+                plan = Plan(steps=list(steps), raw=str(saved.get("plan_raw", ""))) if steps is not None else None
                 if self.escalation is not None:
                     # The ladder's floor and what each attempt asked for were in memory only.
                     self.escalation.restore(attempts)
@@ -1183,8 +1226,6 @@ class AutonomousAgent:
                     )
                 feedback = str(saved.get("feedback", ""))
                 start_index = int(saved.get("next_index", 1))
-                steps = saved.get("plan_steps")
-                plan = Plan(steps=list(steps), raw=str(saved.get("plan_raw", ""))) if steps is not None else None
                 # Re-seed taint: the pre-crash run consumed untrusted content, so this resumed run is
                 # tainted too even if it fetches nothing new (it may succeed off residual workspace
                 # state). Without this the fresh ledger reads clean and the anti-poisoning gates
@@ -1197,18 +1238,26 @@ class AutonomousAgent:
                     self.taint.record_fetch("resumed-tainted-state")
                 self._emit(_ev_status(f"resumed thread {thread_id} at attempt {start_index}"))
 
+        # An approved or checkpointed plan is already available to the first attempt.
+        if saved is None and plan is None and planner and self.config.use_planner:
+            try:
+                plan = planner.plan(plan_task, context=context)
+            except SpendExceeded as exc:
+                return self._finalize_capped(
+                    task, attempts, plan, thread_id,
+                    AgentResult(answer=str(exc), steps=0, stopped_reason="spend", usd=0.0), start_index,
+                )
+            self._save_checkpoint(
+                thread_id, task, start_index, feedback, plan, attempts,
+                spend=spend, was_tainted=self.run_tainted(),
+            )
+
         self._emit(_ev_status("planning complete" if plan else "starting"))
         # For --keep-workspace: the post-edit snapshot of the LAST attempt, so an external grader
         # (SWE-bench, CI, a human) can judge the agent's final work even when Chimera's own verifier
         # rejected it and rolled the tree back. Between-attempt reverts still happen (each attempt stays
         # independent); only the final on-disk state is restored to this on a failed run.
         last_after = None
-        # ONE ceiling for the whole run, not one per attempt. `Agent.run` builds a `SpendBudget`
-        # from `AgentConfig.max_usd` and this loop calls `run` once per attempt, so a three-attempt
-        # run used to get three separate ceilings — measured: a run asking for $0.000002 spent
-        # $0.0129 and every attempt started again at zero. Same reasoning as `SpendCappedBackend`,
-        # which already says it for fan-outs: the money is the RUN's, so the budget is the run's.
-        spend = self._run_budget()
         # The reviewer draws on the same money. It is a model call the user pays for, made once per
         # attempt, and it was outside every ceiling — so a capped run still paid for reviews after
         # the cap. Wrapped, never mutated: the Manager is per-run here, but a wrapper installed on
@@ -1219,7 +1268,7 @@ class AutonomousAgent:
             # interrupted, so a stop request halts the loop here — after the previous attempt finished,
             # before this one begins. The already-completed attempts are returned intact.
             if self.should_stop is not None and self.should_stop():
-                return self._finalize_cancelled(task, attempts, plan, thread_id)
+                return self._finalize_cancelled(task, attempts, plan, thread_id, index=index)
             self._emit(_ev_attempt(index, self.config.max_attempts))
             snapshot = self.guard.snapshot() if self.guard else None
             prompt = self._compose(plan_task, plan, context, feedback)
@@ -1246,7 +1295,7 @@ class AutonomousAgent:
             # uninterruptible: `_run_worker` hands `should_stop` down, and a worker that accepts it
             # returns at its next step boundary.
             if self.should_stop is not None and self.should_stop():
-                return self._finalize_cancelled(task, attempts, plan, thread_id)
+                return self._finalize_cancelled(task, attempts, plan, thread_id, index=index)
             agent_result = self._run_worker(worker, prompt, spend=spend)
             if self.escalation is not None:
                 # A model that ran inside the attempt (`escalate_on_tool_loop`) is a floor for the retries.
@@ -1641,11 +1690,7 @@ class AutonomousAgent:
             # rather than to a running total — and `add_usd` keeps `None` poisonous, because a
             # receipt that adds only the legs it happened to price reports the run as cheaper than
             # it was, always in the same direction.
-            from chimera.orchestration.metering import add_usd
-
-            over_usd, over_prompt, over_completion = (
-                self.meter.take() if self.meter is not None else (0.0, 0, 0)
-            )
+            over_usd, over_prompt, over_completion = self._take_overhead()
             attempt.usd = add_usd(getattr(agent_result, "usd", None), over_usd)
             attempt.overhead_usd = over_usd
             attempt.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0) + over_prompt
@@ -1710,7 +1755,7 @@ class AutonomousAgent:
                 if (run_tainted and self.pause_on_taint) or self.pause_always or flagged:
                     self._save_checkpoint(
                         thread_id, task, index, feedback, plan, attempts,
-                        awaiting_approval=True, paused_answer=answer, was_tainted=run_tainted,
+                        spend=spend, awaiting_approval=True, paused_answer=answer, was_tainted=run_tainted,
                         # Persist the diff-gate verdict (M19-A2): a hollow success (empty diff) must
                         # STILL be blocked from minting a skill/memory when it's approved on resume —
                         # otherwise the HITL path silently bypasses the anti-hollow-learning gate.
@@ -1811,21 +1856,27 @@ class AutonomousAgent:
             # attempts keep failing the *same* way, refining is a local optimum — fold in a
             # pivot instruction so the next attempt tries a fundamentally different approach.
             # Advisory only; the escalated worker still supplies the stronger model.
+            replan_summary = ""
             if self.stagnation is not None:
                 self.stagnation.record_signature(hint or vout or feedback)
                 if self.stagnation.assess().stagnant:
-                    if task_ledger is not None and self.planner is not None:
+                    if task_ledger is not None and planner is not None and index < self.config.max_attempts:
                         # Dual-ledger re-plan: record WHY it's stuck, then rebuild the plan with
                         # that accumulated cause so the retry is fundamentally different — not the
                         # same plan reworded. Strictly stronger than the advisory pivot.
                         task_ledger.add_guess((hint or vout or feedback)[:200])
                         task_ledger.note_replan()
-                        plan = self.planner.plan(
-                            plan_task, context="\n\n".join(p for p in (context, task_ledger.context()) if p)
-                        )
-                        feedback = f"{feedback}\n\nRe-planned after repeated failure. {task_ledger.summary()}"
-                        self._emit(_ev_status(f"re-planned after stall {task_ledger.summary()}"))
-                        _log.debug("attempt %d: stall -> dual-ledger re-plan", index)
+                        try:
+                            plan = planner.plan(
+                                plan_task, context="\n\n".join(p for p in (context, task_ledger.context()) if p)
+                            )
+                        except SpendExceeded as exc:
+                            return self._finalize_capped(
+                                task, attempts, plan, thread_id,
+                                AgentResult(answer=str(exc), steps=0, stopped_reason="spend", usd=0.0), index + 1,
+                            )
+                        replan_summary = task_ledger.summary()
+                        feedback = f"{feedback}\n\nRe-planned after repeated failure. {replan_summary}"
                     else:
                         _log.debug("attempt %d: stagnation detected; injecting pivot advice", index)
                         feedback = f"{feedback}\n\n{self.stagnation.advice()}"
@@ -1841,8 +1892,11 @@ class AutonomousAgent:
             # 'clean' — bypassing the outbound-strip, tainted-provenance and pause-on-taint gates.
             self._save_checkpoint(
                 thread_id, task, index + 1, feedback, plan, attempts,
-                was_tainted=self.run_tainted(),
+                spend=spend, was_tainted=self.run_tainted(),
             )
+            if replan_summary:
+                self._emit(_ev_status(f"re-planned after stall {replan_summary}"))
+                _log.debug("attempt %d: stall -> dual-ledger re-plan", index)
 
         # The run ultimately failed: if this failure pattern recurs, distill an advisory
         # anti-pattern card so future attempts are warned. Guarded — the capability is
@@ -1908,8 +1962,8 @@ class AutonomousAgent:
         plan: Plan | None,
         thread_id: str | None,
         *,
+        index: int,
         agent_result: Any = None,
-        index: int = 0,
         snapshot: Any = None,
     ) -> AutonomousResult:
         """Cooperative stop: the caller asked to cancel between attempts. Return a well-formed result
@@ -1920,22 +1974,23 @@ class AutonomousAgent:
         budget-exhausted return above). The checkpoint is cleared — a user-cancelled run is terminal,
         not resumable — and a receipt is persisted, mirroring the exhaustion path's construction.
 
-        ``agent_result`` is the attempt that was cut short, when there is one. Two of the three cancel
-        sites fire before any model call and pass nothing; the third fires with a worker that already
-        ran, and dropping THAT one was the defect. Its sibling :meth:`_finalize_capped` carries the
-        measurement in a comment: a receipt reading ``usd: null, attempts: []`` for a run that had
-        just spent money showed a paid run as free on the Cost screen.
+        ``agent_result`` is the worker that was cut short, when there is one. Planning and re-planning
+        can already have incurred overhead when cancellation fires before the worker starts.
 
         ``snapshot`` lets the partial attempt record what it wrote. The files are NOT reverted —
         whoever pressed Stop may want the work, and `guard.restore` only runs on the verified path —
         so `reverted: false` with `diffs: []` read as "it changed nothing" about a workspace that had
         changed. Recording is the fix; reverting would destroy work somebody may have wanted.
         """
-        if agent_result is not None:
-            attempts = [*attempts, self._partial_attempt(agent_result, index, snapshot)]
+        last = attempts[-1].answer if attempts else ""
+        overhead = self._take_overhead()
+        if agent_result is not None or overhead != (0.0, 0, 0):
+            partial = self._partial_attempt(agent_result, index, snapshot, overhead=overhead)
+            attempts = [*attempts, partial]
+            if agent_result is not None:
+                last = partial.answer
         self._emit(_ev_status("cancelled"))
         self._clear_checkpoint(thread_id)
-        last = (getattr(agent_result, "answer", "") or "") or (attempts[-1].answer if attempts else "")
         self._emit(_ev_final(False, last))
         result = AutonomousResult(
             answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="cancelled",
@@ -2008,29 +2063,34 @@ class AutonomousAgent:
         self._persist_receipt(result, task)
         return result
 
-    def _partial_attempt(self, agent_result: Any, index: int, snapshot: Any = None) -> Attempt:
+    def _partial_attempt(
+        self,
+        agent_result: Any,
+        index: int,
+        snapshot: Any = None,
+        *,
+        overhead: tuple[float | None, int, int] | None = None,
+    ) -> Attempt:
         """An attempt that was cut short: what it cost, and what it left on disk.
 
         Shared by the two stop paths, because the bookkeeping is the same and having it in one of
         them was how the other went without it for so long. The meter is drained here — the overhead
         it holds belongs to this attempt and would otherwise be billed to whatever runs next.
         """
-        from chimera.orchestration.metering import add_usd
-
-        over_usd, over_prompt, over_completion = (
-            self.meter.take() if self.meter is not None else (0.0, 0, 0)
-        )
+        over_usd, over_prompt, over_completion = self._take_overhead() if overhead is None else overhead
         parcial = Attempt(index, getattr(agent_result, "answer", "") or "", False, False, False, False)
         parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
-        parcial.usd = add_usd(getattr(agent_result, "usd", None), over_usd)
+        worker_usd = 0.0 if agent_result is None else getattr(agent_result, "usd", None)
+        parcial.usd = add_usd(worker_usd, over_usd)
         parcial.overhead_usd = over_usd
         parcial.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0) + over_prompt
         parcial.completion_tokens = (
             int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
         )
         parcial.model = str(getattr(agent_result, "model", "") or "")
-        parcial.requested_model = self._asked_model(self._worker_for(index), index)
-        parcial.effort = split_effort(parcial.requested_model)[1] or ""
+        if agent_result is not None:
+            parcial.requested_model = self._asked_model(self._worker_for(index), index)
+            parcial.effort = split_effort(parcial.requested_model)[1] or ""
 
         # A cut-short attempt still sent its instructions, and was paid for under them.
         parcial.system_sha = _system_sha(agent_result)
@@ -2408,14 +2468,21 @@ class AutonomousAgent:
         feedback: str,
         plan: Plan | None,
         attempts: list[Attempt],
+        *,
+        spend: SpendBudget | None,
         **extra: Any,
     ) -> None:
         """Persist resumable loop state for ``thread_id`` (no-op without a checkpointer/thread)."""
         if self.checkpointer is None or not thread_id:
             return
+        # A saved plan and its charges become durable together. Carry overhead that has yet
+        # to reach an attempt, and account for it once when that attempt or a stop is recorded.
+        self._pending_overhead = self._take_overhead()
         state: dict[str, Any] = {
             "task": task,
             "next_index": next_index,
+            "spend_debits": spend.checkpoint() if spend is not None else None,
+            "pending_overhead": self._pending_overhead,
             "feedback": feedback,
             "plan_steps": plan.steps if plan is not None else None,
             "plan_raw": plan.raw if plan is not None else "",

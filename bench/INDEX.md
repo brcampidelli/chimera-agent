@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-142 directories: 127 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
+143 directories: 128 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
@@ -104,6 +104,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`panel_correlation`](panel_correlation/) | with result | 0 | 1 |
 | [`parallel_tools`](parallel_tools/) | with result | 1 | 2 |
 | [`perturbation_floor`](perturbation_floor/) | with result | 2 | 1 |
+| [`planner_ab`](planner_ab/) | with result | 1 | 1 |
 | [`premise_capitulation`](premise_capitulation/) | with result | 1 | 1 |
 | [`project_pack`](project_pack/) | preregistered, no result | 1 | 0 |
 | [`prompt_overlays`](prompt_overlays/) | preregistered, no result | 1 | 0 |

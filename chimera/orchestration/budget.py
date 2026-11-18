@@ -143,6 +143,14 @@ class SpendBudget:
     def spent(self) -> float:
         return round(self._spent, 6)
 
+    def checkpoint(self) -> tuple[float, bool, str | None]:
+        """Return the settled charges and their provenance at a durable run boundary.
+
+        Keep full precision for admission after resume. No requests are in flight at these
+        boundaries, so reservations are process-local.
+        """
+        return self._spent, self._estimated, self._unpriced_model
+
     @property
     def reserved(self) -> float:
         """The worst case of the calls still in flight, already counted against the ceiling."""
