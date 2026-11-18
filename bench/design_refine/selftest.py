@@ -13,7 +13,7 @@ from typing import Any
 from briefs import BRIEFS, refinement
 from measure import OverflowMeter, contrast, edit_outcome, first_attempt_edit
 
-from chimera.design.model import Artboard, DesignDocument, Page, wire
+from chimera.design.model import Artboard, DesignDocument, Page
 from chimera.design.tokens import default_tokens
 from chimera.providers.gateway import CompletionResult
 

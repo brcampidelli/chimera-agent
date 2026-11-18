@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-142 directories: 126 with result, 14 preregistered, no result, 0 wrapper, 2 neither.
+142 directories: 127 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
@@ -41,7 +41,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`default_model`](default_model/) | preregistered, no result | 1 | 0 |
 | [`denylist_bypass`](denylist_bypass/) | with result | 2 | 1 |
 | [`design_effect`](design_effect/) | with result | 0 | 1 |
-| [`design_refine`](design_refine/) | preregistered, no result | 1 | 0 |
+| [`design_refine`](design_refine/) | with result | 1 | 1 |
 | [`directive_boundary`](directive_boundary/) | with result | 1 | 1 |
 | [`edit_format_by_model`](edit_format_by_model/) | with result | 1 | 1 |
 | [`edit_tools`](edit_tools/) | with result | 1 | 1 |

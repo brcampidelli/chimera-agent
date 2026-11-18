@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, TypeVar
 
@@ -37,6 +37,7 @@ from chimera.design.export_html import TokenIssue, Unchecked, check_report
 from chimera.design.html_check import summarize_html
 from chimera.design.ids import new_id, remap_new_ids
 from chimera.design.model import (
+    Artboard,
     DesignDocument,
     DesignError,
     DesignNode,
@@ -61,6 +62,20 @@ MAX_BRIEF = 8_000
 MAX_SUMMARY_NODES = 300
 #: An HTML source larger than this is not quoted to the refinement; a whole replacement is asked for.
 HTML_SOURCE_CAP = 24 * 1024
+#: A refinement quotes the target artboard's source and, for the others, only an id and a name; the
+#: model asks for one it needs (``read``) and gets it in one more call. The element operations also
+#: leave the guide for a document that has no elements. Off, a refinement quotes every source and sends
+#: the whole guide, as it did before.
+#:
+#: **Off by default: bench/design_refine did not pass its pre-registered rule** (RESULTS.md, measured on
+#: deepseek-v4-flash-0731 and glm-5.3-flash, 30 briefs x 3 repetitions). It does send less: input
+#: tokens per adjustment fell 64% on DeepSeek and 52% on GLM. But on DeepSeek the lean guide made
+#: *generated* artboards overflow more (30% -> 53%, +22.9 pp, McNemar p = 0.0009; Gate 3), and on GLM
+#: the 3-screen designs fell 39% short of the 50% bar (Gate 2). First-attempt ``edit_html`` stayed
+#: within -5 pp on DeepSeek (+3.33 pp), but not on GLM (-8.64 pp; Gate 1). Turn it on only with a
+#: new registration that separates the guide from the sources.
+LEAN_REFINE = False
+MAX_READS = 5
 TEXT_EXCERPT = 120
 MAX_SELECTED = 50
 MAX_COMMENTS_SENT = 50
@@ -92,6 +107,13 @@ class Proposal(_Strict):
     questions: Annotated[list[Line], Field(max_length=5)] = Field(default_factory=list)
 
 
+class RefineProposal(Proposal):
+    """A refinement answer: a proposal, or the ids of the artboard sources the model needs to see first."""
+
+    summary: Annotated[str, StringConstraints(max_length=2_000)] = ""
+    read: Annotated[list[SafeId], Field(max_length=MAX_READS)] = Field(default_factory=list)
+
+
 class AuditIssue(_Strict):
     severity: Literal["high", "medium", "low"]
     node_id: SafeId | None = None
@@ -115,6 +137,8 @@ class ProposalOutcome:
     id_map: dict[str, str] = field(default_factory=dict)
     error: str | None = None
     attempts: int = 0
+    #: How many times the model asked for an artboard source and got it in a follow-up call (0 or 1).
+    read_rounds: int = 0
 
     @property
     def ok(self) -> bool:
@@ -256,6 +280,7 @@ def propose(
     model: str | None = None,
     id_factory: Callable[[str], str] = new_id,
     on_delta: Callable[[str], None] | None = None,
+    lean_refine: bool | None = None,
 ) -> ProposalOutcome:
     """A first proposal for ``brief`` against ``doc`` (usually empty)."""
     user = _generate_prompt().format(
@@ -264,7 +289,7 @@ def propose(
         tokens=_untrusted(_dumps(wire(doc.tokens))),
         assets=_untrusted(_dumps(assets or [])),
         document=_untrusted(_dumps(summarize(doc))),
-        operations=_operations_guide(),
+        operations=_operations_guide(doc, lean_refine=lean_refine),
     )
     return _proposal_call(backend, doc, user, model=model, id_factory=id_factory, on_delta=on_delta)
 
@@ -278,6 +303,7 @@ def refine(
     model: str | None = None,
     id_factory: Callable[[str], str] = new_id,
     html_selection: Mapping[str, Any] | None = None,
+    lean_refine: bool | None = None,
 ) -> ProposalOutcome:
     """A targeted change for ``request``, scoped by the selection and the comments on it."""
     selected = [nid for nid in dict.fromkeys(selected_ids) if nid in doc.nodes][:MAX_SELECTED]
@@ -287,17 +313,30 @@ def refine(
         for c in doc.comments
         if not c.resolved and (not wanted or c.node_id in wanted)
     ][:MAX_COMMENTS_SENT]
-    user = _refine_prompt().format(
-        request=_untrusted(request[:MAX_BRIEF]),
-        selected=_untrusted(_dumps([_node_summary(doc.nodes[nid]) for nid in selected])),
-        comments=_untrusted(_dumps(comments)),
-        tokens=_untrusted(_dumps(wire(doc.tokens))),
-        document=_untrusted(_dumps(summarize(doc))),
-        html_sources=_untrusted(html_sources(doc)),
-        html_selection=_selected_html(doc, html_selection),
-        operations=_operations_guide(),
-    )
-    return _proposal_call(backend, doc, user, model=model, id_factory=id_factory)
+    lean = LEAN_REFINE if lean_refine is None else lean_refine
+    shown = html_source_targets(doc, request, html_selection=html_selection, comments=comments) if lean else None
+
+    def build(only: set[str] | None) -> str:
+        return _refine_prompt(lean_refine=lean).format(
+            request=_untrusted(request[:MAX_BRIEF]),
+            selected=_untrusted(_dumps([_node_summary(doc.nodes[nid]) for nid in selected])),
+            comments=_untrusted(_dumps(comments)),
+            tokens=_untrusted(_dumps(wire(doc.tokens))),
+            document=_untrusted(_dumps(summarize(doc))),
+            html_sources=_untrusted(html_sources(doc, only)),
+            html_selection=_selected_html(doc, html_selection),
+            operations=_operations_guide(doc, lean_refine=lean),
+        )
+
+    def follow_up(ids: Sequence[str]) -> str | None:
+        known = {board.id for board in _html_boards(doc)}
+        if not set(ids) <= known:
+            return None
+        return build(None if shown is None else shown | set(ids))
+
+    return _proposal_call(backend, doc, build(shown), model=model, id_factory=id_factory,
+                          schema=RefineProposal if _html_prompts_enabled() and lean else Proposal,
+                          follow_up=follow_up)
 
 
 def audit(
@@ -340,12 +379,21 @@ def _generate_prompt() -> str:
     return prompts.HTML_GENERATE if _html_prompts_enabled() else prompts.GENERATE
 
 
-def _refine_prompt() -> str:
-    return prompts.HTML_REFINE if _html_prompts_enabled() else prompts.REFINE
+def _refine_prompt(*, lean_refine: bool | None = None) -> str:
+    if not _html_prompts_enabled():
+        return prompts.REFINE
+    lean = LEAN_REFINE if lean_refine is None else lean_refine
+    return prompts.HTML_REFINE_LEAN if lean else prompts.HTML_REFINE
 
 
-def _operations_guide() -> str:
-    return prompts.HTML_OPERATIONS_GUIDE if _html_prompts_enabled() else prompts.OPERATIONS_GUIDE
+def _operations_guide(doc: DesignDocument, *, lean_refine: bool | None = None) -> str:
+    """The operations the model is told about: no element operations for a document without elements."""
+    if not _html_prompts_enabled():
+        return prompts.OPERATIONS_GUIDE
+    lean = LEAN_REFINE if lean_refine is None else lean_refine
+    if lean and not doc.nodes:
+        return prompts.HTML_OPERATIONS_GUIDE_LEAN
+    return prompts.HTML_OPERATIONS_GUIDE
 
 
 def _base_instruction() -> str:
@@ -360,10 +408,30 @@ def _proposal_call(
     model: str | None,
     id_factory: Callable[[str], str],
     on_delta: Callable[[str], None] | None = None,
+    schema: type[Proposal] = Proposal,
+    follow_up: Callable[[Sequence[str]], str | None] | None = None,
 ) -> ProposalOutcome:
-    proposal, error, attempts = _ask(backend, user, Proposal, model=model, on_delta=on_delta)
-    if proposal is None:
-        return ProposalOutcome(error=error, attempts=attempts)
+    parsed, error, attempts = _ask(backend, user, schema, model=model, on_delta=on_delta)
+    reads = 0
+    if isinstance(parsed, RefineProposal) and parsed.read and not parsed.operations and follow_up is not None:
+        # The model asked for a source it was not shown. One more call, with it; a second ask is refused.
+        again = follow_up(parsed.read)
+        if again is None:
+            return ProposalOutcome(error="the model asked to read an artboard that does not exist",
+                                   attempts=attempts, read_rounds=0)
+        parsed, error, follow_attempts = _ask(backend, again, Proposal, model=model)
+        attempts += follow_attempts
+        reads = 1
+    if parsed is None:
+        return ProposalOutcome(error=error, attempts=attempts, read_rounds=reads)
+    if schema is RefineProposal and not parsed.operations:
+        if parsed.questions:
+            answer = Proposal.model_validate({key: value for key, value in wire(parsed).items() if key != "read"})
+            return ProposalOutcome(proposal=answer, error="the refinement needs clarification",
+                                   attempts=attempts, read_rounds=reads)
+        return ProposalOutcome(error="the refinement returned no operations", attempts=attempts, read_rounds=reads)
+    base = {key: value for key, value in wire(parsed).items() if key != "read"}
+    proposal = Proposal.model_validate(base)
     raw_ops = [wire(op) for op in proposal.operations]
     remapped, id_map = remap_new_ids(raw_ops, id_factory)
     try:
@@ -372,13 +440,13 @@ def _proposal_call(
             doc, remapped, max_ops=MAX_PROPOSAL_OPS, allow_lock_changes=False
         )
     except ValidationError as exc:
-        return ProposalOutcome(proposal=proposal, id_map=id_map, attempts=attempts,
+        return ProposalOutcome(proposal=proposal, id_map=id_map, attempts=attempts, read_rounds=reads,
                                error=f"the operations do not apply: {short_errors(exc)}")
     except DesignError as exc:
-        return ProposalOutcome(proposal=proposal, id_map=id_map, attempts=attempts,
+        return ProposalOutcome(proposal=proposal, id_map=id_map, attempts=attempts, read_rounds=reads,
                                error=f"the operations do not apply: {exc}")
     return ProposalOutcome(proposal=proposal, preview=preview, inverse=inverse, id_map=id_map,
-                           attempts=attempts)
+                           attempts=attempts, read_rounds=reads)
 
 
 def _ask(
@@ -553,12 +621,46 @@ def summarize(doc: DesignDocument, *, max_nodes: int = MAX_SUMMARY_NODES) -> dic
     return out
 
 
-def html_sources(doc: DesignDocument) -> str:
+def _html_boards(doc: DesignDocument) -> list[Artboard]:
+    """The HTML artboards of the pages a refinement may edit (not the generated index), in reading order."""
+    return [board for page in doc.pages if not is_index_page(page) for board in page.artboards
+            if board.html is not None]
+
+
+def html_source_targets(
+    doc: DesignDocument,
+    request: str,
+    *,
+    html_selection: Mapping[str, Any] | None = None,
+    comments: Sequence[Mapping[str, Any]] = (),
+) -> set[str]:
+    """The ids of the HTML artboards whose source the request is about, read from what it carries.
+
+    The clicked HTML element, the artboard an open comment is on, an artboard the request names (its
+    name or id as a whole word, any case). A design with one HTML artboard has that one. Nothing found
+    in a design of several is the empty set: the model then sees ids and names and asks for what it needs.
+    """
+    boards = _html_boards(doc)
+    if len(boards) <= 1:
+        return {board.id for board in boards}
+    wanted: set[str] = set()
+    if html_selection is not None and html_selection.get("artboard_id"):
+        wanted.add(str(html_selection["artboard_id"]))
+    wanted.update(str(c["artboardId"]) for c in comments if c.get("artboardId"))
+    for board in boards:
+        for label in (board.name.strip(), board.id):
+            if len(label) >= 2 and re.search(r"(?<![\w-])" + re.escape(label) + r"(?![\w-])", request, re.I):
+                wanted.add(board.id)
+    return wanted & {board.id for board in boards}
+
+
+def html_sources(doc: DesignDocument, only: Collection[str] | None = None) -> str:
     """The exact HTML source of each HTML artboard on a non-index page, for a refinement to quote.
 
     An ``artboard.edit_html`` replaces one text that must occur exactly once, so the model needs the
     source as it is, not as a summary. A source over :data:`HTML_SOURCE_CAP` is not shown; the model is
-    told to replace it whole with ``artboard.set_html`` instead.
+    told to replace it whole with ``artboard.set_html`` instead. With ``only``, the artboards outside it
+    are listed by id and name and marked ``not shown``: the model can ask for one (``read``).
     """
     parts: list[str] = []
     for page in doc.pages:
@@ -569,7 +671,9 @@ def html_sources(doc: DesignDocument) -> str:
                 continue
             size = len(board.html.encode("utf-8"))
             header = f"artboard {board.id} on page {page.id} ({size} bytes)"
-            if size > HTML_SOURCE_CAP:
+            if only is not None and board.id not in only:
+                parts.append(f"{header}, named {board.name!r}: not shown")
+            elif size > HTML_SOURCE_CAP:
                 parts.append(f"{header}: not shown, it is over {HTML_SOURCE_CAP // 1024} KB; "
                              "replace the whole source with artboard.set_html")
             else:

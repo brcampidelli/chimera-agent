@@ -109,7 +109,9 @@ def render_all() -> dict[str, str]:
         "design.html_base": design_prompts.HTML_BASE_INSTRUCTION,
         "design.html_generate": design_prompts.HTML_GENERATE,
         "design.html_refine": design_prompts.HTML_REFINE,
+        "design.html_refine_lean": design_prompts.HTML_REFINE_LEAN,
         "design.html_operations": design_prompts.HTML_OPERATIONS_GUIDE,
+        "design.html_operations_lean": design_prompts.HTML_OPERATIONS_GUIDE_LEAN,
         "design.html_turn_note": HTML_DESIGN_TURN_NOTE,
     })
     out.update(assembled_examples())

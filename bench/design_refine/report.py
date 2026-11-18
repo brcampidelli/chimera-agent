@@ -61,30 +61,57 @@ def model_report(key: str, results: Any) -> dict[str, Any]:
     for r in gen:
         r["valid1"] = bool(r["ok"] and r["attempts"] == 1)
         m = measured.get((r["brief"], r["rep"], r["arm"]))
-        r["contrast_bad"] = bool(m and m["contrast"]["measured"] and m["contrast"]["low"] > 0)
-        r["contrast_measured"] = bool(m and m["contrast"]["measured"])
-        r["overflow"] = bool(m and m["overflow"])
+        contrast = m.get("contrast") if m else None
+        r["contrast_measured"] = bool(isinstance(contrast, dict) and contrast.get("measured") is True
+                                      and type(contrast.get("low")) is int and contrast["low"] >= 0)
+        r["contrast_bad"] = bool(r["contrast_measured"] and contrast["low"] > 0)
+        r["overflow"] = bool(m and m.get("overflow") is True)
+        r["overflow_measured"] = bool(m and isinstance(m.get("overflow"), bool))
+    # A refused contrast is a completed measurement with an explicit negative result. A missing
+    # record/field is an interrupted measurement and cannot establish the guard.
+    valid_gen = [r for r in gen if r["ok"] and not r.get("halt")]
+    missing_overflow = 0
+    missing_contrast = 0
+    refused_contrast = 0
+    for r in valid_gen:
+        m = measured.get((r["brief"], r["rep"], r["arm"]))
+        contrast = m.get("contrast") if m else None
+        if not m or not isinstance(m.get("overflow"), bool):
+            missing_overflow += 1
+        if not isinstance(contrast, dict) or not isinstance(contrast.get("measured"), bool):
+            missing_contrast += 1
+        elif not contrast["measured"]:
+            refused_contrast += 1
+        elif type(contrast.get("low")) is not int or contrast["low"] < 0:
+            missing_contrast += 1
+    out["measurement_coverage"] = {
+        "valid_artboards": len(valid_gen), "overflow_missing": missing_overflow,
+        "contrast_missing": missing_contrast, "contrast_refused": refused_contrast,
+    }
     out["gen_valid1"] = paired_binary(_pairs(gen, "valid1"))
     both = defaultdict(dict)
     for r in gen:
         both[(r["brief"], r["rep"])][r["arm"]] = r
-    for name, flag, gate in (("contrast", "contrast_bad", "contrast_measured"), ("overflow", "overflow", "ok")):
+    for name, flag, gate in (("contrast", "contrast_bad", "contrast_measured"), ("overflow", "overflow", "overflow_measured")):
         pairs = [(v["A"][flag], v["B"][flag], b) for (b, _), v in both.items()
-                 if "A" in v and "B" in v and v["A"][gate] and v["B"][gate]]
+                 if "A" in v and "B" in v and not v["A"].get("halt") and not v["B"].get("halt")
+                 and v["A"]["ok"] and v["B"]["ok"] and v["A"][gate] and v["B"][gate]]
         out[f"gen_{name}"] = paired_binary(pairs)
     out["gen_halts"] = sum(1 for r in gen if r.get("halt"))
     for r in refine:
-        r["read"] = r["shape"]  # alias kept for the dump
+        shape = r["shape"]
+        r["success"] = bool(r["ok"] and r["calls"] == 1 and shape["edits"] >= 1 and shape["whole"] == 0)
     out["refine_success"] = paired_binary(_pairs(refine, "success"))
     out["refine_halts"] = sum(1 for r in refine if r.get("halt"))
     tokens: dict[str, Any] = {}
     for label, pick in (("all", lambda r: True), ("3", lambda r: r["screens"] == 3),
                         ("4", lambda r: r["screens"] == 4), ("5", lambda r: r["screens"] == 5)):
-        rows = [r for r in refine if pick(r) and not r.get("halt")]
-        sums = {arm: sum(r["prompt"] for r in rows if r["arm"] == arm) for arm in "AB"}
+        valid = _pairs([r for r in refine if pick(r)], "prompt")
+        sums = {"A": sum(a for a, _, _ in valid), "B": sum(b for _, b, _ in valid)}
         per: dict[str, dict[str, float]] = defaultdict(lambda: {"A": 0.0, "B": 0.0})
-        for r in rows:
-            per[r["brief"]][r["arm"]] += r["prompt"]
+        for a, b, brief in valid:
+            per[brief]["A"] += a
+            per[brief]["B"] += b
         diffs = [v["A"] - v["B"] for v in per.values() if v["A"] and v["B"]]
         tokens[label] = {"A": sums["A"], "B": sums["B"],
                          "reduction": (1 - sums["B"] / sums["A"]) if sums["A"] else None,
@@ -92,12 +119,27 @@ def model_report(key: str, results: Any) -> dict[str, Any]:
     out["tokens"] = tokens
     reads: dict[str, Any] = {}
     for how in ("named", "ordinal"):
-        rows = [r for r in refine if r["arm"] == "B" and r["how"] == how and not r.get("halt")]
-        reads[how] = {"n": len(rows), "read_rounds": sum(1 for r in rows if r["calls"] > 1 and r["prompt"])}
+        pairs = _pairs([r for r in refine if r["how"] == how], "read_rounds")
+        reads[how] = {"n": len(pairs), "read_rounds": sum(1 for _, b, _ in pairs if b > 0)}
     out["read_share_note"] = reads
-    out["collateral"] = {arm: sum(1 for r in refine if r["arm"] == arm and r["shape"]["collateral"] > 0) for arm in "AB"}
+    shapes = _pairs(refine, "shape")
+    out["collateral"] = {"A": sum(1 for a, _, _ in shapes if a["collateral"] > 0),
+                         "B": sum(1 for _, b, _ in shapes if b["collateral"] > 0)}
     out["strata_success"] = {
         how: paired_binary(_pairs([r for r in refine if r["how"] == how], "success")) for how in ("named", "ordinal")}
+    from bench.design_refine.briefs import BRIEFS
+
+    brief_index = {brief.id: index for index, brief in enumerate(BRIEFS)}
+    out["screen_success"] = {
+        str(n): paired_binary(_pairs([r for r in refine if r["screens"] == n], "success"))
+        for n in (3, 4, 5)
+    }
+    out["order_success"] = {
+        arm: paired_binary(_pairs([r for r in refine if r["brief"] in brief_index
+                                  and ("A" if (brief_index[r["brief"]] + r["rep"]) % 2 == 0 else "B") == arm],
+                                 "success"))
+        for arm in ("A", "B")
+    }
     out["corpus"] = {"designs": len(corpus), "retries": sum(c["tries"] for c in corpus),
                      "failed": len(_load(results / key / "corpus_failed.jsonl"))}
     rows = gen + refine
@@ -110,17 +152,22 @@ def gates(rep: dict[str, Any]) -> dict[str, Any]:
     g1 = rep["refine_success"]["diff_pp"]
     t = rep["tokens"]
     g3v = rep["gen_valid1"]["diff_pp"]
+    coverage = rep["measurement_coverage"]
     return {
         "gate1": g1 is not None and g1 >= PAIR_GATE_PP,
         "gate2": all(t[k]["reduction"] is not None and t[k]["reduction"] >= TOKEN_GATE for k in ("all", "3")),
-        "gate3": (g3v is not None and g3v >= -GUARD_PP
-                  and (rep["gen_contrast"]["diff_pp"] or 0) <= GUARD_PP
-                  and (rep["gen_overflow"]["diff_pp"] or 0) <= GUARD_PP),
+        "gate3": (coverage["valid_artboards"] > 0 and coverage["overflow_missing"] == 0
+                  and coverage["contrast_missing"] == 0
+                  and g3v is not None and g3v >= -GUARD_PP
+                  and rep["gen_contrast"]["diff_pp"] is not None
+                  and rep["gen_contrast"]["diff_pp"] <= GUARD_PP
+                  and rep["gen_overflow"]["diff_pp"] is not None
+                  and rep["gen_overflow"]["diff_pp"] <= GUARD_PP),
     }
 
 
 def print_report() -> None:
-    from run import RESULTS
+    from run import RESULTS, spent
 
     reports = [model_report(k, RESULTS) for k in ("ds", "glm") if (RESULTS / k).exists()]
     for rep in reports:
@@ -128,4 +175,4 @@ def print_report() -> None:
     print(json.dumps(reports, indent=1, default=str))
     both = all(all(r["gates"].values()) for r in reports) and len(reports) == 2
     print("VERDICT: adopt" if both else "VERDICT: not adopted (a gate failed or a model is missing)")
-    print("ledger US$", json.load(open(RESULTS / "spend.json"))["usd"])
+    print("ledger US$", spent())

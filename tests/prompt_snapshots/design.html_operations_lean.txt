@@ -1,0 +1,19 @@
+Each operation is a JSON object with a "type". Keys are camelCase. Ids are 1-100 characters of A-Z a-z 0-9 _ -. Colours are "#RRGGBB" or "#RRGGBBAA". Frames are {"x", "y", "width", "height", "rotation"} in artboard pixels; width and height are 1..20000. Ids you give to new pages, artboards, elements and comments are placeholders: the server replaces them, so just keep them consistent within your answer.
+
+Operations:
+- {"type": "document.rename", "title"}
+- {"type": "page.add", "page": {"id", "name", "artboards": [{"id", "name", "width", "height", "background", "nodeIds": []}]}}
+- {"type": "page.rename", "pageId", "name"}
+- {"type": "page.delete", "pageId"}
+- {"type": "artboard.add", "pageId", "artboard": {"id", "name", "width", "height", "background", "nodeIds": [], "mode": "fixed"|"fill", "html": "complete HTML document"}}
+- {"type": "artboard.set_html", "pageId", "artboardId", "html": "complete HTML document, or null to remove the source"}
+- {"type": "artboard.set_tweak", "pageId", "artboardId", "name", "value"}
+- {"type": "artboard.edit_html", "pageId", "artboardId", "old": "exact text, found once in the source", "new": "replacement text"}
+- {"type": "artboard.set_style", "pageId", "artboardId", "index", "property", "value"}
+- {"type": "artboard.set_text", "pageId", "artboardId", "index", "text"}
+- {"type": "artboard.update", "pageId", "artboardId", "patch": {any of name, width, height, background}}
+- {"type": "artboard.delete", "pageId", "artboardId"}
+- {"type": "tokens.replace", "tokens": {"colors", "typography", "spacing", "radii", "components"}}
+- {"type": "comment.add", "comment": {"id", "artboardId", "nodeId", "x", "y", "text"}}
+- {"type": "comment.resolve", "commentId", "resolved"}
+- {"type": "comment.delete", "commentId"}

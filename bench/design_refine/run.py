@@ -19,6 +19,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import os
 import subprocess
 import sys
 import threading
@@ -27,6 +29,7 @@ import types
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -59,6 +62,7 @@ MODELS = {
 CONSERVATIVE_PRICES = {MODELS["ds"]: (0.10, 0.40), MODELS["glm"]: (0.10, 1.30)}
 LIVE_PRICES = {MODELS["ds"]: (0.06, 0.18), MODELS["glm"]: (0.0399, 0.0784)}
 SPEND_STOP = 4.00
+SPEND_CEILING = 5.00
 REPS = 3
 #: Amendment 2: without a cap on reasoning both routes spend most of the 8,000-token reply budget thinking
 #: and cut off before the JSON ends. Same setting in both arms of a model.
@@ -133,7 +137,7 @@ class Meter:
         kwargs["model"] = self.model
         kwargs["extra_body"] = REASONING[self.model]
         try:
-            result = self.gateway().complete(messages, **kwargs)
+            result = _guarded_complete(self.gateway(), messages, kwargs, self.model)
         except Exception:
             self.errors += 1
             raise
@@ -162,17 +166,101 @@ class Meter:
                 "usd_live": round(self.usd_live, 6)}
 
 
-def spent() -> float:
-    path = RESULTS / "spend.json"
-    return json.loads(path.read_text(encoding="utf-8"))["usd"] if path.exists() else 0.0
+class _AmbiguousTransport(BaseException):
+    """A provider request failed after it might have been billed."""
 
 
-def add_spend(usd: float) -> float:
+def _guarded_complete(gateway: Any, messages: Any, kwargs: dict[str, Any], model: str) -> Any:
+    """Serialize and reserve each paid call, with a durable record if its cost is uncertain."""
+    import litellm
+
+    from chimera.core.filelock import atomic_write_text, try_hold
+    from chimera.orchestration.budget import worst_case_usd
+    from chimera.orchestration.receipts import price_delegation
+
     with _LEDGER_LOCK:
-        RESULTS.mkdir(exist_ok=True)
-        total = spent() + usd
-        (RESULTS / "spend.json").write_text(json.dumps({"usd": round(total, 6)}), encoding="utf-8")
-        return total
+        RESULTS.mkdir(parents=True, exist_ok=True)
+        held = try_hold(RESULTS / "spend")
+        if held is None or not held.real:
+            raise RuntimeError("spend ledger is locked or unavailable")
+        try:
+            pending = RESULTS / "pending-call.json"
+            if pending.exists():
+                raise RuntimeError("a previous call has an unresolved cost")
+            old_path = RESULTS / "spend.json"
+            ledger_path = RESULTS / "spend-v2.json"
+            legacy = json.loads(old_path.read_text(encoding="utf-8"))["usd"] if old_path.exists() else 0.0
+            if not isinstance(legacy, (int, float)) or not math.isfinite(legacy) or legacy < 0:
+                raise RuntimeError("historical spend ledger is invalid")
+            if old_path.exists() and not ledger_path.exists():
+                raise RuntimeError("historical spend must be reconciled before any new paid call")
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else {
+                "usd": 0.0, "historical_usd": 0.0, "accounting": "strict-v1"
+            }
+            total, historical = ledger.get("usd"), ledger.get("historical_usd")
+            if (ledger.get("accounting") != "strict-v1" or not isinstance(total, (int, float))
+                    or not isinstance(historical, (int, float)) or not math.isfinite(historical)
+                    or historical < legacy or total < historical):
+                raise RuntimeError("spend reconciliation is missing or invalid")
+            if not math.isfinite(total) or total < 0:
+                raise RuntimeError("spend ledger has an invalid total")
+            if total >= SPEND_STOP:
+                raise RuntimeError("registered admission stop reached")
+            bound = worst_case_usd(gateway, messages, kwargs, strict=True)
+            maximum = kwargs.get("max_tokens")
+            if bound is None or not math.isfinite(bound) or bound <= 0 or not isinstance(maximum, int) or maximum <= 0:
+                raise RuntimeError("cannot determine strict call reservation")
+            # Same input bound as the strict budget, priced at the bench's conservative rates.
+            prompt_bound = len("\n".join(str(m) for m in messages).encode("utf-8")) + 16 * (len(messages) + 1)
+            price_in, price_out = CONSERVATIVE_PRICES[model]
+            bound = max(bound, (prompt_bound * price_in + maximum * price_out) / 1_000_000)
+            if total + bound > SPEND_CEILING:
+                raise RuntimeError("strict call reservation exceeds the item ceiling")
+            with pending.open("x", encoding="utf-8") as fh:
+                json.dump({"model": model, "reservation_usd": bound}, fh)
+                fh.flush()
+                os.fsync(fh.fileno())
+            completion = litellm.completion
+
+            def once(*args: Any, **call_kwargs: Any) -> Any:
+                call_kwargs["num_retries"] = 0
+                try:
+                    return completion(*args, **call_kwargs)
+                except Exception as exc:
+                    raise _AmbiguousTransport() from exc
+
+            try:
+                with patch.object(litellm, "completion", once):
+                    result = gateway.complete(messages, **kwargs)
+            except _AmbiguousTransport as exc:
+                raise RuntimeError("provider cost is unresolved; collection stopped") from exc
+            if (not isinstance(result.prompt_tokens, int) or result.prompt_tokens < 0
+                    or not isinstance(result.completion_tokens, int) or result.completion_tokens < 0
+                    or result.failed_attempts):
+                raise RuntimeError("provider usage is incomplete; collection stopped")
+            bench_cost = (result.prompt_tokens * price_in + result.completion_tokens * price_out) / 1_000_000
+            catalogue_cost = price_delegation(result.model, result.prompt_tokens, result.completion_tokens)
+            exact = getattr(result, "usd", None)
+            if (catalogue_cost is None or not math.isfinite(catalogue_cost) or catalogue_cost < 0
+                    or (getattr(result, "aggregate", False) and exact is None)):
+                raise RuntimeError("provider price is unknown; collection stopped")
+            if exact is not None and (not isinstance(exact, (int, float)) or not math.isfinite(exact) or exact < 0):
+                raise RuntimeError("provider exact cost is invalid; collection stopped")
+            cost = max(bench_cost, catalogue_cost, exact or 0.0)
+            if cost > bound:
+                raise RuntimeError("provider usage exceeded the reserved bound")
+            atomic_write_text(ledger_path, json.dumps({"usd": total + cost, "historical_usd": historical,
+                                                       "accounting": "strict-v1"}), durable=True)
+            pending.unlink()
+            return result
+        finally:
+            held.release()
+
+
+def spent() -> float:
+    updated = RESULTS / "spend-v2.json"
+    path = updated if updated.exists() else RESULTS / "spend.json"
+    return json.loads(path.read_text(encoding="utf-8"))["usd"] if path.exists() else 0.0
 
 
 def check_budget() -> None:
@@ -212,7 +300,7 @@ def generate(meter: Meter, doc: DesignDocument, brief_text: str, arm: str) -> pr
     if arm == "A":
         return propose._proposal_call(meter, doc, baseline_generate_user(doc, brief_text),
                                       model=meter.model, id_factory=new_id)
-    return propose.propose(meter, doc, brief_text, {}, model=meter.model)
+    return propose.propose(meter, doc, brief_text, {}, model=meter.model, lean_refine=True)
 
 
 def run_gen_item(model_key: str, index: int, rep: int) -> None:
@@ -237,7 +325,6 @@ def run_gen_item(model_key: str, index: int, rep: int) -> None:
             board = wire(added[-1]) if added else None
             ok = board is not None
             error = error or (None if ok else "no html artboard in the proposal")
-        add_spend(meter.usd)
         _append(out, {"brief": brief.id, "rep": rep, "arm": arm, "order": list(_arm_order(index, rep)),
                       "ok": ok, "attempts": attempts, "error": error, "board": board,
                       "halt": bool(error and str(error).startswith("halt")),
@@ -276,7 +363,6 @@ def build_design(model_key: str, index: int) -> None:
             if outcome.ok and outcome.preview is not None and len(html_boards(outcome.preview)) == position + 1:
                 break
         else:
-            add_spend(meter.usd)
             _append(RESULTS / model_key / "corpus_failed.jsonl", {"brief": brief.id, "screen": name, "tries": tries})
             return
         preview = outcome.preview
@@ -285,7 +371,6 @@ def build_design(model_key: str, index: int) -> None:
         page = next(p for p in preview.pages if any(b.id == newest.id for b in p.artboards))
         doc, _ = apply_operations(preview, [{"type": "artboard.update", "pageId": page.id,
                                             "artboardId": newest.id, "patch": {"name": name}}])
-    add_spend(meter.usd)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"brief": brief.id, "tries": tries, "doc": wire(doc), **meter.usage()},
                                ensure_ascii=False), encoding="utf-8")
@@ -327,17 +412,16 @@ def run_refine_item(model_key: str, index: int, rep: int) -> None:
                 outcome = propose._proposal_call(meter, doc, baseline_refine_user(doc, request),
                                                  model=meter.model, id_factory=new_id)
             else:
-                outcome = propose.refine(meter, doc, request, model=meter.model)
+                outcome = propose.refine(meter, doc, request, model=meter.model, lean_refine=True)
             operations = [wire(op) for op in outcome.proposal.operations] if outcome.proposal else []
             ok, attempts, error = outcome.ok, outcome.attempts, outcome.error
             reads = outcome.read_rounds
         except Exception as exc:
             operations, ok, attempts, error, reads = [], False, 0, f"halt: {type(exc).__name__}", 0
-        add_spend(meter.usd)
         _append(out, {"brief": brief.id, "rep": rep, "arm": arm, "screens": len(screens), "how": how,
                       "read_rounds": reads,
                       "target": target, "request": request, "ok": ok, "attempts": attempts, "error": error,
-                      "success": first_attempt_edit(ok, attempts, operations, target),
+                      "success": first_attempt_edit(ok, meter.calls, operations, target),
                       "shape": edit_outcome(operations, target),
                       "halt": bool(error and str(error).startswith("halt")),
                       "secs": round(time.time() - started, 1), **meter.usage()})
