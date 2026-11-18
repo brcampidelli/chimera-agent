@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Fix Design generation on DeepSeek V4 Flash.** Design uses prompt-based JSON on the OpenRouter `deepseek-v4-flash-0731` route and leaves more of the reply budget for the artboard when reasoning effort is left at its default. (#1307)
+
 ## [0.92.0] - 2026-11-18
 ### Added
 
