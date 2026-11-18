@@ -291,7 +291,10 @@ def propose(
         document=_untrusted(_dumps(summarize(doc))),
         operations=_operations_guide(doc, lean_refine=lean_refine),
     )
-    return _proposal_call(backend, doc, user, model=model, id_factory=id_factory, on_delta=on_delta)
+    return _proposal_call(
+        backend, doc, user, model=model, id_factory=id_factory, on_delta=on_delta,
+        design_generation=True,
+    )
 
 
 def refine(
@@ -410,8 +413,11 @@ def _proposal_call(
     on_delta: Callable[[str], None] | None = None,
     schema: type[Proposal] = Proposal,
     follow_up: Callable[[Sequence[str]], str | None] | None = None,
+    design_generation: bool = False,
 ) -> ProposalOutcome:
-    parsed, error, attempts = _ask(backend, user, schema, model=model, on_delta=on_delta)
+    parsed, error, attempts = _ask(
+        backend, user, schema, model=model, on_delta=on_delta, design_generation=design_generation,
+    )
     reads = 0
     if isinstance(parsed, RefineProposal) and parsed.read and not parsed.operations and follow_up is not None:
         # The model asked for a source it was not shown. One more call, with it; a second ask is refused.
@@ -456,6 +462,7 @@ def _ask(
     *,
     model: str | None,
     on_delta: Callable[[str], None] | None = None,
+    design_generation: bool = False,
 ) -> tuple[_M | None, str | None, int]:
     """Call the model, parse its JSON into ``schema``; on failure re-ask once with the reason.
 
@@ -464,7 +471,9 @@ def _ask(
     """
     effective = _effective_model(model)
     budget = _reply_budget(effective)
-    json_mode = _json_object_mode(effective)
+    call_kwargs = _json_object_mode(effective)
+    if design_generation:
+        call_kwargs["design_generation"] = True
     messages: list[Any] = [
         {"role": "system", "content": _base_instruction()},
         {"role": "user", "content": user},
@@ -473,10 +482,10 @@ def _ask(
     for attempt in (1, 2):
         if on_delta is not None and hasattr(backend, "stream_complete"):
             result = backend.stream_complete(
-                messages, model=model, temperature=0.2, max_tokens=budget, on_delta=on_delta, **json_mode
+                messages, model=model, temperature=0.2, max_tokens=budget, on_delta=on_delta, **call_kwargs
             )
         else:
-            result = backend.complete(messages, model=model, temperature=0.2, max_tokens=budget, **json_mode)
+            result = backend.complete(messages, model=model, temperature=0.2, max_tokens=budget, **call_kwargs)
         content = result.content or ""
         data = extract_json(content)
         if isinstance(data, dict):
@@ -485,7 +494,8 @@ def _ask(
             except ValidationError as exc:
                 error = f"the JSON does not match the schema: {short_errors(exc)}"
         elif result.finish_reason == "length" or _unclosed_object(content):
-            error = (f"the reply was cut off at {budget} tokens before its JSON was complete; "
+            limit = getattr(result, "_request_max_tokens", None) or budget
+            error = (f"the reply was cut off at {limit} tokens before its JSON was complete; "
                      f"send at most {MAX_RETRY_OPERATIONS} operations")
         else:
             error = "the reply did not contain a JSON object"

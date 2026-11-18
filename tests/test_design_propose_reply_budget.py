@@ -157,3 +157,124 @@ def test_json_object_mode_is_withheld_from_a_model_whose_provider_does_not_list_
                         lambda **_kwargs: ["temperature", "max_tokens"])
 
     assert propose._json_object_mode("openrouter/acme/model-x") == {}
+
+
+@pytest.mark.parametrize(
+    ("path", "effort"),
+    [("batch", None), ("stream", None), ("stream-to-batch", None), ("batch", "high"), ("stream", "low")],
+)
+def test_deepseek_generation_reserves_the_reply_for_validated_design(
+    monkeypatch: pytest.MonkeyPatch, path: str, effort: str | None,
+) -> None:
+    import litellm
+
+    from chimera.orchestration.metering import MeteredBackend
+    from chimera.providers.gateway import LLMGateway
+
+    slug = "openrouter/deepseek/deepseek-v4-flash-0731"
+    requested = f"{slug}#{effort}" if effort else slug
+    reasoning = {"effort": effort} if effort else {"enabled": False}
+    monkeypatch.setenv("CHIMERA_DEFAULT_MODEL", requested)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-" + "test")
+    monkeypatch.setattr(litellm, "get_supported_openai_params", lambda **_: ["response_format"])
+    chimera.config.get_settings.cache_clear()
+
+    sent: list[dict[str, Any]] = []
+
+    def provider(**kwargs: Any) -> Any:
+        sent.append(kwargs)
+        streamed = kwargs.get("stream", False)
+        if streamed and path == "stream-to-batch":
+            raise RuntimeError("503 provider overloaded")
+        fits = (
+            "response_format" not in kwargs
+            and kwargs.get("extra_body", {}).get("reasoning") == reasoning
+        )
+        content = _valid_reply() if fits else None
+        finish = "stop" if fits else "length"
+        usage = SimpleNamespace(prompt_tokens=400, completion_tokens=2169 if fits else 8000)
+        message = SimpleNamespace(content=content, tool_calls=None, reasoning_content="private draft")
+        if streamed:
+            return [SimpleNamespace(choices=[SimpleNamespace(delta=message, finish_reason=finish)], usage=usage)]
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=finish)], usage=usage)
+
+    monkeypatch.setattr(litellm, "completion", provider)
+    meter = MeteredBackend(LLMGateway(), label="design")
+    doc = _doc()
+    shown: list[str] = []
+    outcome = propose.propose(meter, doc, "make an artboard", on_delta=None if path == "batch" else shown.append)
+
+    assert outcome.ok, outcome.error
+    assert outcome.attempts == meter.calls == 1
+    assert outcome.preview is not None and outcome.preview.pages[0].name == "Home"
+    assert not doc.pages
+    assert meter.last_model == requested
+    assert (meter.prompt_tokens, meter.completion_tokens) == (400, 2169)
+    assert [call.get("stream", False) for call in sent] == {
+        "batch": [False], "stream": [True], "stream-to-batch": [True, False],
+    }[path]
+    for call in sent:
+        assert call["model"] == slug
+        assert "response_format" not in call
+        assert call["max_tokens"] == 8_000
+        assert call["extra_body"]["reasoning"] == reasoning
+    assert "".join(shown) == (_valid_reply() if path == "stream" else "")
+
+
+def test_a_truncated_deepseek_fallback_names_its_budget_and_reasks_only_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import litellm
+
+    from chimera.orchestration.metering import MeteredBackend
+    from chimera.providers.gateway import LLMGateway
+
+    primary = "openrouter/mistralai/mistral-small-3.2-24b-instruct"
+    fallback = "openrouter/deepseek/deepseek-v4-flash-0731"
+    monkeypatch.setenv("CHIMERA_FALLBACK_MODELS", fallback)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-" + "test")
+    chimera.config.get_settings.cache_clear()
+    seen: list[tuple[str, int]] = []
+
+    def provider(**kwargs: Any) -> SimpleNamespace:
+        seen.append((kwargs["model"], kwargs["max_tokens"]))
+        if kwargs["model"] == primary:
+            raise RuntimeError("primary unavailable")
+        message = SimpleNamespace(content=None, reasoning_content="private draft", tool_calls=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="length")], usage=None)
+
+    monkeypatch.setattr(litellm, "completion", provider)
+    meter = MeteredBackend(LLMGateway(), label="design")
+
+    outcome = propose.propose(meter, _doc(), "x", model=primary)
+
+    assert not outcome.ok
+    assert outcome.attempts == meter.calls == 2
+    assert outcome.error is not None and "cut off at 8000 tokens" in outcome.error
+    assert seen == [(primary, 16_000), (fallback, 8_000)] * 2
+
+
+def test_deepseek_refinement_and_audit_keep_the_existing_request_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    import litellm
+
+    from chimera.providers.gateway import LLMGateway
+
+    slug = "openrouter/deepseek/deepseek-v4-flash-0731"
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-" + "test")
+    monkeypatch.setattr(litellm, "get_supported_openai_params", lambda **_: ["response_format"])
+    sent: list[dict[str, Any]] = []
+
+    def provider(**kwargs: Any) -> Any:
+        sent.append(kwargs)
+        content = _valid_reply() if len(sent) == 1 else '{"issues":[]}'
+        message = SimpleNamespace(content=content, tool_calls=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")], usage=None)
+
+    monkeypatch.setattr(litellm, "completion", provider)
+    gateway = LLMGateway()
+    assert propose.refine(gateway, _doc(), "change it", model=slug).ok
+    assert propose.audit(gateway, _doc(), "review it", model=slug).audit is not None
+    assert len(sent) == 2
+    for call in sent:
+        assert call["response_format"] == {"type": "json_object"}
+        assert "reasoning" not in call.get("extra_body", {})
