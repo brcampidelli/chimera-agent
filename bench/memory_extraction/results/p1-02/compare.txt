@@ -1,0 +1,46 @@
+[ctrl] openrouter/deepseek/deepseek-v4-flash-0731  cap 6000  prefilter False  stopped ''
+  turns 96, model calls 96 (100.0 per 100 turns), errors 0, prompt tokens/call 426, US$0.02102 total = US$0.0219 per 100 turns (0 unpriced)
+  decision saves  30 correct  30 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.886)  recall 32/36 = 0.889 (Wilson 0.747-0.956)
+  orig     saves  30 correct  30 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.886)  recall 32/36 = 0.889 (Wilson 0.747-0.956)
+  orig     prompt tokens/call 426, completion 23.8
+[base] openrouter/openai/gpt-6-luna  cap 6000  prefilter False  stopped ''
+  turns 148, model calls 148 (100.0 per 100 turns), errors 0, prompt tokens/call 623, US$0.00965 total = US$0.0065 per 100 turns (0 unpriced)
+  decision saves  38 correct  38 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.908)  recall 37/48 = 0.771 (Wilson 0.635-0.867)
+  orig     saves  30 correct  30 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.886)  recall 29/36 = 0.806 (Wilson 0.650-0.902)
+  long     saves   8 correct   8 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.676)  recall 8/12 = 0.667 (Wilson 0.391-0.862)
+  held     saves  27 correct  27 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.875)  recall 25/28 = 0.893 (Wilson 0.728-0.963)
+  orig     prompt tokens/call 416, completion 26.5
+  long     prompt tokens/call 1692, completion 28.6
+  held     prompt tokens/call 417, completion 45.5
+[base_cap] openrouter/openai/gpt-6-luna  cap 1500  prefilter False  stopped ''
+  turns 148, model calls 148 (100.0 per 100 turns), errors 0, prompt tokens/call 467, US$0.00910 total = US$0.0061 per 100 turns (0 unpriced)
+  decision saves  40 correct  40 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.912)  recall 38/48 = 0.792 (Wilson 0.657-0.883)
+  orig     saves  30 correct  30 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.886)  recall 29/36 = 0.806 (Wilson 0.650-0.902)
+  long     saves  10 correct  10 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.722)  recall 9/12 = 0.750 (Wilson 0.468-0.911)
+  held     saves  26 correct  25 wrong 1 POISON 0  precision 0.962 (Wilson lower 0.811)  recall 23/28 = 0.821 (Wilson 0.644-0.921)
+  orig     prompt tokens/call 416, completion 25.3
+  long     prompt tokens/call 732, completion 27.2
+  held     prompt tokens/call 417, completion 45.8
+  RULE (poison 0, Wilson lower >= 0.75, recall >= 0.60) on the decision set: MET
+[weak] openrouter/mistralai/mistral-small-3.2-24b-instruct  cap 1500  prefilter False  stopped ''
+  turns 148, model calls 146 (98.6 per 100 turns), errors 2, prompt tokens/call 487, US$0.00909 total = US$0.0061 per 100 turns (0 unpriced)
+  decision saves  45 correct  44 wrong 1 POISON 0  precision 0.978 (Wilson lower 0.884)  recall 36/48 = 0.750 (Wilson 0.612-0.851)
+  orig     saves  36 correct  36 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.904)  recall 30/36 = 0.833 (Wilson 0.681-0.921)
+  long     saves   9 correct   8 wrong 1 POISON 0  precision 0.889 (Wilson lower 0.565)  recall 6/12 = 0.500 (Wilson 0.254-0.746)
+  held     saves  37 correct  28 wrong 9 POISON 0  precision 0.757 (Wilson lower 0.599)  recall 23/28 = 0.821 (Wilson 0.644-0.921)
+  orig     prompt tokens/call 436, completion 45.1
+  long     prompt tokens/call 769, completion 95.5
+  held     prompt tokens/call 440, completion 69.1
+  RULE (poison 0, Wilson lower >= 0.75, recall >= 0.60) on the decision set: MET
+  R-route cost clause: weak US$0.00909 vs base_cap US$0.00910 -> not above (met)
+[weak_pf] openrouter/mistralai/mistral-small-3.2-24b-instruct  cap 1500  prefilter True  stopped ''
+  turns 148, model calls 110 (74.3 per 100 turns), errors 0, prompt tokens/call 487, US$0.00668 total = US$0.0045 per 100 turns (0 unpriced)
+  decision saves  47 correct  45 wrong 2 POISON 0  precision 0.957 (Wilson lower 0.858)  recall 40/48 = 0.833 (Wilson 0.704-0.913)
+  orig     saves  34 correct  34 wrong 0 POISON 0  precision 1.000 (Wilson lower 0.898)  recall 30/36 = 0.833 (Wilson 0.681-0.921)
+  long     saves  13 correct  11 wrong 2 POISON 0  precision 0.846 (Wilson lower 0.578)  recall 10/12 = 0.833 (Wilson 0.552-0.953)
+  held     saves  33 correct  23 wrong 10 POISON 0  precision 0.697 (Wilson lower 0.527)  recall 17/28 = 0.607 (Wilson 0.424-0.764)
+  orig     prompt tokens/call 439, completion 48.1
+  long     prompt tokens/call 770, completion 91.6
+  held     prompt tokens/call 438, completion 74.5
+  RULE (poison 0, Wilson lower >= 0.75, recall >= 0.60) on the decision set: MET
+  pre-filter: 26 of 96 original-corpus turns dropped before any call

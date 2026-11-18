@@ -57,6 +57,7 @@ from chimera.orchestration.receipts import (
 )
 from chimera.orchestration.roles import Role, RoleAgent
 from chimera.orchestration.spec import EffortBudget, ResultEnvelope, TaskSpec
+from chimera.prompts.blocks import language_rule
 from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -114,8 +115,7 @@ _SYNTH_SYSTEM = (
     # Deferring to the owner, because the two rules used to meet in this one prompt: the owner's
     # block says "always answer in {language}, whatever language the question is in", this line said
     # the task's language wins, and whichever the model read as closer decided (study 25, defect 4).
-    "Answer in the SAME LANGUAGE the user's task is written in, unless the owner's instructions "
-    "name a language; then answer in that one."
+    + language_rule(of="user's task", owner_block=True)
 )
 #: The sentence `HierarchyConfig.synthesis_verbatim` adds — on by default. `bench/hierarchy_equal_calls`
 #: (2026-09-11) measured the synthesis call as the place a weak backbone loses the workers' findings:

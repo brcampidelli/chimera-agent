@@ -42,6 +42,7 @@ from chimera.memory.tokens import informative, tokens
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.config import Settings
     from chimera.orchestration.metering import MeteredBackend
 
 _log = get_logger("memory.extract")
@@ -189,6 +190,9 @@ class Extraction:
     #: The model that answered, as the meter saw it.
     model: str = ""
     error: str = ""
+    #: True when :func:`worth_a_call` said the user's words held nothing to keep, so no model was
+    #: called at all (opt-in; see ``CHIMERA_MEMORY_EXTRACT_PREFILTER``).
+    prefiltered: bool = False
 
 
 def users_own_words(message: str) -> str:
@@ -205,6 +209,52 @@ def users_own_words(message: str) -> str:
     data = re.compile(re.escape(FENCE_OPEN) + ".*?(?:" + re.escape(FENCE_CLOSE) + "|$)", re.DOTALL)
     text = data.sub(" ", _CODE_FENCE.sub(" ", message))
     return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith(">"))
+
+
+#: Tokens (folded, as :func:`chimera.memory.tokens.tokens` makes them) that say the user is talking
+#: about themselves or stating a habit: first person in English and Portuguese, the commonest
+#: first-person verbs of each, and the words people use for a standing preference. Frozen with
+#: `bench/memory_extraction/PREREGISTRATION-P1-02.md` BEFORE it was run on the corpus.
+_SELF_MARKERS = _words(
+    "i me my mine myself we our ours ourselves always never usually prefer prefers remember "
+    "eu me mim meu minha meus minhas comigo nos nosso nossa nossos nossas sou estou tenho moro uso "
+    "prefiro gosto trabalho costumo sempre nunca geralmente lembre"
+)
+#: The share of a message's tokens that must be English or Portuguese function words before the
+#: absence of a first-person marker is read as "nothing about the user". Below it the language is
+#: not known to this rule, and the model is asked. **This guard leaks**: Spanish shares enough
+#: function words with Portuguese ("a", "que", "de") that "Soy alergico a los cacahuetes, que ceno
+#: hoy?" clears it and is dropped (measured 2026-11-16; French, German, Italian and Chinese passed
+#: through). One more reason the pre-filter ships off.
+_KNOWN_LANGUAGE_SHARE = 0.25
+_MIN_TOKENS_TO_JUDGE = 4
+
+
+def _function_words() -> frozenset[str]:
+    from chimera.memory import tokens as _tokens
+
+    by_language = _tokens._BY_LANGUAGE
+    return frozenset(w for code in ("en", "pt") for w in by_language[code].split())
+
+
+def worth_a_call(user_message: str) -> bool:
+    """False only when the user's own words are plainly English or Portuguese and name no one.
+
+    A deterministic pre-filter for the model call. It answers "is there any sign the user is
+    talking about themselves?" from the user's words alone (not a pasted block, not a quoted
+    line). It is one-sided on purpose (whatever it cannot read, it lets through) and it does not
+    keep that promise for Spanish; see ``_KNOWN_LANGUAGE_SHARE``. It cannot see a fact stated
+    without a pronoun ("Corro meia maratona todo ano", "Allergic to shellfish, so no paella").
+    `bench/memory_extraction/RESULTS-P1-02.md` measured it dropping 2 of 36 expected facts on the
+    frozen corpus and 4 of 28 on turns it was not built from, so it is **off** unless asked for.
+    """
+    words = tokens(users_own_words(user_message))
+    if len(words) < _MIN_TOKENS_TO_JUDGE:
+        return True
+    if _SELF_MARKERS & set(words):
+        return True
+    known = sum(1 for w in words if w in _function_words())
+    return known / len(words) < _KNOWN_LANGUAGE_SHARE
 
 
 def _folded(text: str) -> str:
@@ -313,13 +363,19 @@ def _near(memory: MemoryManager, message: str) -> dict[str, MemoryItem]:
     return {f"f{i}": item for i, item in enumerate(items, 1)}
 
 
+def _shown(answer: str, cap: int) -> str:
+    """Preserve the upstream slice; mark a shorter experimental slice when it omits text."""
+    shown = answer[:cap]
+    return shown + " [...]" if cap < _MAX_INPUT_CHARS and len(answer) > cap else shown
+
+
 def _ask(backend: SupportsComplete, user: str, answer: str, near: dict[str, MemoryItem],
-         model: str | None) -> Any:
+         model: str | None, answer_cap: int = _MAX_INPUT_CHARS) -> Any:
     from chimera.providers.gateway import Message
 
     payload = {
         "user_message": user[:_MAX_INPUT_CHARS],
-        "assistant_answer": answer[:_MAX_INPUT_CHARS],
+        "assistant_answer": _shown(answer, answer_cap),
         "stored_facts": [{"id": alias, "fact": item.content} for alias, item in near.items()],
     }
     return backend.complete(
@@ -337,7 +393,8 @@ def _ask(backend: SupportsComplete, user: str, answer: str, near: dict[str, Memo
 
 def extract(user_message: str, answer: str, *, memory: MemoryManager,
             backend: SupportsComplete, model: str | None = None,
-            tainted: bool = False) -> Extraction:
+            tainted: bool = False, prefilter: bool = False,
+            answer_cap: int = _MAX_INPUT_CHARS) -> Extraction:
     """Ask the model what to keep from one turn, check every proposal, and write what survives.
 
     ``tainted`` is the turn's own provenance: a fact written during a turn that read untrusted
@@ -345,8 +402,11 @@ def extract(user_message: str, answer: str, *, memory: MemoryManager,
     words are still the user's, but the model that read them had read something else too.
     """
     result = Extraction()
+    if prefilter and not worth_a_call(user_message):
+        result.prefiltered = True
+        return result
     near = _near(memory, user_message)
-    reply = _ask(backend, user_message, answer, near, model)
+    reply = _ask(backend, user_message, answer, near, model, answer_cap)
     result.prompt_tokens = int(getattr(reply, "prompt_tokens", 0) or 0)
     result.completion_tokens = int(getattr(reply, "completion_tokens", 0) or 0)
     own = users_own_words(user_message)
@@ -366,6 +426,25 @@ def extract(user_message: str, answer: str, *, memory: MemoryManager,
             continue
         _write(memory, op, near, provenance, result)
     return result
+
+
+class ExtractionRouteUnavailable(RuntimeError):
+    """An explicit extraction pin could not be resolved safely."""
+
+
+def extraction_model(settings: Settings) -> str | None:
+    """Return the resolved pin, or defer to the global gateway when no pin was selected."""
+    from chimera.providers.routing import memory_extract_pin
+
+    if not memory_extract_pin(settings):
+        return None
+    try:
+        route = settings.routing_table().route("memory_extract")
+    except Exception as exc:
+        raise ExtractionRouteUnavailable("memory extraction pin could not be resolved") from exc
+    if route.inherits or not route.slug:
+        raise ExtractionRouteUnavailable("memory extraction pin has no usable route")
+    return route.slug
 
 
 def _forget_if_secret(op: Operation, reason: str | None) -> Operation:
@@ -425,16 +504,19 @@ class MemoryExtractor:
     is recorded too; a call that never returned cost nothing and is not.
 
     ``usage_id`` may be a callable, read when the spend is written, for a surface whose conversation
-    id changes under it (a terminal thread that ``/new`` replaces).
+    id changes under it (a terminal thread that ``/new`` replaces). A callable ``model`` is
+    resolved per extraction, so a transient routing error cannot stop the conversation.
     """
 
     def __init__(self, memory: MemoryManager, backend: SupportsComplete | None = None, *,
-                 model: str | None = None, background: bool = True,
+                 model: str | Callable[[], str | None] | None = None, background: bool = True,
                  usage_home: Path | None = None,
-                 usage_id: str | Callable[[], str] = "") -> None:
+                 usage_id: str | Callable[[], str] = "", prefilter: bool = False) -> None:
         self.memory = memory
         self.backend = backend
+        self._default_backend: SupportsComplete | None = None
         self.model = model
+        self.prefilter = prefilter
         self.background = background
         self.usage_home = usage_home
         self.usage_id = usage_id
@@ -459,13 +541,29 @@ class MemoryExtractor:
 
         meter: MeteredBackend | None = None
         try:
-            if self.backend is None:
+            if self.prefilter and not worth_a_call(user_message):
+                # Before the gateway is even built: nothing to ask, nothing to pay.
+                self.last = Extraction(prefiltered=True)
+                return
+            model = self.model() if callable(self.model) else self.model
+            backend = self.backend
+            if backend is None:
                 from chimera.providers import LLMGateway
 
-                self.backend = LLMGateway()
-            meter = _Meter(self.backend, label="memory")
+                if model is None:
+                    if self._default_backend is None:
+                        self._default_backend = LLMGateway()
+                    backend = self._default_backend
+                else:
+                    from chimera.config import get_settings
+
+                    # A separate extraction pin names who may read the turn. If it is
+                    # unavailable, skip extraction through the same error path as other failures.
+                    settings = get_settings().model_copy(update={"fallback_models": []})
+                    backend = LLMGateway(settings)
+            meter = _Meter(backend, label="memory")
             done = extract(user_message, answer, memory=self.memory, backend=meter,
-                           model=self.model, tainted=tainted)
+                           model=model, tainted=tainted, prefilter=False)
         except Exception as exc:  # the answer is the product; memory is extra
             _log.warning("memory extraction skipped: %s", exc)
             done = Extraction(error=f"{type(exc).__name__}: {exc}")

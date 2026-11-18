@@ -11,7 +11,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 - `wrapper`: neither, and every file is a script or a README.
 - `neither`: neither, and something besides scripts and a README.
 
-142 directories: 127 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
+144 directories: 129 with result, 13 preregistered, no result, 0 wrapper, 2 neither.
 
 | directory | status | PREREGISTRATION files | RESULT files |
 |---|---|---:|---:|
@@ -90,7 +90,7 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`manager_p`](manager_p/) | with result | 1 | 1 |
 | [`mcp_description_fence`](mcp_description_fence/) | with result | 1 | 1 |
 | [`mcp_error_text`](mcp_error_text/) | with result | 1 | 1 |
-| [`memory_extraction`](memory_extraction/) | with result | 1 | 1 |
+| [`memory_extraction`](memory_extraction/) | with result | 2 | 2 |
 | [`memory_gate_cost`](memory_gate_cost/) | with result | 2 | 2 |
 | [`memory_graph`](memory_graph/) | with result | 1 | 1 |
 | [`memory_poison`](memory_poison/) | with result | 1 | 1 |
@@ -104,9 +104,11 @@ directory holds, never what they found. Read the directory's RESULTS file for th
 | [`panel_correlation`](panel_correlation/) | with result | 0 | 1 |
 | [`parallel_tools`](parallel_tools/) | with result | 1 | 2 |
 | [`perturbation_floor`](perturbation_floor/) | with result | 2 | 1 |
+| [`planner_ab`](planner_ab/) | with result | 1 | 1 |
 | [`premise_capitulation`](premise_capitulation/) | with result | 1 | 1 |
 | [`project_pack`](project_pack/) | preregistered, no result | 1 | 0 |
 | [`prompt_overlays`](prompt_overlays/) | preregistered, no result | 1 | 0 |
+| [`proportionality`](proportionality/) | with result | 1 | 1 |
 | [`rag`](rag/) | with result | 1 | 1 |
 | [`rag_rerank`](rag_rerank/) | with result | 2 | 2 |
 | [`recipient_provenance`](recipient_provenance/) | with result | 1 | 1 |

@@ -459,6 +459,7 @@ def solve(
         WorkspaceGuard,
     )
     from chimera.core.failure_class import RECOVERY_MODES
+    from chimera.core.planner_policy import resolve_use_planner
     from chimera.core.tool_router import ToolRouter as _ToolRouter
     from chimera.core.verify_infer import cli_verifier
     from chimera.evolution import build_evolution_context
@@ -509,10 +510,15 @@ def solve(
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
+    from chimera.orchestration.metering import MeteredBackend
+
     workspace_path = Path(workspace)
     gateway = LLMGateway()
+    # The worker already prices itself through AgentResult.usd. The planner and reviewer
+    # share one meter underneath their backends so the receipt also includes their calls.
+    meter = MeteredBackend(gateway, label="overhead")
     backend: SupportsComplete = gateway
-    planner_backend: SupportsComplete = gateway
+    planner_backend: SupportsComplete = meter
     # --cascade (or CHIMERA_CASCADE): tiered routing weak -> gate -> mid -> gate -> fusion.
     # Takes precedence over --fuse (the cascade already has fusion as its top rung).
     if cascade or settings.cascade:
@@ -532,7 +538,7 @@ def solve(
         # so an explicit --fuse routes the plan through fusion directly. Auto-fuse keeps
         # planning single unless asked, to bound cost.
         if fuse:
-            planner_backend = engine
+            planner_backend = fusion_engine(meter)
 
     # Collective (cross-model) skill evolution is meaningful whenever the run's reasoning peak is
     # fusion over a multi-model panel — true for BOTH --fuse and --cascade (the cascade's top rung is
@@ -553,13 +559,6 @@ def solve(
     # the same function the desktop endpoint uses: a bench that drives the CLI has to exercise the
     # routing the app ships, or it measures something nobody uses.
     roles = _resolve_cli_roles(profile, role_models, settings)
-    # One meter per run, wrapping the gateway UNDERNEATH the non-worker backends — see
-    # chimera.orchestration.metering. The worker is not metered: it prices itself via
-    # AgentResult.usd, and routing it here too would double-count every step.
-    from chimera.orchestration.metering import MeteredBackend
-
-    meter = MeteredBackend(gateway, label="overhead")
-
     # Built OUTSIDE `_run_solve` on purpose: the worktree path calls that function again on retry,
     # and a ledger created inside it would be discarded along with the evidence of what the run was
     # not allowed to do — which is the one fact this whole mechanism exists to keep.
@@ -828,6 +827,8 @@ def solve(
         )
 
         run_verifier, verify_origin = cli_verifier(verify, ws, gen_tests=gen_tests)
+        # `--no-plan` is the caller's explicit word; without it the shared policy decides.
+        use_planner = resolve_use_planner(False if no_plan else None, has_verifier=run_verifier is not None)
         auto = AutonomousAgent(
             worker,
             escalation=escalation,
@@ -867,9 +868,11 @@ def solve(
             ),
             # Provenance gate: artifacts born from a tainted run are marked/held pending.
             taint=ledger,
-            planner=None if no_plan else Planner(
+            planner=Planner(
                 _fused_if(planner_backend, roles.models.fuse_plan, meter, settings), roles.models.plan or model
-            ),
+            )
+            if use_planner
+            else None,
             # review_model_for refuses to let the reviewer be the model that wrote the patch —
             # generate-and-verify collapses when it grades its own work and agrees with itself.
             manager=None if no_manager else Manager(
@@ -915,7 +918,7 @@ def solve(
             meter=meter,
             config=AutonomousConfig(
                 max_attempts=max_attempts,
-                use_planner=not no_plan,
+                use_planner=use_planner,
                 use_manager=not no_manager,
                 normalize_task=normalize_task,
             ),

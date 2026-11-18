@@ -187,6 +187,33 @@ DEFAULT_SYSTEM_PROMPT = (
     "write_file — edit in place instead of rewriting the whole file. "
 ) + UNTRUSTED_DATA_RULE
 
+#: P1-17 (audit 2026-11, a03-02). The base prompt above says "DO the task" and that a final answer
+#: which only tells the user what they "can" or "should" do is a failure. Nothing in it says the
+#: opposite for a question: a person who asks what a function does, or where something is defined,
+#: wants the answer, and the base prompt has no sentence that lets the model give it without first
+#: looking for something to change. The audit's claim was the cost of that (more steps and more
+#: output on a read-only question), and it was a hypothesis, not a measurement.
+#:
+#: OFF (``AgentConfig.proportionality`` / ``CHIMERA_PROPORTIONALITY``). MEASURED 2026-11-16 on
+#: deepseek-chat-v3.1, 150 paired runs (``bench/proportionality/RESULTS.md``), and NOT ADOPTED by the
+#: pre-registered rule: on 36 read-question pairs the mean steps went 2.08 -> +0.03 (t interval over 12
+#: items [-0.16, +0.22]) and output tokens -20 (-9.5%, [-60, +19]), neither clearing zero; correctness
+#: stayed 100%; on 33 edit pairs the pass rate went 87.9% -> 90.9% (no drop). The hypothesis that the
+#: base prompt makes read questions cost more steps was not borne out on this model and corpus: the
+#: fixture questions already took ~2 steps. One model, a corpus of three modules; a null here is not
+#: a reason to drop the block for another model. The text is deliberately narrow in
+#: the same way the bakery exception above is: it names what a question is (the answer is already in
+#: what can be read) and says in the same breath that a request to change something is still a task,
+#: because the "DO the task" rule above was written against a measured failure and this must not
+#: reopen it.
+PROPORTIONALITY_BLOCK = (
+    "Match the size of the answer to the size of the question. When the person asks something that "
+    "can be answered from what you can read (what a function does, where something is defined, why "
+    "a test fails), read what you need, answer it directly and stop: do not look for something to "
+    "change, and do not propose changes nobody asked for. A request to change, add, fix or "
+    "remove something is still a task: carry it out with the tools, as above."
+)
+
 _ACTION_NUDGE = (
     "You described a solution but did not carry it out. Do it NOW using your tools — run the "
     "commands and make the edits — then report what you actually did. Do not just describe it again."
@@ -496,6 +523,12 @@ def _default_browser_situation() -> bool:
     return get_settings().browser_situation
 
 
+def _default_proportionality() -> bool:
+    from chimera.config import get_settings
+
+    return get_settings().proportionality
+
+
 def _default_context_reorientation() -> bool:
     from chimera.config import get_settings
 
@@ -686,6 +719,8 @@ class AgentConfig:
     #: browser hands to the person ends the run as ``handover``. The registry reads the same setting
     #: for the tool's half (`default_registry`), so one switch turns on both.
     browser_situation: bool = field(default_factory=_default_browser_situation)
+    #: Appends :data:`PROPORTIONALITY_BLOCK` after the base prompt. Off by default (P1-17).
+    proportionality: bool = field(default_factory=_default_proportionality)
 
     # A cheap model picks the tool NAME before each step and the executor is given only that tool
     # (`chimera/core/tool_router.py`). Off by default: it is an experiment about cost and steps
@@ -1169,6 +1204,11 @@ class Agent:
             system_prompt = f"{system_prompt}\n\n{UNTRUSTED_DATA_RULE}"
         if self.config.prefix_nonce:
             system_prompt = f"[session {self.config.prefix_nonce}]\n\n{system_prompt}"
+        # P1-17: proportionality, only when switched on (off by default; see the block's docstring).
+        # Right after the core, the same place and for the same reason as the browser situation:
+        # it is the same bytes for every task, so it stays in the cacheable part of the prefix.
+        if self.config.proportionality:
+            system_prompt = f"{system_prompt}\n\n{PROPORTIONALITY_BLOCK}"
         # The browser situation module (study 25, S11), only when the owner switched it on AND this
         # session holds the browser: rules about a tool the session lacks invite calls to nothing.
         # Right after the core, before anything retrieved: it is the same bytes for every task, so

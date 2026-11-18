@@ -883,6 +883,24 @@ def test_a_turn_with_no_verifier_says_why_and_commits_nothing(tmp_path: Path, mo
     assert _remote_head(origin, "feat/turn") == ""
 
 
+def test_an_answer_only_turn_says_nothing_about_the_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws, origin = _workspace_on_a_branch(tmp_path)
+    before = _commits(ws)
+    fake = FakeGh(tmp_path)
+    agent = _EditingAgent(ws, {}, "widget() returns 3.")
+
+    _client, done, _session = _turn(
+        tmp_path, monkeypatch, ws, agent, message="What does widget() return?", setting=True, verify=None,
+        fake=fake,
+    )
+
+    # No file changed: there was nothing to verify, so "verification did not pass" would be false.
+    assert "close_loop" not in done
+    assert "Close loop" not in done["answer"]
+    assert _commits(ws) == before
+    assert _remote_head(origin, "feat/turn") == ""
+
+
 def test_a_verified_turn_with_an_unclean_self_check_says_why_and_commits_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

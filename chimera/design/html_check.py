@@ -534,6 +534,11 @@ def _analyse(board: Artboard, tokens: DesignTokens, notes: _Notes) -> tuple[list
         notes.add("head_display", _HEAD_DISPLAY)
     root_px: float | None = 16.0
     root_bg = _root_background(board, notes)
+    # Every _entries call charges this amount before selector matching, even for rules that do
+    # not match. If that unavoidable work alone exceeds the remaining shared budget, the result
+    # must be too_complex; avoid processing declarations merely to reach the same refusal.
+    if len(tree.elements) * (5 * len(rules) + 1) > budget.left:
+        raise TooComplex
     for el in tree.elements:
         _compute(el, rules, root_px, notes, budget)
         if el.tag == "html":
