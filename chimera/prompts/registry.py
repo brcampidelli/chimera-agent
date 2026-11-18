@@ -540,7 +540,12 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("design.html_base", "chimera.design.prompts:HTML_BASE_INSTRUCTION", "call", ("S2",), "unmeasured"),
     _c("design.html_generate", "chimera.design.prompts:HTML_GENERATE", "turn", ("S2",), "unmeasured"),
     _c("design.html_refine", "chimera.design.prompts:HTML_REFINE", "turn", ("S2",), "unmeasured"),
+    _c("design.html_refine_lean", "chimera.design.prompts:HTML_REFINE_LEAN", "turn", ("S2",), "unmeasured",
+       note="the refinement prompt behind propose.LEAN_REFINE (off); bench/design_refine"),
     _c("design.html_operations", "chimera.design.prompts:HTML_OPERATIONS_GUIDE", "tool", ("S2",), "unmeasured"),
+    _c("design.html_operations_lean", "chimera.design.prompts:HTML_OPERATIONS_GUIDE_LEAN", "tool", ("S2",),
+       "unmeasured", note="the guide without the element operations, for a document that has no elements; "
+                          "bench/design_refine measures it against the full one"),
     _c("design.turn_note", "chimera.tools.design:DESIGN_TURN_NOTE", "volatile", ("S2",),
        "unmeasured",
        note="turn context, only on a Code turn whose message fires chimera.design.intent and "

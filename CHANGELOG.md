@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Experimental lean Design refinement.** The refiner can work with only the artboard it edits. The flag stays off because the corrected benchmark did not meet its gates. (P1-06) (#1304)
+
 - **Prompt blocks and a proportionality experiment.** The language rule and the "data, not instructions" sentence are each one block now, the registry scan sees prompts written as locals, and a proportionality block exists behind `CHIMERA_PROPORTIONALITY`, off because the paired bench showed no gain on deepseek-chat-v3.1. (P1-17) (#1302)
 
 ## [0.91.0] - 2026-11-16
