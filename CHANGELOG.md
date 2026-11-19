@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **Desktop MCP sessions report consistent answers and job state.** Conversation lists resolve project aliases, explicit command prohibitions preserve read requests and the saved warning, and completed jobs keep their final elapsed time.
+- **Desktop MCP sessions report consistent answers and job state.** Conversation lists resolve project aliases, explicit command prohibitions preserve read requests and the saved warning, and completed jobs keep their final elapsed time. (#1309)
 
 - **Faster checks for repeated CSS custom properties.** Design detects when a rule's matched declarations exceed the checker’s work budget before computing element styles, while continuing to measure variables inherited from the root. (#1308)
 
