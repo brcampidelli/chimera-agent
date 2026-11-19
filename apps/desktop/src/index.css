@@ -504,12 +504,22 @@
   /* High contrast: secondary text closer to primary, primary closer to pure, and every line between
      panels at roughly three times its alpha. Hue-neutral, so it composes with any tint. */
   :root:not([data-theme='light'])[data-contrast='high'] {
+    --surface-hover: 222 24% 21%;
+    --card: 222 28% 12.5%;
     --foreground: 210 25% 96%;
     --card-foreground: 210 25% 96%;
     --muted-foreground: 214 16% 76%;
     --hairline: 210 20% 100% / 0.16;
     --border: 220 8% 38%;
     --ring-width: 3px;
+  }
+  :root:not([data-theme='light'])[data-tint='neutral'][data-contrast='high'] {
+    --surface-hover: 220 7% 19.5%;
+    --card: 220 8% 11.5%;
+  }
+  :root:not([data-theme='light'])[data-tint='warm'][data-contrast='high'] {
+    --surface-hover: 30 8% 18.75%;
+    --card: 30 10% 10.75%;
   }
   :root[data-theme='light'][data-contrast='high'] {
     --foreground: 222 50% 8%;
