@@ -108,6 +108,7 @@ import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeil
 import { EnvironmentPicker } from "@/components/code/EnvironmentPicker";
 import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
 import { ExchangeView, useStableActions } from "@/components/code/ExchangeView";
+import { closeLoopWatchPending } from "@/lib/closeLoopNote";
 import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
 import { CodeReviewCard } from "@/components/code/CodeReviewCard";
 import { parseReviewCommand } from "@/components/code/codeReview";
@@ -1297,6 +1298,36 @@ export function Conversation({
       live = false;
     };
   }, [resumeSession]);
+
+  // The watch only amends the receipt on disk. Re-read this conversation's pending records,
+  // never its answers/drafts, and never while a turn is streaming or the window is hidden.
+  const pendingCloseLoopIds = JSON.stringify([...new Set(exchanges
+    .filter((e) => closeLoopWatchPending(e.done))
+    .map((e) => e.done?.close_loop?.turn_id).filter((id): id is string => !!id))].sort());
+  useEffect(() => {
+    if (!sessionId || pendingCloseLoopIds === "[]") return;
+    const watched = new Set<string>(JSON.parse(pendingCloseLoopIds));
+    let active = true;
+    let fetching = false;
+    const timer = window.setInterval(() => {
+      if (!active || fetching || busyRef.current || document.hidden) return;
+      fetching = true;
+      void getCodeSession(sessionId).then((stored) => {
+        if (!active || busyRef.current) return;
+        const updates = new Map(stored.exchanges.filter((e) => e.done?.close_loop_note === "payload")
+          .map((e) => [e.done?.close_loop?.turn_id, e.done?.close_loop]));
+        setExchanges((current) => current.map((e) => {
+          const state = e.done?.close_loop;
+          if (e.done?.close_loop_note !== "payload" || !state?.turn_id || !watched.has(state.turn_id)) return e;
+          const next = updates.get(state.turn_id);
+          if (!next || JSON.stringify(next) === JSON.stringify(state)) return e;
+          return { ...e, done: { ...e.done, close_loop: next } };
+        }));
+      }).catch(() => { /* Keep the current receipt; a later tick can retry this read. */ })
+        .finally(() => { fetching = false; });
+    }, 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [sessionId, pendingCloseLoopIds, setExchanges]);
 
   // The Editor's question, sent once the conversation is ready for it: its stored turns read back
   // (so the new one lands under them, not under a blank screen that the replay then overwrites),

@@ -62,8 +62,12 @@ from chimera.core.guest_history import (
     HUMAN_TEXT_KEY,
     MODEL_ANSWER_KEY,
     ORIGIN_KEY,
+    WORKSPACE_IMAGE_KEY,
+    WorkspaceImageFrame,
+    is_workspace_image_frame,
     message_text,
     project_history,
+    workspace_image_positions,
 )
 from chimera.core.redact import redact_json
 from chimera.providers.cache_ttl import cache_ttl_seconds
@@ -219,7 +223,7 @@ def _opens_turn(message: MessageLike) -> bool:
     guidance as a turn would split one turn in two: the title, the turn count and the cut point
     for a long conversation all read "user" as "a turn began here"."""
     data = _as_dict(message)
-    return data.get("role") == "user" and not is_guidance(data)
+    return data.get("role") == "user" and (not is_guidance(data) or WORKSPACE_IMAGE_KEY in data)
 
 
 def _is_person_turn(message: MessageLike) -> bool:
@@ -235,9 +239,10 @@ def _title_from(messages: Sequence[MessageLike]) -> str:
     own note. The restored block right after it carries the task verbatim, so the title is taken from
     there; without one, from the first message the person typed that is still in the transcript.
     """
-    for message in messages:
+    images = workspace_image_positions(messages)
+    for index, message in enumerate(messages):
         data = _as_dict(message)
-        if data.get("role") != "user":
+        if index in images or data.get("role") != "user":
             continue
         task = restored_task(data.get("content"))
         if task:
@@ -260,11 +265,12 @@ def trim_to_a_safe_boundary(messages: list[MessageLike], limit: int) -> list[Mes
     """
     if len(messages) <= limit:
         return messages
+    images = workspace_image_positions(messages)
     for i in range(len(messages) - limit, len(messages)):
-        if _opens_turn(messages[i]):
+        if i not in images and _opens_turn(messages[i]):
             return messages[i:]
     for i in range(len(messages) - 1, -1, -1):
-        if _opens_turn(messages[i]):
+        if i not in images and _opens_turn(messages[i]):
             return messages[i:]
     return []  # no user message at all: nothing here is a safe place to resume from
 
@@ -295,6 +301,18 @@ def environment_record(value: object) -> dict[str, str] | None:
     if not (isinstance(env_id, str) and isinstance(name, str) and isinstance(kind, str)) or not env_id:
         return None
     return {"id": env_id, "name": name, "kind": kind}
+
+
+@dataclass(frozen=True)
+class TurnAnswerContext:
+    """A lock-captured persisted span, with positions minted from runtime image-frame identities.
+
+    The indices are relative to the opener. This is transient server state, never read from a request
+    or restored from a JSON marker; the marker by itself is only presentation metadata.
+    """
+
+    messages: tuple[dict[str, Any], ...]
+    workspace_images: frozenset[int]
 
 
 @dataclass
@@ -649,9 +667,10 @@ class CodeSession:
 
     def _withdraw_final_seals(self) -> None:
         """Take the seal off the current turn's earlier final answer(s) before it is retried."""
+        images = workspace_image_positions(self.messages)
         for index in range(len(self.messages) - 1, -1, -1):
             message = _as_dict(self.messages[index])
-            if message.get("role") == "user" and not message.get("guidance"):
+            if index not in images and _opens_turn(message):
                 return
             if message.get(FINAL_KEY):
                 self.messages[index] = {k: v for k, v in message.items() if k != FINAL_KEY}
@@ -666,7 +685,10 @@ class CodeSession:
         provably a person's" and hides.
         """
         for message in reversed(self.messages):
-            if isinstance(message, dict) and message.get("role") == "user" and not message.get("guidance"):
+            # Only the live Python identity is a continuation here; a copied JSON mark is a user.
+            if isinstance(message, WorkspaceImageFrame):
+                continue
+            if isinstance(message, dict) and _opens_turn(message):
                 if message_text(message.get("content")) == task:
                     message[ORIGIN_KEY] = origin
                     if author:
@@ -761,20 +783,25 @@ class CodeSession:
 
     def replace_turn_answer_at(
         self, opener_index: int, answer_index: int, opener: dict[str, Any],
-        answer: dict[str, Any], text: str,
+        answer: dict[str, Any], text: str, *, context: TurnAnswerContext | None = None,
     ) -> bool:
-        """Replace a captured turn's final answer only if both saved anchors still match."""
+        """Replace only our captured turn. A raw user/image marker never bypasses ownership."""
         if not 0 <= opener_index < answer_index < len(self.messages):
             return False
         stored_opener = _as_dict(self.messages[opener_index])
         stored_answer = _as_dict(self.messages[answer_index])
         if stored_opener != opener or stored_answer != answer:
             return False
-        if stored_opener.get("role") != "user" or stored_opener.get("guidance"):
+        if not _opens_turn(stored_opener) or is_workspace_image_frame(stored_opener):
             return False
-        if any(_as_dict(m).get("role") == "user" and not _as_dict(m).get("guidance")
-               for m in self.messages[opener_index + 1:answer_index]):
+        if context is not None and tuple(_as_dict(m) for m in self.messages[opener_index:answer_index + 1]) != context.messages:
             return False
+        for index in range(opener_index + 1, answer_index):
+            message = _as_dict(self.messages[index])
+            if (_opens_turn(message)
+                    and (context is None or index - opener_index not in context.workspace_images
+                         or not is_workspace_image_frame(message))):
+                return False
         if stored_answer.get("role") != "assistant" or stored_answer.get("tool_calls") or is_batch_note(stored_answer):
             return False
         self.messages[answer_index] = _replaced(stored_answer, text)
@@ -935,6 +962,7 @@ def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
     last = receipts[-1] if isinstance(receipts, list) and receipts else None
     verified = last.get("verified") if isinstance(last, dict) else None
     last_verdict = str(verified.get("state") or "") if isinstance(verified, dict) else ""
+    images = workspace_image_positions(messages)
     return {
         "id": str(data.get("session_id") or stem),
         "title": _title_from(messages),
@@ -943,7 +971,7 @@ def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
         # Turns, not messages: a user asking twice is two turns, but the transcript between them
         # holds every tool call the agent made, and counting those would report a number that grows
         # with the agent's verbosity rather than with the conversation.
-        "turns": sum(1 for m in messages if _is_person_turn(m)),
+        "turns": sum(1 for index, m in enumerate(messages) if index not in images and _is_person_turn(m)),
         "updated_at": mtime,
 
         "last_verdict": last_verdict,
@@ -1390,6 +1418,8 @@ class CodeSessionStore:
         The close loop's CI watch outlives the turn that started it, so its later states are written
         back into the receipt the turn stored (the receipt is the only record that outlives the
         request). A file that is missing or unreadable is not an error here: nothing was recorded.
+        A fix publishes its clean pending head before its watcher starts. A late terminal report
+        from the previous head cannot replace it, even if enqueue let the fix finish immediately.
         """
         path = self._path(session_id)
         with self._guard(path):
@@ -1405,6 +1435,18 @@ class CodeSessionStore:
             for receipt in document.get("receipts") or []:
                 record = receipt.get("close_loop") if isinstance(receipt, dict) else None
                 if isinstance(record, dict) and record.get("turn_id") == turn_id:
+                    old_head, new_head = record.get("commit"), close_loop.get("commit")
+                    if old_head and new_head and old_head != new_head:
+                        old_attempts, new_attempts = record.get("fix_attempts"), close_loop.get("fix_attempts")
+                        advances = (
+                            close_loop.get("ci") == "pending" and not close_loop.get("error")
+                            and type(new_attempts) is int and type(old_attempts) is int
+                            and new_attempts >= old_attempts
+                        )
+                        if not advances:
+                            # A queued fix can finish before the previous watch returns from enqueue.
+                            # Only its clean pending-head publication may advance this receipt's head.
+                            continue
                     receipt["close_loop"] = close_loop
                     count += 1
             if count:

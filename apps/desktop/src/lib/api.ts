@@ -1828,7 +1828,27 @@ export interface RecalledFact {
 }
 
 /** The terminal `done` payload of a coding turn — what it did, what it cost, how close to the wall. */
+/** Close-loop fields are additive. Unknown codes keep the server's raw reason visible. */
+export interface CloseLoopPayload {
+  turn_id?: string;
+  committed?: boolean;
+  commit?: string;
+  branch?: string;
+  pr_url?: string;
+  ci?: string;
+  merged?: boolean;
+  merge_blocked_reason?: string;
+  merge_blocked_code?: string;
+  fix_attempts?: number;
+  skipped_reason?: string;
+  skipped_code?: string;
+  error?: string;
+}
+
 export interface CodeTurnDone {
+  close_loop?: CloseLoopPayload;
+  /** Marked receipts render separately; legacy answers already contain their note. */
+  close_loop_note?: "payload";
   answer: string;
   /** Who asked, when it was a guest: their name, on the receipt the conversation keeps. Absent
    *  for the owner's own turns. */

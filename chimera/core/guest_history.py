@@ -21,6 +21,7 @@ The marks are ours, local to Chimera, and dropped before a provider sees a messa
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from chimera.core.agent_batch_note import is_batch_note
@@ -62,9 +63,76 @@ CARD_TURN_TEXT = "(executou um card sugerido)"
 #: What a guest's ``done`` carries when the turn did not end normally with an answer.
 UNFINISHED_TEXT = "(o turno não concluiu)"
 
+#: A user-role continuation created after the agent's own view_image result. Presentation only:
+#: persisted dictionaries bearing this key never confer authority to rewrite a turn's answer.
+WORKSPACE_IMAGE_KEY = "workspace_image"
+WORKSPACE_IMAGE_ORIGIN = "auto:workspace_image"
+_IMAGE_INSTRUCTION = "Inspect this workspace image and answer the user's task."
+_IMAGE_KEYS = frozenset({"role", "content", "images", ORIGIN_KEY, WORKSPACE_IMAGE_KEY})
+
+
+class WorkspaceImageFrame(dict[str, Any]):
+    """Runtime identity minted only at the image-tool seam; JSON/request fields cannot create it."""
+
+    def __init__(self, path: str, tool_call_id: str) -> None:
+        super().__init__({"role": "user", "content": _IMAGE_INSTRUCTION, "images": [path],
+                          ORIGIN_KEY: WORKSPACE_IMAGE_ORIGIN, WORKSPACE_IMAGE_KEY: {"tool_call_id": tool_call_id}})
+
+
+def is_workspace_image_frame(message: Any) -> bool:
+    """Strict internal shape, never enough by itself to hide a persisted user separator."""
+    if (not isinstance(message, dict) or message.get("role") != "user"
+            or message.get(ORIGIN_KEY) != WORKSPACE_IMAGE_ORIGIN or set(message) != _IMAGE_KEYS):
+        return False
+    mark, images = message.get(WORKSPACE_IMAGE_KEY), message.get("images")
+    return bool(
+        message.get("content") == _IMAGE_INSTRUCTION
+        and isinstance(mark, dict) and set(mark) == {"tool_call_id"}
+        and isinstance(mark.get("tool_call_id"), str) and mark["tool_call_id"]
+        and isinstance(images, list) and len(images) == 1 and isinstance(images[0], str) and images[0]
+    )
+
+
+def workspace_image_positions(messages: Sequence[Any]) -> frozenset[int]:
+    """Prove persisted continuations against the immediately preceding view_image tool trace.
+
+    Human/guest authorship fields make the shape fail. Missing/ambiguous provenance is a separator,
+    even when a copied flag or an image is present. No provider or request can mint runtime identity.
+    """
+    positions: set[int] = set()
+    image_calls: set[str] = set()
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            image_calls.clear()
+            continue
+        role = message.get("role")
+        if role == "assistant":
+            image_calls.clear()
+            calls = message.get("tool_calls")
+            if isinstance(calls, list):
+                for call in calls:
+                    if not isinstance(call, dict) or not isinstance(call.get("id"), str):
+                        continue
+                    function = call.get("function")
+                    if isinstance(function, dict) and function.get("name") == "view_image":
+                        image_calls.add(call["id"])
+        elif role == "user":
+            previous = messages[index - 1] if index else None
+            if (is_workspace_image_frame(message) and isinstance(previous, dict)
+                    and previous.get("role") == "tool" and isinstance(previous.get("content"), str)
+                    and previous.get("tool_call_id") == message[WORKSPACE_IMAGE_KEY]["tool_call_id"]
+                    and previous.get("tool_call_id") in image_calls):
+                positions.add(index)
+            else:
+                image_calls.clear()
+        elif role != "tool":
+            image_calls.clear()
+    return frozenset(positions)
+
+
 #: Keys the marks above use, for the gateway to drop from the wire.
 LOCAL_MESSAGE_KEYS = frozenset(
-    {ORIGIN_KEY, AUTHOR_KEY, MODEL_ANSWER_KEY, GUEST_KEY, HUMAN_TEXT_KEY, FINAL_KEY}
+    {ORIGIN_KEY, AUTHOR_KEY, MODEL_ANSWER_KEY, GUEST_KEY, HUMAN_TEXT_KEY, FINAL_KEY, WORKSPACE_IMAGE_KEY}
 )
 
 
@@ -78,12 +146,16 @@ def message_text(content: Any) -> str:
 
 
 def is_turn_opener(message: Any) -> bool:
-    """A ``user`` message that opens a turn: not guidance typed into one, not a batch's record."""
+    """A user boundary. An image mark alone cannot suppress it; the full-list trace must prove that.
+
+    Mixed/ambiguous image metadata stays a separator, including when another continuation flag
+    was copied with it. Normal guidance and batch records without this mark keep their behavior.
+    """
     return (
         isinstance(message, dict)
         and message.get("role") == "user"
-        and not message.get("guidance")
-        and not is_batch_note(message)
+        and (not message.get("guidance") or WORKSPACE_IMAGE_KEY in message)
+        and (not is_batch_note(message) or WORKSPACE_IMAGE_KEY in message)
     )
 
 
@@ -115,10 +187,14 @@ def shown_request(opener: Any) -> str:
 def _turns(messages: list[Any]) -> list[tuple[dict[str, Any] | None, list[dict[str, Any]]]]:
     """The messages cut into turns: (opening message or None, every message of the turn)."""
     turns: list[tuple[dict[str, Any] | None, list[dict[str, Any]]]] = []
-    for message in messages:
-        if not isinstance(message, dict) or is_batch_note(message):
+    images = workspace_image_positions(messages)
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
             continue
-        if is_turn_opener(message):
+        marked_user = message.get("role") == "user" and WORKSPACE_IMAGE_KEY in message
+        if is_batch_note(message) and not marked_user:
+            continue
+        if index not in images and is_turn_opener(message):
             turns.append((message, [message]))
         elif turns:
             turns[-1][1].append(message)

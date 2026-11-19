@@ -381,7 +381,7 @@ def test_a_clean_verified_turn_commits_pushes_opens_the_pr_and_starts_the_ci_wat
     watches: list[str] = []
     monkeypatch.setattr(
         _wiring_class(), "_start_watch",
-        lambda self, state, root, session: watches.append(state.commit),
+        lambda self, state, root, session, *, desktop=False: watches.append(state.commit),
     )
 
     state = _wiring(fake).at_turn_end(
@@ -529,7 +529,7 @@ def test_a_follow_up_fix_turn_pushes_its_commit_to_the_open_pr_and_does_not_open
     ws, origin = repos
     first = _commit_widget(ws)
     fake = FakeGh(tmp_path)
-    monkeypatch.setattr(_wiring_class(), "_start_watch", lambda self, state, root, session: None)
+    monkeypatch.setattr(_wiring_class(), "_start_watch", lambda self, state, root, session, *, desktop=False: None)
     _git(ws, "push", "origin", f"{first}:refs/heads/feat/turn")  # the first turn's push, as it happened
     wiring = _wiring(fake)
     failing = _pr_state(first, fix_attempts=1, ci="failed")
@@ -878,7 +878,9 @@ def test_a_turn_with_no_verifier_says_why_and_commits_nothing(tmp_path: Path, mo
     )
 
     assert done["close_loop"]["skipped_reason"] == "verification did not pass for this turn"
-    assert "Close loop: did not run" in done["answer"]
+    assert done["close_loop_note"] == "payload"
+    assert done["answer"] == "Changed the widget."
+    assert done["close_loop"]["skipped_code"] == "verification_failed"
     assert _commits(ws) == before
     assert _remote_head(origin, "feat/turn") == ""
 
@@ -942,7 +944,8 @@ def test_a_verified_clean_turn_commits_opens_the_pr_and_merges_once_ci_is_green(
     assert loop["pr_url"] == PR_URL and loop["ci"] == "pending"
     assert _commits(ws) == before + 1
     assert _remote_head(origin, "feat/turn") == loop["commit"]
-    assert "Close loop: committed" in done["answer"]
+    assert done["close_loop_note"] == "payload"
+    assert done["answer"] == "Changed the widget to return 5."
     # The watch moved to green and merged, and the stored receipt says so after the turn ended.
     stored = client.get(f"/api/code/sessions/{session_id}").json()["exchanges"][-1]["done"]
     assert stored["close_loop"]["merged"] is True
@@ -1213,7 +1216,7 @@ def test_a_continuation_from_the_bridge_or_a_channel_pushes_nothing(
     first = _commit_widget(ws)
     _git(ws, "push", "origin", f"{first}:refs/heads/feat/turn")
     fake = FakeGh(tmp_path)
-    monkeypatch.setattr(_wiring_class(), "_start_watch", lambda self, state, root, session: None)
+    monkeypatch.setattr(_wiring_class(), "_start_watch", lambda self, state, root, session, *, desktop=False: None)
     _dirty_widget(ws, "def widget():\n    return 7\n")
     failing = _pr_state(first, fix_attempts=1, ci="failed")
 

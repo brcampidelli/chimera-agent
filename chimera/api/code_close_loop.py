@@ -46,6 +46,28 @@ def _merge_off() -> bool:
     return False
 
 
+def present_close_loop(payload: dict[str, Any], state: CloseLoop, *, desktop: bool) -> str | None:
+    """Separate Desktop presentation from the canonical answer; old channels keep their note.
+
+    The marker is durable with the receipt. Old receipts have no marker and already carry a note,
+    so replay must not append a second one. This function grants no close-loop capability.
+    """
+    payload["close_loop"] = state.to_payload()
+    if desktop:
+        payload["close_loop_note"] = "payload"
+        return None
+    note = state.note()
+    answer = str(payload.get("answer") or "")
+    if note is not None and answer.strip():
+        payload["answer"] = answer.rstrip() + "\n\n" + note
+    return note
+
+
+def desktop_close_loop_note(via_screen: bool, follow: dict[str, Any] | None) -> bool:
+    """An internal continuation keeps presentation, without acquiring screen authority."""
+    return via_screen or bool(follow and follow.get("note_presentation") == "payload")
+
+
 class CloseLoopWiring:
     """One instance per server. Dependencies are injected so the tests can drive it without a server."""
 
@@ -103,7 +125,11 @@ class CloseLoopWiring:
                 return None
             gate = gate_reason(verified=verified, self_check_clean=self_check_clean, incomplete=incomplete)
             if gate:
-                return CloseLoop(turn_id=turn_id, skipped_reason=gate)
+                return CloseLoop(
+                    turn_id=turn_id, skipped_reason=gate,
+                    skipped_code=("verification_failed" if not verified else
+                                  "self_check_failed" if not self_check_clean else "incomplete_changes"),
+                )
             state = close_at_turn_end(
                 ws, turn_id=turn_id, message=message, paths=paths, hooks=self._hooks(),
             )
@@ -128,14 +154,22 @@ class CloseLoopWiring:
                 ws, state=state, message=message, paths=paths, hooks=self._hooks(),
             )
         if state.ci == "pending" and state.commit:
-            self._start_watch(state, ws, session_id)
+            if follow is not None:
+                # Publish the fix's new head before its watcher (or a fast queued turn) can finish.
+                # The old watcher may still return from enqueue; its old-head report must not win.
+                self._record(session_id, state)
+            self._start_watch(
+                state, ws, session_id, desktop=desktop_close_loop_note(via_screen, follow),
+            )
         return state
 
     def _hooks(self) -> Hooks:
         gh = list(self._gh) if self._gh is not None else gh_command()
         return Hooks(gh=gh, sleep=self._sleep, clock=self._clock, merge_allowed=self._merge_enabled)
 
-    def _start_watch(self, state: CloseLoop, ws: Path, session_id: str) -> None:
+    def _start_watch(
+        self, state: CloseLoop, ws: Path, session_id: str, *, desktop: bool = False,
+    ) -> None:
         # The watch owns a copy: the done frame reads `state` on this thread while the watch mutates its own.
         watched = CloseLoop.from_payload(state.to_payload())
         gh = list(self._gh) if self._gh is not None else gh_command()
@@ -147,7 +181,7 @@ class CloseLoopWiring:
             gh=gh,
             sleep=self._sleep,
             clock=self._clock,
-            ask_fix=lambda log, attempt: self._ask_fix(session_id, ws, watched, log, attempt),
+            ask_fix=lambda log, attempt: self._ask_fix(session_id, ws, watched, log, attempt, desktop=desktop),
             report=lambda current: self._record(session_id, current),
             merge_allowed=self._merge_enabled,
         )
@@ -178,13 +212,16 @@ class CloseLoopWiring:
             self._sleep(_STORE_RETRY_SECONDS)
 
     def _ask_fix(
-        self, session_id: str, ws: Path, state: CloseLoop, log: str, attempt: int,
+        self, session_id: str, ws: Path, state: CloseLoop, log: str, attempt: int, *, desktop: bool = False,
     ) -> bool:
         payload = {
             "message": fix_request(log, attempt),
             "session_id": session_id,
             "workspace": str(ws),
-            "close_loop_follow": {"state": state.to_payload(), "turn_id": state.turn_id},
+            "close_loop_follow": {
+                "state": state.to_payload(), "turn_id": state.turn_id,
+                "note_presentation": "payload" if desktop else "answer",
+            },
         }
         return self._enqueue(session_id, f"close-loop-{state.turn_id}-{attempt}", payload)
 

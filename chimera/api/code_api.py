@@ -66,7 +66,11 @@ from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.big_task import is_big_task
 from chimera.api.browser_screen import BROWSER_SCOPE_KEY, needs_screen
-from chimera.api.code_close_loop import CloseLoopWiring
+from chimera.api.code_close_loop import (
+    CloseLoopWiring,
+    desktop_close_loop_note,
+    present_close_loop,
+)
 from chimera.api.code_session_queue import (
     CodeTurnQueue,
     QueueDrainer,
@@ -189,7 +193,7 @@ from chimera.core.cache_miss import (
 )
 from chimera.core.claims import success_claims
 from chimera.core.close_loop import may_start_loop
-from chimera.core.code_session import EnvironmentFixedError
+from chimera.core.code_session import EnvironmentFixedError, TurnAnswerContext
 from chimera.core.command_intent import COMMANDS_UNVERIFIED_LINE
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
@@ -210,11 +214,13 @@ from chimera.core.guest_history import (
     HUMAN,
     HUMAN_TEXT_KEY,
     ORIGIN_KEY,
+    WorkspaceImageFrame,
 )
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.pr_auto_archive import Sweeper
 from chimera.core.pr_auto_archive import has_work as pr_has_work
 from chimera.core.project_place import Place
+from chimera.core.redact import redact_json
 from chimera.core.task_cards import (
     BROKEN_REASON,
     CARDS_FILE_NAME,
@@ -5400,11 +5406,11 @@ def register_code_api(
                 commands_unverified = False
                 turn_has_answer = False
                 turn_opening_index: int | None = None
-                turn_saved_anchor: tuple[int, int, dict[str, Any], dict[str, Any]] | None = None
+                turn_saved_anchor: tuple[int, int, dict[str, Any], dict[str, Any], TurnAnswerContext] | None = None
 
-                def _capture_saved_anchor() -> tuple[int, int, dict[str, Any], dict[str, Any]] | None:
+                def _capture_saved_anchor() -> tuple[int, int, dict[str, Any], dict[str, Any], TurnAnswerContext] | None:
                     """Capture this turn's saved endpoints before verification can rewrite its answer."""
-                    if not commands_unverified or not turn_has_answer or turn_opening_index is None:
+                    if not turn_has_answer or turn_opening_index is None:
                         return None
                     answer_index = _final_answer_index(session)
                     if answer_index is None or turn_opening_index >= answer_index:
@@ -5412,16 +5418,23 @@ def register_code_api(
                     stored = store_for.load_existing(session_id, session.agent)
                     if stored is None:
                         return None
-                    own_messages = session.to_dict()["messages"]
+                    own_messages = cast("list[dict[str, Any]]", redact_json(session.to_dict()["messages"]))
                     saved_messages = stored.to_dict()["messages"]
+                    # save() redacts the document. Compare exactly that persisted representation,
+                    # including the entire span, instead of mistaking masking for another turn.
                     if answer_index >= len(saved_messages) or (
-                        own_messages[turn_opening_index] != saved_messages[turn_opening_index]
-                        or own_messages[answer_index] != saved_messages[answer_index]
+                        own_messages[turn_opening_index:answer_index + 1]
+                        != saved_messages[turn_opening_index:answer_index + 1]
                     ):
                         return None
+                    context = TurnAnswerContext(
+                        tuple(copy.deepcopy(saved_messages[turn_opening_index:answer_index + 1])),
+                        frozenset(i - turn_opening_index for i in range(turn_opening_index + 1, answer_index)
+                                  if isinstance(session.messages[i], WorkspaceImageFrame)),
+                    )
                     return (turn_opening_index, answer_index,
                             copy.deepcopy(saved_messages[turn_opening_index]),
-                            copy.deepcopy(saved_messages[answer_index]))
+                            copy.deepcopy(saved_messages[answer_index]), context)
 
                 def _verify_and_finish(payload: dict[str, Any]) -> None:
                     """Judge what the turn wrote and close the stream.
@@ -5973,7 +5986,6 @@ def register_code_api(
                     # would put a button on a reopened conversation that cannot do what it says.
                     # The close loop (`chimera/core/close_loop.py`): only a foreground turn of the owner's, never a
                     # work, a guest's turn, an external agent's loop or a fused answer. Off means no measurement.
-                    close_note: str | None = None
                     closed = close_loop_wiring.at_turn_end(
                         session_id=session_id, turn_id=turn_id, ws=ws,
                         requested=req.close_loop, via_screen=bool(req._via_screen),
@@ -5996,11 +6008,10 @@ def register_code_api(
                         follow=req.close_loop_follow,
                     )
                     if closed is not None:
-                        payload["close_loop"] = closed.to_payload()
-                        close_note = closed.note()
-                        raw_answer = str(payload.get("answer") or "")
-                        if close_note is not None and raw_answer.strip():
-                            payload["answer"] = raw_answer.rstrip() + "\n\n" + close_note
+                        present_close_loop(
+                            payload, closed,
+                            desktop=desktop_close_loop_note(bool(req._via_screen), req.close_loop_follow),
+                        )
                     if commands_unverified and str(payload.get("answer") or "").strip():
                         payload["answer"] = COMMANDS_UNVERIFIED_LINE + "\n\n" + str(payload["answer"])
                     # The model's own final answer AFTER any repair, and only when the turn ended
@@ -6083,34 +6094,20 @@ def register_code_api(
                         # stored now, never back over it with this turn's older copy.
                         with lock_for(session_id):
                             if turn_id not in deleted_mid_turn:
-                                # This turn's final answer is addressed by POSITION, read before the refresh (the
-                                # refresh replaces the messages with the stored ones; later turns of this conversation
-                                # append after this answer, never before it). A text match would confuse it with an
-                                # identical answer from another turn, and would miss it when verify_retry rewrote it.
-                                answer_index = _final_answer_index(session)
-                                if not commands_unverified:
-                                    # Preserve the existing repair and guest-seal path when no
-                                    # commands-off answer needs to be added.
-                                    store_for.refresh(session)
-                                    if (
-                                        (self_check_note is not None or close_note is not None)
-                                        and answer_index is not None
-                                        and str(payload.get("answer") or "").strip()
-                                    ):
-                                        session.replace_answer_at(answer_index, str(payload["answer"]))
-                                    if sealed_answer is not None and answer_index is not None:
+                                # Captured under this same lock when the definitive pass was saved,
+                                # before verification rewrote the local answer. Tool frames may sit
+                                # between opener and final; both saved anchors must still belong to us.
+                                store_for.refresh(session)
+                                if turn_saved_anchor is not None and str(payload.get("answer") or "").strip():
+                                    opener_index, answer_index, opener, original_answer, context = turn_saved_anchor
+                                    replaced = session.replace_turn_answer_at(
+                                        opener_index, answer_index, opener, original_answer,
+                                        str(payload["answer"]), context=context,
+                                    )
+                                    # No qualification means no overwrite or new seal. Existing seals
+                                    # read from disk are left intact, including those of another turn.
+                                    if sealed_answer is not None and replaced:
                                         session.seal_final_at(answer_index, sealed_answer)
-                                else:
-                                    store_for.refresh(session)
-                                    replaced = False
-                                    if turn_saved_anchor is not None and str(payload.get("answer") or "").strip():
-                                        opener_index, answer_index, opener, original_answer = turn_saved_anchor
-                                        replaced = session.replace_turn_answer_at(
-                                            opener_index, answer_index, opener, original_answer,
-                                            str(payload["answer"]),
-                                        )
-                                        if sealed_answer is not None and replaced:
-                                            session.seal_final_at(answer_index, sealed_answer)
                                 session.remember_receipt(receipt)
                                 with live_turns.writing(turn_id):
                                     store_for.save(session)

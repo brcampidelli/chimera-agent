@@ -434,7 +434,7 @@ def _without_refused(resolved: str, kwargs: dict[str, Any]) -> dict[str, Any]:
 # `origin`, `author` and `model_answer` are the marks `chimera.core.guest_history` puts on stored
 # messages (who wrote a user message; the model's own text where the server replaced it).
 _LOCAL_KEYS = frozenset({"images", "guidance", "agent_batch", "origin", "author", "model_answer",
-     "guest_id", "human_text", "final_seal"})
+     "guest_id", "human_text", "final_seal", "workspace_image"})
 
 
 def _request_chars(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None) -> int:

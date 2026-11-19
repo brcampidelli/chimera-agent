@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.failure_class import ToolErrorClass, classify_tool_error
+from chimera.core.guest_history import WorkspaceImageFrame
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance import wire_context
@@ -2302,11 +2303,7 @@ class Agent:
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
                 if image_to_attach is not None:
-                    messages.append({
-                        "role": "user",
-                        "content": "Inspect this workspace image and answer the user's task.",
-                        "images": [image_to_attach],
-                    })
+                    messages.append(WorkspaceImageFrame(image_to_attach, call.id))
                 if nested_context:
                     # A standalone history message keeps the run's system prefix stable for provider
                     # caches and avoids presenting repository text as a tool's actual observation.
