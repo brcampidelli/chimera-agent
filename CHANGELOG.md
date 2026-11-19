@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Document the measured MCP description trade-off and preserve full descriptions as the default. (#1310)
+
 ### Fixed
 
 - **Desktop MCP sessions report consistent answers and job state.** Conversation lists resolve project aliases, explicit command prohibitions preserve read requests and the saved warning, and completed jobs keep their final elapsed time. (#1309)
