@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-11-19
+
 - **Close loop notices.** The desktop now translates Close loop notices and refreshes their CI status in the open conversation. (Fable 7) (#1313)
 
 - Keyboard focus rings now reach 4.5:1 contrast on hovered controls in the dark high-contrast palette. (#1312)
