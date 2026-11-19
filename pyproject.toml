@@ -374,10 +374,11 @@ only_mutate = [
 # in-scope module — by name, or through a bench/ runner it loads (test_run_paired.py drives paired.py
 # that way) — is neither listed here nor excluded there with a reason (the slow ones are).
 pytest_add_cli_args_test_selection = [
-  # These two build an app whose verifier is faked through `chimera.core.verify.CommandVerifier` and read
-  # what a guest is shown of a verified turn (audit P1b); they name core/verify.py, so the gate runs them.
+  # Shared-turn tests fake core.verify.CommandVerifier and inspect the guest's view or command
+  # exclusions. They name core/verify.py, so the mutation gate must select them.
   "tests/test_a_guest_sees_what_a_person_said_and_the_model_concluded.py",
   "tests/test_a_guest_view_is_sealed_when_the_turn_is_made_and_not_guessed_after.py",
+  "tests/test_a_shared_guest_turn_carries_no_commands_or_hooks.py",
   "tests/test_bypass_one_rule_and_one_credential_list.py",  # names governance/audit, ledger, ledger_tool, policy (P0-01)
   "tests/test_code_environments.py",
   "tests/test_chimera_agent_governance_review_fixes.py",  # names governance/ledger.py (taint mode on the audit lines, P0-15)

@@ -11,7 +11,8 @@ for it once:
   them, not by the folder they ran in, and the browser keeps no sign-in (always ephemeral);
 * nothing reads outside the conversation's folder, whatever the approval mode: the guest's file tools
   get no "ask outside" approver, and `CHIMERA_APPROVAL_MODE=allow` is read as `ask` for the guest;
-* the owner's hooks (`hooks.json`, `~/.claude/settings.json`) do not run; the project's own hooks do;
+* guest turns exclude `run_shell`, `execute_code`, the verifier, setup, and hooks from all origins
+  (owner `chimera-hooks.json`, `~/.claude/settings.json`, and project hooks);
 * the prompt sources that belong to the owner (`agent.json`, the global AGENTS.md, the owner's skill
   list, learned lessons) are withheld by the builder through ``AgentConfig.guest``.
 
@@ -71,7 +72,7 @@ def guest_runs_nothing(author: str | None, req: Any) -> bool:
 def guest_governance_settings(settings: Any) -> Any:
     """``settings`` as the governance layer (policy, hooks) should read them for a guest's turn.
 
-    Identical except that EVERY hook source is off: ``CHIMERA_HOME/hooks.json``, the user-level
+    Identical except that EVERY hook source is off: ``CHIMERA_HOME/chimera-hooks.json``, the user-level
     ``~/.claude/settings.json`` and the project's ``.claude/settings.json``. The first two are the
     owner's commands; the project's are approved by fingerprint once, and the guest can then rewrite
     the script that fingerprint names (the post hook of the same write runs the new bytes). This
