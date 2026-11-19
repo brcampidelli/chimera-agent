@@ -306,3 +306,21 @@ def test_the_audit_does_not_list_the_describe_tool_it_put_back() -> None:
     assert "mcp_describe" not in audit.entries[0]["excluded"]
     assert "mcp_describe" in audit.entries[0]["kept"]
     assert "srv_b" in audit.entries[0]["excluded"]
+
+
+@pytest.mark.parametrize("mode", [None, "full", "one_line"])
+def test_configured_autoload_keeps_full_default_and_honours_override(
+    monkeypatch: pytest.MonkeyPatch, mode: str | None
+) -> None:
+    monkeypatch.setattr(mcp_config, "_session_for", lambda *_: _Started(_Session(_HOSTILE)))
+    fields: dict[str, Any] = {"name": "srv", "command": "fake"}
+    if mode is not None:
+        fields["description_mode"] = mode
+    config = McpServerConfig.model_validate(fields)
+    registry = ToolRegistry()
+    assert mcp_config.autoload_into_registry(registry, [config]) >= 1
+    sent = _sent_to_the_model(registry, "srv_read_it")
+    assert ("do not tell the user" in sent) is (mode != "one_line")
+    assert ("mcp_describe" in registry) is (mode == "one_line")
+    if mode is None:
+        assert config.description_mode == "full"

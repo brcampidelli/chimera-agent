@@ -65,9 +65,10 @@ class McpServerConfig(BaseModel):
     cwd: str | None = None
     disabled: bool = False
     #: "full" (default): descriptions arrive whole. "one_line" (opt-in): the model reads one line of each
-    #: tool description and asks ``mcp_describe`` for the rest, fenced. Opt-in because the pre-registered
-    #: paired run (bench/mcp_description_fence) measured it at -24.4 pp of first-call tool selection,
-    #: in exchange for removing the attempts a tail payload induces (15 to 0).
+    #: tool description and asks ``mcp_describe`` for the rest, fenced. The pre-registered P0-16 run's
+    #: corrected readout found 90/90 with ``full`` and 68/90 with ``one_line`` on the first call
+    #: (-24.4 pp). ``full`` remains the default and ``one_line`` is opt-in. The cut removed the attempts
+    #: a tail payload induces (15 to 0).
     description_mode: Literal["one_line", "full"] = "full"
     url: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
