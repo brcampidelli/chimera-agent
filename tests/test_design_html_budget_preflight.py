@@ -33,3 +33,34 @@ def test_affordable_nonmatching_rule_remains_measurable() -> None:
     summary = summarize_html(board, default_tokens())
     assert summary["counts"] == {"p": 1}
     assert summary["texts"] == ["x"]
+
+
+def test_declaration_preflight_reuses_classes_for_rules_with_few_matches(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.design import html_check
+    from chimera.design.html_css import Budget, selector_matches
+
+    # These modest rules fit: their declarations match no paragraphs, so all text stays measurable.
+    declarations = "".join(f"--space{i}:0;" for i in range(100))
+    selectors = [".absent-a", ".absent-b", ".absent-c"]
+    css = "".join(f"{selector}{{{declarations}}}" for selector in selectors)
+    html = f"<style>{css}</style>" + "".join(
+        f'<p id="text{i}" class="note" style="color:#111827">x</p>' for i in range(24)
+    )
+    seen: dict[str, list[set[str]]] = {}
+
+    def record(selector: str, tag: str, classes: set[str], element_id: str | None) -> bool:
+        if selector in selectors and element_id:
+            seen.setdefault(element_id, []).append(classes)
+        return selector_matches(selector, tag, classes, element_id)
+
+    monkeypatch.setattr(html_check, "Budget", lambda: Budget(10_000))
+    monkeypatch.setattr(html_check, "selector_matches", record)
+    summary = summarize_html(_board(html), default_tokens())
+
+    assert summary["texts"] == ["x"] * 12
+    assert summary["counts"] == {"p": 24}
+    assert len(seen) == 24
+    for classes in seen.values():
+        assert len(classes) == 6  # Three preflight matches, then the same three in normal traversal.
+        assert all(value is classes[0] for value in classes[:3])
+        assert all(value is classes[3] for value in classes[3:])
