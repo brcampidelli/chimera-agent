@@ -301,3 +301,74 @@ def test_the_mcp_tool_asks_for_the_summary_unless_given_since() -> None:
     assert "Notice: context drift at step 10" in text
     mcp.dispatch("desktop_job", {"job_id": "j1", "since": 5})
     assert "since=5" in urls[-1]
+
+
+def test_completed_job_clock_and_answer_are_final(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [100.0]
+    monkeypatch.setattr("chimera.api.desktop_bridge.time.monotonic", lambda: clock[0])
+    job = BridgeJob(id="j", route="conversations.send", started=100.0)
+    assert _job_out(job, 0, [], lambda _: False)["elapsed_seconds"] == 0.0
+    job.take("token", json.dumps({"text": "raw"}))
+    clock[0] = 102.0
+    job.take("done", json.dumps({"answer": "warning\n\nraw"}))
+    clock[0] = 120.0
+    out = _job_out(job, 0, [], lambda _: False)
+    assert out["elapsed_seconds"] == 2.0
+    assert out["text"] == out["result"]["answer"]
+
+
+def test_error_frame_freezes_elapsed(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [105.0]
+    monkeypatch.setattr("chimera.api.desktop_bridge.time.monotonic", lambda: clock[0])
+    job = BridgeJob(id="j", route="conversations.send", started=100.0)
+    job.take("error", json.dumps({"message": "cancelled"}))
+    clock[0] = 120.0
+    assert _job_out(job, 0, [], lambda _: False)["elapsed_seconds"] == 5.0
+
+
+def test_old_done_warning_is_corrected_and_matches_the_bridge_text() -> None:
+    old = ("NADA FOI VERIFICADO: os comandos estão desligados nesta pasta, então nenhum teste, "
+           "build ou verificação rodou neste turno.\n\nConteúdo lido.")
+    job = BridgeJob(id="j", route="conversations.send")
+    job.take("token", json.dumps({"text": "Conteúdo lido."}))
+    job.take("done", json.dumps({"answer": old}))
+    assert job.text == job.final["answer"]
+    assert "NADA FOI VERIFICADO" not in job.text
+    assert job.text.endswith("Conteúdo lido.")
+
+
+def test_cancelled_job_freezes_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.api.desktop_bridge import BridgeJobs
+
+    clock = [100.0]
+    monkeypatch.setattr("chimera.api.desktop_bridge.time.monotonic", lambda: clock[0])
+
+    async def exercise() -> None:
+        async def run(_job: BridgeJob) -> None:
+            await asyncio.Event().wait()
+
+        job = BridgeJobs().start("conversations.send", run)
+        job.started = 100.0
+        await asyncio.sleep(0)
+        clock[0] = 105.0
+        assert job.task is not None
+        job.task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await job.task
+        clock[0] = 120.0
+        assert job.done
+        assert _job_out(job, 0, [], lambda _: False)["elapsed_seconds"] == 5.0
+
+    asyncio.run(exercise())
+
+
+def test_long_terminal_answer_preserves_warning_in_bridge_text() -> None:
+    from chimera.core.command_intent import COMMANDS_UNVERIFIED_LINE
+
+    old = ("NADA FOI VERIFICADO: os comandos estão desligados nesta pasta, então nenhum teste, "
+           "build ou verificação rodou neste turno.\n\n" + "x" * 30000)
+    job = BridgeJob(id="j", route="conversations.send")
+    job.take("done", json.dumps({"answer": old}))
+    assert len(job.text) <= 20000
+    assert job.text.startswith(COMMANDS_UNVERIFIED_LINE)
+    assert job.final["answer"].startswith(job.text[:len(COMMANDS_UNVERIFIED_LINE)])
