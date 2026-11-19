@@ -50,6 +50,8 @@ stale or a directory is missing. Regenerate with `python scripts/gen_bench_index
 The status is a fact about files, not a conclusion about the experiment: it says which documents a
 directory holds, never what they found. Read the directory's RESULTS file for the finding.
 
+The [corrected P0-16 readout](mcp_description_fence/RESULTS.md) found 90/90 with `full` descriptions and 68/90 with `one_line` on the first call (-24.4 pp). `full` remains the default and `one_line` is opt-in.
+
 - `with result`: has a file named `RESULT*`.
 - `preregistered, no result`: has a `PREREGISTRATION*` file and no `RESULT*` file.
 - `wrapper`: neither, and every file is a script or a README.

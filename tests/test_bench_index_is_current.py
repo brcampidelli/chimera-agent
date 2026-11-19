@@ -94,3 +94,10 @@ def test_frozen_corpora_are_searchable() -> None:
     visible = {Path(name.decode("utf-8")) for name in searchable.stdout.split(b"\0") if name}
     hidden = sorted(str(path) for path in corpora - visible)
     assert not hidden, f"frozen bench corpora hidden by .rgignore: {hidden}"
+
+
+def test_mcp_description_decision_is_generated_from_the_corrected_result() -> None:
+    rendered = gen.render(["mcp_description_fence/RESULTS.md"])
+    assert "[corrected P0-16 readout](mcp_description_fence/RESULTS.md)" in rendered
+    assert "90/90" in rendered and "68/90" in rendered and "-24.4 pp" in rendered
+    assert "full" in rendered and "opt-in" in rendered
