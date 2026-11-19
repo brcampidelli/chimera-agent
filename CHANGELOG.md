@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Clarify the shared guest turn contract.** The module documentation now describes the existing exclusion of execution tools, setup, verification and hooks from all origins, with an owner-and-guest regression through the sharing API. (#1311)
+
 - Document the measured MCP description trade-off and preserve full descriptions as the default. (#1310)
 
 ### Fixed
