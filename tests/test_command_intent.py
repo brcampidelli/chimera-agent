@@ -137,3 +137,22 @@ def test_is_plain_question_reads_the_question_mark_and_the_opening_word(
     message: str, expected: bool
 ) -> None:
     assert is_plain_question(message) is expected
+
+
+def test_negated_command_request_stays_read_only() -> None:
+    message = "Leia RELEASING.md e explique a promoção. Não execute comandos nem altere arquivos."
+    assert not request_needs_commands(message, verify_configured=True)
+    assert request_needs_commands(message + " Rode os testes.", verify_configured=True)
+
+
+def test_read_with_negation_and_unlisted_edit_remains_actionable() -> None:
+    for configured in (False, True):
+        assert request_needs_commands(
+            "Leia o guia. Não execute comandos. Renomeie o arquivo de configuração.",
+            verify_configured=configured,
+        )
+
+
+def test_read_then_unlisted_action_after_comma_is_not_read_only() -> None:
+    message = "Leia o guia, depois renomeie o arquivo. Não execute comandos."
+    assert request_needs_commands(message, verify_configured=True)

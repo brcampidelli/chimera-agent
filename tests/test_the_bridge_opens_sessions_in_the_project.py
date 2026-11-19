@@ -29,7 +29,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -637,3 +637,51 @@ def test_a_request_reaching_the_turn_another_way_with_a_project_is_refused(
         assert app.rows() == {}
     finally:
         app.client.close()
+
+
+def test_list_by_registered_alias_matches_project_path(s: Setup) -> None:
+    s.register(s.repo, alias="smoke-alias")
+    from chimera.core.code_session import CodeSession, CodeSessionStore
+
+    store = CodeSessionStore(s.app.home / "code_sessions")
+    ids = {"alias-smoke-1", "alias-smoke-2"}
+    for sid in sorted(ids):
+        session = CodeSession(
+            cast(Any, Agent()), session_id=sid, workspace=str(s.repo),
+            messages=[{"role": "user", "content": f"hello {sid}"}],
+        )
+        session.stamp_checkout(s.repo)
+        assert session.checkout is not None
+        store.save(session)
+    by_path = s.client.get("/api/code/sessions", params={"project": str(s.repo)}).json()
+    assert {row["id"] for row in by_path} == ids
+    by_alias = s.client.get("/api/code/sessions", params={"project": "smoke-alias"}).json()
+    assert [row["id"] for row in by_alias] == [row["id"] for row in by_path]
+    page = s.client.get("/api/code/sessions", params={"project": "smoke-alias", "limit": 1})
+    assert page.status_code == 200 and len(page.json()) == 1
+    cursor = page.headers.get("X-Next-Cursor")
+    assert cursor
+    last = s.client.get("/api/code/sessions", params={"project": "smoke-alias", "limit": 1, "cursor": cursor})
+    assert last.status_code == 200 and "X-Next-Cursor" not in last.headers
+    assert [row["id"] for row in page.json() + last.json()] == [row["id"] for row in by_path]
+
+
+def test_registered_alias_takes_precedence_over_another_project_basename(s: Setup) -> None:
+    from chimera.core.code_session import CodeSession, CodeSessionStore
+
+    other = make_repo(s.repo.parent / "smoke-alias")
+    s.register(s.repo, alias="smoke-alias")
+    s.register(other)
+    store = CodeSessionStore(s.app.home / "code_sessions")
+    for sid, folder in (("alias-project", s.repo), ("basename-project", other)):
+        session = CodeSession(
+            cast(Any, Agent()), session_id=sid, workspace=str(folder),
+            messages=[{"role": "user", "content": sid}],
+        )
+        session.stamp_checkout(folder)
+        assert session.checkout is not None
+        store.save(session)
+    rows = s.client.get("/api/code/sessions", params={"project": "smoke-alias"}).json()
+    assert [row["id"] for row in rows] == ["alias-project"]
+    other_rows = s.client.get("/api/code/sessions", params={"project": str(other)}).json()
+    assert [row["id"] for row in other_rows] == ["basename-project"]

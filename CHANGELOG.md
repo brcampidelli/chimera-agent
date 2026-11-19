@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Desktop MCP sessions report consistent answers and job state.** Conversation lists resolve project aliases, explicit command prohibitions preserve read requests and the saved warning, and completed jobs keep their final elapsed time. (#1309)
+
 - **Faster checks for repeated CSS custom properties.** Design detects when a rule's matched declarations exceed the checker’s work budget before computing element styles, while continuing to measure variables inherited from the root. (#1308)
 
 - **Fix Design generation on DeepSeek V4 Flash.** Design uses prompt-based JSON on the OpenRouter `deepseek-v4-flash-0731` route and leaves more of the reply budget for the artboard when reasoning effort is left at its default. (#1307)

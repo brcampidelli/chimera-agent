@@ -190,6 +190,7 @@ from chimera.core.cache_miss import (
 from chimera.core.claims import success_claims
 from chimera.core.close_loop import may_start_loop
 from chimera.core.code_session import EnvironmentFixedError
+from chimera.core.command_intent import COMMANDS_UNVERIFIED_LINE
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
 from chimera.core.diff_self_check import (
@@ -905,10 +906,6 @@ COMMANDS_OFF_OPTIONS = ("Liberar", "Continuar sem comandos", "Cancelar")
 COMMANDS_OFF_NOTICE = (
     "Os comandos estão desligados nesta pasta; sem eles o agente não consegue rodar testes nem "
     "verificar o que fizer."
-)
-COMMANDS_UNVERIFIED_LINE = (
-    "NADA FOI VERIFICADO: os comandos estão desligados nesta pasta, então nenhum teste, build ou "
-    "verificação rodou neste turno."
 )
 COMMANDS_NOT_GRANTED_ANSWER = (
     "Não foi possível liberar comandos para esta pasta: {reason}. O turno foi encerrado antes de "
@@ -2509,6 +2506,22 @@ def _final_answer_index(session: Any) -> int | None:
     if not messages or messages[-1].get("role") != "assistant" or messages[-1].get("tool_calls"):
         return None
     return len(messages) - 1
+
+
+def _new_turn_opener(before: list[dict[str, Any]], after: list[dict[str, Any]], task: str) -> int | None:
+    """Find a newly appended opener; an unrecognizable rewritten history fails closed."""
+    overlap = next(
+        (size for size in range(min(len(before), len(after)), 0, -1)
+         if before[-size:] == after[:size]),
+        0,
+    )
+    if before and not overlap:
+        return None
+    return next(
+        (i for i in range(overlap, len(after)) if after[i].get("role") == "user"
+         and after[i].get("content") == task and not after[i].get("guidance")),
+        None,
+    )
 
 
 def _turn_receipt_summary(receipt: dict[str, Any]) -> str:
@@ -5385,6 +5398,31 @@ def register_code_api(
                 steered: dict[str, list[Any]] = {"read": [], "unread": []}
 
                 commands_unverified = False
+                turn_has_answer = False
+                turn_opening_index: int | None = None
+                turn_saved_anchor: tuple[int, int, dict[str, Any], dict[str, Any]] | None = None
+
+                def _capture_saved_anchor() -> tuple[int, int, dict[str, Any], dict[str, Any]] | None:
+                    """Capture this turn's saved endpoints before verification can rewrite its answer."""
+                    if not commands_unverified or not turn_has_answer or turn_opening_index is None:
+                        return None
+                    answer_index = _final_answer_index(session)
+                    if answer_index is None or turn_opening_index >= answer_index:
+                        return None
+                    stored = store_for.load_existing(session_id, session.agent)
+                    if stored is None:
+                        return None
+                    own_messages = session.to_dict()["messages"]
+                    saved_messages = stored.to_dict()["messages"]
+                    if answer_index >= len(saved_messages) or (
+                        own_messages[turn_opening_index] != saved_messages[turn_opening_index]
+                        or own_messages[answer_index] != saved_messages[answer_index]
+                    ):
+                        return None
+                    return (turn_opening_index, answer_index,
+                            copy.deepcopy(saved_messages[turn_opening_index]),
+                            copy.deepcopy(saved_messages[answer_index]))
+
                 def _verify_and_finish(payload: dict[str, Any]) -> None:
                     """Judge what the turn wrote and close the stream.
 
@@ -5402,10 +5440,7 @@ def register_code_api(
                     # `turn_succeeded` too: assigned here without it, it was a local of this function,
                     # the turn's own flag stayed False, and every queued item that ran to a clean
                     # `done` was recorded as failed.
-                    nonlocal plan_meter, turn_succeeded
-                    if commands_unverified:
-                        # Said first, in the answer, every time: a reader who stops after one line still learns it.
-                        payload["answer"] = COMMANDS_UNVERIFIED_LINE + "\n\n" + str(payload.get("answer") or "")
+                    nonlocal plan_meter, turn_succeeded, turn_opening_index, turn_saved_anchor
                     payload["model_source"] = model_source
                     if plan_first:
                         # Why this turn stopped on its plan, on the receipt: a turn that waited
@@ -5684,6 +5719,7 @@ def register_code_api(
                                     store_for.refresh(session)
                                     from chimera.tools.write_region import repair_writes_read_only
 
+                                    before_repair_messages = copy.deepcopy(session.to_dict()["messages"])
                                     with repair_writes_read_only(command, repair_write_state):
                                         result = session.send(
                                             repair_task,
@@ -5704,6 +5740,12 @@ def register_code_api(
                                             take_guidance=take_guidance if background is None else None,
                                         )
 
+                                    if result.transcript:
+                                        turn_opening_index = _new_turn_opener(
+                                            before_repair_messages, session.to_dict()["messages"], repair_task
+                                        )
+                                    else:
+                                        turn_opening_index = None
                                     answer = result.answer
                                     repairs += 1
                                     retry_tool_names = list(result.tool_names)
@@ -5736,6 +5778,7 @@ def register_code_api(
                                     if turn_id not in deleted_mid_turn:
                                         with live_turns.writing(turn_id):
                                             store_for.save(session)
+                                            turn_saved_anchor = _capture_saved_anchor()
                                 # Two consecutive repair runs that did not call a tool or change
                                 # the workspace cannot benefit from another verification cycle.
                                 try:
@@ -5958,6 +6001,8 @@ def register_code_api(
                         raw_answer = str(payload.get("answer") or "")
                         if close_note is not None and raw_answer.strip():
                             payload["answer"] = raw_answer.rstrip() + "\n\n" + close_note
+                    if commands_unverified and str(payload.get("answer") or "").strip():
+                        payload["answer"] = COMMANDS_UNVERIFIED_LINE + "\n\n" + str(payload["answer"])
                     # The model's own final answer AFTER any repair, and only when the turn ended
                     # normally with it (`CodeSession._seal_final`): what a guest of a shared
                     # conversation is shown. An error sentence, a cap, a timeout or a fragment is not
@@ -6027,7 +6072,8 @@ def register_code_api(
                         payload["undo_available"] = undo_available
                         payload["turn_summary"] = summary
                         receipt["turn_summary"] = summary
-                        session.replace_last_answer(str(payload["answer"]))
+                        if not commands_unverified:
+                            session.replace_last_answer(str(payload["answer"]))
                     # This turn's own messages, for the history index below, before the stored
                     # conversation (which may by now hold a later turn) is read back.
                     own_messages = session.to_dict()["messages"]
@@ -6042,18 +6088,29 @@ def register_code_api(
                                 # append after this answer, never before it). A text match would confuse it with an
                                 # identical answer from another turn, and would miss it when verify_retry rewrote it.
                                 answer_index = _final_answer_index(session)
-                                store_for.refresh(session)
-                                if (
-                                    (self_check_note is not None or close_note is not None)
-                                    and answer_index is not None
-                                    and str(payload.get("answer") or "").strip()
-                                ):
-                                    # The answer as shown on `done`, note and any receipt summary included.
-                                    session.replace_answer_at(answer_index, str(payload["answer"]))
-                                # The seal is written here, once the turn has closed with its
-                                # definitive answer, onto the stored copy the refresh just read.
-                                if sealed_answer is not None and answer_index is not None:
-                                    session.seal_final_at(answer_index, sealed_answer)
+                                if not commands_unverified:
+                                    # Preserve the existing repair and guest-seal path when no
+                                    # commands-off answer needs to be added.
+                                    store_for.refresh(session)
+                                    if (
+                                        (self_check_note is not None or close_note is not None)
+                                        and answer_index is not None
+                                        and str(payload.get("answer") or "").strip()
+                                    ):
+                                        session.replace_answer_at(answer_index, str(payload["answer"]))
+                                    if sealed_answer is not None and answer_index is not None:
+                                        session.seal_final_at(answer_index, sealed_answer)
+                                else:
+                                    store_for.refresh(session)
+                                    replaced = False
+                                    if turn_saved_anchor is not None and str(payload.get("answer") or "").strip():
+                                        opener_index, answer_index, opener, original_answer = turn_saved_anchor
+                                        replaced = session.replace_turn_answer_at(
+                                            opener_index, answer_index, opener, original_answer,
+                                            str(payload["answer"]),
+                                        )
+                                        if sealed_answer is not None and replaced:
+                                            session.seal_final_at(answer_index, sealed_answer)
                                 session.remember_receipt(receipt)
                                 with live_turns.writing(turn_id):
                                     store_for.save(session)
@@ -6358,6 +6415,7 @@ def register_code_api(
                         )
                         # The conversation is the agent's, but the RECORD is ours: without this the
                         # sidebar would show an untitled, empty session for work that really happened.
+                        turn_opening_index = len(session.messages)
                         session.messages.append({
                             "role": "user", "content": message, ORIGIN_KEY: _turn_origin(req)[0],
                             HUMAN_TEXT_KEY: _turn_origin(req)[1],
@@ -6367,6 +6425,7 @@ def register_code_api(
                         # call, and only when it ended its turn normally; the seal is written when
                         # the turn closes, not here (`CodeSession.seal_final_at`).
                         session.messages.append({"role": "assistant", "content": acp_result.answer})
+                        turn_has_answer = True
                         session.set_pending_final(
                             acp_result.final_text.strip() if acp_result.stop_reason == "end_turn" else None
                         )
@@ -6378,6 +6437,7 @@ def register_code_api(
                         if turn_id not in deleted_mid_turn:
                             with live_turns.writing(turn_id):
                                 store_for.save(session)
+                                turn_saved_anchor = _capture_saved_anchor()
                     _verify_and_finish(
                         done_payload(acp_result, provider=external, tainted=bool(ledger.run_tainted()))
                     )
@@ -6420,6 +6480,7 @@ def register_code_api(
                         _log.warning("idle compaction failed, sending the history as it is: %s", exc)
                         session.idle_view = None
                         idle_compaction = None
+                    before_turn_messages = copy.deepcopy(session.to_dict()["messages"])
                     result = session.send(
                         message,
                         origin=_turn_origin(req)[0],
@@ -6449,6 +6510,10 @@ def register_code_api(
                         # work is not a live turn (nobody follows it here), so it takes none.
                         take_guidance=take_guidance if background is None else None,
                     )
+                    after_turn_messages = session.to_dict()["messages"]
+                    if result.transcript:
+                        turn_opening_index = _new_turn_opener(before_turn_messages, after_turn_messages, message)
+                    turn_has_answer = turn_opening_index is not None
                     turn_run["steps"] = int(getattr(result, "steps", 0) or 0)
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
@@ -6509,6 +6574,7 @@ def register_code_api(
                     if turn_id not in deleted_mid_turn:
                         with live_turns.writing(turn_id):
                             store_for.save(session)
+                            turn_saved_anchor = _capture_saved_anchor()
                 steered["read"], steered["unread"] = live_turns.close_guidance(turn_id)
                 _verify_and_finish(
                     {
@@ -7543,15 +7609,25 @@ def register_code_api(
             listed = [r for r in listed if str(r.get("state", "idle")).casefold() in wanted_states]
         if project:
             wanted_project = project.casefold()
-            listed = [
-                r
-                for r in listed
-                if wanted_project
-                in {
-                    str(r.get("project") or "").casefold(),
-                    str(r.get("project_name") or "").casefold(),
-                }
-            ]
+            # Match the same unique, registered alias as the send route, while retaining
+            # the existing name and path filters for older conversations.
+            aliases = [row for row in projects.entries() if row.alias == project]
+            alias_project = aliases[0].path if len(aliases) == 1 and not aliases[0].hidden else ""
+            if alias_project:
+                from chimera.core.project_place import _key
+
+                alias_key = _key(alias_project)
+            else:
+                alias_key = ""
+            if alias_key:
+                listed = [r for r in listed if r.get("project") and _key(str(r["project"])) == alias_key]
+            else:
+                listed = [
+                    r for r in listed if wanted_project in {
+                        str(r.get("project") or "").casefold(),
+                        str(r.get("project_name") or "").casefold(),
+                    }
+                ]
         if q:
             needle = q.casefold()
             listed = [r for r in listed if needle in str(r.get("title") or "").casefold()]

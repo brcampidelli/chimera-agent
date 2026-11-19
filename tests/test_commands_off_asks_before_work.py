@@ -361,3 +361,143 @@ def test_an_unattended_turn_is_never_asked(tmp_path: Path, monkeypatch: pytest.M
     outcome, _reason, _ = _gate(_req(), tmp_path / "home", tmp_path / "ws", attended=False)
     assert outcome == "proceed"
     assert asked == []
+
+
+def test_unverified_answer_is_saved_as_shown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: _Agent, events: list[str]
+) -> None:
+    _fake_ask(monkeypatch, events, answer="Continuar sem comandos")
+    app = _app(tmp_path, tmp_path / "home")
+    done = _frames(_turn(app, NEEDS, session_id="persisted-warning"))[-1][1]
+    stored = TestClient(app).get("/api/code/sessions/persisted-warning").json()
+    assert stored["exchanges"][-1]["answer"] == done["answer"]
+    assert "NADA FOI VERIFICADO" not in done["answer"]
+
+
+def test_old_persisted_warning_is_corrected_when_replayed() -> None:
+    from chimera.api.code_replay import exchanges_from_messages
+
+    old = ("NADA FOI VERIFICADO: os comandos estão desligados nesta pasta, então nenhum teste, "
+           "build ou verificação rodou neste turno.\n\nConteúdo lido.")
+    exchanges = exchanges_from_messages([{"role": "user", "content": "Leia"},
+                                          {"role": "assistant", "content": old}])
+    assert exchanges[0]["answer"].startswith(COMMANDS_UNVERIFIED_LINE)
+    assert exchanges[0]["answer"].endswith("Conteúdo lido.")
+
+
+def test_refused_plan_does_not_overwrite_previous_answer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: _Agent
+) -> None:
+    from types import SimpleNamespace
+
+    from chimera.api import plan_gate
+    from chimera.core.code_session import CodeSession, CodeSessionStore
+
+    home = tmp_path / "home"
+    app = _app(tmp_path, home)
+    store = CodeSessionStore(home / "code_sessions")
+    store.save(CodeSession(agent, session_id="old-answer", workspace=str(tmp_path / "ws"),
+                           messages=[{"role": "user", "content": "Anterior"},
+                                     {"role": "assistant", "content": "Resposta anterior"}]))
+    monkeypatch.setattr(code_api, "gate_commands_before_work", lambda *_a, **_k: ("proceed_unverified", ""))
+    monkeypatch.setattr(plan_gate, "gate", lambda *_a, **_k: SimpleNamespace(approved=False, outcome="refused"))
+    response = TestClient(app).post(
+        "/api/code/turn", json={"session_id": "old-answer", "message": NEEDS, "plan_gate": True},
+        headers=_screen_headers(app),
+    )
+    done = _frames(response)[-1][1]
+    assert done["stopped_reason"] == "plan_gate:refused"
+    assert done["answer"] == ""
+    stored = TestClient(app).get("/api/code/sessions/old-answer").json()
+    assert stored["exchanges"][0]["answer"] == "Resposta anterior"
+    assert not agent.tasks
+
+
+def test_warning_survives_read_file_in_saved_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: _Agent, events: list[str]
+) -> None:
+    def run(task: str, **_kw: Any) -> AgentResult:
+        return AgentResult(
+            answer="Conteúdo lido", steps=1, stopped_reason="final", model="test/model",
+            tool_names=["read_file"], transcript=[
+                {"role": "user", "content": task},
+                {"role": "assistant", "content": "", "tool_calls": [
+                    {"id": "r1", "function": {"name": "read_file", "arguments": "{}"}}]},
+                {"role": "tool", "tool_call_id": "r1", "content": "texto"},
+                {"role": "assistant", "content": "Conteúdo lido"},
+            ],
+        )
+    monkeypatch.setattr(agent, "run", run)
+    _fake_ask(monkeypatch, events, answer="Continuar sem comandos")
+    app = _app(tmp_path, tmp_path / "home")
+    done = _frames(_turn(app, NEEDS, session_id="read-first"))[-1][1]
+    stored = TestClient(app).get("/api/code/sessions/read-first").json()
+    assert stored["exchanges"][-1]["answer"] == done["answer"]
+    assert "nenhum teste" not in done["answer"].casefold()
+
+
+def test_turn_answer_anchors_refuse_an_interleaved_turn() -> None:
+    from chimera.core.code_session import CodeSession
+
+    session = CodeSession(_Agent([]), messages=[
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "first answer"},
+        {"role": "user", "content": "second"},
+        {"role": "assistant", "content": "second answer"},
+    ])
+    snapshot = session.to_dict()["messages"]
+    assert not session.replace_turn_answer_at(0, 3, snapshot[0], snapshot[3], "wrong")
+    assert session.to_dict()["messages"] == snapshot
+
+
+def test_turn_opener_rejects_old_or_unrecognizable_history() -> None:
+    from chimera.api.code_api import _new_turn_opener
+
+    old = [{"role": "user", "content": "same"}, {"role": "assistant", "content": "old"}]
+    assert _new_turn_opener(old, old, "same") is None
+    assert _new_turn_opener(old, [{"role": "user", "content": "same"},
+                                  {"role": "assistant", "content": "new"}], "same") is None
+    added = old + [{"role": "user", "content": "same"}, {"role": "assistant", "content": "new"}]
+    assert _new_turn_opener(old, added, "same") == 2
+
+
+def test_commands_off_does_not_deny_a_successful_server_verifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.test_code_turn_verification_retries import _run_turn
+
+    monkeypatch.setattr(code_api, "gate_commands_before_work", lambda *_a, **_k: ("proceed_unverified", ""))
+    kept: list[Any] = []
+    streamed, done, receipt = _run_turn(
+        tmp_path, monkeypatch, [(True, False, "2 passed")], enabled=True, keep_client=kept,
+    )
+    assert streamed["state"] == "passed" and receipt["verified"]["state"] == "passed"
+    assert done["answer"].startswith(COMMANDS_UNVERIFIED_LINE)
+    assert "nenhum teste" not in done["answer"].casefold()
+    client, session_id = kept[0]
+    assert client.get(f"/api/code/sessions/{session_id}").json()["exchanges"][-1]["answer"] == done["answer"]
+
+
+@pytest.mark.parametrize(("checks", "state"), [
+    ([(False, True, "verificador indisponível")], "abstained"),
+    ([(False, False, "falhou")] * 4, "failed"),
+])
+def test_commands_off_preserves_saved_answer_when_verifier_does_not_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checks: list[Any], state: str
+) -> None:
+    from tests.test_code_turn_verification_retries import _run_turn
+
+    monkeypatch.setattr(code_api, "gate_commands_before_work", lambda *_a, **_k: ("proceed_unverified", ""))
+    kept: list[Any] = []
+    streamed, done, _ = _run_turn(
+        tmp_path, monkeypatch, checks, enabled=True, retry_no_progress=True, keep_client=kept,
+    )
+    assert streamed["state"] == state
+    client, session_id = kept[0]
+    exchange = client.get(f"/api/code/sessions/{session_id}").json()["exchanges"][-1]
+    assert exchange["answer"] == done["answer"]
+    assert exchange["answer"].startswith(COMMANDS_UNVERIFIED_LINE)
+    stored = json.loads((tmp_path / "home" / "code_sessions" / f"{session_id}.json").read_text(encoding="utf-8"))
+    assert done["final_sealed"] is True
+    assert stored["messages"][-1]["final_seal"] is True
+    assert stored["messages"][-1]["model_answer"] == done["final_answer"]

@@ -430,6 +430,7 @@ class BridgeJob:
     route: str
     started: float = field(default_factory=time.monotonic)
     done: bool = False
+    ended_at: float | None = None
     status: int = 0
     text: str = ""
     events: list[dict[str, Any]] = field(default_factory=list)
@@ -495,7 +496,16 @@ class BridgeJob:
                 self.branch = str(data.get("branch") or "")
             elif event == "done":
                 self.final = data
+                if self.ended_at is None:
+                    self.ended_at = time.monotonic()
+                if self.route == "conversations.send" and isinstance(data, dict) and isinstance(data.get("answer"), str):
+                    from chimera.core.command_intent import normalize_commands_warning
+
+                    data["answer"] = normalize_commands_warning(data["answer"])
+                    self.text = data["answer"][:_MAX_TEXT]
             elif event == "error":
+                if self.ended_at is None:
+                    self.ended_at = time.monotonic()
                 self.error = str(data.get("message", data) if isinstance(data, dict) else data)
         self.changed.set()
 
@@ -535,6 +545,8 @@ class BridgeJobs:
             except Exception as exc:  # a job's failure is its result, not a crash
                 job.error = job.error or f"{type(exc).__name__}: {exc}"
             finally:
+                if job.ended_at is None:
+                    job.ended_at = time.monotonic()
                 job.done = True
                 job.blocked = False
                 job.changed.set()
@@ -792,7 +804,7 @@ def _job_out(
                     for e in events
                 ],
                 "next": next_n,
-                "elapsed_seconds": round(time.monotonic() - job.started, 1),
+                "elapsed_seconds": round((job.ended_at if job.ended_at is not None else time.monotonic()) - job.started, 1),
                 "ended": job.ended,
                 "waiting_for_folder": job.folder_wait and not job.ended,
                 # What the app's own registry says, beside what the stream said: the two disagree

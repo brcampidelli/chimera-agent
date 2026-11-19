@@ -759,6 +759,27 @@ class CodeSession:
         self.messages[index] = _replaced(message, text)
         return True
 
+    def replace_turn_answer_at(
+        self, opener_index: int, answer_index: int, opener: dict[str, Any],
+        answer: dict[str, Any], text: str,
+    ) -> bool:
+        """Replace a captured turn's final answer only if both saved anchors still match."""
+        if not 0 <= opener_index < answer_index < len(self.messages):
+            return False
+        stored_opener = _as_dict(self.messages[opener_index])
+        stored_answer = _as_dict(self.messages[answer_index])
+        if stored_opener != opener or stored_answer != answer:
+            return False
+        if stored_opener.get("role") != "user" or stored_opener.get("guidance"):
+            return False
+        if any(_as_dict(m).get("role") == "user" and not _as_dict(m).get("guidance")
+               for m in self.messages[opener_index + 1:answer_index]):
+            return False
+        if stored_answer.get("role") != "assistant" or stored_answer.get("tool_calls") or is_batch_note(stored_answer):
+            return False
+        self.messages[answer_index] = _replaced(stored_answer, text)
+        return True
+
     def note_agent_batch(self, record: dict[str, Any]) -> None:
         """Record a finished parallel batch this conversation started (`agent_batch_note`).
 

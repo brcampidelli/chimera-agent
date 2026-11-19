@@ -22,6 +22,7 @@ import json
 from typing import Any
 
 from chimera.core.agent_batch_note import AGENT_BATCH_KEY, is_batch_note
+from chimera.core.command_intent import normalize_commands_warning
 from chimera.core.guest_history import (
     AUTHOR_KEY,
     GUEST_KEY,
@@ -154,6 +155,8 @@ def exchanges_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
             waiting["observation"] = observation
             waiting["ok"] = not observation.startswith("error:")
 
+    for exchange in exchanges:
+        exchange["answer"] = normalize_commands_warning(exchange["answer"])
     return exchanges
 
 

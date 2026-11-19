@@ -47,6 +47,15 @@ _ACTION_VERBS = re.compile(
     re.IGNORECASE,
 )
 
+# Explicitly prohibited commands and their coordinated prohibition of file edits.
+_NEGATED_COMMANDS = re.compile(
+    r"\b(?:não|nao)\s+(?:execute|executar|rode|rodar)\s+(?:os\s+)?comandos?\b"
+    r"(?:\s+nem\s+(?:altere|alterar|edite|editar)\s+(?:os\s+)?arquivos?)?",
+    re.IGNORECASE,
+)
+_READ_REQUEST = re.compile(r"^(?:leia|ler|explique|explica|resuma|descreva|consulte|read|explain|summarize)\b", re.IGNORECASE)
+_READ_CLAUSE = re.compile(r"(?<=[.!?;])\s+|,\s*|\s+(?:e|and|then|depois)\s+", re.IGNORECASE)
+
 #: A question opens with one of these, in pt or en.
 _QUESTION_OPENER = re.compile(
     r"^\s*(o que|oque|qual|quais|quem|quando|onde|por que|porque|como|explique|explica|"
@@ -68,8 +77,29 @@ def is_plain_question(message: str) -> bool:
 
 def request_needs_commands(message: str, *, verify_configured: bool = False) -> bool:
     """Whether this request probably needs commands to be done or checked. See the module rule."""
-    if has_action_verb(message):
+    remainder = _NEGATED_COMMANDS.sub("", message)
+    if has_action_verb(remainder):
         return True
+    clauses = [part.strip(" .!?;\t\n") for part in _READ_CLAUSE.split(remainder)]
+    clauses = [part for part in clauses if part]
+    if remainder != message:
+        return bool(clauses) and not all(_READ_REQUEST.match(part) for part in clauses)
     if is_plain_question(message):
         return False
     return verify_configured
+
+
+COMMANDS_UNVERIFIED_LINE = (
+    "COMANDOS DESLIGADOS: o agente não tinha acesso à execução de comandos nesta pasta."
+)
+_LEGACY_UNVERIFIED_LINE = (
+    "NADA FOI VERIFICADO: os comandos estão desligados nesta pasta, então nenhum teste, build ou "
+    "verificação rodou neste turno."
+)
+
+
+def normalize_commands_warning(answer: str) -> str:
+    """Correct the old blanket warning only when it is the exact leading system notice."""
+    if answer.startswith(_LEGACY_UNVERIFIED_LINE + "\n\n"):
+        return COMMANDS_UNVERIFIED_LINE + answer[len(_LEGACY_UNVERIFIED_LINE):]
+    return answer
