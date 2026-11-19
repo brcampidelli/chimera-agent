@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **Close loop notices.** The desktop now translates Close loop notices and refreshes their CI status in the open conversation. (Fable 7) (#1313)
+
 - Keyboard focus rings now reach 4.5:1 contrast on hovered controls in the dark high-contrast palette. (#1312)
 
 - **Clarify the shared guest turn contract.** The module documentation now describes the existing exclusion of execution tools, setup, verification and hooks from all origins, with an owner-and-guest regression through the sharing API. (#1311)

@@ -27,6 +27,7 @@ import {
 import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/i18n";
+import { CloseLoopNote } from "@/components/code/CloseLoopNote";
 import type { Suggestion } from "@/lib/suggestions";
 import { exchangeToMarkdown } from "@/lib/transcript";
 import { viewShowsToolDetail, type TranscriptView } from "@/lib/transcriptView";
@@ -291,6 +292,7 @@ export const ExchangeView = memo(function ExchangeView({
               </button>
             </div>
           ) : null}
+          <CloseLoopNote done={e.done} />
           {e.guidance?.map((text, index) => (
             <p key={`${index}:${text}`} className="text-xs text-muted-foreground" data-testid="delivered-guidance">
               {t("code.chat.guidanceDelivered")}: {text}

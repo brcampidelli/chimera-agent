@@ -129,6 +129,7 @@ class CloseLoop:
     ``ci``: ``""`` (no pull request), ``pending``, ``passed``, ``failed``, or ``none`` (the repository
     reports no checks at all, so there was nothing to be green). ``merge_blocked_reason`` says why a
     green pull request was not merged; it is empty when it was merged or nothing was green.
+    The additive reason codes are assigned at decision sites, never inferred from historical prose.
     """
 
     turn_id: str = ""
@@ -141,6 +142,8 @@ class CloseLoop:
     merge_blocked_reason: str = ""
     fix_attempts: int = 0
     skipped_reason: str = ""
+    skipped_code: str = ""
+    merge_blocked_code: str = ""
     error: str = ""
 
     def to_payload(self) -> dict[str, Any]:
@@ -155,6 +158,8 @@ class CloseLoop:
             "merge_blocked_reason": self.merge_blocked_reason,
             "fix_attempts": self.fix_attempts,
             "skipped_reason": self.skipped_reason,
+            "skipped_code": self.skipped_code,
+            "merge_blocked_code": self.merge_blocked_code,
             "error": self.error,
         }
 
@@ -176,11 +181,13 @@ class CloseLoop:
             merge_blocked_reason=text("merge_blocked_reason"),
             fix_attempts=attempts if isinstance(attempts, int) and not isinstance(attempts, bool) else 0,
             skipped_reason=text("skipped_reason"),
+            skipped_code=text("skipped_code"),
+            merge_blocked_code=text("merge_blocked_code"),
             error=text("error"),
         )
 
     def note(self) -> str | None:
-        """One line for the answer. None only when there is nothing to say."""
+        """English line for legacy answers and other channels; Desktop presents the payload."""
         if self.skipped_reason:
             return f"Close loop: did not run — {self.skipped_reason}."
         parts: list[str] = []
@@ -510,6 +517,7 @@ def _commit_turn_checked(
     exceptions = _classify(diff)[1]
     if exceptions:
         state.merge_blocked_reason = "; ".join(exceptions) + _LEFT_OPEN
+        state.merge_blocked_code = "exceptions"
     if not diff.strip():
         state.error = "nothing to commit: the turn's changes are already committed or ignored"
         return False
@@ -630,23 +638,28 @@ def close_at_turn_end(
     root = Path(ws)
     if not is_git_repo(root):
         state.skipped_reason = "the workspace is not a git repository"
+        state.skipped_code = "not_repo"
         return state
     if not paths:
         state.skipped_reason = "the turn changed no files"
+        state.skipped_code = "no_changes"
         return state
     branch, refusal = branch_refusal(root)
     if refusal:
         state.skipped_reason = refusal
+        state.skipped_code = "default_branch" if branch else "detached"
         return state
     gh = _gh(hooks)
     if gh is None:
         state.skipped_reason = "the GitHub CLI (gh) is not installed"
+        state.skipped_code = "no_gh"
         return state
     # Readiness is decided BEFORE the local commit, for both branches: a push that would be refused
     # must not leave a commit behind. ``nothing_ahead`` is expected here, since the commit is not made.
     ready = readiness(root, branch=branch, gh=gh)
     if ready.reason and ready.reason != "nothing_ahead":
         state.skipped_reason = sentence(ready.reason)
+        state.skipped_code = ready.reason
         return state
     existing = _existing_pr(root, hooks, gh, branch)
     subject = subject_of(message)
@@ -809,12 +822,15 @@ def fix_request(log: str, attempt: int) -> str:
 def _merge(root: Path, state: CloseLoop, hooks: Hooks, gh: Sequence[str], head: str) -> None:
     if not hooks.merge_allowed():
         # Keep a reason already recorded at commit time (billing, a migration): it says more than "off".
+        if not state.merge_blocked_reason:
+            state.merge_blocked_code = "merging_off"
         state.merge_blocked_reason = state.merge_blocked_reason or (
             "merging is off (CHIMERA_CLOSE_LOOP_MERGE); left open for the owner"
         )
         return
     diff = _pr_diff(root, state, hooks, gh)
     if diff is None:
+        state.merge_blocked_code = "unreadable_diff"
         state.merge_blocked_reason = (
             "the pull request's diff could not be read in full, so it was not checked for the exceptions"
         )
@@ -822,6 +838,7 @@ def _merge(root: Path, state: CloseLoop, hooks: Hooks, gh: Sequence[str], head: 
     reasons = excepted_reasons(diff)
     if reasons:
         state.merge_blocked_reason = "; ".join(reasons) + _LEFT_OPEN
+        state.merge_blocked_code = "exceptions"
         return
     merged = hooks.run(
         [*gh, "pr", "merge", *_pr_args(state), "--squash", f"--match-head-commit={head}"], root,
@@ -829,7 +846,9 @@ def _merge(root: Path, state: CloseLoop, hooks: Hooks, gh: Sequence[str], head: 
     if merged.returncode == 0:
         state.merged = True
         state.merge_blocked_reason = ""
+        state.merge_blocked_code = ""
     else:
+        state.merge_blocked_code = "merge_refused"
         state.merge_blocked_reason = "merge refused: " + _first_line(redact(merged.stderr or merged.stdout))
 
 
@@ -838,7 +857,8 @@ def follow_ci(root: Path, state: CloseLoop, hooks: Hooks, *, head: str, gh: Sequ
 
     Passed: merge unless an exception applies. Failed: ask for ONE fix turn (up to
     :data:`MAX_FIX_ATTEMPTS`) and stop here; the fix turn's own end pushes and starts the next watch.
-    Every change of state goes through ``hooks.report``.
+    Terminal decisions are published after merging or attempting to enqueue the fix, so a reader
+    cannot mistake a preliminary merge reason or a not-yet-enqueued failure for the final result.
     """
     deadline = hooks.clock() + CI_BUDGET_SECONDS
     empty_looks = 0
@@ -859,7 +879,6 @@ def follow_ci(root: Path, state: CloseLoop, hooks: Hooks, *, head: str, gh: Sequ
                     return
             elif verdict == "passed":
                 state.ci = "passed"
-                hooks.report(state)
                 _merge(root, state, hooks, gh, head)
                 hooks.report(state)
                 return
@@ -871,10 +890,9 @@ def follow_ci(root: Path, state: CloseLoop, hooks: Hooks, *, head: str, gh: Sequ
                     return
                 log = _failed_log(root, state, hooks, gh, failing)
                 state.fix_attempts += 1
-                hooks.report(state)
                 if not hooks.ask_fix(log, state.fix_attempts):
                     state.error = "could not start the fix turn"
-                    hooks.report(state)
+                hooks.report(state)
                 return
         if hooks.clock() >= deadline:
             state.error = "CI did not finish within the watch budget"

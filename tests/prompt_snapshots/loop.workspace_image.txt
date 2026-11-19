@@ -1,0 +1,1 @@
+Inspect this workspace image and answer the user's task.

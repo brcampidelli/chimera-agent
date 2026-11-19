@@ -28,8 +28,10 @@ from chimera.core.guest_history import (
     GUEST_KEY,
     HUMAN_TEXT_KEY,
     ORIGIN_KEY,
+    WORKSPACE_IMAGE_KEY,
     is_sealed_final,
     model_final_answer,
+    workspace_image_positions,
 )
 
 
@@ -77,19 +79,25 @@ def exchanges_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
             exchanges.append({"you": "", "answer": "", "tools": [], "edits": []})
         return exchanges[-1]
 
-    for message in messages:
+    images = workspace_image_positions(messages)
+    for index, message in enumerate(messages):
         if not isinstance(message, dict):
             continue
         role = message.get("role")
+        marked_user = role == "user" and WORKSPACE_IMAGE_KEY in message
 
-        if is_batch_note(message):
+        if is_batch_note(message) and not marked_user:
             # A finished batch's record (`agent_batch_note`): beside the exchange that started it,
             # drawn from its structured record, never merged into that exchange's answer. Its prose
             # content is for the next model, which reads it as context.
             current().setdefault("batches", []).append(message[AGENT_BATCH_KEY])
             continue
 
-        if role == "user" and message.get("guidance"):
+        if index in images:
+            # A view_image continuation stays with its human opener, not a new exchange.
+            continue
+
+        if role == "user" and message.get("guidance") and not marked_user:
             # Typed into a running turn (`agent.GUIDANCE_KEY`): part of that turn, not a new one.
             # Opening an exchange here would also shift every receipt — they pair from the end.
             current().setdefault("guidance", []).append(_text(message.get("content")))
