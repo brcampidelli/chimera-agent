@@ -91,17 +91,18 @@ function palette(theme: Theme, tint: Tint, contrast: Contrast, accent: Accent): 
     ...base(theme),
     ...(tint === "navy" ? {} : optionBlock(theme, "tint", tint)),
     ...(contrast === "standard" ? {} : optionBlock(theme, "contrast", contrast)),
+    ...(contrast === "high" && tint !== "navy"
+      ? BLOCKS.find((b) =>
+          b.selector.startsWith(theme === "light" ? ":root[data-theme='light']" : ":root:not([data-theme='light'])") &&
+          b.selector.includes(`[data-tint='${tint}']`) && b.selector.includes("[data-contrast='high']"),
+        )?.tokens
+      : {}),
     ...(accent === "blue" ? {} : optionBlock(theme, "accent", accent)),
   };
 }
 
-/** The surfaces a focused control sits on: the page, a card, a `muted` well, a raised row, and a
- *  recessed `.field` (`--input`), which passed without being checked.
- *
- *  `--surface-hover` is NOT here yet, and that is a finding rather than an oversight: measured, the
- *  ring on it is 4.19–4.24:1 in the dark high-contrast palettes, under the 4.5:1 that mode promises.
- *  Adding it red-lines six palettes until a token is retuned, which is a design decision. */
-const GROUNDS = ["--background", "--card", "--muted", "--surface-2", "--input"];
+/** The surfaces a focused control sits on, including a row under the pointer. */
+const GROUNDS = ["--background", "--card", "--muted", "--surface-2", "--input", "--surface-hover"];
 
 const SOLID = /focus-visible:outline-ring\b/.test(FOCUS) && !/focus-visible:outline-hidden/.test(FOCUS);
 
@@ -159,6 +160,34 @@ describe("the keyboard focus ring", () => {
       expect(p["--ring-width"], "high contrast sets a thicker ring").toBe("3px");
     },
   );
+
+  it.each(TINTS)("dark high · %s: hover remains distinct from card and background", (tint) => {
+    const high = palette("dark", tint, "high", "blue");
+    const hover = hslToRgb(high["--surface-hover"]);
+    const standard = palette("dark", tint, "standard", "blue");
+    for (const token of ["--surface-hover", "--card"]) {
+      expect(high[token].split(/\s+/).slice(0, 2), `${token} keeps its tint hue and saturation`).toEqual(
+        standard[token].split(/\s+/).slice(0, 2),
+      );
+    }
+    expect(luminance(hover), "high contrast darkens hover").toBeLessThan(
+      luminance(hslToRgb(standard["--surface-hover"])),
+    );
+    expect(luminance(hslToRgb(high["--card"])), "high contrast darkens the card").toBeLessThan(
+      luminance(hslToRgb(standard["--card"])),
+    );
+    for (const ground of ["--card", "--background"]) {
+      const floor = Math.min(...TINTS.flatMap((baseTint) => {
+        const standard = palette("dark", baseTint, "standard", "blue");
+        return ["--card", "--background"].map((surface) =>
+          ratio(hslToRgb(standard["--surface-hover"]), hslToRgb(standard[surface])),
+        );
+      }));
+      const actual = ratio(hover, hslToRgb(high[ground]));
+      expect(luminance(hover), `hover must be lighter than ${ground}`).toBeGreaterThan(luminance(hslToRgb(high[ground])));
+      expect(actual, `hover on ${ground} is ${actual.toFixed(3)}:1, standard floor ${floor.toFixed(3)}:1`).toBeGreaterThanOrEqual(floor);
+    }
+  });
 
   it("keeps the standard ring at 2px", () => {
     expect(base("dark")["--ring-width"]).toBe("2px");
