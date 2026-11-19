@@ -18,12 +18,12 @@ For the extension's capability, permission, and privacy details, see [the securi
 
 ## Versioning
 
-The manifest version is `0.92.0` for the corresponding Chimera release. Update it to the package's version in the same release when the package version changes; the Chrome Web Store package must ship with that release.
+The manifest version is `0.93.0` for the corresponding Chimera release. Update it to the package's version in the same release when the package version changes; the Chrome Web Store package must ship with that release.
 
 Site access is optional and must be granted explicitly. The Stop button detaches the debugger, closes tabs in the Chimera-owned group and keeps the extension disconnected until you press Start. Cancel on Chrome's debugging bar is held the same way until you press Resume in the popup. Every top-level navigation of a Chimera tab (the first request, each redirect, back, a clicked link, a script) is checked against the sites you allowed before the request is sent; a hop to a site that is not allowed is stopped and the popup offers Allow for it. Known limit: a popup opened by the page (`window.open`, `target=_blank`) cannot be paused by an extension, so its first request is not covered; see docs/chrome-extension.md. Unpairing removes the pairing key; it does not automatically revoke optional site permissions, which can be removed in Chrome's extension settings.
 
 ## Store package
 
-Regenerate the extension icons from the desktop source with `python scripts/generate_chrome_extension_icons.py` (requires Pillow), then run `python scripts/package_chrome_extension.py`. The deterministic package is written to `dist/chimera-chrome-extension-0.92.0.zip`. When the Chimera package version changes, update `manifest.json` and this README together. The ZIP contains only the manifest, runtime scripts, popup (HTML, CSS and script) and icons.
+Regenerate the extension icons from the desktop source with `python scripts/generate_chrome_extension_icons.py` (requires Pillow), then run `python scripts/package_chrome_extension.py`. The deterministic package is written to `dist/chimera-chrome-extension-0.93.0.zip`. When the Chimera package version changes, update `manifest.json` and this README together. The ZIP contains only the manifest, runtime scripts, popup (HTML, CSS and script) and icons.
 
 No package is uploaded or published by these scripts.
