@@ -93,6 +93,12 @@ function palette(theme: Theme, tint: Tint, contrast: Contrast, accent: Accent): 
     ...base(theme),
     ...(tint === "navy" ? {} : optionBlock(theme, "tint", tint)),
     ...(contrast === "standard" ? {} : optionBlock(theme, "contrast", contrast)),
+    ...(contrast === "high" && tint !== "navy"
+      ? BLOCKS.find((b) =>
+          b.selector.startsWith(theme === "light" ? ":root[data-theme='light']" : ":root:not([data-theme='light'])") &&
+          b.selector.includes(`[data-tint='${tint}']`) && b.selector.includes("[data-contrast='high']"),
+        )?.tokens
+      : {}),
     ...(accent === "blue" ? {} : optionBlock(theme, "accent", accent)),
   };
 }
